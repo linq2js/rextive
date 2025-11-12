@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Handle, MutableSignal } from "./types";
+import { Ref, MutableSignal } from "./types";
 import { effectToken, localEffectDispatcher } from "./effectDispatcher";
 import { signal } from "./signal";
 import isEqual from "lodash/isEqual";
@@ -30,7 +30,7 @@ import { signalToken } from "./signalDispatcher";
  *
  * The `blox` function creates a React component that:
  * - Converts each prop into a separate signal for fine-grained reactivity
- * - Provides a handle object for imperative access to component state
+ * - Provides a ref object for imperative access to component state
  * - Collects and manages effects created during builder
  * - Automatically tracks prop access through a proxy
  * - Re-runs effects when tracked props change
@@ -39,13 +39,13 @@ import { signalToken } from "./signalDispatcher";
  * with their own lifecycle and effect management. Each prop becomes a signal,
  * allowing effects to track individual prop changes rather than the entire props object.
  *
- * @param builder - Function that receives props (as a proxy) and a handle object.
+ * @param builder - Function that receives props (as a proxy) and a ref object.
  *                The function can create effects that will be automatically managed.
  * @returns A memoized React component with forwardRef support
  *
  * @example
  * ```tsx
- * // Simple component without handle
+ * // Simple component without ref
  * const Counter = blox<{ count: number }>((props) => {
  *   effect(() => {
  *     console.log('Count changed:', props.count);
@@ -78,18 +78,18 @@ import { signalToken } from "./signalDispatcher";
 export function blox<TProps extends Record<string, unknown>>(
   builder: (props: TProps) => ReactNode
 ): FC<PropsWithoutRef<TProps>>;
-export function blox<TProps extends Record<string, unknown>, THandle>(
-  builder: (props: TProps, handle: Handle<THandle>) => ReactNode
-): FC<PropsWithoutRef<TProps> & { ref?: ForwardedRef<THandle | undefined> }>;
+export function blox<TProps extends Record<string, unknown>, TRef>(
+  builder: (props: TProps, ref: Ref<TRef>) => ReactNode
+): FC<PropsWithoutRef<TProps> & { ref?: ForwardedRef<TRef | undefined> }>;
 export function blox<
-  TProps extends Record<string, unknown> & { ref?: RefObject<THandle> },
-  THandle
->(builder: (props: TProps, handle: Handle<THandle>) => ReactNode) {
+  TProps extends Record<string, unknown> & { ref?: RefObject<TRef> },
+  TRef
+>(builder: (props: TProps, ref: Ref<TRef>) => ReactNode) {
   /**
    * Internal component that manages reactive props and effects.
    *
    * This component:
-   * - Maintains a handle object for imperative access
+   * - Maintains a ref object for imperative access
    * - Converts each prop into a separate signal
    * - Provides a proxy for props that tracks signal dependencies
    * - Collects effects during render and runs them in useLayoutEffect
@@ -97,7 +97,7 @@ export function blox<
    */
   const Block = (
     props: PropsWithoutRef<TProps>,
-    forwardedRef: ForwardedRef<THandle | undefined>
+    forwardedRef: ForwardedRef<TRef | undefined>
   ) => {
     const providerResolver = useProviderResolver();
     const [eventDispatcher] = useState(() => {
@@ -117,29 +117,29 @@ export function blox<
     useUnmount(eventDispatcher.emitUnmount);
 
     /**
-     * State used to trigger re-renders when handle.current changes.
+     * State used to trigger re-renders when ref.current changes.
      * The state value itself is not used, only the setter to trigger updates.
      */
     const rerender = useRerender({ debounce: 0 });
 
     /**
-     * Handle object that provides imperative access to component state.
+     * Ref object that provides imperative access to component state.
      *
-     * The handle:
+     * The ref:
      * - Has a `current` property that can be set/get
      * - Automatically triggers a re-render when `current` is set to a new value
-     * - Is exposed via ref using useImperativeHandle
+     * - Is exposed via forwardedRef using useImperativeHandle
      *
      * Created once per component instance and reused across renders.
      */
-    const [handle] = useState(() => {
-      let value: THandle | undefined;
+    const [ref] = useState(() => {
+      let value: TRef | undefined;
 
       return {
         get current() {
           return value;
         },
-        set current(v: THandle | undefined) {
+        set current(v: TRef | undefined) {
           if (value !== v) {
             value = v;
             if (!rerender.rendering()) {
@@ -151,10 +151,10 @@ export function blox<
     });
 
     /**
-     * Exposes the handle.current value via the forwarded ref.
-     * Updates whenever handle.current changes.
+     * Exposes the ref.current value via the forwarded ref.
+     * Updates whenever ref.current changes.
      */
-    useImperativeHandle(forwardedRef, () => handle.current, [handle.current]);
+    useImperativeHandle(forwardedRef, () => ref.current, [ref.current]);
 
     /**
      * Ref to store the current props for comparison and proxy access.
@@ -293,7 +293,7 @@ export function blox<
           eventToken(eventDispatcher.emitters),
         ],
         () => {
-          return builder(propsProxy as TProps, handle);
+          return builder(propsProxy as TProps, ref);
         }
       );
     });

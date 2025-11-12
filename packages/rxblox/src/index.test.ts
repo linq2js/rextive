@@ -34,5 +34,10 @@ describe("index exports", () => {
     expect(typeof index.on.render).toBe("function");
     expect(typeof index.on.unmount).toBe("function");
   });
+
+  it("should export handle", () => {
+    expect(index.handle).toBeDefined();
+    expect(typeof index.handle).toBe("function");
+  });
 });
 

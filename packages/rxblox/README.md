@@ -298,43 +298,39 @@ const Counter = blox<CounterProps>((props) => {
 
 #### Using React Hooks with `blox`
 
-Since `blox` components only run their definition phase **once**, you can't use React hooks directly in the definition phase. Use `on.render()` to call React hooks during the render phase:
+Since `blox` components only run their definition phase **once**, you can't use React hooks directly in the definition phase. Use the `handle()` utility to capture hook results:
 
 ```tsx
-import { blox, signal, rx, on } from "rxblox";
+import { blox, handle, signal, rx } from "rxblox";
 import { useHistory, useEffect, useState } from "react";
 
 const Counter = blox<Props>((props) => {
   // 🔵 Definition phase - runs ONCE
   const count = signal(0);
 
-  // Define variables to hold hook results
-  let history: ReturnType<typeof useHistory> | undefined;
-  let localState: number | undefined;
-
-  // ✅ CORRECT: Use on.render() to call React hooks
-  on.render(() => {
-    // Now we're in React's render phase - hooks work here!
-    history = useHistory();
-    [localState] = useState(0);
-
-    useEffect(() => {
-      // Note: No signal tracking in on.render() - count() won't create dependencies
-      console.log("React effect", count());
-    }, []);
+  // ✅ CORRECT: Use handle() to capture React hooks
+  const router = handle(() => {
+    const history = useHistory();
+    const location = useLocation();
+    return { history, location };
   });
 
   // ❌ WRONG: Can't use hooks directly in definition phase
   // const history = useHistory(); // Error: hooks called outside render!
 
   const handleNavigate = () => {
-    history?.push("/next");
+    // Access hook results in event handlers
+    router.current?.history.push("/next");
   };
 
   return (
     <div>
+      {/* Access hook results in rx() expressions */}
       {rx(() => (
-        <div>Count: {count()}</div>
+        <div>
+          <div>Count: {count()}</div>
+          <div>Path: {router.current?.location.pathname}</div>
+        </div>
       ))}
       <button onClick={handleNavigate}>Navigate</button>
       <button onClick={() => count.set(count() + 1)}>+</button>
@@ -345,12 +341,14 @@ const Counter = blox<Props>((props) => {
 
 **Important Notes:**
 
-- **`on.render()` runs on every render** - The callback executes during React's render phase
-- **No signal tracking** - Signals accessed inside `on.render()` do NOT create reactive dependencies (no tracking context)
-- **Assign to outer variables** - Define variables in the blox scope and assign to them inside `on.render()`
-- **Hooks rules apply** - All React hooks rules apply inside `on.render()`
+- **Use `handle()`** - The recommended way to capture React hook results
+- **Access via `.current`** - Hook results available in `rx()` expressions and event handlers
+- **Undefined in builder phase** - `handle().current` is `undefined` during the definition phase
+- **Runs on every render** - The callback passed to `handle()` executes during React's render phase
 
-**Pattern for exposing hook results:**
+**Alternative: Manual pattern with `on.render()`:**
+
+If you prefer more control, you can manually use `on.render()`:
 
 ```tsx
 const MyComponent = blox(() => {
@@ -371,11 +369,11 @@ const MyComponent = blox(() => {
 });
 ```
 
-**When to use `on.render()`:**
+**When to use hooks in `blox`:**
 
 - ✅ Integrating with React Router hooks (`useHistory`, `useParams`, `useLocation`)
 - ✅ Using custom hooks from third-party libraries
-- ✅ Calling React hooks like `useCallback`, `useMemo`, `useRef` that need to run on every render
+- ✅ Calling React hooks like `useContext` to access React Context
 - ❌ Not needed for rxblox's own `signal`, `effect` - use them directly in definition phase
 
 ### 6. Providers - Dependency Injection
@@ -964,24 +962,24 @@ const MyComponent = blox<{ value: number }>((props) => {
   return <div>{rx(() => local())}</div>;
 });
 
-// With imperative handle
-interface Handle {
+// With imperative ref
+interface CounterRef {
   reset: () => void;
 }
 
-const MyComponent = blox<Props, Handle>((props, handle) => {
+const MyComponent = blox<Props, CounterRef>((props, ref) => {
   const count = signal(0);
 
-  handle.current = {
+  ref.current = {
     reset: () => count.set(0),
   };
 
   return <div>{rx(() => count())}</div>;
 });
 
-const ref = useRef<Handle>();
-<MyComponent ref={ref} />;
-ref.current?.reset();
+const counterRef = useRef<CounterRef>();
+<MyComponent ref={counterRef} />;
+counterRef.current?.reset();
 ```
 
 **Returns:** Memoized React component
@@ -1099,6 +1097,62 @@ const MyComponent = blox(() => {
   return <div>Content</div>;
 });
 ```
+
+### `handle<T>(callback)`
+
+Creates a handle to capture values from React hooks during the render phase.
+
+This is useful in `blox` components where you need to use React hooks, but the component body only runs once. The callback runs on every render via `on.render()`, and the returned value is accessible via `.current`.
+
+**Important**: The captured value is only available inside `rx()` expressions or event handlers, not in the component builder phase (which runs only once).
+
+```tsx
+import { blox, handle, signal, rx } from "rxblox";
+import { useHistory, useLocation } from "react-router";
+
+const MyComponent = blox(() => {
+  const count = signal(0);
+
+  // Capture React hooks
+  const router = handle(() => {
+    const history = useHistory();
+    const location = useLocation();
+    return { history, location };
+  });
+
+  const handleNavigate = () => {
+    // ✅ Available in event handlers
+    router.current?.history.push("/home");
+  };
+
+  return (
+    <div>
+      {/* ✅ Available in rx() expressions */}
+      {rx(() => (
+        <div>Path: {router.current?.location.pathname}</div>
+      ))}
+      <button onClick={handleNavigate}>Go Home</button>
+    </div>
+  );
+});
+```
+
+**Returns:** `Handle<T>` - An object with a `.current` property
+
+**Type:**
+
+```ts
+type Handle<T> = {
+  readonly current: T | undefined;
+};
+```
+
+**Notes:**
+
+- The `callback` runs on every component render
+- The value is `undefined` during the builder phase
+- Must use `rx()` to access the value in JSX
+- Can access directly in event handlers
 
 ## Development
 

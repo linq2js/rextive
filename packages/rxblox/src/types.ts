@@ -118,16 +118,16 @@ export type Effect = {
 };
 
 /**
- * Handle type for component handles in `blox` components.
+ * Ref type for component refs in `blox` components.
  *
- * Handles provide imperative access to component state and methods.
- * They're similar to refs but work with `blox`'s reactive system.
+ * Refs provide imperative access to component state and methods.
+ * They work like React's refs but integrate with `blox`'s reactive system.
  *
- * @template T - The type of value stored in the handle
+ * @template T - The type of value stored in the ref
  */
-export type Handle<T> = {
+export type Ref<T> = {
   /**
-   * The current value of the handle.
+   * The current value of the ref.
    * Can be set to expose methods or state to parent components via ref.
    */
   current: T | undefined;
@@ -148,10 +148,10 @@ export type RxFunction = (exp: () => unknown) => ReactNode;
  * manages effects automatically.
  *
  * @template TProps - The props type for the component
- * @template THandle - The handle type for imperative access (optional)
+ * @template TRef - The ref type for imperative access (optional)
  */
-export type BloxFunction = <TProps extends object = {}, THandle = unknown>(
-  render: (props: Readonly<TProps>, handle: Handle<THandle>) => ReactNode
+export type BloxFunction = <TProps extends object = {}, TRef = unknown>(
+  render: (props: Readonly<TProps>, ref: Ref<TRef>) => ReactNode
 ) => FC<TProps>;
 
 /**
