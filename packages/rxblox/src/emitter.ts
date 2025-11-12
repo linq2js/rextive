@@ -99,6 +99,16 @@ export function emitter<T = void>() {
     clear(): void {
       listeners.length = 0;
     },
+
+    /**
+     * Emits an event to all registered listeners and then clears all listeners.
+     *
+     * @param payload - The value to pass to all listeners
+     */
+    emitAndClear(payload: T): void {
+      this.emit(payload);
+      this.clear();
+    },
   };
 }
 

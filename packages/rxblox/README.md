@@ -174,6 +174,40 @@ function App() {
 
 `blox()` creates reactive components where props become signals and effects are automatically managed.
 
+#### Structure of a `blox` Component
+
+A `blox` component has two distinct parts with different execution behavior:
+
+```tsx
+const Counter = blox<Props>((props, ref) => {
+  // 🔵 DEFINITION PHASE: Runs ONCE on mount
+  // - Create signals
+  // - Set up effects
+  // - Define event handlers
+  // - Register cleanup with on.unmount()
+  const count = signal(0);
+
+  effect(() => {
+    console.log("Count:", count());
+  });
+
+  // 🟢 SHAPE PHASE: Returns static JSX that NEVER re-renders
+  // - Only rx() expressions update
+  // - Event handlers work normally
+  // - No re-execution of this JSX
+  return (
+    <div>
+      {rx(() => count())} {/* Only this updates */}
+      <button onClick={() => count.set(count() + 1)}>+</button>
+    </div>
+  );
+});
+```
+
+**Key Insight**: The component body runs **once**, the returned JSX is **static**. Only `rx()` expressions re-execute when signals change.
+
+#### Complete Example
+
 ```tsx
 import { blox, signal, rx, effect } from "rxblox";
 
@@ -183,6 +217,9 @@ interface CounterProps {
 }
 
 const Counter = blox<CounterProps>((props) => {
+  // Runs once on mount
+  console.log("Component initialized");
+
   // Local state as signal
   const count = signal(props.initialCount);
 
@@ -198,6 +235,7 @@ const Counter = blox<CounterProps>((props) => {
     console.log("Label changed:", props.label);
   });
 
+  // Static JSX - never re-renders
   return (
     <div>
       <h3>{props.label}</h3>
@@ -215,31 +253,93 @@ const Counter = blox<CounterProps>((props) => {
 
 **Key differences from regular React components:**
 
-- Props are accessed as signals - `props.label` tracks the prop as a dependency
-- Effects created inside are automatically cleaned up on unmount
-- Local signals persist across prop changes (only re-initialize on mount)
+- **Definition phase runs once** - The component body executes only on mount, not on every prop change
+- **Shape is static** - The returned JSX structure never re-renders
+- **Props are signals** - `props.label` tracks the prop as a dependency when accessed
+- **Only `rx()` updates** - Reactive expressions re-execute when dependencies change
+- **Effects auto-cleanup** - Effects created inside are automatically cleaned up on unmount
+- **Local signals persist** - Signals keep their state across prop changes
+
+#### Using React Hooks with `blox`
+
+Since `blox` components only run their definition phase **once**, you can't use React hooks directly in the definition phase. Use `on.render()` to call React hooks during the render phase:
+
+```tsx
+import { blox, signal, rx, on } from "rxblox";
+import { useHistory, useEffect, useState } from "react";
+
+const Counter = blox<Props>((props) => {
+  // 🔵 Definition phase - runs ONCE
+  const count = signal(0);
+
+  // ✅ CORRECT: Use on.render() to call React hooks
+  on.render(() => {
+    // Now we're in React's render phase - hooks work here!
+    const history = useHistory();
+    const [localState, setLocalState] = useState(0);
+
+    useEffect(() => {
+      console.log("React effect", count.peek());
+      // Use peek() to avoid tracking signals as dependencies
+    }, []);
+
+    const handleNavigate = () => {
+      history.push("/next");
+    };
+
+    return { handleNavigate, localState };
+  });
+
+  // ❌ WRONG: Can't use hooks directly in definition phase
+  // const history = useHistory(); // Error: hooks called outside render!
+
+  return (
+    <div>
+      {rx(() => (
+        <div>Count: {count()}</div>
+      ))}
+      <button onClick={() => count.set(count() + 1)}>+</button>
+    </div>
+  );
+});
+```
+
+**Important Notes:**
+
+- **`on.render()` runs on every render** - The callback executes during React's render phase
+- **Use `signal.peek()`** - Inside `on.render()`, use `peek()` to read signals without creating dependencies
+- **Return values are available** - You can return values from `on.render()` for use in event handlers
+- **Hooks rules apply** - All React hooks rules apply inside `on.render()`
+
+**When to use `on.render()`:**
+
+- ✅ Integrating with React Router hooks (`useHistory`, `useParams`, `useLocation`)
+- ✅ Using custom hooks from third-party libraries
+- ✅ Calling React hooks like `useCallback`, `useMemo`, `useRef` that need to run on every render
+- ❌ Not needed for rxblox's own `signal`, `effect` - use them directly in definition phase
 
 ### 6. Providers - Dependency Injection
 
 Providers inject values down the component tree without causing re-renders like React Context.
 
 ```tsx
-import { provider, blox, rx, useState } from "rxblox";
+import { useState } from "react";
+import { provider, blox, rx } from "rxblox";
 
-// Create provider (returns [useValue, Provider])
-const [useTheme, ThemeProvider] = provider(
+// Create provider (returns [consume, Provider])
+const [consumeTheme, ThemeProvider] = provider(
   "theme",
   "light" as "light" | "dark"
 );
 
 // Consumer component
 const ThemeDisplay = blox(() => {
-  const theme = useTheme(); // Returns Signal<"light" | "dark"> (read-only)
+  const theme = consumeTheme(); // Returns Signal<"light" | "dark"> (read-only)
 
-  // ✅ Can read the value
-  // ❌ Cannot set: theme.set("dark") would be a TypeScript error
+  // ⚠️ Component itself won't re-render when theme changes!
+  // Only rx() or effect() will react to changes
 
-  // Only this rx() updates when theme changes
+  // ✅ Correct: Use rx() to make it reactive
   return rx(() => (
     <div
       style={{
@@ -250,6 +350,9 @@ const ThemeDisplay = blox(() => {
       Current theme: {theme()}
     </div>
   ));
+
+  // ❌ Wrong: Component won't update
+  // return <div>{theme()}</div>;
 });
 
 function App() {
@@ -268,10 +371,14 @@ function App() {
 }
 ```
 
-**Important Notes:**
+**⚠️ Critical Differences from React Context:**
 
-- **Read-only for consumers**: `useTheme()` returns `Signal<T>` (read-only), not `MutableSignal<T>`. Consumers can only read values, not update them. Only the parent component providing the value can change it.
-- **Selective reactivity**: Unlike React Context, the component itself doesn't re-render when provider value changes. Only `rx()` expressions or `effect()` calls that access the value will react.
+1. **No automatic re-renders**: The component using `consume()` does NOT re-render when the provider value changes
+2. **Only `rx()` and `effect()` react**: You must explicitly wrap reactive code
+3. **Returns signals**: `consumeTheme()` returns a signal, not the raw value
+4. **Read-only for consumers**: Consumers get `Signal<T>` (without `.set()` or `.reset()`), only the Provider can change the value
+
+Think of providers as **dependency injection for signals**, not React Context.
 
 ## API Reference
 
@@ -379,37 +486,97 @@ ref.current?.reset();
 
 ### `provider<T>(name, initialValue, options?)`
 
-Creates a provider for dependency injection.
+Creates a provider for dependency injection of reactive signals.
+
+**⚠️ This is NOT React Context!** Providers don't cause re-renders. Only `rx()` and `effect()` react to changes.
 
 ```tsx
-const [useValue, Provider] = provider("myValue", 0);
+const [consumeValue, ValueProvider] = provider("myValue", 0);
 
 // In parent
-<Provider value={currentValue}>
+<ValueProvider value={currentValue}>
   <Child />
-</Provider>;
+</ValueProvider>;
 
 // In child (inside blox component)
-const MyChild = blox(() => {
-  const value = useValue(); // Returns Signal<T> (read-only, no .set() or .reset())
+const Child = blox(() => {
+  const value = consumeValue(); // Returns Signal<T> (read-only)
 
-  // ✅ Can read the value
+  // ❌ Wrong: Won't update
+  return <div>{value()}</div>;
+
+  // ✅ Correct: Use rx()
   return rx(() => <div>{value()}</div>);
-
-  // ❌ Cannot mutate (TypeScript error)
-  // value.set(newValue); // Error: Property 'set' does not exist
 });
 ```
 
-**Returns:** Tuple of `[useValue, ProviderComponent]`
+**Returns:** `[consume, Provider]` tuple:
 
-### `unmount(callback)`
+- `consume()` - Function that returns the signal (must be called inside provider tree)
+- `Provider` - React component with `{ value: T; children: ReactNode }` props
 
-Register cleanup callback that runs on component unmount (inside `blox` only).
+**Options:**
+
+- `equals?: (a: T, b: T) => boolean` - Custom equality function
+
+### `on` - Lifecycle Events
+
+Namespace for lifecycle event hooks in `blox` components.
+
+#### `on.render(callback)`
+
+Execute code during React's render phase, enabling React hooks usage.
 
 ```tsx
 const MyComponent = blox(() => {
-  unmount(() => {
+  const count = signal(0);
+
+  // Call React hooks inside on.render()
+  on.render(() => {
+    const history = useHistory();
+    const location = useLocation();
+
+    useEffect(() => {
+      // Use peek() to avoid tracking
+      console.log("Count:", count.peek());
+    }, []);
+
+    return { history, location };
+  });
+
+  return rx(() => <div>{count()}</div>);
+});
+```
+
+**When to use:**
+
+- Integrating with React Router or other hook-based libraries
+- Using third-party custom hooks
+- Accessing React context via `useContext`
+
+**Important:** Use `signal.peek()` inside `on.render()` to read signals without tracking them as dependencies.
+
+#### `on.mount(callback)`
+
+Execute code immediately after component mounts.
+
+```tsx
+const MyComponent = blox(() => {
+  on.mount(() => {
+    console.log("Component mounted");
+  });
+
+  return <div>Content</div>;
+});
+```
+
+#### `on.unmount(callback)`
+
+Register cleanup callback that runs on component unmount.
+
+```tsx
+const MyComponent = blox(() => {
+  on.unmount(() => {
     console.log("Cleanup on unmount");
   });
 
@@ -419,12 +586,12 @@ const MyComponent = blox(() => {
 
 ## Composable Logic with `blox`
 
-One of the most powerful features of `blox` is the ability to extract and reuse reactive logic. Since signals, effects, and `unmount` can be used anywhere (not just in React components), you can create composable logic functions.
+One of the most powerful features of `blox` is the ability to extract and reuse reactive logic. Since signals, effects, and `on.unmount` can be used anywhere (not just in React components), you can create composable logic functions.
 
 ### Basic Composable Logic
 
 ```tsx
-import { signal, effect, unmount, blox } from "rxblox";
+import { signal, effect, on, blox } from "rxblox";
 
 // Reusable logic function
 function useCounter(initialValue = 0) {
@@ -478,7 +645,7 @@ const Counter2 = blox(() => {
 
 ### Logic with Cleanup
 
-Use `unmount()` to register cleanup callbacks that run when the component unmounts:
+Use `on.unmount()` to register cleanup callbacks that run when the component unmounts:
 
 ```tsx
 function useWebSocket(url: string) {
@@ -494,7 +661,7 @@ function useWebSocket(url: string) {
   };
 
   // Register cleanup - ws will be closed when component unmounts
-  unmount(() => {
+  on.unmount(() => {
     ws.close();
   });
 
@@ -535,7 +702,7 @@ const Chat = blox<{ roomId: string }>((props) => {
 
 ### Multiple Subscriptions with Cleanup
 
-You can register multiple cleanup callbacks using `unmount()`:
+You can register multiple cleanup callbacks using `on.unmount()`:
 
 ```tsx
 function useMultipleSubscriptions() {
@@ -545,7 +712,7 @@ function useMultipleSubscriptions() {
 
   // Subscribe to external signal and cleanup on unmount
   const externalSignal = globalStore.someSignal;
-  unmount(
+  on.unmount(
     externalSignal.on((value) => {
       s1.set(value);
     })
@@ -553,14 +720,14 @@ function useMultipleSubscriptions() {
 
   // Subscribe to another signal
   const anotherSignal = globalStore.anotherSignal;
-  unmount(
+  on.unmount(
     anotherSignal.on((value) => {
       s2.set(value);
     })
   );
 
   // You can also register non-subscription cleanup
-  unmount(() => {
+  on.unmount(() => {
     console.log("Component unmounted, cleaning up");
   });
 
@@ -681,14 +848,14 @@ const LoginForm = blox(() => {
 2. **Testability** - Logic functions can be tested independently
 3. **Separation of concerns** - Keep business logic separate from UI
 4. **No hooks rules** - Call these functions anywhere, in any order
-5. **Automatic cleanup** - `unmount()` ensures resources are freed
+5. **Automatic cleanup** - `on.unmount()` ensures resources are freed
 6. **Type safety** - Full TypeScript support for logic composition
 
 ### Tips for Composable Logic
 
 - **Start with `use` prefix** - Convention to indicate it's a logic function (not a React hook)
 - **Return an object** - Makes it easy to destructure what you need
-- **Use `unmount()` for cleanup** - Subscriptions, timers, event listeners, etc.
+- **Use `on.unmount()` for cleanup** - Subscriptions, timers, event listeners, etc.
 - **Keep signals private if needed** - Return only what consumers need
 - **Combine multiple logic functions** - Compose small pieces into larger ones
 
@@ -700,7 +867,7 @@ function useTimer(interval = 1000) {
     elapsed.set((prev) => prev + interval);
   }, interval);
 
-  unmount(() => clearInterval(timer));
+  on.unmount(() => clearInterval(timer));
 
   return { elapsed };
 }

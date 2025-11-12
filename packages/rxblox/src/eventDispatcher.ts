@@ -50,12 +50,12 @@ function onEvent(type: keyof EventDispatcher, callbacks: VoidFunction[]) {
  * @example
  * ```tsx
  * const MyComponent = blox(() => {
- *   onUnmount(() => console.log("Unmounting"));
+ *   on.unmount(() => console.log("Unmounting"));
  *   return <div>Content</div>;
  * });
  * ```
  */
-export function onUnmount(...callbacks: VoidFunction[]) {
+function unmount(...callbacks: VoidFunction[]) {
   onEvent("unmount", callbacks);
 }
 
@@ -66,19 +66,71 @@ export function onUnmount(...callbacks: VoidFunction[]) {
  *
  * @param callbacks - Functions to call on component mount
  * @throws {Error} If called outside a blox component context
+ *
+ * @example
+ * ```tsx
+ * const MyComponent = blox(() => {
+ *   on.mount(() => console.log("Mounted"));
+ *   return <div>Content</div>;
+ * });
+ * ```
  */
-export function onMount(...callbacks: VoidFunction[]) {
+function mount(...callbacks: VoidFunction[]) {
   onEvent("mount", callbacks);
 }
 
 /**
  * Registers callbacks to run on each render.
  *
- * Must be called inside a `blox` component.
+ * Must be called inside a `blox` component during the definition phase.
+ * The callback executes during React's render phase, enabling React hooks usage.
  *
  * @param callbacks - Functions to call on each render
  * @throws {Error} If called outside a blox component context
+ *
+ * @example
+ * ```tsx
+ * const MyComponent = blox(() => {
+ *   on.render(() => {
+ *     const history = useHistory();
+ *     return { history };
+ *   });
+ *   return <div>Content</div>;
+ * });
+ * ```
  */
-export function onRender(...callbacks: VoidFunction[]) {
+function render(...callbacks: VoidFunction[]) {
   onEvent("render", callbacks);
 }
+
+/**
+ * Lifecycle event namespace for blox components.
+ *
+ * Provides lifecycle hooks for blox components:
+ * - `on.mount()` - Called when component mounts
+ * - `on.render()` - Called on each render (use for React hooks)
+ * - `on.unmount()` - Called when component unmounts
+ *
+ * @example
+ * ```tsx
+ * import { blox, on } from "rxblox";
+ *
+ * const MyComponent = blox(() => {
+ *   on.mount(() => console.log("Mounted"));
+ *
+ *   on.render(() => {
+ *     const history = useHistory(); // React hooks work here
+ *     return { history };
+ *   });
+ *
+ *   on.unmount(() => console.log("Cleanup"));
+ *
+ *   return <div>Content</div>;
+ * });
+ * ```
+ */
+export const on = {
+  mount,
+  render,
+  unmount,
+} as const;

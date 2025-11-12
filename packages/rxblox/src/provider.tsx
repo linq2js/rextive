@@ -154,28 +154,37 @@ export type ProviderOptions<T> = {
  *
  * @example
  * ```tsx
- * const [useCount, CountProvider] = provider("count", 0);
+ * // Create a provider for theme
+ * const [consumeTheme, ThemeProvider] = provider("theme", "light" as "light" | "dark");
  *
- * // Parent provides the value
- * const Parent = blox<{ count: number }>((props) => {
+ * // Provider component supplies the value
+ * const App = blox<{ theme: "light" | "dark" }>((props) => {
  *   return (
- *     <CountProvider value={props.count}>
- *       <Child />
- *     </CountProvider>
+ *     <ThemeProvider value={props.theme}>
+ *       <ChildComponent />
+ *     </ThemeProvider>
  *   );
  * });
  *
- * // Child consumes the signal - but won't re-render automatically
- * const Child = blox(() => {
- *   const count = useCount();
- *   // This component won't re-render when count changes
- *   return <div>Static content</div>;
+ * // ❌ WRONG: Component won't re-render when theme changes
+ * const ChildComponent = blox(() => {
+ *   const theme = consumeTheme();
+ *   return <div>Theme: {theme()}</div>; // Static, won't update!
  * });
  *
- * // Only rx() expressions react to provider changes
- * const ReactiveChild = blox(() => {
- *   const count = useCount();
- *   return <div>{rx(() => `Count: ${count()}`)}</div>; // This WILL update
+ * // ✅ CORRECT: Use rx() to make it reactive
+ * const ChildComponent = blox(() => {
+ *   const theme = consumeTheme();
+ *   return <div>{rx(() => `Theme: ${theme()}`)}</div>; // Updates!
+ * });
+ *
+ * // ✅ CORRECT: Use effect() for side effects
+ * const ChildComponent = blox(() => {
+ *   const theme = consumeTheme();
+ *   effect(() => {
+ *     console.log("Theme changed:", theme()); // Runs when theme changes
+ *   });
+ *   return <div>Check console</div>;
  * });
  * ```
  *
@@ -193,26 +202,26 @@ export function provider<T>(
   };
 
   /**
-   * Returns a signal that provides access to the current provider value.
+   * Consumes the provider's signal within a component.
    *
-   * When called within a provider context, returns a signal connected to that provider's value.
-   * When called outside any provider context, throws an error.
+   * Must be called inside a `blox` component within the provider's tree.
+   * Returns a **read-only signal** - use `signal()` to get the value.
    *
-   * **Important**: The returned signal is read-only. To react to provider value changes,
-   * you must use `rx()` or `effect()` to consume the signal. Simply calling `use()` does
-   * not make the component reactive - only `rx()` expressions or `effect()` callbacks that
-   * access the signal will react to changes.
+   * **⚠️ Critical: The component itself will NOT re-render when the value changes!**
+   * Only `rx()` expressions or `effect()` callbacks that access the signal will react.
    *
-   * @returns A read-only signal containing the current provider value
-   * @throws Error if called outside a provider context
+   * @returns A read-only Signal<T> (without .set() or .reset())
+   * @throws Error if called outside the provider's component tree
    *
    * @example
    * ```tsx
-   * const count = countProvider.use();
-   * // Component won't re-render when provider value changes
+   * const theme = consumeTheme();
    *
-   * // Only rx() or effect() make it reactive:
-   * return <div>{rx(() => count())}</div>; // This WILL update
+   * // ❌ Won't update: theme() called outside rx()
+   * return <div>{theme()}</div>;
+   *
+   * // ✅ Will update: theme() called inside rx()
+   * return <div>{rx(() => theme())}</div>;
    * ```
    */
   const consume = () => {

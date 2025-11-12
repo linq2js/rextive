@@ -6,7 +6,7 @@ import {
   globalEffectDispatcher,
   effectToken,
 } from "./effectDispatcher";
-import { withDispatchers, getDispatcher } from "./dispatcher";
+import { withDispatchers } from "./dispatcher";
 
 describe("effect", () => {
   beforeEach(() => {

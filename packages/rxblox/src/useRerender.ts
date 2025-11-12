@@ -1,53 +1,90 @@
 import { debounce } from "lodash";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 export type RerenderOptions = {
   debounce?: number;
 };
 
-export function useRerender<TData>(options: RerenderOptions = {}) {
+export type RerenderFunction<TData = void> = {
+  (data?: TData): void;
+  data?: TData;
+  rendering: () => boolean;
+  cancel: () => void;
+  flush: () => void;
+  immediate: (data?: TData) => void;
+};
+
+/**
+ * Hook for managing component re-renders with optional debouncing and data passing.
+ * Returns a stable function reference that only changes when dependencies change.
+ *
+ * @template TData - Type of data to pass with re-render
+ * @param options - Configuration options
+ * @param options.debounce - Debounce delay in milliseconds (0 = microtask queue)
+ * @returns Stable rerender function with cancel, flush, immediate, data, and rendering properties
+ *
+ * @example
+ * ```tsx
+ * const rerender = useRerender<number>({ debounce: 100 });
+ * rerender(42); // Debounced re-render with data
+ * rerender.immediate(42); // Immediate re-render
+ * rerender.cancel(); // Cancel pending debounced re-render
+ * console.log(rerender.data); // Access last re-render data
+ * console.log(rerender.rendering()); // Check if currently rendering
+ * ```
+ */
+export function useRerender<TData = void>(
+  options: RerenderOptions = {}
+): RerenderFunction<TData> {
   const [rerenderData, originalRerender] = useState<{ data?: TData }>({});
   const rerenderWrapper = useCallback(
     (data?: TData) => originalRerender({ data }),
     [originalRerender]
   );
+  const isRenderingRef = useRef(false);
 
-  const rerender = useMemo(() => {
+  const debounced = useMemo(() => {
     if (typeof options.debounce === "number") {
-      const debounced = debounce(rerenderWrapper, options.debounce);
-      // Capture original cancel and flush before assigning properties
-      const originalCancel = debounced.cancel.bind(debounced);
-      const originalFlush = debounced.flush.bind(debounced);
-
-      // Expose cancel function for debounced rerender
-      const cancel = () => {
-        if (typeof options.debounce === "number") {
-          originalCancel();
-        }
+      const d = debounce(rerenderWrapper, options.debounce);
+      return {
+        call: d,
+        cancel: d.cancel.bind(d),
+        flush: d.flush.bind(d),
       };
-
-      // Expose flush function to immediately execute pending debounced calls
-      const flush = () => {
-        if (typeof options.debounce === "number") {
-          originalFlush();
-        }
-      };
-
-      return Object.assign(debounced, {
-        data: rerenderData.data,
-        cancel,
-        flush,
-        immediate: rerenderWrapper,
-      });
     }
-    // For non-debounced case, just return wrapper with properties
-    return Object.assign(rerenderWrapper, {
-      data: rerenderData.data,
-      cancel: () => {}, // No-op for non-debounced
-      flush: () => {}, // No-op for non-debounced
+
+    return {
+      call: rerenderWrapper,
+      cancel: () => {},
+      flush: () => {},
+    };
+  }, [rerenderWrapper, options.debounce]);
+  const debouncedRef = useRef(debounced);
+  debouncedRef.current = debounced;
+
+  // Only recreate the function when rerenderWrapper changes (stable)
+  const rerender = useMemo(() => {
+    return Object.assign((data?: TData) => debouncedRef.current.call(data!), {
+      cancel() {
+        debouncedRef.current.cancel();
+      },
+      flush() {
+        debouncedRef.current.flush();
+      },
+      rendering: () => isRenderingRef.current,
       immediate: rerenderWrapper,
     });
-  }, [rerenderWrapper, options.debounce, rerenderData.data]);
+  }, [rerenderWrapper]);
 
-  return rerender;
+  // Track rendering state: set to true during render, false after paint
+  useLayoutEffect(() => {
+    isRenderingRef.current = true;
+    return () => {
+      isRenderingRef.current = false;
+    };
+  });
+
+  return Object.assign(rerender, {
+    data: rerenderData.data,
+  });
 }

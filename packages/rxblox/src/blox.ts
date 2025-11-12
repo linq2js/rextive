@@ -13,10 +13,7 @@ import {
   useState,
 } from "react";
 import { Handle, MutableSignal } from "./types";
-import {
-  effectToken,
-  localEffectDispatcher,
-} from "./effectDispatcher";
+import { effectToken, localEffectDispatcher } from "./effectDispatcher";
 import { signal } from "./signal";
 import isEqual from "lodash/isEqual";
 import { providerToken, useProviderResolver } from "./provider";
@@ -100,7 +97,7 @@ export function blox<
    */
   const Block = (
     props: PropsWithoutRef<TProps>,
-    ref: ForwardedRef<THandle | undefined>
+    forwardedRef: ForwardedRef<THandle | undefined>
   ) => {
     const providerResolver = useProviderResolver();
     const [eventDispatcher] = useState(() => {
@@ -112,8 +109,8 @@ export function blox<
       return {
         emitters,
         emitRender: emitters.render.emit,
-        emitMount: once(emitters.mount.emit),
-        emitUnmount: once(emitters.unmount.emit),
+        emitMount: once(() => emitters.mount.emitAndClear()),
+        emitUnmount: once(() => emitters.unmount.emitAndClear()),
       };
     });
 
@@ -145,7 +142,9 @@ export function blox<
         set current(v: THandle | undefined) {
           if (value !== v) {
             value = v;
-            rerender();
+            if (!rerender.rendering()) {
+              rerender();
+            }
           }
         },
       };
@@ -155,7 +154,7 @@ export function blox<
      * Exposes the handle.current value via the forwarded ref.
      * Updates whenever handle.current changes.
      */
-    useImperativeHandle(ref, () => handle.current, [handle.current]);
+    useImperativeHandle(forwardedRef, () => handle.current, [handle.current]);
 
     /**
      * Ref to store the current props for comparison and proxy access.

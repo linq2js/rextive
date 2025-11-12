@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import { act, createRef } from "react";
 import { blox } from "./blox";
-import { onUnmount } from "./eventDispatcher";
+import { on } from "./eventDispatcher";
 import { signal } from "./signal";
 import { effect } from "./effect";
 import { Handle } from "./types";
@@ -264,7 +264,7 @@ describe("blox", () => {
   describe("unmount function", () => {
     it("should throw error when called outside blox component", () => {
       expect(() => {
-        onUnmount(() => {});
+        on.unmount(() => {});
       }).toThrow("Event dispatcher not found");
     });
 
@@ -272,7 +272,7 @@ describe("blox", () => {
       const callback = vi.fn();
 
       const Component = blox(() => {
-        onUnmount(callback);
+        on.unmount(callback);
         return <div>Test</div>;
       });
 
@@ -294,9 +294,9 @@ describe("blox", () => {
       const callback3 = vi.fn();
 
       const Component = blox(() => {
-        onUnmount(callback1);
-        onUnmount(callback2);
-        onUnmount(callback3);
+        on.unmount(callback1);
+        on.unmount(callback2);
+        on.unmount(callback3);
         return <div>Test</div>;
       });
 
@@ -321,8 +321,8 @@ describe("blox", () => {
         .mockImplementation(() => {});
 
       const Component = blox(() => {
-        onUnmount(errorCallback);
-        onUnmount(normalCallback);
+        on.unmount(errorCallback);
+        on.unmount(normalCallback);
         return <div>Test</div>;
       });
 

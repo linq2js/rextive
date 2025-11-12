@@ -3,8 +3,6 @@ import {
   dispatcherToken,
   getDispatcher,
   withDispatchers,
-  type DispatcherToken,
-  type DispatcherEntry,
 } from "./dispatcher";
 
 describe("dispatcher", () => {
