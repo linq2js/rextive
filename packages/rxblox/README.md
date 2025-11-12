@@ -308,32 +308,35 @@ const Counter = blox<Props>((props) => {
   // 🔵 Definition phase - runs ONCE
   const count = signal(0);
 
+  // Define variables to hold hook results
+  let history: ReturnType<typeof useHistory> | undefined;
+  let localState: number | undefined;
+
   // ✅ CORRECT: Use on.render() to call React hooks
   on.render(() => {
     // Now we're in React's render phase - hooks work here!
-    const history = useHistory();
-    const [localState, setLocalState] = useState(0);
+    history = useHistory();
+    [localState] = useState(0);
 
     useEffect(() => {
-      console.log("React effect", count.peek());
-      // Use peek() to avoid tracking signals as dependencies
+      // Note: No signal tracking in on.render() - count() won't create dependencies
+      console.log("React effect", count());
     }, []);
-
-    const handleNavigate = () => {
-      history.push("/next");
-    };
-
-    return { handleNavigate, localState };
   });
 
   // ❌ WRONG: Can't use hooks directly in definition phase
   // const history = useHistory(); // Error: hooks called outside render!
+
+  const handleNavigate = () => {
+    history?.push("/next");
+  };
 
   return (
     <div>
       {rx(() => (
         <div>Count: {count()}</div>
       ))}
+      <button onClick={handleNavigate}>Navigate</button>
       <button onClick={() => count.set(count() + 1)}>+</button>
     </div>
   );
@@ -343,9 +346,30 @@ const Counter = blox<Props>((props) => {
 **Important Notes:**
 
 - **`on.render()` runs on every render** - The callback executes during React's render phase
-- **Use `signal.peek()`** - Inside `on.render()`, use `peek()` to read signals without creating dependencies
-- **Return values are available** - You can return values from `on.render()` for use in event handlers
+- **No signal tracking** - Signals accessed inside `on.render()` do NOT create reactive dependencies (no tracking context)
+- **Assign to outer variables** - Define variables in the blox scope and assign to them inside `on.render()`
 - **Hooks rules apply** - All React hooks rules apply inside `on.render()`
+
+**Pattern for exposing hook results:**
+
+```tsx
+const MyComponent = blox(() => {
+  // Define variable in blox scope
+  let someHookResult: SomeType | undefined;
+
+  on.render(() => {
+    // Assign hook result to outer variable
+    someHookResult = useSomeHook();
+  });
+
+  // Now you can use someHookResult in event handlers
+  const handleClick = () => {
+    console.log(someHookResult);
+  };
+
+  return <button onClick={handleClick}>Click</button>;
+});
+```
 
 **When to use `on.render()`:**
 
@@ -1009,20 +1033,34 @@ Execute code during React's render phase, enabling React hooks usage.
 const MyComponent = blox(() => {
   const count = signal(0);
 
+  // Define variables to hold hook results
+  let history: ReturnType<typeof useHistory> | undefined;
+  let location: ReturnType<typeof useLocation> | undefined;
+
   // Call React hooks inside on.render()
   on.render(() => {
-    const history = useHistory();
-    const location = useLocation();
+    history = useHistory();
+    location = useLocation();
 
     useEffect(() => {
-      // Use peek() to avoid tracking
-      console.log("Count:", count.peek());
+      // Note: No signal tracking in on.render() context
+      console.log("Count:", count());
     }, []);
-
-    return { history, location };
   });
 
-  return rx(() => <div>{count()}</div>);
+  // Use hook results in event handlers
+  const handleNavigate = () => {
+    history?.push("/home");
+  };
+
+  return (
+    <div>
+      {rx(() => (
+        <div>{count()}</div>
+      ))}
+      <button onClick={handleNavigate}>Go Home</button>
+    </div>
+  );
 });
 ```
 
@@ -1032,7 +1070,7 @@ const MyComponent = blox(() => {
 - Using third-party custom hooks
 - Accessing React context via `useContext`
 
-**Important:** Use `signal.peek()` inside `on.render()` to read signals without tracking them as dependencies.
+**Important:** Signals accessed inside `on.render()` are NOT tracked as dependencies - there is no tracking context in `on.render()`.
 
 #### `on.mount(callback)`
 
