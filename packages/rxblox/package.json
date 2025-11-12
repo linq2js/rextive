@@ -1,0 +1,64 @@
+{
+  "name": "rxblox",
+  "version": "0.1.0",
+  "description": "A reactive state management library",
+  "type": "module",
+  "main": "./dist/rxblox.umd.js",
+  "module": "./dist/rxblox.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/rxblox.js",
+      "require": "./dist/rxblox.umd.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "tsc && vite build",
+    "test": "vitest --no-watch",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage --no-watch",
+    "dry": "npm pack --dry-run",
+    "version:minor": "pnpm version minor",
+    "version:major": "pnpm version major",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "state",
+    "management",
+    "reactive",
+    "react"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  },
+  "dependencies": {
+    "immer": "^10.0.3",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.14.202",
+    "@types/react": "^18.2.45",
+    "@vitejs/plugin-react": "^4.2.1",
+    "react": "^18.2.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
+    "vite-plugin-dts": "^3.6.4",
+    "vitest": "^1.1.0",
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/jest-dom": "^6.1.5",
+    "@vitest/ui": "^1.1.0",
+    "jsdom": "^23.0.1",
+    "@vitest/coverage-v8": "^1.1.0"
+  }
+}
