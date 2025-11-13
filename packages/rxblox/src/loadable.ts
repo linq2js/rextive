@@ -26,17 +26,17 @@ export const LOADABLE_TYPE = Symbol("LOADABLE_TYPE");
  *   [LOADABLE_TYPE]: true,
  *   status: "loading",
  *   promise: fetchUser(1),
- *   data: undefined,
+ *   value: undefined,
  *   error: undefined,
  *   loading: true,
  * };
  * ```
  */
-export type LoadingLoadable<TData> = {
+export type LoadingLoadable<TValue> = {
   [LOADABLE_TYPE]: true;
   status: "loading";
-  promise: PromiseLike<TData>;
-  data: undefined;
+  promise: PromiseLike<TValue>;
+  value: undefined;
   error: undefined;
   loading: true;
 };
@@ -44,10 +44,10 @@ export type LoadingLoadable<TData> = {
 /**
  * Represents a successfully completed async operation.
  *
- * @template TData - The type of the successful result
+ * @template TValue - The type of the successful result
  * @property status - Always "success"
  * @property promise - The resolved promise
- * @property data - The successful result data
+ * @property value - The successful result data
  * @property error - Always undefined (no error)
  * @property loading - Always false
  *
@@ -57,17 +57,17 @@ export type LoadingLoadable<TData> = {
  *   [LOADABLE_TYPE]: true,
  *   status: "success",
  *   promise: Promise.resolve(user),
- *   data: { id: 1, name: "Alice" },
+ *   value: { id: 1, name: "Alice" },
  *   error: undefined,
  *   loading: false,
  * };
  * ```
  */
-export type SuccessLoadable<TData> = {
+export type SuccessLoadable<TValue> = {
   [LOADABLE_TYPE]: true;
   status: "success";
-  promise: PromiseLike<TData>;
-  data: TData;
+  promise: PromiseLike<TValue>;
+  value: TValue;
   error: undefined;
   loading: false;
 };
@@ -77,7 +77,7 @@ export type SuccessLoadable<TData> = {
  *
  * @property status - Always "error"
  * @property promise - The rejected promise
- * @property data - Always undefined (no data)
+ * @property value - Always undefined (no data)
  * @property error - The error that occurred
  * @property loading - Always false
  *
@@ -87,17 +87,17 @@ export type SuccessLoadable<TData> = {
  *   [LOADABLE_TYPE]: true,
  *   status: "error",
  *   promise: Promise.reject(new Error("Failed")),
- *   data: undefined,
+ *   value: undefined,
  *   error: new Error("Failed"),
  *   loading: false,
  * };
  * ```
  */
-export type ErrorLoadable<TData> = {
+export type ErrorLoadable<TValue> = {
   [LOADABLE_TYPE]: true;
   status: "error";
-  promise: PromiseLike<TData>;
-  data: undefined;
+  promise: PromiseLike<TValue>;
+  value: undefined;
   error: unknown;
   loading: false;
 };
@@ -123,7 +123,7 @@ export type ErrorLoadable<TData> = {
  *     case "loading":
  *       return <Spinner />;
  *     case "success":
- *       return <div>{loadable.data}</div>; // TypeScript knows data exists
+ *       return <div>{loadable.value}</div>; // TypeScript knows data exists
  *     case "error":
  *       return <Error error={loadable.error} />; // TypeScript knows error exists
  *   }
@@ -148,17 +148,17 @@ export type Loadable<T> =
  * // { status: "loading", promise: userPromise, data: undefined, error: undefined, loading: true }
  * ```
  */
-export function loadable<TData>(
+export function loadable<TValue>(
   status: "loading",
-  promise: PromiseLike<TData>
-): LoadingLoadable<TData>;
+  promise: PromiseLike<TValue>
+): LoadingLoadable<TValue>;
 
 /**
  * Creates a success loadable with data and the resolved promise.
  *
- * @template TData - The type of the successful result
+ * @template TValue - The type of the successful result
  * @param status - Must be "success"
- * @param data - The successful result data
+ * @param value - The successful result data
  * @param promise - The resolved promise (optional, will create one if not provided)
  * @returns A SuccessLoadable containing the data
  *
@@ -169,11 +169,11 @@ export function loadable<TData>(
  * // { status: "success", promise: Promise.resolve(user), data: user, error: undefined, loading: false }
  * ```
  */
-export function loadable<TData>(
+export function loadable<TValue>(
   status: "success",
-  data: TData,
-  promise?: PromiseLike<TData>
-): SuccessLoadable<TData>;
+  value: TValue,
+  promise?: PromiseLike<TValue>
+): SuccessLoadable<TValue>;
 
 /**
  * Creates an error loadable with error information.
@@ -190,11 +190,11 @@ export function loadable<TData>(
  * // { status: "error", promise: Promise.reject(err), data: undefined, error: err, loading: false }
  * ```
  */
-export function loadable<TData>(
+export function loadable<TValue>(
   status: "error",
   error: unknown,
-  promise?: PromiseLike<TData>
-): ErrorLoadable<TData>;
+  promise?: PromiseLike<TValue>
+): ErrorLoadable<TValue>;
 
 /**
  * Internal implementation of the loadable factory function.
@@ -217,7 +217,7 @@ export function loadable(
       [LOADABLE_TYPE]: true,
       status: "loading",
       promise,
-      data: undefined,
+      value: undefined,
       error: undefined,
       loading: true,
     };
@@ -230,7 +230,7 @@ export function loadable(
       [LOADABLE_TYPE]: true,
       status: "success",
       promise: resolvedPromise,
-      data,
+      value: data,
       error: undefined,
       loading: false,
     };
@@ -247,7 +247,7 @@ export function loadable(
       [LOADABLE_TYPE]: true,
       status: "error",
       promise: rejectedPromise,
-      data: undefined,
+      value: undefined,
       error,
       loading: false,
     };
@@ -277,7 +277,7 @@ export function loadable(
  *       console.log("Loading...");
  *       break;
  *     case "success":
- *       console.log("Data:", value.data);
+ *       console.log("Data:", value.value);
  *       break;
  *     case "error":
  *       console.error("Error:", value.error);

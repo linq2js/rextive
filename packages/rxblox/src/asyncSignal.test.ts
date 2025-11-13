@@ -25,7 +25,7 @@ describe("asyncSignal", () => {
       // After resolution, should be success
       const resolved = asyncSig();
       expect(resolved.status).toBe("success");
-      expect(resolved.data).toBe(42);
+      expect(resolved.value).toBe(42);
       expect(resolved.loading).toBe(false);
     });
 
@@ -47,7 +47,7 @@ describe("asyncSignal", () => {
 
       const loadable = asyncSig();
       expect(loadable.status).toBe("success");
-      expect(loadable.data).toBe(42);
+      expect(loadable.value).toBe(42);
     });
   });
 
@@ -60,7 +60,7 @@ describe("asyncSignal", () => {
 
       const loadable = asyncSig();
       expect(loadable.status).toBe("loading");
-      expect(loadable.data).toBeUndefined();
+      expect(loadable.value).toBeUndefined();
       expect(loadable.error).toBeUndefined();
       expect(loadable.loading).toBe(true);
     });
@@ -80,7 +80,7 @@ describe("asyncSignal", () => {
       // Should be success
       const loadable = asyncSig();
       expect(loadable.status).toBe("success");
-      expect(loadable.data).toEqual({ id: 1, name: "Test" });
+      expect(loadable.value).toEqual({ id: 1, name: "Test" });
       expect(loadable.error).toBeUndefined();
       expect(loadable.loading).toBe(false);
     });
@@ -102,7 +102,7 @@ describe("asyncSignal", () => {
       const loadable = asyncSig();
       expect(loadable.status).toBe("error");
       expect(loadable.error).toBe(testError);
-      expect(loadable.data).toBeUndefined();
+      expect(loadable.value).toBeUndefined();
       expect(loadable.loading).toBe(false);
     });
   });
@@ -124,7 +124,7 @@ describe("asyncSignal", () => {
       // Initial fetch
       expect(user().status).toBe("loading");
       await delay(20);
-      expect(user().data).toEqual({ id: 1, name: "User 1" });
+      expect(user().value).toEqual({ id: 1, name: "User 1" });
       expect(fetchSpy).toHaveBeenCalledTimes(1);
 
       // Change dependency
@@ -133,7 +133,7 @@ describe("asyncSignal", () => {
       // Should trigger re-fetch
       expect(user().status).toBe("loading");
       await delay(20);
-      expect(user().data).toEqual({ id: 2, name: "User 2" });
+      expect(user().value).toEqual({ id: 2, name: "User 2" });
       expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
 
@@ -155,17 +155,17 @@ describe("asyncSignal", () => {
 
       // Wait for initial computation
       await delay(20);
-      expect(result().data).toBe("a-1");
+      expect(result().value).toBe("a-1");
 
       // Change first param
       param1.set("b");
       await delay(20);
-      expect(result().data).toBe("b-1");
+      expect(result().value).toBe("b-1");
 
       // Change second param
       param2.set(2);
       await delay(20);
-      expect(result().data).toBe("b-2");
+      expect(result().value).toBe("b-2");
 
       expect(fetchSpy).toHaveBeenCalledTimes(3);
     });
@@ -285,7 +285,7 @@ describe("asyncSignal", () => {
 
       const loadable = asyncSig();
       expect(loadable.status).toBe("success");
-      expect(loadable.data).toBe("suspended data");
+      expect(loadable.value).toBe("suspended data");
     });
   });
 
@@ -315,7 +315,7 @@ describe("asyncSignal", () => {
       // Access after resolution
       const l3 = asyncSig();
       expect(l3.status).toBe("success");
-      expect(l3.data).toBe("result");
+      expect(l3.value).toBe("result");
 
       // Should still be just 1 computation
       expect(computeCount).toBe(1);
@@ -339,13 +339,13 @@ describe("asyncSignal", () => {
 
       // Initial computation
       await delay(20);
-      expect(doubled().data).toBe(2);
+      expect(doubled().value).toBe(2);
       expect(computeCount).toBe(1);
 
       // Change dependency
       count.set(5);
       await delay(20);
-      expect(doubled().data).toBe(10);
+      expect(doubled().value).toBe(10);
       expect(computeCount).toBe(2);
     });
 
@@ -399,7 +399,7 @@ describe("asyncSignal", () => {
       await delay(50);
 
       // Should have result from last computation
-      expect(data().data).toBe(40);
+      expect(data().value).toBe(40);
     });
   });
 
@@ -430,14 +430,14 @@ describe("asyncSignal", () => {
 
       // Should use cache
       await delay(20);
-      expect(user().data).toEqual({ id: 1, source: "cache" });
+      expect(user().value).toEqual({ id: 1, source: "cache" });
       expect(getCacheSpy).toHaveBeenCalledTimes(1);
       expect(fetchSpy).toHaveBeenCalledTimes(0);
 
       // Switch to API
       useCache.set(false);
       await delay(20);
-      expect(user().data).toEqual({ id: 1, source: "api" });
+      expect(user().value).toEqual({ id: 1, source: "api" });
       expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
@@ -455,7 +455,7 @@ describe("asyncSignal", () => {
           throw new Error("User not loaded");
         }
         await delay(10);
-        return [`Post by ${u.data.name}`];
+        return [`Post by ${u.value.name}`];
       });
 
       // Trigger first access
@@ -471,7 +471,7 @@ describe("asyncSignal", () => {
       // Posts should now load
       await delay(20);
       expect(posts().status).toBe("success");
-      expect(posts().data).toEqual(["Post by User"]);
+      expect(posts().value).toEqual(["Post by User"]);
     });
   });
 
@@ -488,7 +488,7 @@ describe("asyncSignal", () => {
 
       const loadable = asyncSig();
       expect(loadable.status).toBe("success");
-      expect(loadable.data).toBeUndefined();
+      expect(loadable.value).toBeUndefined();
     });
 
     it("should handle null return value", async () => {
@@ -503,7 +503,7 @@ describe("asyncSignal", () => {
 
       const loadable = asyncSig();
       expect(loadable.status).toBe("success");
-      expect(loadable.data).toBeNull();
+      expect(loadable.value).toBeNull();
     });
 
     it("should handle promise that never resolves", () => {
@@ -542,7 +542,7 @@ describe("asyncSignal", () => {
       // Should have executed multiple times
       expect(executionCount).toBeGreaterThan(1);
       // Final result should be the last value
-      expect(data().data).toBe(5);
+      expect(data().value).toBe(5);
     });
   });
 
@@ -561,17 +561,17 @@ describe("asyncSignal", () => {
       data();
 
       await delay(20);
-      expect(data().data).toBe(3);
+      expect(data().value).toBe(3);
 
       // Change s1
       s1.set(10);
       await delay(20);
-      expect(data().data).toBe(12);
+      expect(data().value).toBe(12);
 
       // Change s2
       s2.set(20);
       await delay(20);
-      expect(data().data).toBe(30);
+      expect(data().value).toBe(30);
     });
 
     it("should only track signals that are actually accessed", async () => {
@@ -591,20 +591,20 @@ describe("asyncSignal", () => {
       data();
 
       await delay(20);
-      expect(data().data).toBe(3);
+      expect(data().value).toBe(3);
       expect(computeCount).toBe(1);
 
       // Changing s3 should NOT trigger re-computation
       s3.set(100);
       await delay(20);
       expect(computeCount).toBe(1); // Still 1
-      expect(data().data).toBe(3);
+      expect(data().value).toBe(3);
 
       // Changing s1 should trigger re-computation
       s1.set(10);
       await delay(20);
       expect(computeCount).toBe(2);
-      expect(data().data).toBe(12);
+      expect(data().value).toBe(12);
     });
 
     it("should support conditional tracking", async () => {
@@ -628,7 +628,7 @@ describe("asyncSignal", () => {
       data();
 
       await delay(20);
-      expect(data().data).toBe(10);
+      expect(data().value).toBe(10);
       expect(computeCount).toBe(1);
 
       // Change s2 - should NOT trigger (condition is true, s2 not accessed)
@@ -640,12 +640,12 @@ describe("asyncSignal", () => {
       s1.set(100);
       await delay(20);
       expect(computeCount).toBe(2);
-      expect(data().data).toBe(100);
+      expect(data().value).toBe(100);
 
       // Switch condition to false
       condition.set(false);
       await delay(20);
-      expect(data().data).toBe(200);
+      expect(data().value).toBe(200);
       expect(computeCount).toBe(3);
 
       // Now s1 changes should NOT trigger
@@ -657,7 +657,7 @@ describe("asyncSignal", () => {
       s2.set(300);
       await delay(20);
       expect(computeCount).toBe(4);
-      expect(data().data).toBe(300);
+      expect(data().value).toBe(300);
     });
 
     it("should support destructuring from track", async () => {
@@ -674,11 +674,11 @@ describe("asyncSignal", () => {
       data();
 
       await delay(20);
-      expect(data().data).toBe(50);
+      expect(data().value).toBe(50);
 
       s1.set(3);
       await delay(20);
-      expect(data().data).toBe(30);
+      expect(data().value).toBe(30);
     });
 
     it("should track signals accessed in loops", async () => {
@@ -700,17 +700,17 @@ describe("asyncSignal", () => {
       data();
 
       await delay(20);
-      expect(data().data).toBe(12); // (1+2+3) * 2
+      expect(data().value).toBe(12); // (1+2+3) * 2
 
       // Change items
       items.set([1, 2, 3, 4]);
       await delay(20);
-      expect(data().data).toBe(20); // (1+2+3+4) * 2
+      expect(data().value).toBe(20); // (1+2+3+4) * 2
 
       // Change multiplier
       multiplier.set(3);
       await delay(20);
-      expect(data().data).toBe(30); // (1+2+3+4) * 3
+      expect(data().value).toBe(30); // (1+2+3+4) * 3
     });
 
     it("should work with multiple track calls", async () => {
@@ -730,20 +730,20 @@ describe("asyncSignal", () => {
       data();
 
       await delay(20);
-      expect(data().data).toBe(6);
+      expect(data().value).toBe(6);
 
       // All signals should trigger re-computation
       s1.set(10);
       await delay(20);
-      expect(data().data).toBe(15);
+      expect(data().value).toBe(15);
 
       s2.set(20);
       await delay(20);
-      expect(data().data).toBe(33);
+      expect(data().value).toBe(33);
 
       s3.set(30);
       await delay(20);
-      expect(data().data).toBe(60);
+      expect(data().value).toBe(60);
     });
 
     it("should combine implicit and explicit tracking", async () => {
@@ -766,22 +766,22 @@ describe("asyncSignal", () => {
       data();
 
       await delay(20);
-      expect(data().data).toBe(6);
+      expect(data().value).toBe(6);
 
       // s1 should trigger (implicit)
       s1.set(10);
       await delay(20);
-      expect(data().data).toBe(15);
+      expect(data().value).toBe(15);
 
       // s2 should trigger (explicit via track)
       s2.set(20);
       await delay(20);
-      expect(data().data).toBe(33);
+      expect(data().value).toBe(33);
 
       // s3 should trigger (explicit via track)
       s3.set(30);
       await delay(20);
-      expect(data().data).toBe(60);
+      expect(data().value).toBe(60);
     });
 
     it("should track signals accessed multiple times", async () => {
@@ -798,11 +798,11 @@ describe("asyncSignal", () => {
       data();
 
       await delay(20);
-      expect(data().data).toBe(15);
+      expect(data().value).toBe(15);
 
       s1.set(10);
       await delay(20);
-      expect(data().data).toBe(30);
+      expect(data().value).toBe(30);
     });
 
     it("should handle empty track object", async () => {
@@ -816,7 +816,7 @@ describe("asyncSignal", () => {
       data();
 
       await delay(20);
-      expect(data().data).toBe("done");
+      expect(data().value).toBe("done");
     });
   });
 });

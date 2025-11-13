@@ -129,7 +129,7 @@ function waitAll(awaitableOrArray: any): any {
     if (l.status === "error") {
       throw l.error;
     }
-    return l.data;
+    return l.value;
   }
 
   // Handle array of awaitables
@@ -140,7 +140,7 @@ function waitAll(awaitableOrArray: any): any {
   if (loadingLoadable) {
     // Throw Promise.all of all loading promises
     const promises = loadables.map((l) =>
-      l.status === "loading" ? l.promise : Promise.resolve(l.data)
+      l.status === "loading" ? l.promise : Promise.resolve(l.value)
     );
     throw Promise.all(promises);
   }
@@ -152,7 +152,7 @@ function waitAll(awaitableOrArray: any): any {
   }
 
   // All succeeded, return data array
-  return loadables.map((l) => l.data);
+  return loadables.map((l) => l.value);
 }
 
 /**
@@ -188,7 +188,7 @@ function waitAny(awaitables: Record<string, Awaitable<unknown>>): any {
   // Check if any succeeded
   const succeeded = loadables.find(({ loadable: l }) => l.status === "success");
   if (succeeded) {
-    return [succeeded.loadable.data, succeeded.key];
+    return [succeeded.loadable.value, succeeded.key];
   }
 
   // Check if all failed
@@ -206,7 +206,7 @@ function waitAny(awaitables: Record<string, Awaitable<unknown>>): any {
     l.status === "loading"
       ? l.promise.then((data) => [data, key])
       : l.status === "success"
-      ? Promise.resolve([l.data, key])
+      ? Promise.resolve([l.value, key])
       : Promise.reject(l.error)
   );
 
@@ -268,7 +268,7 @@ function waitRace(awaitables: Record<string, Awaitable<unknown>>): any {
     if (completed.loadable.status === "error") {
       throw completed.loadable.error;
     }
-    return [completed.loadable.data, completed.key];
+    return [completed.loadable.value, completed.key];
   }
 
   // All still loading, throw Promise.race
@@ -319,7 +319,7 @@ function waitSettled(awaitableOrArray: any): any {
     if (l.status === "error") {
       return { status: "rejected" as const, reason: l.error };
     }
-    return { status: "fulfilled" as const, value: l.data };
+    return { status: "fulfilled" as const, value: l.value };
   }
 
   // Handle array of awaitables
@@ -333,7 +333,7 @@ function waitSettled(awaitableOrArray: any): any {
       l.status === "loading"
         ? l.promise
         : l.status === "success"
-        ? Promise.resolve(l.data)
+        ? Promise.resolve(l.value)
         : Promise.reject(l.error)
     );
 
@@ -351,7 +351,7 @@ function waitSettled(awaitableOrArray: any): any {
   // All settled, return results
   return loadables.map((l) =>
     l.status === "success"
-      ? { status: "fulfilled" as const, value: l.data }
+      ? { status: "fulfilled" as const, value: l.value }
       : { status: "rejected" as const, reason: l.error }
   );
 }

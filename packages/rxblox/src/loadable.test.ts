@@ -9,7 +9,7 @@ describe("loadable", () => {
 
       expect(l.status).toBe("loading");
       expect(l.promise).toBe(promise);
-      expect(l.data).toBeUndefined();
+      expect(l.value).toBeUndefined();
       expect(l.error).toBeUndefined();
       expect(l.loading).toBe(true);
       expect(l[LOADABLE_TYPE]).toBe(true);
@@ -30,7 +30,7 @@ describe("loadable", () => {
       const l = loadable("loading", promise);
 
       expect(l.status).toBe("loading");
-      expect(l.data).toBeUndefined();
+      expect(l.value).toBeUndefined();
 
       // Resolve the promise
       resolve!(42);
@@ -54,7 +54,7 @@ describe("loadable", () => {
       const l = loadable("success", data);
 
       expect(l.status).toBe("success");
-      expect(l.data).toEqual(data);
+      expect(l.value).toEqual(data);
       expect(l.error).toBeUndefined();
       expect(l.loading).toBe(false);
       expect(l[LOADABLE_TYPE]).toBe(true);
@@ -84,16 +84,16 @@ describe("loadable", () => {
       };
       const l = loadable("success", data);
 
-      expect(l.data).toEqual(data);
-      expect(l.data?.nested.value).toBe("test");
+      expect(l.value).toEqual(data);
+      expect(l.value?.nested.value).toBe("test");
     });
 
     it("should handle null and undefined data", () => {
       const successNull = loadable("success", null);
-      expect(successNull.data).toBeNull();
+      expect(successNull.value).toBeNull();
 
       const successUndef = loadable("success", undefined);
-      expect(successUndef.data).toBeUndefined();
+      expect(successUndef.value).toBeUndefined();
     });
 
     it("should infer correct data type", () => {
@@ -102,8 +102,8 @@ describe("loadable", () => {
       // Type should be SuccessLoadable<{ id: number; name: string }>
       if (l.status === "success") {
         // TypeScript should know data type
-        const id: number = l.data.id;
-        const name: string = l.data.name;
+        const id: number = l.value.id;
+        const name: string = l.value.name;
         expect(id).toBe(1);
         expect(name).toBe("Alice");
       }
@@ -117,7 +117,7 @@ describe("loadable", () => {
 
       expect(l.status).toBe("error");
       expect(l.error).toBe(err);
-      expect(l.data).toBeUndefined();
+      expect(l.value).toBeUndefined();
       expect(l.loading).toBe(false);
       expect(l[LOADABLE_TYPE]).toBe(true);
     });
@@ -211,8 +211,8 @@ describe("loadable", () => {
       if (isLoadable<{ id: number; name: string }>(value)) {
         // TypeScript should know value is Loadable<{ id: number; name: string }>
         if (value.status === "success") {
-          expect(value.data.id).toBe(1);
-          expect(value.data.name).toBe("Alice");
+          expect(value.value.id).toBe(1);
+          expect(value.value.name).toBe("Alice");
         }
       }
     });
@@ -224,7 +224,7 @@ describe("loadable", () => {
 
       if (l.status === "loading") {
         // TypeScript should know these are undefined
-        expect(l.data).toBeUndefined();
+        expect(l.value).toBeUndefined();
         expect(l.error).toBeUndefined();
         expect(l.loading).toBe(true);
       }
@@ -235,7 +235,7 @@ describe("loadable", () => {
 
       if (l.status === "success") {
         // TypeScript should know data exists and is number
-        const value: number = l.data;
+        const value: number = l.value;
         expect(value).toBe(42);
         expect(l.error).toBeUndefined();
         expect(l.loading).toBe(false);
@@ -249,7 +249,7 @@ describe("loadable", () => {
       if (l.status === "error") {
         // TypeScript should know error exists
         expect(l.error).toBe(err);
-        expect(l.data).toBeUndefined();
+        expect(l.value).toBeUndefined();
         expect(l.loading).toBe(false);
       }
     });
@@ -260,7 +260,7 @@ describe("loadable", () => {
           case "loading":
             return "loading";
           case "success":
-            return `success: ${l.data}`;
+            return `success: ${l.value}`;
           case "error":
             return `error: ${l.error}`;
         }
@@ -344,7 +344,7 @@ describe("loadable", () => {
       });
 
       expect(l.status).toBe("success");
-      expect(l.data).toEqual({ status: "custom", data: "test" });
+      expect(l.value).toEqual({ status: "custom", data: "test" });
       expect(l[LOADABLE_TYPE]).toBe(true);
     });
   });
@@ -369,26 +369,26 @@ describe("loadable", () => {
 
     it("should handle empty objects and arrays", () => {
       const emptyObj = loadable("success", {});
-      expect(emptyObj.data).toEqual({});
+      expect(emptyObj.value).toEqual({});
 
       const emptyArr = loadable("success", []);
-      expect(emptyArr.data).toEqual([]);
+      expect(emptyArr.value).toEqual([]);
     });
 
     it("should handle boolean values", () => {
       const trueValue = loadable("success", true);
-      expect(trueValue.data).toBe(true);
+      expect(trueValue.value).toBe(true);
 
       const falseValue = loadable("success", false);
-      expect(falseValue.data).toBe(false);
+      expect(falseValue.value).toBe(false);
     });
 
     it("should handle zero and empty string", () => {
       const zero = loadable("success", 0);
-      expect(zero.data).toBe(0);
+      expect(zero.value).toBe(0);
 
       const empty = loadable("success", "");
-      expect(empty.data).toBe("");
+      expect(empty.value).toBe("");
     });
 
     it("should handle generic type parameters correctly", () => {
@@ -401,7 +401,7 @@ describe("loadable", () => {
 
       // Success with inferred type
       const success = loadable("success", { id: 1, name: "Bob" });
-      expect(success.data.name).toBe("Bob");
+      expect(success.value.name).toBe("Bob");
 
       // Error with type parameter
       const error = loadable<User>("error", new Error("Failed"));
@@ -424,7 +424,7 @@ describe("loadable", () => {
       const userData = await userPromise;
       const success = loadable("success", userData);
       expect(success.status).toBe("success");
-      expect(success.data.name).toBe("Alice");
+      expect(success.value.name).toBe("Alice");
     });
 
     it("should model failed API calls", () => {
@@ -442,7 +442,7 @@ describe("loadable", () => {
           case "loading":
             return "Loading...";
           case "success":
-            return `Success: ${JSON.stringify(l.data)}`;
+            return `Success: ${JSON.stringify(l.value)}`;
           case "error":
             return `Error: ${l.error}`;
         }

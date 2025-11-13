@@ -100,6 +100,7 @@ function Counter() {
   - [Async Signals](#7-async-signals---asyncsignal)
   - [Loadable States](#8-loadable-states)
   - [Wait Utilities](#9-wait-utilities)
+  - [Actions](#10-actions)
 - [Patterns & Best Practices](#patterns--best-practices)
 - [Composable Logic](#composable-logic-with-blox)
 - [Comparisons](#comparison-with-other-solutions)
@@ -714,6 +715,163 @@ const allResults = signal(() => {
 - 🎯 **Type-safe** - Full TypeScript inference for results
 - ⚡ **Promise caching** - Efficiently tracks promise states
 - 🔄 **Automatic updates** - Results update when source signals change
+
+### 10. Actions
+
+Actions are stateful, callable functions that track their execution status. They're perfect for handling user interactions, API calls, and side effects with automatic state management.
+
+```tsx
+import { action } from "rxblox";
+
+// Create an action
+const saveUser = action(async (user: User) => {
+  const response = await fetch("/api/users", {
+    method: "POST",
+    body: JSON.stringify(user),
+  });
+  return response.json();
+});
+
+// Call it like a function
+await saveUser({ name: "John", email: "john@example.com" });
+
+// Check status reactively
+console.log(saveUser.status); // "idle" | "loading" | "success" | "error"
+console.log(saveUser.result); // The returned data
+console.log(saveUser.calls); // Number of times called
+```
+
+#### Basic Actions
+
+Actions track their state automatically:
+
+```tsx
+const UserProfile = blox<{ userId: number }>((props) => {
+  const fetchUser = action(async (id: number) => {
+    const response = await fetch(`/api/users/${id}`);
+    return response.json();
+  });
+
+  // Fetch on mount
+  blox.onMount(() => {
+    fetchUser(props.userId());
+  });
+
+  return rx(() => {
+    if (fetchUser.status === "loading") {
+      return <div>Loading...</div>;
+    }
+
+    if (fetchUser.status === "error") {
+      return <div>Error: {fetchUser.error?.message}</div>;
+    }
+
+    if (fetchUser.status === "success") {
+      return <div>User: {fetchUser.result.name}</div>;
+    }
+
+    return <button onClick={() => fetchUser(props.userId())}>Load User</button>;
+  });
+});
+```
+
+#### Cancellable Actions
+
+Use `action.cancellable()` for operations that can be aborted:
+
+```tsx
+const searchUsers = action.cancellable(
+  async (signal: AbortSignal, query: string) => {
+    const response = await fetch(`/api/users/search?q=${query}`, { signal });
+    return response.json();
+  }
+);
+
+// Start search
+searchUsers("john");
+
+// Cancel if user types more
+searchUsers.abort();
+
+// Check if aborted
+console.log(searchUsers.aborted); // true
+
+// Next search gets a fresh AbortSignal
+searchUsers("jane");
+```
+
+#### Event Callbacks
+
+Actions support lifecycle callbacks:
+
+```tsx
+const deleteUser = action(
+  async (id: number) => {
+    await fetch(`/api/users/${id}`, { method: "DELETE" });
+  },
+  {
+    on: {
+      init: () => console.log("Action started"),
+      loading: () => console.log("Request in progress"),
+      success: () => {
+        console.log("User deleted successfully");
+        showNotification("User deleted");
+      },
+      error: (err) => {
+        console.error("Delete failed:", err);
+        showErrorNotification(err.message);
+      },
+      done: (error, result) => {
+        console.log("Action completed", { error, result });
+      },
+      reset: () => console.log("Action reset"),
+    },
+  }
+);
+
+// Reset to idle state
+deleteUser.reset();
+```
+
+#### Concurrent Call Handling
+
+Actions automatically handle concurrent calls - only the latest call updates the action's state:
+
+```tsx
+const SearchResults = blox(() => {
+  const search = action.cancellable(
+    async (signal: AbortSignal, query: string) => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (signal.aborted) throw new Error("Aborted");
+      return `Results for: ${query}`;
+    }
+  );
+
+  const handleSearch = (query: string) => {
+    search(query); // Previous search is automatically aborted
+  };
+
+  return (
+    <div>
+      <input onChange={(e) => handleSearch(e.target.value)} />
+      {rx(() => {
+        if (search.status === "loading") return <div>Searching...</div>;
+        if (search.status === "success") return <div>{search.result}</div>;
+        return null;
+      })}
+    </div>
+  );
+});
+```
+
+**Key Features:**
+
+- 📊 **Automatic state tracking** - `status`, `result`, `error`, `calls` are automatically managed
+- 🚫 **Cancellation support** - Built-in AbortSignal integration with `action.cancellable()`
+- 🔄 **Concurrent call handling** - Only the latest call updates the action state
+- 🎯 **Event callbacks** - React to lifecycle events (`init`, `loading`, `success`, `error`, `done`, `reset`)
+- 🎨 **Type-safe** - Full TypeScript support with proper type inference
+- 🔌 **Works anywhere** - Use in `blox` components, effects, or plain JavaScript
 
 ---
 
@@ -1746,6 +1904,113 @@ results.forEach((r) => {
 - `Signal<Promise<T>>`
 - `Signal<Loadable<T>>`
 - `Promise<T>` or `PromiseLike<T>`
+
+### `action<TResult, TArgs>(fn, options?)`
+
+Creates an action that tracks execution state.
+
+```tsx
+// Basic action
+const saveUser = action(async (user: User) => {
+  const response = await fetch("/api/users", {
+    method: "POST",
+    body: JSON.stringify(user),
+  });
+  return response.json();
+});
+
+await saveUser({ name: "John" });
+console.log(saveUser.status); // "success"
+console.log(saveUser.result); // User object
+
+// With callbacks
+const deleteUser = action(
+  async (id: number) => {
+    await fetch(`/api/users/${id}`, { method: "DELETE" });
+  },
+  {
+    on: {
+      success: () => console.log("Deleted"),
+      error: (err) => console.error(err),
+    },
+  }
+);
+```
+
+**Properties:**
+
+- `action.status` - Current status: `"idle" | "loading" | "success" | "error"`
+- `action.result` - Last successful result (undefined if no success yet)
+- `action.error` - Last error (undefined if no error yet)
+- `action.calls` - Number of times the action has been called
+- `action.reset()` - Reset to idle state
+
+### `action.cancellable<TResult, TArgs>(fn, options?)`
+
+Creates a cancellable action with abort capabilities.
+
+The function receives `AbortSignal` as its first parameter.
+
+```tsx
+const fetchUser = action.cancellable(
+  async (signal: AbortSignal, userId: number) => {
+    const response = await fetch(`/api/users/${userId}`, { signal });
+    return response.json();
+  }
+);
+
+const promise = fetchUser(123);
+
+// Cancel the request
+fetchUser.abort();
+
+// Check if aborted
+console.log(fetchUser.aborted); // true
+
+// Next call gets a fresh signal
+await fetchUser(456);
+```
+
+**Additional Properties:**
+
+- `action.abort()` - Abort the currently running action
+- `action.aborted` - Whether the action has been aborted
+
+**Options:**
+
+```tsx
+type ActionOptions<TResult> = {
+  on?: {
+    init?: () => void; // Called when action is invoked
+    loading?: () => void; // Called when async action starts
+    success?: (result: TResult) => void; // Called on success
+    error?: (error: unknown) => void; // Called on error
+    done?: (error: unknown | undefined, result: TResult | undefined) => void;
+    reset?: () => void; // Called when reset() is called
+  };
+};
+```
+
+### `action.aborter()`
+
+Creates an AbortController wrapper with reset capability.
+
+Useful when you need manual control over AbortController lifecycle outside of `action.cancellable()`.
+
+```tsx
+import { action } from "rxblox";
+
+const ac = action.aborter();
+
+// Use the signal
+fetch("/api/data", { signal: ac.signal });
+
+// Abort
+ac.abort();
+
+// Reset to a fresh controller
+ac.reset();
+```
 
 ## Development
 
