@@ -58,8 +58,12 @@ export function signalDispatcher(): SignalDispatcher {
      *
      * @param signal - The signal to track
      */
-    add(signal: Signal<unknown>): void {
+    add(signal: Signal<unknown>) {
+      if (signals.has(signal)) {
+        return false;
+      }
       signals.add(signal);
+      return true;
     },
     /**
      * Gets all signals that have been tracked.

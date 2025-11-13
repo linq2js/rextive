@@ -26,6 +26,21 @@ export type Signal<T> = {
    * @returns The current signal value
    */
   (): T;
+
+  /**
+   * Reads the current signal value with tracking it as a dependency.
+   * This getter is used for exposing API to read signal value only
+   * @example
+   * ```ts
+   * const count = signal(0);
+   * const value = signal.get();
+   * const api = {
+   *   getCount: count.get, // it better than assign count signal directly to the api object
+   * }
+   * ```
+   */
+  get(): T;
+
   /**
    * Reads the current signal value without tracking it as a dependency.
    * Useful when you want to read a signal without creating a reactive dependency.
@@ -182,7 +197,7 @@ export type SignalDispatcher = {
    *
    * @param signal - The signal to track
    */
-  add(signal: Signal<unknown>): void;
+  add(signal: Signal<unknown>): boolean;
 
   /**
    * Gets all signals that have been tracked.

@@ -4,6 +4,7 @@ import React, { act } from "react";
 import { rx, Reactive } from "./rx";
 import { signal } from "./signal";
 import { Signal } from "./types";
+import { delay } from "./delay";
 
 describe("rx", () => {
   beforeEach(() => {
@@ -718,6 +719,9 @@ describe("rx", () => {
       await waitFor(() => {
         expect(container.textContent).toBe("3"); // 1 + 2
       });
+
+      // Wait for subscriptions to be set up
+      await delay(10);
 
       // Verify signal1/signal2 are tracked now
       act(() => {
