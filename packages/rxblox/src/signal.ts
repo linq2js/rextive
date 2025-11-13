@@ -3,7 +3,7 @@ import type { Listener, MutableSignal, Signal } from "./types";
 import { signalDispatcher, signalToken } from "./signalDispatcher";
 import { emitter } from "./emitter";
 import { getDispatcher, withDispatchers } from "./dispatcher";
-import { disposableToken } from "./disposeableDispatcher";
+import { disposableToken } from "./disposableDispatcher";
 
 /**
  * Options for configuring a signal's behavior.

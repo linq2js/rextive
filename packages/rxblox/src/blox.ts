@@ -24,7 +24,7 @@ import { getDispatcher, withDispatchers } from "./dispatcher";
 import { EventDispatcher, eventToken } from "./eventDispatcher";
 import { once } from "lodash";
 import { signalToken } from "./signalDispatcher";
-import { disposableToken } from "./disposeableDispatcher";
+import { disposableToken } from "./disposableDispatcher";
 
 /**
  * Creates a reactive component that tracks props as signals and manages effects.
