@@ -1,15 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
-import { blox } from "./blox";
+import { blox } from "./index";
 import { on } from "./eventDispatcher";
 
 describe("eventDispatcher", () => {
-  describe("on.mount", () => {
+  describe("blox.onMount", () => {
     it("should call mount callback when component mounts", async () => {
       const mountCallback = vi.fn();
 
       const Component = blox(() => {
-        on.mount(mountCallback);
+        blox.onMount(mountCallback);
         return <div>Test</div>;
       });
 
@@ -24,7 +24,7 @@ describe("eventDispatcher", () => {
       const callback2 = vi.fn();
 
       const Component = blox(() => {
-        on.mount(callback1, callback2);
+        blox.onMount(callback1, callback2);
         return <div>Test</div>;
       });
 
@@ -36,17 +36,17 @@ describe("eventDispatcher", () => {
 
     it("should throw error when called outside blox component", () => {
       expect(() => {
-        on.mount(() => {});
+        blox.onMount(() => {});
       }).toThrow("Event dispatcher not found");
     });
   });
 
-  describe("on.render", () => {
+  describe("blox.onRender", () => {
     it("should call render callback on each render", () => {
       const renderCallback = vi.fn();
 
       const Component = blox<{ count: number }>((props) => {
-        on.render(renderCallback);
+        blox.onRender(renderCallback);
         return <div>{props.count}</div>;
       });
 
@@ -62,7 +62,7 @@ describe("eventDispatcher", () => {
       const callback2 = vi.fn();
 
       const Component = blox(() => {
-        on.render(callback1, callback2);
+        blox.onRender(callback1, callback2);
         return <div>Test</div>;
       });
 
@@ -73,17 +73,17 @@ describe("eventDispatcher", () => {
 
     it("should throw error when called outside blox component", () => {
       expect(() => {
-        on.render(() => {});
+        blox.onRender(() => {});
       }).toThrow("Event dispatcher not found");
     });
   });
 
-  describe("on.unmount", () => {
+  describe("blox.onUnmount", () => {
     it("should call unmount callback when component unmounts", async () => {
       const unmountCallback = vi.fn();
 
       const Component = blox(() => {
-        on.unmount(unmountCallback);
+        blox.onUnmount(unmountCallback);
         return <div>Test</div>;
       });
 
@@ -98,7 +98,7 @@ describe("eventDispatcher", () => {
 
     it("should throw error when called outside blox component", () => {
       expect(() => {
-        on.unmount(() => {});
+        blox.onUnmount(() => {});
       }).toThrow("Event dispatcher not found");
     });
   });

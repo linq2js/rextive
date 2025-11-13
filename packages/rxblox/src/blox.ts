@@ -24,6 +24,7 @@ import { getDispatcher, withDispatchers } from "./dispatcher";
 import { EventDispatcher, eventToken } from "./eventDispatcher";
 import { once } from "lodash";
 import { signalToken } from "./signalDispatcher";
+import { disposableToken } from "./disposeableDispatcher";
 
 /**
  * Creates a reactive component that tracks props as signals and manages effects.
@@ -291,6 +292,7 @@ export function blox<
           providerToken(providerResolver),
           effectToken(effectDispatcher),
           eventToken(eventDispatcher.emitters),
+          disposableToken(eventDispatcher.emitters.unmount),
         ],
         () => {
           return builder(propsProxy as TProps, ref);

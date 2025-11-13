@@ -5,11 +5,11 @@ import "./App.css";
 const globalCount = signal(0);
 
 // Create providers for dependency injection
-const [useTheme, ThemeProvider] = provider(
+const [withTheme, ThemeProvider] = provider(
   "theme",
   "light" as "light" | "dark"
 );
-const [useCount, CountProvider] = provider("count", 0);
+const [withCount, CountProvider] = provider("count", 0);
 
 function App() {
   return (
@@ -87,6 +87,11 @@ function App() {
 const CounterComponent = blox<{ initialCount: number }>((props) => {
   // Create a local signal for this component instance
   const localCount = signal(props.initialCount);
+
+  // Lifecycle hook example
+  blox.onMount(() => {
+    console.log(`Counter mounted with initial value: ${props.initialCount}`);
+  });
 
   // Log when count changes
   effect(() => {
@@ -206,7 +211,7 @@ const ProviderExample = blox(() => {
 
 // Consumer component that uses the provider
 const ProviderCounter = blox(() => {
-  const count = useCount();
+  const count = withCount();
 
   return (
     <div className="counter-display">
@@ -219,7 +224,7 @@ const ProviderCounter = blox(() => {
 
 // Another consumer of the same provider
 const ProviderDisplay = blox(() => {
-  const count = useCount();
+  const count = withCount();
 
   return (
     <div className="counter-info">
@@ -264,7 +269,7 @@ const ThemeExample = blox(() => {
 });
 
 const ThemeDisplay = blox(() => {
-  const theme = useTheme();
+  const theme = withTheme();
 
   return rx(() => (
     <div
@@ -285,7 +290,7 @@ const ThemeDisplay = blox(() => {
 });
 
 const ThemeButton = blox(() => {
-  const theme = useTheme();
+  const theme = withTheme();
 
   return rx(() => (
     <button

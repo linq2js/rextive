@@ -220,7 +220,7 @@ const Counter = blox<Props>((props, ref) => {
   // - Create signals
   // - Set up effects
   // - Define event handlers
-  // - Register cleanup with on.unmount()
+  // - Register cleanup with blox.onUnmount()
   const count = signal(0);
 
   effect(() => {
@@ -298,18 +298,18 @@ const Counter = blox<CounterProps>((props) => {
 
 #### Using React Hooks with `blox`
 
-Since `blox` components only run their definition phase **once**, you can't use React hooks directly in the definition phase. Use the `handle()` utility to capture hook results:
+Since `blox` components only run their definition phase **once**, you can't use React hooks directly in the definition phase. Use the `blox.handle()` utility to capture hook results:
 
 ```tsx
-import { blox, handle, signal, rx } from "rxblox";
+import { blox, signal, rx } from "rxblox";
 import { useHistory, useEffect, useState } from "react";
 
 const Counter = blox<Props>((props) => {
   // 🔵 Definition phase - runs ONCE
   const count = signal(0);
 
-  // ✅ CORRECT: Use handle() to capture React hooks
-  const router = handle(() => {
+  // ✅ CORRECT: Use blox.handle() to capture React hooks
+  const router = blox.handle(() => {
     const history = useHistory();
     const location = useLocation();
     return { history, location };
@@ -341,21 +341,21 @@ const Counter = blox<Props>((props) => {
 
 **Important Notes:**
 
-- **Use `handle()`** - The recommended way to capture React hook results
+- **Use `blox.handle()`** - The recommended way to capture React hook results
 - **Access via `.current`** - Hook results available in `rx()` expressions and event handlers
-- **Undefined in builder phase** - `handle().current` is `undefined` during the definition phase
-- **Runs on every render** - The callback passed to `handle()` executes during React's render phase
+- **Undefined in builder phase** - `blox.handle().current` is `undefined` during the definition phase
+- **Runs on every render** - The callback passed to `blox.handle()` executes during React's render phase
 
-**Alternative: Manual pattern with `on.render()`:**
+**Alternative: Manual pattern with `blox.onRender()`:**
 
-If you prefer more control, you can manually use `on.render()`:
+If you prefer more control, you can manually use `blox.onRender()`:
 
 ```tsx
 const MyComponent = blox(() => {
   // Define variable in blox scope
   let someHookResult: SomeType | undefined;
 
-  on.render(() => {
+  blox.onRender(() => {
     // Assign hook result to outer variable
     someHookResult = useSomeHook();
   });
@@ -583,7 +583,7 @@ One of the most powerful features of `blox` is the ability to extract and reuse 
 
 **Blox-only Logic** (`withXXX` prefix)
 - Must be called inside `blox()` components
-- Uses blox APIs: `blox.onMount()`, `blox.onUnmount()`, `blox.capture()`
+- Uses blox APIs: `blox.onMount()`, `blox.onUnmount()`, `blox.onRender()`, `blox.handle()`
 - Example: `withWebSocket()`, `withCleanup()`, `withReactRouter()`
 
 ⚠️ **Never use `useXXX`** - Reserved for React hooks only!
@@ -633,7 +633,7 @@ function withWebSocket(url: string) {
   ws.onclose = () => connected.set(false);
   ws.onmessage = (e) => messages.set((prev) => [...prev, e.data]);
 
-  blox.onUnmount(() => ws.close()); // Cleanup
+  blox.onUnmount(() => ws.close()); // ✅ Cleanup on unmount
 
   return { messages, connected, send: (msg: string) => ws.send(msg) };
 }
@@ -698,7 +698,7 @@ Combine smaller logic functions into larger ones:
 function withTimer(interval = 1000) {
   const elapsed = signal(0);
   const timer = setInterval(() => elapsed.set((p) => p + interval), interval);
-  blox.onUnmount(() => clearInterval(timer));
+  blox.onUnmount(() => clearInterval(timer)); // ✅ Cleanup
   return { elapsed };
 }
 
@@ -730,6 +730,7 @@ function withTimedCounter() {
 - ✅ **No hooks rules** - Call these functions anywhere, in any order
 - ✅ **Automatic cleanup** - `blox.onUnmount()` ensures resources are freed
 - ✅ **Clear naming** - `withXXX` = blox-only, plain/`xxxLogic` = universal
+- ✅ **Namespaced API** - All blox-specific APIs live under `blox.*`
 
 ---
 
@@ -1047,11 +1048,11 @@ const Child = blox(() => {
 
 - `equals?: (a: T, b: T) => boolean` - Custom equality function
 
-### `on` - Lifecycle Events
+### Lifecycle Hooks
 
-Namespace for lifecycle event hooks in `blox` components.
+Lifecycle methods available inside `blox()` components, namespaced under `blox.*`
 
-#### `on.render(callback)`
+#### `blox.onRender(callback)`
 
 Execute code during React's render phase, enabling React hooks usage.
 
@@ -1063,13 +1064,13 @@ const MyComponent = blox(() => {
   let history: ReturnType<typeof useHistory> | undefined;
   let location: ReturnType<typeof useLocation> | undefined;
 
-  // Call React hooks inside on.render()
-  on.render(() => {
+  // Call React hooks inside blox.onRender()
+  blox.onRender(() => {
     history = useHistory();
     location = useLocation();
 
     useEffect(() => {
-      // Note: No signal tracking in on.render() context
+      // Note: No signal tracking in blox.onRender() context
       console.log("Count:", count());
     }, []);
   });
@@ -1096,15 +1097,15 @@ const MyComponent = blox(() => {
 - Using third-party custom hooks
 - Accessing React context via `useContext`
 
-**Important:** Signals accessed inside `on.render()` are NOT tracked as dependencies - there is no tracking context in `on.render()`.
+**Important:** Signals accessed inside `blox.onRender()` are NOT tracked as dependencies - there is no tracking context in `blox.onRender()`.
 
-#### `on.mount(callback)`
+#### `blox.onMount(callback)`
 
 Execute code immediately after component mounts.
 
 ```tsx
 const MyComponent = blox(() => {
-  on.mount(() => {
+  blox.onMount(() => {
     console.log("Component mounted");
   });
 
@@ -1112,13 +1113,13 @@ const MyComponent = blox(() => {
 });
 ```
 
-#### `on.unmount(callback)`
+#### `blox.onUnmount(callback)`
 
 Register cleanup callback that runs on component unmount.
 
 ```tsx
 const MyComponent = blox(() => {
-  on.unmount(() => {
+  blox.onUnmount(() => {
     console.log("Cleanup on unmount");
   });
 
@@ -1126,23 +1127,23 @@ const MyComponent = blox(() => {
 });
 ```
 
-### `handle<T>(callback)`
+### `blox.handle<T>(callback)`
 
 Creates a handle to capture values from React hooks during the render phase.
 
-This is useful in `blox` components where you need to use React hooks, but the component body only runs once. The callback runs on every render via `on.render()`, and the returned value is accessible via `.current`.
+This is useful in `blox` components where you need to use React hooks, but the component body only runs once. The callback runs on every render via `blox.onRender()`, and the returned value is accessible via `.current`.
 
 **Important**: The captured value is only available inside `rx()` expressions or event handlers, not in the component builder phase (which runs only once).
 
 ```tsx
-import { blox, handle, signal, rx } from "rxblox";
+import { blox, signal, rx } from "rxblox";
 import { useHistory, useLocation } from "react-router";
 
 const MyComponent = blox(() => {
   const count = signal(0);
 
   // Capture React hooks
-  const router = handle(() => {
+  const router = blox.handle(() => {
     const history = useHistory();
     const location = useLocation();
     return { history, location };

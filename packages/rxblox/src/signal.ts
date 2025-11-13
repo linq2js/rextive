@@ -3,6 +3,7 @@ import type { Listener, MutableSignal, Signal } from "./types";
 import { signalDispatcher, signalToken } from "./signalDispatcher";
 import { emitter } from "./emitter";
 import { getDispatcher, withDispatchers } from "./dispatcher";
+import { disposableToken } from "./disposeableDispatcher";
 
 /**
  * Options for configuring a signal's behavior.
@@ -172,6 +173,10 @@ export function signal<T>(
       current = undefined;
       recompute();
     },
+  });
+
+  getDispatcher(disposableToken)?.add(() => {
+    onCleanup.emitAndClear();
   });
 
   return s;

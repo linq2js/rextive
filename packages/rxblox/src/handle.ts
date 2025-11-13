@@ -1,4 +1,4 @@
-import { on } from "./eventDispatcher";
+import { onRender } from "./eventDispatcher";
 
 /**
  * A handle to capture and access values from React hooks or render-phase logic.
@@ -17,8 +17,10 @@ export type Handle<T> = {
  * Creates a handle to capture values from React hooks during the render phase.
  *
  * This is useful in `blox` components where you need to use React hooks but the component
- * body only runs once. The callback runs on every render via `on.render()`, and the returned
+ * body only runs once. The callback runs on every render via `blox.onRender()`, and the returned
  * value is accessible via `.current`.
+ *
+ * **Must be called inside a `blox` component.** Exported as `blox.handle()`.
  *
  * @example
  * ```tsx
@@ -26,7 +28,7 @@ export type Handle<T> = {
  *   const count = signal(0);
  *
  *   // Capture React hooks
- *   const router = handle(() => {
+ *   const router = blox.handle(() => {
  *     const history = useHistory();
  *     const location = useLocation();
  *     return { history, location };
@@ -52,7 +54,7 @@ export type Handle<T> = {
 export function handle<T>(callback: () => T): Handle<T> {
   let current: T | undefined;
 
-  on.render(() => {
+  onRender(() => {
     current = callback();
   });
 

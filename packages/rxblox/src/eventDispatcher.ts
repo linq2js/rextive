@@ -42,7 +42,7 @@ function onEvent(type: keyof EventDispatcher, callbacks: VoidFunction[]) {
 /**
  * Registers callbacks to run when the component unmounts.
  *
- * Must be called inside a `blox` component.
+ * Must be called inside a `blox` component. Exported as `blox.onUnmount()`.
  *
  * @param callbacks - Functions to call on component unmount
  * @throws {Error} If called outside a blox component context
@@ -50,19 +50,19 @@ function onEvent(type: keyof EventDispatcher, callbacks: VoidFunction[]) {
  * @example
  * ```tsx
  * const MyComponent = blox(() => {
- *   on.unmount(() => console.log("Unmounting"));
+ *   blox.onUnmount(() => console.log("Unmounting"));
  *   return <div>Content</div>;
  * });
  * ```
  */
-function unmount(...callbacks: VoidFunction[]) {
+export function onUnmount(...callbacks: VoidFunction[]) {
   onEvent("unmount", callbacks);
 }
 
 /**
  * Registers callbacks to run when the component mounts.
  *
- * Must be called inside a `blox` component.
+ * Must be called inside a `blox` component. Exported as `blox.onMount()`.
  *
  * @param callbacks - Functions to call on component mount
  * @throws {Error} If called outside a blox component context
@@ -70,12 +70,12 @@ function unmount(...callbacks: VoidFunction[]) {
  * @example
  * ```tsx
  * const MyComponent = blox(() => {
- *   on.mount(() => console.log("Mounted"));
+ *   blox.onMount(() => console.log("Mounted"));
  *   return <div>Content</div>;
  * });
  * ```
  */
-function mount(...callbacks: VoidFunction[]) {
+export function onMount(...callbacks: VoidFunction[]) {
   onEvent("mount", callbacks);
 }
 
@@ -84,6 +84,7 @@ function mount(...callbacks: VoidFunction[]) {
  *
  * Must be called inside a `blox` component during the definition phase.
  * The callback executes during React's render phase, enabling React hooks usage.
+ * Exported as `blox.onRender()`.
  *
  * @param callbacks - Functions to call on each render
  * @throws {Error} If called outside a blox component context
@@ -91,46 +92,14 @@ function mount(...callbacks: VoidFunction[]) {
  * @example
  * ```tsx
  * const MyComponent = blox(() => {
- *   on.render(() => {
+ *   blox.onRender(() => {
  *     const history = useHistory();
- *     return { history };
+ *     // Note: no return value
  *   });
  *   return <div>Content</div>;
  * });
  * ```
  */
-function render(...callbacks: VoidFunction[]) {
+export function onRender(...callbacks: VoidFunction[]) {
   onEvent("render", callbacks);
 }
-
-/**
- * Lifecycle event namespace for blox components.
- *
- * Provides lifecycle hooks for blox components:
- * - `on.mount()` - Called when component mounts
- * - `on.render()` - Called on each render (use for React hooks)
- * - `on.unmount()` - Called when component unmounts
- *
- * @example
- * ```tsx
- * import { blox, on } from "rxblox";
- *
- * const MyComponent = blox(() => {
- *   on.mount(() => console.log("Mounted"));
- *
- *   on.render(() => {
- *     const history = useHistory(); // React hooks work here
- *     return { history };
- *   });
- *
- *   on.unmount(() => console.log("Cleanup"));
- *
- *   return <div>Content</div>;
- * });
- * ```
- */
-export const on = {
-  mount,
-  render,
-  unmount,
-} as const;

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import React, { act } from "react";
 import { rx, Reactive } from "./rx";
 import { signal } from "./signal";
+import { Signal } from "./types";
 
 describe("rx", () => {
   beforeEach(() => {
@@ -774,7 +775,7 @@ describe("rx", () => {
 
     it("should handle undefined/null/false in signal array", () => {
       const count = signal(10);
-      const maybeSignal: Signal<number> | undefined = undefined;
+      const maybeSignal: Signal<number> | undefined = undefined as any;
 
       render(
         <div data-testid="result">
@@ -992,7 +993,9 @@ describe("rx", () => {
 
     it("should throw error with invalid arguments", () => {
       // Suppress console.error for this test
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       expect(() => {
         render(<div>{rx("div", null as any)}</div>);

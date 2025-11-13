@@ -148,56 +148,6 @@ export const Reactive = memo(function Reactive(props: { exp: () => unknown }) {
 });
 
 /**
- * Creates a reactive expression with explicit signal dependencies.
- *
- * This overload allows you to specify which signals to track explicitly,
- * and receive their unwrapped values as function parameters. This provides:
- * - Better type inference
- * - Explicit dependency list (similar to React's dependency arrays)
- * - Potential performance optimization (only tracks listed signals)
- *
- * @param signals - Array of signals to track. Can include undefined/null/false for conditional signals.
- * @param fn - Function that receives unwrapped signal values as arguments
- * @returns A ReactNode that renders the function result and updates when signals change
- *
- * @example
- * ```tsx
- * const count = signal(0);
- * const multiplier = signal(2);
- *
- * // Explicit dependencies - count and multiplier
- * {rx([count, multiplier], (c, m) => (
- *   <div>{c} × {m} = {c * m}</div>
- * ))}
- *
- * // With optional signals
- * const maybeSignal = condition ? signal(5) : undefined;
- * {rx([count, maybeSignal], (c, value) => (
- *   <div>Count: {c}, Value: {value ?? 'N/A'}</div>
- * ))}
- * ```
- */
-export function rx<
-  const TSignals extends readonly (Signal<any> | undefined | null | false)[]
->(
-  signals: TSignals,
-  fn: (
-    ...values: {
-      [K in keyof TSignals]: Exclude<
-        // ensure item is signal
-        TSignals[K],
-        undefined | null | false
-      > extends Signal<infer T>
-        ? // infer signal value can be optional or not
-          Exclude<TSignals[K], Signal<any>> extends undefined | null | false
-          ? T | undefined
-          : T
-        : undefined;
-    }
-  ) => ReactNode
-): ReactNode;
-
-/**
  * Creates a reactive component with auto-reactive props.
  *
  * This overload automatically unwraps signal props when creating a component.
@@ -233,7 +183,61 @@ export function rx<
     | JSXElementConstructor<any>
 >(
   componentType: TComponentType,
-  componentProps: ComponentProps<TComponentType>
+  componentProps: {
+    [key in ComponentProps<TComponentType>]:
+      | Signal<ComponentProps<TComponentType>>
+      | ComponentProps<TComponentType>;
+  }
+): ReactNode;
+
+/**
+ * Creates a reactive expression with explicit signal dependencies.
+ *
+ * This overload allows you to specify which signals to track explicitly,
+ * and receive their unwrapped values as function parameters. This provides:
+ * - Better type inference
+ * - Explicit dependency list (similar to React's dependency arrays)
+ * - Potential performance optimization (only tracks listed signals)
+ *
+ * @param signals - Array of signals to track. Can include undefined/null/false for conditional signals.
+ * @param fn - Function that receives unwrapped signal values as arguments
+ * @returns A ReactNode that renders the function result and updates when signals change
+ *
+ * @example
+ * ```tsx
+ * const count = signal(0);
+ * const multiplier = signal(2);
+ *
+ * // Explicit dependencies - count and multiplier
+ * {rx([count, multiplier], (c, m) => (
+ *   <div>{c} × {m} = {c * m}</div>
+ * ))}
+ *
+ * // With optional signals
+ * const maybeSignal = condition ? signal(5) : undefined;
+ * {rx([count, maybeSignal], (c, value) => (
+ *   <div>Count: {c}, Value: {value ?? 'N/A'}</div>
+ * ))}
+ * ```
+ */
+export function rx<
+  const TSignals extends readonly (Signal<any> | undefined | null | false)[]
+>(
+  signals: TSignals,
+  fn: (
+    ...values: {
+      [K in keyof TSignals]: TSignals[K] extends Signal<infer T>
+        ? // Signal type - check if it's required or optional
+          // Check if there's anything besides Signal<T> in the union
+          // If Exclude leaves nothing (never), signal is required → return T
+          // If Exclude leaves something (undefined/null/false), signal is optional → return T | undefined
+          [Exclude<TSignals[K], Signal<T>>] extends [never]
+          ? T
+          : T | undefined
+        : // Non-signal values (undefined, null, false) become undefined at runtime
+          undefined;
+    }
+  ) => ReactNode
 ): ReactNode;
 
 /**

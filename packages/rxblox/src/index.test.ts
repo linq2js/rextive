@@ -27,17 +27,18 @@ describe("index exports", () => {
     expect(typeof index.provider).toBe("function");
   });
 
-  it("should export on", () => {
-    expect(index.on).toBeDefined();
-    expect(typeof index.on).toBe("object");
-    expect(typeof index.on.mount).toBe("function");
-    expect(typeof index.on.render).toBe("function");
-    expect(typeof index.on.unmount).toBe("function");
+  it("should export blox.onMount, blox.onRender, blox.onUnmount", () => {
+    expect(index.blox.onMount).toBeDefined();
+    expect(index.blox.onRender).toBeDefined();
+    expect(index.blox.onUnmount).toBeDefined();
+    expect(typeof index.blox.onMount).toBe("function");
+    expect(typeof index.blox.onRender).toBe("function");
+    expect(typeof index.blox.onUnmount).toBe("function");
   });
 
-  it("should export handle", () => {
-    expect(index.handle).toBeDefined();
-    expect(typeof index.handle).toBe("function");
+  it("should export blox.handle", () => {
+    expect(index.blox.handle).toBeDefined();
+    expect(typeof index.blox.handle).toBe("function");
   });
 });
 
