@@ -49,6 +49,8 @@ function Counter() {
 - 📦 **TypeScript first** - Full type safety out of the box
 - 🪶 **Lightweight** - Minimal bundle size
 - 🎪 **No hooks rules** - Call signals anywhere (conditionally, in loops, etc.)
+- 🔀 **Async signals** - First-class support for async operations with automatic state management
+- 📊 **Loadable states** - Built-in loading/success/error state handling
 
 ## Installation
 
@@ -95,6 +97,9 @@ function Counter() {
   - [Reactive Expressions](#4-reactive-expressions---rx)
   - [Reactive Components](#5-reactive-components---blox)
   - [Providers](#6-providers---dependency-injection)
+  - [Async Signals](#7-async-signals---asyncsignal)
+  - [Loadable States](#8-loadable-states)
+  - [Wait Utilities](#9-wait-utilities)
 - [Patterns & Best Practices](#patterns--best-practices)
 - [Composable Logic](#composable-logic-with-blox)
 - [Comparisons](#comparison-with-other-solutions)
@@ -155,6 +160,36 @@ console.log(fullName()); // "Jane Doe" - recomputed automatically
 ```
 
 **Computed signals are lazy** - they only recompute when accessed and cache their result.
+
+#### Explicit Dependency Tracking with `track()`
+
+For conditional dependencies or more control, use the `track()` function:
+
+```tsx
+const condition = signal(true);
+const a = signal(10);
+const b = signal(20);
+
+// Only tracks the signals you actually access
+const result = signal(({ track }) => {
+  const { condition: cond, a: valA, b: valB } = track({ condition, a, b });
+
+  // Only tracks 'condition' + one of 'a' or 'b'
+  return cond ? valA : valB;
+});
+
+console.log(result()); // 10
+
+// Changing 'b' won't trigger recomputation (not accessed when condition is true)
+b.set(30);
+console.log(result()); // Still 10
+
+// Changing 'a' will trigger recomputation
+a.set(15);
+console.log(result()); // 15
+```
+
+The `track()` function creates a proxy that lazily tracks only the signals you access, perfect for conditional dependencies!
 
 ### 3. Effects - Side Effects with Auto-Tracking
 
@@ -438,6 +473,248 @@ function App() {
 
 Think of providers as **dependency injection for signals**, not React Context.
 
+### 7. Async Signals - `signal.async()`
+
+Async signals (`signal.async()`) manage asynchronous operations with automatic loading/success/error state tracking.
+
+```tsx
+import { signal } from "rxblox";
+
+const userId = signal(1);
+
+// Create an async signal that fetches user data
+const user = signal.async(async ({ track, abortSignal }) => {
+  // Use track() to access signals after await
+  const proxy = track({ userId });
+
+  const response = await fetch(`/api/users/${proxy.userId}`, {
+    signal: abortSignal, // Automatic cancellation
+  });
+
+  return response.json();
+});
+
+// The async signal returns a Loadable
+function UserProfile() {
+  return rx(() => {
+    const loadable = user();
+
+    if (loadable.status === "loading") {
+      return <div>Loading...</div>;
+    }
+
+    if (loadable.status === "error") {
+      return <div>Error: {loadable.error.message}</div>;
+    }
+
+    // loadable.status === "success"
+    return <div>User: {loadable.data.name}</div>;
+  });
+}
+
+// Changing userId automatically triggers re-fetch (previous request aborted)
+userId.set(2);
+```
+
+**Key Features:**
+
+- 📊 **Loadable return type** - Returns `Loadable<T>` with `status`, `data`, `error`, `promise`
+- 🔄 **Automatic re-fetch** - Re-runs when tracked signals change
+- 🚫 **Auto-cancellation** - Previous requests aborted via `AbortSignal`
+- ⚡ **Promise caching** - Efficient state management
+- 🎯 **Lazy evaluation** - Only starts when first accessed
+- ✨ **Explicit tracking** - Use `track()` to track signals even after `await`
+
+#### Dependency Tracking in Async Signals
+
+There are two ways to track signal dependencies:
+
+```tsx
+// ✅ Method 1: Use track() for explicit tracking (RECOMMENDED)
+const data = signal.async(async ({ track }) => {
+  const proxy = track({ userId, filter });
+
+  // Can await before accessing signals!
+  await delay(10);
+
+  return fetchData(proxy.userId, proxy.filter);
+});
+
+// ✅ Method 2: Implicit tracking (before await only)
+const data = signal.async(async () => {
+  const id = userId(); // Tracked implicitly
+
+  // Must access signals BEFORE any await
+  const response = await fetch(`/api/users/${id}`);
+  return response.json();
+});
+
+// ❌ WRONG: Implicit tracking after await doesn't work
+const data = signal.async(async () => {
+  await delay(10);
+  return userId(); // NOT TRACKED - use track() instead!
+});
+```
+
+**Best Practice:** Use `track()` for maximum flexibility and clarity.
+
+### 8. Loadable States
+
+Loadable is a discriminated union type representing the state of an asynchronous operation.
+
+```tsx
+type Loadable<T> =
+  | {
+      status: "loading";
+      data: undefined;
+      error: undefined;
+      loading: true;
+      promise: Promise<T>;
+    }
+  | {
+      status: "success";
+      data: T;
+      error: undefined;
+      loading: false;
+      promise: Promise<T>;
+    }
+  | {
+      status: "error";
+      data: undefined;
+      error: unknown;
+      loading: false;
+      promise: Promise<T>;
+    };
+```
+
+#### Creating Loadables
+
+```tsx
+import { loadable } from "rxblox";
+
+// Loading state
+const loading = loadable("loading", promise);
+
+// Success state
+const success = loadable("success", data);
+
+// Error state
+const error = loadable("error", errorObj);
+```
+
+#### Type Guard
+
+```tsx
+import { isLoadable } from "rxblox";
+
+if (isLoadable(value)) {
+  // TypeScript knows value is Loadable<T>
+  if (value.status === "success") {
+    console.log(value.data);
+  }
+}
+```
+
+#### React Suspense Integration
+
+Async signals automatically work with React Suspense:
+
+```tsx
+import { Suspense } from "react";
+
+const user = signal.async(async () => {
+  const response = await fetch("/api/user");
+  return response.json();
+});
+
+function UserProfile() {
+  return rx(() => {
+    const loadable = user();
+
+    // Automatically throws promise for Suspense if loading
+    // Automatically throws error for ErrorBoundary if error
+    // Just use the data when status is "success"
+    return <div>User: {loadable.data.name}</div>;
+  });
+}
+
+function App() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <UserProfile />
+    </Suspense>
+  );
+}
+```
+
+### 9. Wait Utilities
+
+The `wait` utilities help coordinate multiple asynchronous operations (signals or promises).
+
+```tsx
+import { signal, wait } from "rxblox";
+
+const user = signal.async(() => fetchUser());
+const posts = signal.async(() => fetchPosts());
+const comments = signal.async(() => fetchComments());
+```
+
+#### `wait()` / `wait.all()` - Wait for all to complete
+
+```tsx
+const combined = signal(() => {
+  // Wait for all async signals
+  const [userData, postsData, commentsData] = wait([user, posts, comments]);
+
+  return {
+    user: userData,
+    posts: postsData,
+    comments: commentsData,
+  };
+});
+```
+
+#### `wait.any()` - Wait for first success
+
+```tsx
+const fastest = signal(() => {
+  // Returns [value, key] from first successful async signal
+  const [data, source] = wait.any({ user, posts, comments });
+
+  console.log(`${source} loaded first:`, data);
+  return data;
+});
+```
+
+#### `wait.race()` - Wait for first to complete (success or error)
+
+```tsx
+const first = signal(() => {
+  // Returns [value, key] from first completed async signal
+  const [data, source] = wait.race({ primary, fallback });
+
+  return { data, source };
+});
+```
+
+#### `wait.settled()` - Wait for all to settle
+
+```tsx
+const allResults = signal(() => {
+  // Returns array of PromiseSettledResult
+  const results = wait.settled([user, posts, comments]);
+
+  return results.map((r) => (r.status === "fulfilled" ? r.value : r.reason));
+});
+```
+
+**Key Features:**
+
+- 🔗 **Works with signals and promises** - Pass `Signal<Promise<T>>`, `Signal<Loadable<T>>`, or raw promises
+- 🎯 **Type-safe** - Full TypeScript inference for results
+- ⚡ **Promise caching** - Efficiently tracks promise states
+- 🔄 **Automatic updates** - Results update when source signals change
+
 ---
 
 ## Patterns & Best Practices
@@ -485,7 +762,7 @@ const FormExample = blox(() => {
     console.log({ name: name(), email: email() });
   };
 
-  return (
+  return rx(() => (
     <form
       onSubmit={(e) => {
         e.preventDefault();
@@ -496,35 +773,37 @@ const FormExample = blox(() => {
       <input value={email()} onChange={(e) => email.set(e.target.value)} />
       <button disabled={!isValid()}>Submit</button>
     </form>
-  );
+  ));
 });
 ```
 
 ### Async Data Loading
 
-Handle loading states with signals:
+Use `signal.async()` for automatic loading state management:
 
 ```tsx
 const UserList = blox(() => {
-  const users = signal<User[]>([]);
-  const loading = signal(true);
-  const error = signal<Error | null>(null);
-
-  effect(() => {
-    loading.set(true);
-    fetch("/api/users")
-      .then((res) => res.json())
-      .then((data) => users.set(data))
-      .catch((err) => error.set(err))
-      .finally(() => loading.set(false));
+  // Async signal with automatic loading/success/error states
+  const users = signal.async(async () => {
+    const response = await fetch("/api/users");
+    return response.json();
   });
 
   return rx(() => {
-    if (loading()) return <div>Loading...</div>;
-    if (error()) return <div>Error: {error()!.message}</div>;
+    const loadable = users();
+
+    if (loadable.status === "loading") {
+      return <div>Loading...</div>;
+    }
+
+    if (loadable.status === "error") {
+      return <div>Error: {loadable.error.message}</div>;
+    }
+
+    // loadable.status === "success"
     return (
       <ul>
-        {users().map((user) => (
+        {loadable.data.map((user) => (
           <li key={user.id}>{user.name}</li>
         ))}
       </ul>
@@ -532,6 +811,143 @@ const UserList = blox(() => {
   });
 });
 ```
+
+**With dependencies:**
+
+```tsx
+const UserPosts = blox<{ userId: number }>((props) => {
+  const posts = signal.async(async ({ track }) => {
+    const { userId } = track({ userId: props.userId });
+
+    const response = await fetch(`/api/users/${userId}/posts`);
+    return response.json();
+  });
+
+  return rx(() => {
+    const loadable = posts();
+
+    if (loadable.loading) return <div>Loading posts...</div>;
+    if (loadable.status === "error") return <div>Error loading posts</div>;
+
+    return (
+      <ul>
+        {loadable.data.map((post) => (
+          <li key={post.id}>{post.title}</li>
+        ))}
+      </ul>
+    );
+  });
+});
+```
+
+### Using React Refs
+
+You can use React refs with `blox` components to access DOM elements or component instances.
+
+#### With `createRef`
+
+Create refs in the definition phase:
+
+```tsx
+import { createRef } from "react";
+
+const InputFocus = blox(() => {
+  // Create ref in definition phase
+  const inputRef = createRef<HTMLInputElement>();
+
+  const handleFocus = () => {
+    inputRef.current?.focus();
+  };
+
+  return (
+    <div>
+      <input ref={inputRef} type="text" />
+      <button onClick={handleFocus}>Focus Input</button>
+    </div>
+  );
+});
+```
+
+#### With `useRef` via `blox.handle()`
+
+Use `blox.handle()` to capture refs from React hooks:
+
+```tsx
+import { useRef } from "react";
+
+const VideoPlayer = blox(() => {
+  // Capture useRef via blox.handle()
+  const videoRef = blox.handle(() => useRef<HTMLVideoElement>(null));
+
+  const handlePlay = () => {
+    videoRef.current?.current?.play();
+  };
+
+  const handlePause = () => {
+    videoRef.current?.current?.pause();
+  };
+
+  return rx(() => (
+    <div>
+      <video ref={videoRef.current?.current} src="/video.mp4" />
+      <button onClick={handlePlay}>Play</button>
+      <button onClick={handlePause}>Pause</button>
+    </div>
+  ));
+});
+```
+
+#### Forwarding Refs to `blox` Components
+
+Use the second parameter to expose a ref handle:
+
+```tsx
+interface InputHandle {
+  focus: () => void;
+  clear: () => void;
+}
+
+const CustomInput = blox<{ placeholder: string }, InputHandle>((props, ref) => {
+  const inputRef = createRef<HTMLInputElement>();
+  const value = signal("");
+
+  // Expose methods via ref
+  ref.current = {
+    focus: () => inputRef.current?.focus(),
+    clear: () => value.set(""),
+  };
+
+  return rx(() => (
+    <input
+      ref={inputRef}
+      placeholder={props.placeholder}
+      value={value()}
+      onChange={(e) => value.set(e.target.value)}
+    />
+  ));
+});
+
+// Usage
+function Parent() {
+  const inputRef = useRef<InputHandle>(null);
+
+  return (
+    <div>
+      <CustomInput ref={inputRef} placeholder="Enter text" />
+      <button onClick={() => inputRef.current?.focus()}>Focus</button>
+      <button onClick={() => inputRef.current?.clear()}>Clear</button>
+    </div>
+  );
+}
+```
+
+**Key Points:**
+
+- ✅ `createRef()` works directly in the definition phase
+- ✅ `useRef()` must be captured via `blox.handle()`
+- ✅ Access `useRef` values via `videoRef.current?.current` (handle.current → ref.current)
+- ✅ Use the second parameter to forward imperative handles to parent components
+- ✅ Refs work normally in event handlers and `rx()` expressions
 
 ### Optimistic Updates
 
@@ -577,11 +993,13 @@ One of the most powerful features of `blox` is the ability to extract and reuse 
 ### Naming Conventions
 
 **Universal Logic** (plain names or `xxxLogic` suffix)
+
 - Can be called anywhere
 - Only uses: `signal()`, `effect()`, `rx()`
 - Example: `counterLogic()`, `formState()`, `timer()`
 
 **Blox-only Logic** (`withXXX` prefix)
+
 - Must be called inside `blox()` components
 - Uses blox APIs: `blox.onMount()`, `blox.onUnmount()`, `blox.onRender()`, `blox.handle()`
 - Example: `withWebSocket()`, `withCleanup()`, `withReactRouter()`
@@ -705,7 +1123,7 @@ function withTimer(interval = 1000) {
 // Universal - can use anywhere
 function timedCounterLogic() {
   const counter = counterLogic(0);
-  
+
   effect(() => counter.increment()); // Auto-increment
 
   return counter;
@@ -738,48 +1156,57 @@ function withTimedCounter() {
 
 ### Feature Matrix
 
-| Feature                  | rxblox | React useState | Zustand | Jotai | Solid Signals |
-| ------------------------ | ------ | -------------- | ------- | ----- | ------------- |
-| Fine-grained reactivity  | ✅     | ❌             | ❌      | ✅    | ✅            |
-| Computed values          | ✅     | ❌             | ❌      | ✅    | ✅            |
-| Auto dependency tracking | ✅     | ❌             | ❌      | ✅    | ✅            |
-| No hooks rules           | ✅     | ❌             | ❌      | ❌    | ✅            |
-| Works in React           | ✅     | ✅             | ✅      | ✅    | ❌            |
-| Built-in DI              | ✅     | ❌             | ❌      | ❌    | ✅            |
-| Zero boilerplate         | ✅     | ✅             | ❌      | ❌    | ✅            |
+| Feature                  | rxblox | React | Zustand | Jotai | Solid Signals |
+| ------------------------ | ------ | ----- | ------- | ----- | ------------- |
+| Fine-grained reactivity  | ✅     | ❌    | ❌      | ✅    | ✅            |
+| Computed values          | ✅     | ❌    | ❌      | ✅    | ✅            |
+| Auto dependency tracking | ✅     | ❌    | ❌      | ✅    | ✅            |
+| No hooks rules           | ✅     | ❌    | ❌      | ❌    | ✅            |
+| Works in React           | ✅     | ✅    | ✅      | ✅    | ❌            |
+| Built-in DI              | ✅     | ❌    | ❌      | ❌    | ✅            |
+| Zero boilerplate         | ✅     | ✅    | ❌      | ❌    | ✅            |
 
 ### Boilerplate Comparisons
 
-#### vs Redux (90% less code)
+Here's how rxblox compares to other popular state management solutions for a simple counter with increment functionality.
 
-**Redux** requires extensive boilerplate with actions, reducers, and selectors.
+#### Redux Toolkit (~35 lines across 3 files)
+
+**Redux Toolkit** reduces Redux boilerplate but still requires slice setup, store configuration, and causes component re-renders.
 
 ```tsx
-// ❌ Redux - Lots of boilerplate (~60 lines across 4 files)
-// actions.ts
-const INCREMENT = "INCREMENT";
-export const increment = () => ({ type: INCREMENT });
+// counterSlice.ts
+import { createSlice } from "@reduxjs/toolkit";
 
-// reducer.ts
-const initialState = { count: 0 };
-export const counterReducer = (state = initialState, action) => {
-  switch (action.type) {
-    case INCREMENT:
-      return { ...state, count: state.count + 1 };
-    default:
-      return state;
-  }
-};
+const counterSlice = createSlice({
+  name: "counter",
+  initialState: { count: 0 },
+  reducers: {
+    increment: (state) => {
+      state.count += 1;
+    },
+  },
+});
+
+export const { increment } = counterSlice.actions;
+export default counterSlice.reducer;
 
 // store.ts
-import { createStore } from "redux";
-const store = createStore(counterReducer);
+import { configureStore } from "@reduxjs/toolkit";
+import counterReducer from "./counterSlice";
+
+export const store = configureStore({
+  reducer: { counter: counterReducer },
+});
 
 // Component.tsx
 import { useSelector, useDispatch } from "react-redux";
+import { increment } from "./counterSlice";
+
 function Counter() {
-  const count = useSelector((state) => state.count);
+  const count = useSelector((state) => state.counter.count);
   const dispatch = useDispatch();
+  console.log("Component rendered"); // Logs on every state change
   return (
     <div>
       <div>Count: {count}</div>
@@ -789,28 +1216,13 @@ function Counter() {
 }
 ```
 
-```tsx
-// ✅ rxblox - Minimal boilerplate (~12 lines, 1 file)
-import { signal, rx } from "rxblox";
+**Issues:** Still requires slice creation and store setup, multiple files needed, component re-renders on every state change, hook-based (rules of hooks apply).
 
-const count = signal(0);
-
-function Counter() {
-  return (
-    <div>
-      <div>{rx(() => `Count: ${count()}`)}</div>
-      <button onClick={() => count.set(count() + 1)}>+</button>
-    </div>
-  );
-}
-```
-
-#### vs Zustand (50% less code)
+#### Zustand (~20 lines, 1 file)
 
 **Zustand** is simpler than Redux but still requires store setup and causes full component re-renders.
 
 ```tsx
-// ❌ Zustand - Store setup required, component re-renders
 import create from "zustand";
 
 const useStore = create((set) => ({
@@ -830,29 +1242,13 @@ function Counter() {
 }
 ```
 
-```tsx
-// ✅ rxblox - No store setup, fine-grained updates
-import { signal, rx } from "rxblox";
+**Issues:** Store setup required, component re-renders on every state change, hook-based (rules of hooks apply).
 
-const count = signal(0);
-
-function Counter() {
-  console.log("Component rendered"); // Logs ONCE
-  return (
-    <div>
-      <div>{rx(() => `Count: ${count()}`)}</div>
-      <button onClick={() => count.set(count() + 1)}>+</button>
-    </div>
-  );
-}
-```
-
-#### vs Jotai (50% less code)
+#### Jotai (~25 lines, 1 file + Provider)
 
 **Jotai** uses atoms but requires Provider wrapper and is subject to hooks rules.
 
 ```tsx
-// ❌ Jotai - Provider + hooks required, component re-renders
 import { atom, useAtom, Provider } from "jotai";
 
 const countAtom = atom(0);
@@ -877,8 +1273,13 @@ function Counter() {
 }
 ```
 
+**Issues:** Provider required, component re-renders on every state change, hook-based (rules of hooks apply).
+
+#### rxblox (~12 lines, 1 file)
+
+**rxblox** provides the simplest API with fine-grained reactivity - only the exact UI that depends on state updates.
+
 ```tsx
-// ✅ rxblox - No Provider, no hooks rules, fine-grained updates
 import { signal, rx } from "rxblox";
 
 const count = signal(0);
@@ -894,18 +1295,20 @@ function Counter() {
 }
 ```
 
+**Benefits:** Zero boilerplate, no store setup, no Provider, fine-grained updates (component doesn't re-render), no hooks rules.
+
 #### Summary: Lines of Code
 
-For a simple counter with computed value:
+For a simple counter with increment functionality:
 
-| Solution    | Lines of Code | Boilerplate Files                            |
-| ----------- | ------------- | -------------------------------------------- |
-| **Redux**   | ~60 lines     | 4 files (actions, reducer, store, component) |
-| **Zustand** | ~20 lines     | 1 file                                       |
-| **Jotai**   | ~25 lines     | 1 file + Provider                            |
-| **rxblox**  | ~12 lines     | 1 file                                       |
+| Solution          | Lines of Code | Files Required                    |
+| ----------------- | ------------- | --------------------------------- |
+| **Redux Toolkit** | ~35 lines     | 3 files (slice, store, component) |
+| **Zustand**       | ~20 lines     | 1 file                            |
+| **Jotai**         | ~25 lines     | 1 file + Provider wrapper         |
+| **rxblox**        | ~12 lines     | 1 file                            |
 
-**rxblox wins on simplicity** with the least code and zero configuration! 🎯
+**rxblox wins on simplicity** with the least code, zero configuration, and fine-grained reactivity! 🎯
 
 ---
 
@@ -922,6 +1325,12 @@ const count = signal(0);
 // Computed value (auto-tracks dependencies)
 const doubled = signal(() => count() * 2);
 
+// Computed with explicit tracking
+const result = signal(({ track }) => {
+  const { condition, a, b } = track({ condition, a, b });
+  return condition ? a : b;
+});
+
 // With custom equality
 const user = signal(
   { id: 1, name: "John" },
@@ -936,6 +1345,46 @@ const user = signal(
 - `signal.set(value | updater)` - Update value
 - `signal.on(listener)` - Subscribe to changes (returns unsubscribe function)
 - `signal.reset()` - Clear cache and recompute (for computed signals)
+
+**Context Parameter (for computed signals):**
+
+- `track(signals)` - Creates a proxy for explicit dependency tracking
+
+### `signal.async<T>(fn)`
+
+Creates an async signal that manages loading/success/error states automatically.
+
+```tsx
+const user = signal.async(async ({ track, abortSignal }) => {
+  const proxy = track({ userId });
+
+  const response = await fetch(`/api/users/${proxy.userId}`, {
+    signal: abortSignal,
+  });
+
+  return response.json();
+});
+
+// Returns Loadable<T>
+const loadable = user();
+if (loadable.status === "success") {
+  console.log(loadable.data);
+}
+```
+
+**Context Parameter:**
+
+- `track(signals)` - Track signal dependencies (works even after `await`)
+- `abortSignal` - AbortSignal for request cancellation
+
+**Returns:** `Signal<Loadable<T>>`
+
+**Key Features:**
+
+- Lazy evaluation (only starts when first accessed)
+- Automatic re-fetch when dependencies change
+- Previous requests automatically aborted
+- Promise state caching
 
 ### `effect(fn)`
 
@@ -1182,6 +1631,121 @@ type Handle<T> = {
 - The value is `undefined` during the builder phase
 - Must use `rx()` to access the value in JSX
 - Can access directly in event handlers
+
+### `loadable(status, value, promise?)`
+
+Creates a Loadable object representing the state of an async operation.
+
+```tsx
+import { loadable } from "rxblox";
+
+// Loading state
+const loading = loadable("loading", promise);
+
+// Success state
+const success = loadable("success", data);
+
+// Error state
+const error = loadable("error", errorObj);
+```
+
+**Type:**
+
+```tsx
+type Loadable<T> =
+  | LoadingLoadable<T> // { status: "loading", data: undefined, error: undefined, loading: true, promise }
+  | SuccessLoadable<T> // { status: "success", data: T, error: undefined, loading: false, promise }
+  | ErrorLoadable<T>; // { status: "error", data: undefined, error: unknown, loading: false, promise }
+```
+
+### `isLoadable(value)`
+
+Type guard to check if a value is a Loadable.
+
+```tsx
+import { isLoadable } from "rxblox";
+
+if (isLoadable(value)) {
+  // TypeScript knows value is Loadable<T>
+  switch (value.status) {
+    case "loading": // ...
+    case "success":
+      console.log(value.data);
+      break;
+    case "error":
+      console.log(value.error);
+      break;
+  }
+}
+```
+
+### `wait` / `wait.all`
+
+Waits for all awaitables (signals or promises) to complete successfully.
+
+```tsx
+import { wait } from "rxblox";
+
+// Single awaitable
+const result = wait(asyncSignal);
+
+// Array of awaitables
+const [data1, data2, data3] = wait([signal1, signal2, promise]);
+```
+
+**Throws:** If any awaitable fails
+
+### `wait.any(awaitables)`
+
+Waits for the first awaitable to succeed. Returns `[value, key]` tuple.
+
+```tsx
+const [data, source] = wait.any({
+  primary: primarySignal,
+  fallback: fallbackSignal,
+});
+
+console.log(`${source} succeeded first:`, data);
+```
+
+**Throws:** If all awaitables fail
+
+### `wait.race(awaitables)`
+
+Waits for the first awaitable to complete (success or error). Returns `[value, key]` tuple.
+
+```tsx
+const [data, source] = wait.race({
+  fast: fastSignal,
+  slow: slowSignal,
+});
+```
+
+### `wait.settled(awaitables)`
+
+Waits for all awaitables to settle. Returns array of `PromiseSettledResult`.
+
+```tsx
+// Single awaitable
+const result = wait.settled(asyncSignal);
+
+// Array of awaitables
+const results = wait.settled([signal1, signal2, promise]);
+
+results.forEach((r) => {
+  if (r.status === "fulfilled") {
+    console.log("Success:", r.value);
+  } else {
+    console.log("Error:", r.reason);
+  }
+});
+```
+
+**Awaitable Types:**
+
+- `Signal<Promise<T>>`
+- `Signal<Loadable<T>>`
+- `Promise<T>` or `PromiseLike<T>`
 
 ## Development
 
