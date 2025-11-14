@@ -1,6 +1,6 @@
 {
   "name": "rxblox",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "A reactive state management library",
   "type": "module",
   "main": "./dist/rxblox.umd.js",
@@ -25,7 +25,9 @@
     "dry": "npm pack --dry-run",
     "version:minor": "pnpm version minor",
     "version:major": "pnpm version major",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm build",
+    "pub:minor": "pnpm version minor && pnpm publish",
+    "pub:major": "pnpm version major && pnpm publish"
   },
   "keywords": [
     "state",
