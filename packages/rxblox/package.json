@@ -1,6 +1,6 @@
 {
   "name": "rxblox",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "A reactive state management library",
   "type": "module",
   "main": "./dist/rxblox.umd.js",
@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "@types/lodash": "^4.17.20",
-    "immer": "^10.0.3",
+    "immer": "^10.2.0",
     "lodash": "^4.17.21"
   },
   "devDependencies": {

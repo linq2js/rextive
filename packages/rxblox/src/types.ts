@@ -79,8 +79,20 @@ export type Listener<T> = (value: T) => void;
  * A mutable signal extends Signal with the ability to set/update its value.
  */
 export type MutableSignal<T> = Signal<T> & {
+  /**
+   * Sets the current signal value or updates it using a function.
+   * @param value - The new value or a function that receives the previous value
+   */
   set(value: T | ((prev: T) => T | void)): void;
+  /**
+   * Resets the current signal value to the initial value.
+   */
   reset(): void;
+  /**
+   * Casts the current signal to a readonly signal, preventing consumers from calling mutation methods
+   * @returns A readonly signal that prevents consumers from calling mutation methods
+   */
+  readonly readonly: Signal<T>;
 };
 
 /**

@@ -22,7 +22,7 @@ importers:
         specifier: ^4.17.20
         version: 4.17.20
       immer:
-        specifier: ^10.0.3
+        specifier: ^10.2.0
         version: 10.2.0
       lodash:
         specifier: ^4.17.21

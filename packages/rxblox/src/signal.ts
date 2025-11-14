@@ -177,6 +177,7 @@ export function signal<T>(
 
   // Create the signal object by assigning methods to the get function
   let s: MutableSignal<T> = Object.assign(get, {
+    readonly: undefined as unknown as Signal<T>,
     get: () => get(),
     /**
      * Sets the signal to a new value or updates it using a function.
@@ -187,10 +188,10 @@ export function signal<T>(
      */
     set(value: T | ((prev: T) => T | void)): void {
       const prevValue = get();
-      // If value is a function, use immer to produce an immutable update
+      // If value is a function, use produce to create an immutable update
       const nextValue =
         typeof value === "function"
-          ? (produce(prevValue, value as (prev: T) => T | void) as T)
+          ? (produce(prevValue, value as (draft: T) => T | void) as T)
           : (value as T);
 
       // Only update and notify if the value actually changed
@@ -229,6 +230,8 @@ export function signal<T>(
       recompute();
     },
   });
+
+  Object.assign(s, { readonly: s });
 
   getDispatcher(disposableToken)?.add(() => {
     onCleanup.emitAndClear();
