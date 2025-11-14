@@ -33,7 +33,7 @@ const count = signal(0);
 
 function Counter() {
   console.log("Component rendered"); // Logs ONCE
-  return <div>{rx(() => count())}</div>; // Only this updates
+  return <div>{rx(count)}</div>; // Only this updates
 }
 ```
 
@@ -283,7 +283,7 @@ const Counter = blox<Props>((props, ref) => {
   // - No re-execution of this JSX
   return (
     <div>
-      {rx(() => count())} {/* Only this updates */}
+      {rx(count)} {/* Only this updates */}
       <button onClick={() => count.set(count() + 1)}>+</button>
     </div>
   );
@@ -2210,7 +2210,7 @@ const MyComponent = blox<{ value: number }>((props) => {
     console.log("Props changed:", props.value);
   });
 
-  return <div>{rx(() => local())}</div>;
+  return <div>{rx(local)}</div>;
 });
 
 // With imperative ref
@@ -2225,7 +2225,7 @@ const MyComponent = blox<Props, CounterRef>((props, ref) => {
     reset: () => count.set(0),
   };
 
-  return <div>{rx(() => count())}</div>;
+  return <div>{rx(count)}</div>;
 });
 
 const counterRef = useRef<CounterRef>();
