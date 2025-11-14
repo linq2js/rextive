@@ -150,12 +150,6 @@ export function blox<
     });
 
     /**
-     * Exposes the ref.current value via the forwarded ref.
-     * Updates whenever ref.current changes.
-     */
-    useImperativeHandle(forwardedRef, () => ref.current, [ref.current]);
-
-    /**
      * Ref to store the current props for comparison and proxy access.
      * Used to detect prop changes and provide current prop values to the proxy.
      */
@@ -328,6 +322,12 @@ export function blox<
         cleanup();
       };
     }, [effectDispatcher, rerender, eventDispatcher]);
+
+    /**
+     * Exposes the ref.current value via the forwarded ref.
+     * Updates whenever ref.current changes.
+     */
+    useImperativeHandle(forwardedRef, () => ref.current, [ref.current]);
 
     eventDispatcher.emitRender();
 
