@@ -35,11 +35,11 @@
     "reactive",
     "react"
   ],
-  "author": "",
+  "author": "linq2js",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/linq2js/rxblox/"
   },
   "peerDependencies": {
     "react": "^18.0.0"
