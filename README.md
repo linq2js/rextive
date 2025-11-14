@@ -6,7 +6,6 @@ A monorepo containing the RxBlox state management library and demo application.
 
 - `packages/rxblox` - The main library package (publishable to NPM)
 - `packages/rxblox-demo` - Demo application using the library
-- `packages/rxblox-benchmark` - Performance benchmarks comparing rxblox with other libraries
 
 ## Getting Started
 
@@ -20,10 +19,6 @@ pnpm install
 
 ```bash
 # Run demo app
-pnpm dev
-
-# Run performance benchmarks
-cd packages/rxblox-benchmark
 pnpm dev
 
 # Build library
@@ -50,4 +45,3 @@ pnpm version:minor  # or version:major
 pnpm build
 npm publish
 ```
-
