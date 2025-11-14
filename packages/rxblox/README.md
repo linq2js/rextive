@@ -10,9 +10,11 @@ Signals, computed values, and reactive components with zero boilerplate.
 
 ## Why rxblox?
 
-Traditional React state management re-renders entire component trees when state changes. **rxblox** provides **fine-grained reactivity** - only the exact UI elements that depend on changed state will update.
+**React state management is broken. Let's fix it.**
 
-**The Problem:**
+Traditional React re-renders entire components when state changes. You spend more time managing `useCallback`, `useMemo`, `useEffect` dependency arrays than writing actual features. Component optimization becomes a full-time job.
+
+**rxblox** flips this around with **fine-grained reactivity** - only the exact UI elements that depend on changed state update. No component re-renders. No dependency arrays. No hook rules. Just reactive state that works.
 
 ```tsx
 // ❌ Traditional React - entire component re-renders
@@ -22,8 +24,6 @@ function Counter() {
   return <div>{count}</div>;
 }
 ```
-
-**The Solution:**
 
 ```tsx
 // ✅ rxblox - only the reactive expression updates
@@ -51,6 +51,109 @@ function Counter() {
 - 🎪 **No hooks rules** - Call signals anywhere (conditionally, in loops, etc.)
 - 🔀 **Async signals** - First-class support for async operations with automatic state management
 - 📊 **Loadable states** - Built-in loading/success/error state handling
+
+---
+
+## 🔥 The Dependency Array Problem
+
+The real pain? **Dependency arrays.**
+
+Every React developer knows this hell:
+
+```tsx
+// The dependency array hell we all know too well
+useEffect(() => {
+  fetchData(userId, filters, sortBy);
+}, [userId, filters, sortBy]); // ⚠️ ESLint warning: missing 'fetchData'
+
+// Add fetchData, now it's infinite loop!
+useEffect(() => {
+  fetchData(userId, filters, sortBy);
+}, [userId, filters, sortBy, fetchData]); // 🔥 Infinite re-renders!
+
+// Wrap in useCallback... now fetchData needs dependencies
+const fetchData = useCallback(
+  (userId, filters, sortBy) => {
+    // ...
+  },
+  [
+    /* wait, what goes here? */
+  ]
+);
+
+// Hours later... you have this monstrosity:
+const fetchData = useCallback(
+  (userId, filters, sortBy) => {
+    // ...
+  },
+  [apiToken, config, retryCount]
+); // And if ONE changes, everything breaks
+
+useEffect(() => {
+  fetchData(userId, filters, sortBy);
+}, [userId, filters, sortBy, fetchData]);
+```
+
+**Every. Single. Time.**
+
+You're not writing business logic. You're babysitting dependency arrays. You're debugging why `useEffect` fired 47 times. You're hunting down stale closures at 2 AM because you forgot to add one variable to a dependency array three functions deep.
+
+State management shouldn't require a PhD in React optimization. You shouldn't need to memorize the Rules of Hooks. You shouldn't need a 10-line dependency chain just to fetch data. Your UI should just... _react_.
+
+### The rxblox Solution
+
+**Automatic dependency tracking. Zero arrays.**
+
+Here's that same data fetching with rxblox:
+
+```tsx
+// No dependency arrays. No useCallback. No infinite loops. Just... works.
+const userId = signal(1);
+const filters = signal({ status: "active" });
+const sortBy = signal("date");
+
+const data = signal.async(async ({ track }) => {
+  // Automatic dependency tracking - no arrays needed!
+  const tracked = track({ userId, filters, sortBy });
+
+  const response = await fetch(
+    `/api/data?user=${tracked.userId}&filters=${JSON.stringify(
+      tracked.filters
+    )}&sort=${tracked.sortBy}`
+  );
+  return response.json();
+});
+
+// Changes automatically trigger re-fetch. Previous requests auto-canceled.
+userId.set(2); // Just works. No dependency arrays. No stale closures. No bugs.
+```
+
+**What you get:**
+
+- ❌ No `useCallback` - functions are stable by default
+- ❌ No `useMemo` - computed signals handle it automatically
+- ❌ No dependency arrays - automatic tracking "just works"
+- ❌ No re-renders - only reactive expressions update
+- ❌ No stale closures - signals always have the current value
+- ❌ No Rules of Hooks - call signals anywhere, anytime
+
+**Just reactive state that works the way you think.**
+
+### Why This Matters
+
+This isn't just about performance. It's about **developer experience**.
+
+Every millisecond counts. Every re-render matters. Every line of boilerplate is time stolen from building features. With rxblox, you write what you mean and it just works.
+
+- **Components run once** - No re-renders, no optimization needed
+- **Dependencies auto-track** - No arrays, no stale closures, no bugs
+- **Code is simple** - Write business logic, not React plumbing
+
+Fine-grained reactivity isn't just a feature—it's the future. Solid.js proved it works. Preact Signals brought it to Preact. **rxblox brings the full power of fine-grained reactivity to React**, with first-class TypeScript support and zero dependencies.
+
+Go home on time. Build features, not workarounds.
+
+---
 
 ## Installation
 
@@ -86,6 +189,7 @@ function Counter() {
 ## Table of Contents
 
 - [Why rxblox?](#why-rxblox)
+- [The Dependency Array Problem](#-the-dependency-array-problem)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Core Concepts](#core-concepts)
