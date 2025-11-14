@@ -1,6 +1,6 @@
 {
   "name": "rxblox",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "description": "A reactive state management library",
   "type": "module",
   "main": "./dist/rxblox.umd.js",
@@ -45,22 +45,23 @@
     "react": "^18.0.0"
   },
   "dependencies": {
+    "@types/lodash": "^4.17.20",
     "immer": "^10.0.3",
     "lodash": "^4.17.21"
   },
   "devDependencies": {
-    "@types/lodash": "^4.14.202",
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/react": "^14.1.2",
     "@types/react": "^18.2.45",
     "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^1.1.0",
+    "@vitest/ui": "^1.1.0",
+    "jsdom": "^23.0.1",
     "react": "^18.2.0",
+    "terser": "^5.36.0",
     "typescript": "^5.3.3",
     "vite": "^5.0.8",
     "vite-plugin-dts": "^3.6.4",
-    "vitest": "^1.1.0",
-    "@testing-library/react": "^14.1.2",
-    "@testing-library/jest-dom": "^6.1.5",
-    "@vitest/ui": "^1.1.0",
-    "jsdom": "^23.0.1",
-    "@vitest/coverage-v8": "^1.1.0"
+    "vitest": "^1.1.0"
   }
 }

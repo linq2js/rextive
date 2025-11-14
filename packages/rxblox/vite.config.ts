@@ -17,6 +17,20 @@ export default defineConfig({
       formats: ["es", "umd"],
       fileName: (format) => `rxblox.${format === "es" ? "js" : "umd.js"}`,
     },
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: false,
+        drop_debugger: true,
+        passes: 2,
+      },
+      mangle: {
+        safari10: true,
+      },
+      format: {
+        comments: false,
+      },
+    },
     rollupOptions: {
       external: ["react", "react-dom"],
       output: {
@@ -24,6 +38,11 @@ export default defineConfig({
           react: "React",
           "react-dom": "ReactDOM",
         },
+        manualChunks: undefined,
+      },
+      treeshake: {
+        moduleSideEffects: false,
+        propertyReadSideEffects: false,
       },
     },
   },
