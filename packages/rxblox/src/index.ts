@@ -37,6 +37,8 @@ export * from "./types";
 export { effect } from "./effect";
 export { rx } from "./rx";
 export { provider } from "./provider";
+export { useTracked } from "./useTracked";
+export type { Tracked } from "./useTracked";
 export * from "./loadable";
 export { wait, type Awaitable } from "./wait";
 export { diff } from "./diff";

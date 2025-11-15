@@ -368,4 +368,151 @@ describe("signal", () => {
       expect(calls.length).toBeGreaterThan(0);
     });
   });
+
+  describe("toJSON", () => {
+    it("should return the signal value without tracking", () => {
+      const s = signal(42);
+      expect(s.toJSON()).toBe(42);
+    });
+
+    it("should work with objects", () => {
+      const s = signal({ name: "Alice", age: 30 });
+      const json = s.toJSON();
+      expect(json).toEqual({ name: "Alice", age: 30 });
+    });
+
+    it("should work with arrays", () => {
+      const s = signal([1, 2, 3]);
+      const json = s.toJSON();
+      expect(json).toEqual([1, 2, 3]);
+    });
+
+    it("should work with nested signals in JSON.stringify", () => {
+      const count = signal(5);
+      const user = signal({ name: "Bob", count });
+
+      const json = JSON.stringify(user);
+      expect(json).toBe('{"name":"Bob","count":5}');
+    });
+
+    it("should not track dependencies when called", () => {
+      const source = signal(10);
+      const computed = signal(() => source());
+      const listener = vi.fn();
+
+      computed.on(listener);
+
+      // Call toJSON should use peek and not track
+      const value = computed.toJSON();
+      expect(value).toBe(10);
+
+      // Change source
+      source.set(20);
+
+      // Computed should update
+      expect(computed()).toBe(20);
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it("should work with primitive values", () => {
+      expect(signal(42).toJSON()).toBe(42);
+      expect(signal("hello").toJSON()).toBe("hello");
+      expect(signal(true).toJSON()).toBe(true);
+      expect(signal(null).toJSON()).toBe(null);
+      expect(signal(undefined).toJSON()).toBe(undefined);
+    });
+
+    it("should work with JSON.stringify on primitives", () => {
+      expect(JSON.stringify(signal(42))).toBe("42");
+      expect(JSON.stringify(signal("hello"))).toBe('"hello"');
+      expect(JSON.stringify(signal(true))).toBe("true");
+      expect(JSON.stringify(signal(null))).toBe("null");
+      expect(JSON.stringify(signal(undefined))).toBe(undefined);
+    });
+
+    it("should work with JSON.stringify on objects", () => {
+      const user = signal({ name: "Alice", age: 30 });
+      expect(JSON.stringify(user)).toBe('{"name":"Alice","age":30}');
+    });
+
+    it("should work with JSON.stringify on arrays", () => {
+      const items = signal([1, 2, 3]);
+      expect(JSON.stringify(items)).toBe("[1,2,3]");
+    });
+
+    it("should work with JSON.stringify on complex nested structures", () => {
+      const count = signal(5);
+      const isActive = signal(true);
+      const tags = signal(["react", "signals"]);
+      const user = signal({
+        name: "Bob",
+        count,
+        isActive,
+        tags,
+        metadata: {
+          nested: signal("value"),
+        },
+      });
+
+      const result = JSON.parse(JSON.stringify(user));
+      expect(result).toEqual({
+        name: "Bob",
+        count: 5,
+        isActive: true,
+        tags: ["react", "signals"],
+        metadata: {
+          nested: "value",
+        },
+      });
+    });
+
+    it("should work with JSON.stringify in array of signals", () => {
+      const signals = [signal(1), signal(2), signal(3)];
+      expect(JSON.stringify(signals)).toBe("[1,2,3]");
+    });
+
+    it("should work with JSON.stringify and computed signals", () => {
+      const base = signal(10);
+      const computed = signal(() => base() * 2);
+
+      expect(JSON.stringify(computed)).toBe("20");
+
+      base.set(15);
+      expect(JSON.stringify(computed)).toBe("30");
+    });
+
+    it("should work with JSON.stringify using replacer function", () => {
+      const data = signal({
+        name: "Alice",
+        password: "secret123",
+        age: 30,
+      });
+
+      const json = JSON.stringify(data, (key, value) => {
+        if (key === "password") return undefined;
+        return value;
+      });
+
+      expect(json).toBe('{"name":"Alice","age":30}');
+    });
+
+    it("should not trigger reactivity in JSON.stringify", () => {
+      const source = signal(10);
+      const computed = signal(() => source());
+      const listener = vi.fn();
+
+      computed.on(listener);
+
+      // JSON.stringify should not create tracking
+      const json = JSON.stringify({ value: computed });
+      expect(json).toBe('{"value":10}');
+
+      // Change source
+      source.set(20);
+
+      // Should only notify once from the actual change
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(20);
+    });
+  });
 });

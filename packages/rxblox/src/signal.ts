@@ -311,7 +311,12 @@ export function signal<T>(
     },
   });
 
-  Object.assign(s, { readonly: s });
+  Object.assign(s, {
+    readonly: s,
+    toJSON() {
+      return s.peek();
+    },
+  });
 
   getDispatcher(disposableToken)?.on(() => {
     onCleanup.emitAndClear();

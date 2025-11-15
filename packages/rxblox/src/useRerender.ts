@@ -77,6 +77,7 @@ export function useRerender<TData = void>(
   }, [rerenderWrapper, options.debounce]);
   const debouncedRef = useRef(debounced);
   debouncedRef.current = debounced;
+  isRenderingRef.current = true;
 
   // Only recreate the function when rerenderWrapper changes (stable)
   const rerender = useMemo(() => {
@@ -94,7 +95,7 @@ export function useRerender<TData = void>(
 
   // Track rendering state: set to true during render, false after paint
   useLayoutEffect(() => {
-    isRenderingRef.current = true;
+    isRenderingRef.current = false;
     return () => {
       isRenderingRef.current = false;
     };

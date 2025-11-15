@@ -108,6 +108,12 @@ export type Signal<T> = {
    * @returns An unsubscribe function to remove the listener
    */
   on(listener: (value: T) => void): VoidFunction;
+
+  /**
+   * Returns the current signal value as a JSON-serializable value.
+   * @returns The current signal value as a JSON-serializable value
+   */
+  toJSON(): T;
 };
 
 /**
