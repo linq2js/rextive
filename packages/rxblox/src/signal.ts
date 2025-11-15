@@ -255,6 +255,9 @@ export function signal<T>(
   let s: MutableSignal<T> & { persistInfo: PersistInfo } = Object.assign(get, {
     readonly: undefined as unknown as Signal<T>,
     persistInfo,
+    toJSON() {
+      return s.peek();
+    },
     get: () => get(),
     /**
      * Sets the signal to a new value or updates it using a function.
@@ -313,9 +316,6 @@ export function signal<T>(
 
   Object.assign(s, {
     readonly: s,
-    toJSON() {
-      return s.peek();
-    },
   });
 
   getDispatcher(disposableToken)?.on(() => {
