@@ -83,7 +83,7 @@ describe("signal.history", () => {
   it("should use shouldRecord filter", () => {
     const count = signal(0);
     const hist = history(() => count(), {
-      shouldRecord: (prev, next) => {
+      shouldRecord: (_prev, next) => {
         // Only record even numbers
         return next.value % 2 === 0;
       },
@@ -162,8 +162,14 @@ describe("signal.history", () => {
     vi.runAllTimers();
 
     expect(hist().length).toBe(2);
-    expect(hist()[0].value).toEqual({ name: "John", email: "john@example.com" });
-    expect(hist()[1].value).toEqual({ name: "Jane", email: "john@example.com" });
+    expect(hist()[0].value).toEqual({
+      name: "John",
+      email: "john@example.com",
+    });
+    expect(hist()[1].value).toEqual({
+      name: "Jane",
+      email: "john@example.com",
+    });
   });
 
   it("should maintain sequential indices", () => {
@@ -584,4 +590,3 @@ describe("signal.history", () => {
     });
   });
 });
-
