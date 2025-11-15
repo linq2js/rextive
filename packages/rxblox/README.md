@@ -1,8 +1,7 @@
 # 🎯 rxblox
 
-**Fine-grained reactive state management for React.**
-
-Signals, computed values, and reactive components with automatic dependency tracking and zero boilerplate.
+**Fine-grained reactive state management for React.**  
+Signals, computed values, and reactive components with zero boilerplate.
 
 [![npm version](https://img.shields.io/npm/v/rxblox.svg)](https://www.npmjs.com/package/rxblox)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -11,57 +10,158 @@ Signals, computed values, and reactive components with automatic dependency trac
 
 ## Why rxblox?
 
-Traditional React re-renders entire components when state changes. You manage `useCallback`, `useMemo`, and dependency arrays just to optimize performance.
+**React state management needs better tools.**
 
-**rxblox provides fine-grained reactivity** - only the exact UI that depends on changed state updates. No manual dependency arrays. No Rules of Hooks limitations.
+Traditional React re-renders entire component functions when state changes. You spend significant time managing `useCallback`, `useMemo`, and `useEffect` dependency arrays just to avoid unnecessary work. Component optimization often becomes a maintenance burden.
+
+**rxblox** provides **fine-grained reactivity** - only the exact UI subtrees that depend on changed state re-execute. Component definition phases run once per mount. Reactive expressions (`rx()`) update independently. No manual dependency arrays. No Rules of Hooks limitations.
 
 ```tsx
-// ❌ Traditional React - entire function re-executes
+// ❌ Traditional React - entire function body re-executes
 function Counter() {
   const [count, setCount] = useState(0);
-  console.log("Component executed"); // Runs on EVERY change
+  console.log("Component function executed"); // Runs on EVERY state change
   return <div>{count}</div>;
 }
 ```
 
 ```tsx
-// ✅ rxblox - definition runs once, only rx() updates
-import { signal, blox, rx } from "rxblox";
+// ✅ rxblox - definition runs once, only rx() subtrees re-execute
+import { signal, rx } from "rxblox";
 
 const count = signal(0);
 
 const Counter = blox(() => {
   console.log("Component mounted"); // Runs ONCE
+
   return (
     <div>
-      {rx(count)} {/* Only this updates */}
+      {rx(count)} {/* only this part will update */}
+      <HeavyComponent />
     </div>
-  );
+  ); // Only this subtree re-executes on signal changes
 });
 ```
 
-### No More Dependency Arrays
+### Key Benefits
 
-```tsx
-// ❌ React - Dependency array hell
-useEffect(() => {
-  fetchData(userId, filters, sortBy);
-}, [userId, filters, sortBy, fetchData]); // 🔥 Infinite loops!
-
-// ✅ rxblox - Automatic tracking
-const data = signal.async(async ({ track }) => {
-  const tracked = track({ userId, filters, sortBy });
-  return fetchData(tracked.userId, tracked.filters, tracked.sortBy);
-});
-
-userId.set(2); // Just works. No arrays. No bugs.
-```
+- 🎯 **Fine-grained reactivity** - Subtree updates instead of full component re-execution
+- 🚀 **Minimal boilerplate** - No actions, reducers, or centralized store configuration
+- 🔄 **Computed values** - Automatic dependency tracking and memoization
+- ⚡ **Performance optimizations** - Reduced reconciliation overhead for signal-driven updates
+- 🎨 **Reactive components** - `blox()` components with definition-phase-once semantics
+- 🔌 **Dependency injection** - Provider pattern with fine-grained subscriptions
+- 🧹 **Automatic cleanup** - `blox` lifecycle manages subscriptions and effects
+- 📦 **TypeScript first** - Full type inference and type safety
+- 🪶 **Lightweight** - Small bundle footprint
+- 🎪 **Flexible signal access** - Call signals conditionally, in loops, outside React render
+- 🔀 **Async signals** - Built-in async state management with loading/success/error tracking
+- 📊 **Loadable states** - Discriminated union types for async operation states
 
 ---
 
-## Quick Start
+## 🔥 The Dependency Array Problem
 
-### Installation
+The real pain? **Dependency arrays.**
+
+Every React developer knows this hell:
+
+```tsx
+// The dependency array hell we all know too well
+useEffect(() => {
+  fetchData(userId, filters, sortBy);
+}, [userId, filters, sortBy]); // ⚠️ ESLint warning: missing 'fetchData'
+
+// Add fetchData, now it's infinite loop!
+useEffect(() => {
+  fetchData(userId, filters, sortBy);
+}, [userId, filters, sortBy, fetchData]); // 🔥 Infinite re-renders!
+
+// Wrap in useCallback... now fetchData needs dependencies
+const fetchData = useCallback(
+  (userId, filters, sortBy) => {
+    // ...
+  },
+  [
+    /* wait, what goes here? */
+  ]
+);
+
+// Hours later... you have this monstrosity:
+const fetchData = useCallback(
+  (userId, filters, sortBy) => {
+    // ...
+  },
+  [apiToken, config, retryCount]
+); // And if ONE changes, everything breaks
+
+useEffect(() => {
+  fetchData(userId, filters, sortBy);
+}, [userId, filters, sortBy, fetchData]);
+```
+
+**Every. Single. Time.**
+
+You're not writing business logic. You're babysitting dependency arrays. You're debugging why `useEffect` fired 47 times. You're hunting down stale closures at 2 AM because you forgot to add one variable to a dependency array three functions deep.
+
+State management shouldn't require a PhD in React optimization. You shouldn't need to memorize the Rules of Hooks. You shouldn't need a 10-line dependency chain just to fetch data. Your UI should just... _react_.
+
+### The rxblox Solution
+
+**Automatic dependency tracking. Zero arrays.**
+
+Here's that same data fetching with rxblox:
+
+```tsx
+// No dependency arrays. No useCallback. No infinite loops. Just... works.
+const userId = signal(1);
+const filters = signal({ status: "active" });
+const sortBy = signal("date");
+
+const data = signal.async(async ({ track }) => {
+  // Automatic dependency tracking - no arrays needed!
+  const tracked = track({ userId, filters, sortBy });
+
+  const response = await fetch(
+    `/api/data?user=${tracked.userId}&filters=${JSON.stringify(
+      tracked.filters
+    )}&sort=${tracked.sortBy}`
+  );
+  return response.json();
+});
+
+// Changes automatically trigger re-fetch. Previous requests auto-canceled.
+userId.set(2); // Just works. No dependency arrays. No stale closures. No bugs.
+```
+
+**What you get:**
+
+- ❌ No `useCallback` - functions are stable by default
+- ❌ No `useMemo` - computed signals handle it automatically
+- ❌ No dependency arrays - automatic tracking "just works"
+- ❌ Reduced function re-execution - only reactive expressions update
+- ❌ No stale closures - signals always have the current value
+- ❌ No Rules of Hooks - call signals anywhere, anytime
+
+**Just reactive state that works the way you think.**
+
+### Why This Matters
+
+This isn't just about performance. It's about **developer experience**.
+
+Every millisecond counts. Every re-render matters. Every line of boilerplate is time stolen from building features. With rxblox, you write what you mean and it just works.
+
+- **Components run once** - Reduced function re-execution, no optimization needed
+- **Dependencies auto-track** - No arrays, no stale closures, no bugs
+- **Code is simple** - Write business logic, not React plumbing
+
+Fine-grained reactivity isn't just a feature—it's the future. Solid.js proved it works. Preact Signals brought it to Preact. **rxblox brings the full power of fine-grained reactivity to React**, with first-class TypeScript support and zero dependencies.
+
+Go home on time. Build features, not workarounds.
+
+---
+
+## Installation
 
 ```bash
 npm install rxblox
@@ -71,288 +171,44 @@ pnpm add rxblox
 yarn add rxblox
 ```
 
-### Basic Example
+## Quick Start
 
 ```tsx
 import { signal, rx } from "rxblox";
 
-// Create a signal
 const count = signal(0);
 
-// Use in any component
 function Counter() {
   return (
     <div>
-      <h1>{rx(count)}</h1>
+      {/* Only this reactive expression updates when count changes */}
+      <h1>Count: {rx(count)}</h1>
+
       <button onClick={() => count.set(count() + 1)}>Increment</button>
     </div>
   );
 }
 ```
 
-### Reactive Components with `blox()`
-
-```tsx
-import { blox, signal, rx } from "rxblox";
-
-const Counter = blox(() => {
-  // Local state - definition phase runs once
-  const count = signal(0);
-  const doubled = signal(() => count() * 2);
-
-  return (
-    <div>
-      {rx(() => (
-        <div>
-          Count: {count()} | Doubled: {doubled()}
-        </div>
-      ))}
-      <button onClick={() => count.set(count() + 1)}>+1</button>
-    </div>
-  );
-});
-```
-
-### Async Data Loading
-
-```tsx
-import { signal } from "rxblox";
-
-const userId = signal(1);
-
-// Automatic loading/success/error state management
-const user = signal.async(async ({ track }) => {
-  const { userId: id } = track({ userId });
-
-  const response = await fetch(`/api/users/${id}`);
-  return response.json();
-});
-
-// Changes automatically trigger re-fetch
-userId.set(2);
-```
-
----
-
-## Key Features
-
-- 🎯 **Fine-grained reactivity** - Only dependent UI updates, not entire components
-- 🚀 **Zero boilerplate** - No actions, reducers, or store configuration
-- 🔄 **Computed values** - Automatic dependency tracking and memoization
-- 📊 **Async signals** - Built-in loading/success/error state management
-- ⚡ **Performance** - Minimal re-renders and reconciliation
-- 🎨 **Reactive components** - `blox()` components with once-per-mount execution
-- 🔌 **Dependency injection** - Providers without Context re-render overhead
-- 🧹 **Automatic cleanup** - Effects and subscriptions managed automatically
-- 📦 **TypeScript first** - Full type inference and type safety
-- 🪶 **Lightweight** - Small bundle (17.21 kB gzipped UMD)
-- 🎪 **Flexible** - Use signals anywhere: conditionally, in loops, outside React
-
----
-
-## Core Concepts
-
-### Signals
-
-Reactive state containers that track subscribers and notify on changes.
-
-```tsx
-import { signal } from "rxblox";
-
-const count = signal(0); // Create
-const value = count(); // Read
-count.set(10); // Write
-count.set((prev) => prev + 1); // Update with function
-```
-
-### Computed Signals
-
-Automatically track dependencies and recompute when they change.
-
-```tsx
-const firstName = signal("John");
-const lastName = signal("Doe");
-const fullName = signal(() => `${firstName()} ${lastName()}`);
-
-console.log(fullName()); // "John Doe"
-firstName.set("Jane");
-console.log(fullName()); // "Jane Doe" - auto-recomputed
-```
-
-### Effects
-
-Side effects with automatic dependency tracking.
-
-```tsx
-import { effect } from "rxblox";
-
-effect(() => {
-  console.log("Count:", count());
-  return () => console.log("Cleanup");
-});
-```
-
-### Reactive Expressions
-
-Create fine-grained reactive UI with `rx()`.
-
-```tsx
-function App() {
-  return (
-    <div>
-      {rx(() => (
-        <span>Count: {count()}</span>
-      ))}
-    </div>
-  );
-}
-
-// Shorthand for single signals
-function App() {
-  return <div>Count: {rx(count)}</div>;
-}
-```
-
----
-
-## Comparison: Lines of Code
-
-For a simple counter with increment:
-
-| Solution          | Lines of Code | Files | Notes                   |
-| ----------------- | ------------- | ----- | ----------------------- |
-| **Redux Toolkit** | ~35 lines     | 3     | Slice, store, component |
-| **Zustand**       | ~20 lines     | 1     | Store hook + component  |
-| **Jotai**         | ~25 lines     | 1     | Atoms + Provider + hook |
-| **rxblox**        | **~12 lines** | 1     | Signal + component      |
-
-**rxblox wins on simplicity** with the least code and finest granularity! 🎯
-
 ---
 
 ## Documentation
 
-📚 **[Full Documentation](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/README.md)**
+📚 **[Full Documentation](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/README.md)** - Complete guide with examples and best practices
 
-Comprehensive guides covering:
+### Quick Links
 
-- Core Concepts & API Reference
-- Reactive Components (`blox`)
-- Async Signals & Data Loading
-- Providers & Dependency Injection
-- Actions & State Tracking
-- Patterns & Best Practices
-- Performance & Memory Optimization
-- React Compatibility & SSR
-- Migration Guides
+- **[Core Concepts](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/core-concepts.md)** - Signals, computed values, effects, reactive components, providers, async signals, actions
+- **[API Reference](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/api-reference.md)** - Complete API documentation
+- **[Patterns & Best Practices](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/patterns.md)** - Common patterns, organizing signals, composable logic
+- **[Comparisons](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/comparisons.md)** - How rxblox compares to Redux, Zustand, Jotai, and others
 
----
+### Additional Resources
 
-## Examples
-
-### Global State
-
-```tsx
-// store.ts
-export const userStore = {
-  user: signal<User | null>(null),
-  isLoggedIn: signal(() => userStore.user() !== null),
-  login: (user: User) => userStore.user.set(user),
-  logout: () => userStore.user.set(null),
-};
-
-// Component.tsx
-const Profile = blox(() => {
-  return rx(() => {
-    const user = userStore.user();
-    return user ? <div>Hello, {user.name}</div> : <div>Please log in</div>;
-  });
-});
-```
-
-### Form State
-
-```tsx
-const LoginForm = blox(() => {
-  const email = signal("");
-  const password = signal("");
-  const isValid = signal(() => email().includes("@") && password().length >= 6);
-
-  const handleSubmit = () => {
-    if (!isValid()) return;
-    console.log({ email: email(), password: password() });
-  };
-
-  return rx(() => (
-    <form onSubmit={handleSubmit}>
-      <input value={email()} onChange={(e) => email.set(e.target.value)} />
-      <input
-        type="password"
-        value={password()}
-        onChange={(e) => password.set(e.target.value)}
-      />
-      <button disabled={!isValid()}>Login</button>
-    </form>
-  ));
-});
-```
-
-### Data Fetching with Dependencies
-
-```tsx
-const UserPosts = blox<{ userId: number }>((props) => {
-  const posts = signal.async(async ({ track }) => {
-    const userId = props.userId;
-    const response = await fetch(`/api/users/${userId}/posts`);
-    return response.json();
-  });
-
-  return rx(() => {
-    const { status, value } = posts();
-
-    if (status === "loading") return <div>Loading...</div>;
-    if (status === "error") return <div>Error loading posts</div>;
-
-    return (
-      <ul>
-        {value.map((post) => (
-          <li key={post.id}>{post.title}</li>
-        ))}
-      </ul>
-    );
-  });
-});
-```
-
----
-
-## Architecture
-
-Want to understand how rxblox works under the hood?
-
-📐 **[Architecture Documentation](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/ARCHITECTURE.md)**
-
-Learn about:
-
-- Signal-based reactivity system
-- Dispatcher and dependency tracking
-- Component lifecycle management
-- Performance optimization strategies
-- Design decisions and trade-offs
-
----
-
-## Contributing
-
-Contributions are welcome! See our **[Contributing Guide](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/README.md#contributing)** for details.
-
-### Development
-
-```bash
-pnpm install
-pnpm test
-pnpm build
-```
+- **[Lifecycle & Cleanup](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/lifecycle-cleanup.md)** - Memory management and cleanup
+- **[Performance & Memory](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/performance.md)** - Optimization guide
+- **[Architecture](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/ARCHITECTURE.md)** - Internal architecture and design decisions
+- **[Contributing](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/contributing.md)** - Guidelines for contributing to rxblox
 
 ---
 
@@ -360,16 +216,4 @@ pnpm build
 
 MIT © 2025
 
----
-
-## Links
-
-- 📦 [NPM Package](https://www.npmjs.com/package/rxblox)
-- 📚 [Full Documentation](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/README.md)
-- 📐 [Architecture](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/ARCHITECTURE.md)
-- 🐛 [Issue Tracker](https://github.com/linq2js/rxblox/issues)
-- 💬 [Discussions](https://github.com/linq2js/rxblox/discussions)
-
----
-
-**Made with ❤️ for the React community**
+Made with ❤️ for the React community

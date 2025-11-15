@@ -8,6 +8,7 @@ import {
   useLayoutEffect,
   useMemo,
   useState,
+  ReactElement,
 } from "react";
 import { trackingDispatcher, trackingToken } from "./trackingDispatcher";
 import { emitter } from "./emitter";
@@ -241,7 +242,7 @@ export function rx<
           undefined;
     }
   ) => ReactNode
-): ReactNode;
+): ReactElement;
 
 /**
  * Creates a reactive expression that automatically updates when its signal dependencies change.

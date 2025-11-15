@@ -1,4 +1,5 @@
-import { withDispatchers } from "./dispatcher";
+import { getDispatcher, withDispatchers } from "./dispatcher";
+import { disposableToken } from "./disposableDispatcher";
 import { addEffect } from "./effectDispatcher";
 import { emitter } from "./emitter";
 import { trackingDispatcher, trackingToken } from "./trackingDispatcher";
@@ -87,9 +88,7 @@ export function effect(
   const cleanup = () => {
     // Execute all cleanup functions (effect cleanup and signal unsubscribes from previous run)
     // Pass undefined since cleanup functions don't take parameters
-    onCleanup.emit(undefined);
-    // Clear all registered cleanup functions to prepare for new subscriptions
-    onCleanup.clear();
+    onCleanup.emitAndClear(undefined);
   };
 
   /**
@@ -121,6 +120,8 @@ export function effect(
 
   // Register effect with dispatcher (default dispatcher runs it immediately)
   addEffect(effectImpl);
+
+  getDispatcher(disposableToken)?.add(cleanup);
 
   // Return the effect object (for custom dispatchers that don't run immediately)
   return effectImpl;

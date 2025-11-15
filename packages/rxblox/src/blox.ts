@@ -25,7 +25,6 @@ import { EventDispatcher, eventToken } from "./eventDispatcher";
 import once from "lodash/once";
 import { trackingToken } from "./trackingDispatcher";
 import { disposableToken } from "./disposableDispatcher";
-
 /**
  * Creates a reactive component that tracks props as signals and manages effects.
  *
@@ -76,16 +75,15 @@ import { disposableToken } from "./disposableDispatcher";
  * timerRef.current?.start();
  * ```
  */
-export function blox<TProps extends Record<string, unknown>>(
+export function blox<TProps extends object>(
   builder: (props: TProps) => ReactNode
 ): FC<PropsWithoutRef<TProps>>;
-export function blox<TProps extends Record<string, unknown>, TRef>(
+export function blox<TProps extends object, TRef>(
   builder: (props: TProps, ref: Ref<TRef>) => ReactNode
 ): FC<PropsWithoutRef<TProps> & { ref?: ForwardedRef<TRef | undefined> }>;
-export function blox<
-  TProps extends Record<string, unknown> & { ref?: RefObject<TRef> },
-  TRef
->(builder: (props: TProps, ref: Ref<TRef>) => ReactNode) {
+export function blox<TProps extends object & { ref?: RefObject<TRef> }, TRef>(
+  builder: (props: TProps, ref: Ref<TRef>) => ReactNode
+) {
   /**
    * Internal component that manages reactive props and effects.
    *

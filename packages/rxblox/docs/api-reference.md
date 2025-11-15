@@ -1,0 +1,1436 @@
+# API Reference
+
+Complete API documentation for all rxblox functions and utilities.
+
+## Table of Contents
+
+- [signal](#signalt)
+- [signal.async](#signalasynct)
+- [signal.snapshot](#signalsnapshott)
+- [signal.history](#signalhistoryt)
+- [diff](#difft)
+- [effect](#effect)
+- [rx](#rx)
+- [blox](#blox)
+- [blox.onRender](#bloxonrender)
+- [blox.onMount](#bloxonmount)
+- [blox.onUnmount](#bloxonunmount)
+- [blox.handle](#bloxhandlet)
+- [provider](#providert)
+- [loadable](#loadable)
+- [isLoadable](#isloadable)
+- [wait / wait.all](#wait--waitall)
+- [wait.any](#waitany)
+- [wait.race](#waitrace)
+- [wait.settled](#waitsettled)
+- [action](#action)
+- [action.cancellable](#actioncancellable)
+- [action.aborter](#actionaborter)
+
+---
+
+## `signal<T>(value, options?)`
+
+Creates a reactive signal.
+
+```tsx
+// Static value
+const count = signal(0);
+
+// Computed value (auto-tracks dependencies)
+const doubled = signal(() => count() * 2);
+
+// Computed with explicit tracking
+const result = signal(({ track }) => {
+  const { condition, a, b } = track({ condition, a, b });
+  return condition ? a : b;
+});
+
+// With custom equality
+const user = signal(
+  { id: 1, name: "John" },
+  { equals: (a, b) => a.id === b.id }
+);
+```
+
+**Methods:**
+
+- `signal()` - Read value and track as dependency
+- `signal.peek()` - Read value without tracking
+- `signal.set(value | updater)` - Update value
+- `signal.on(listener)` - Subscribe to changes (returns unsubscribe function)
+- `signal.reset()` - Clear cache and recompute (for computed signals)
+
+**Context Parameter (for computed signals):**
+
+- `track(signals)` - Creates a proxy for explicit dependency tracking
+
+---
+
+## `signal.async<T>(fn)`
+
+Creates an async signal that manages loading/success/error states automatically.
+
+```tsx
+const user = signal.async(async ({ track, abortSignal }) => {
+  const tracked = track({ userId });
+
+  const response = await fetch(`/api/users/${tracked.userId}`, {
+    signal: abortSignal,
+  });
+
+  return response.json();
+});
+
+// Returns Loadable<T>
+const loadable = user();
+if (loadable.status === "success") {
+  console.log(loadable.value);
+}
+```
+
+**Context Parameter:**
+
+- `track(signals)` - Track signal dependencies (works even after `await`)
+- `abortSignal` - AbortSignal for request cancellation
+
+**Returns:** `Signal<Loadable<T>>`
+
+**Key Features:**
+
+- Lazy evaluation (only starts when first accessed)
+- Automatic re-fetch when dependencies change
+- Previous requests automatically aborted
+- Promise state caching
+
+---
+
+## `signal.snapshot<T>(input)`
+
+Deep traverses an object or array and extracts all signal values, returning a plain JavaScript value.
+
+This is useful for:
+- **API submission** - Prepare reactive state for POST/PUT requests
+- **Logging** - Capture current state for debugging
+- **Serialization** - Convert reactive state to JSON
+- **Testing** - Get snapshot of state for assertions
+
+```tsx
+import { signal } from "rxblox";
+
+const todos = signal([
+  { id: 1, text: signal("Buy milk"), completed: signal(false) },
+  { id: 2, text: signal("Walk dog"), completed: signal(true) },
+]);
+const filter = signal("all");
+
+// Extract all signal values
+const data = signal.snapshot({ todos, filter });
+// {
+//   todos: [
+//     { id: 1, text: "Buy milk", completed: false },
+//     { id: 2, text: "Walk dog", completed: true }
+//   ],
+//   filter: "all"
+// }
+
+// Use for API submission
+await fetch("/api/todos", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(data),
+});
+```
+
+**Returns:** `T` - A plain JavaScript value with all signals replaced by their current values
+
+**Key Features:**
+
+- ✅ **Deep traversal** - Handles nested objects and arrays
+- ✅ **Mixed values** - Preserves plain values, only extracts signals
+- ✅ **Non-reactive** - Uses `signal.peek()` internally (no tracking)
+- ✅ **Type-safe** - Preserves input structure types
+- ✅ **Circular-safe** - Handles circular references gracefully
+
+**Examples:**
+
+```tsx
+// Nested structures
+const user = {
+  name: signal("John"),
+  profile: {
+    email: signal("john@example.com"),
+    settings: {
+      theme: signal("dark"),
+    },
+  },
+};
+
+const data = signal.snapshot(user);
+// { name: "John", profile: { email: "john@...", settings: { theme: "dark" } } }
+
+// Arrays with signals
+const items = [signal(1), signal(2), signal(3)];
+const arr = signal.snapshot(items);
+// [1, 2, 3]
+
+// Signal containing complex structure
+const appState = signal({
+  users: [{ id: 1, active: signal(true) }],
+  config: { debug: signal(false) },
+});
+
+const state = signal.snapshot(appState);
+// { users: [{ id: 1, active: true }], config: { debug: false } }
+
+// Mixed plain and reactive values
+const form = {
+  id: 123, // plain value
+  name: signal("Product"),
+  price: 99.99, // plain value
+  tags: [signal("new"), "featured", signal("sale")], // mixed
+};
+
+const formData = signal.snapshot(form);
+// { id: 123, name: "Product", price: 99.99, tags: ["new", "featured", "sale"] }
+```
+
+**Real-World Use Cases:**
+
+```tsx
+// Form submission
+const UserForm = blox(() => {
+  const name = signal("");
+  const email = signal("");
+  const notifications = signal({ email: true, push: false });
+
+  const handleSubmit = async () => {
+    const data = signal.snapshot({ name, email, notifications });
+
+    await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+  };
+
+  return rx(() => (
+    <form onSubmit={handleSubmit}>
+      {/* form fields */}
+    </form>
+  ));
+});
+
+// Logging for debugging
+const logState = () => {
+  const state = signal.snapshot(appState);
+  console.log("Current state:", state);
+};
+```
+
+**Important Notes:**
+
+- `signal.snapshot()` does **not** track dependencies - it uses `signal.peek()` internally
+- Preserves `Date`, `RegExp`, and other special objects
+- Returns a plain JavaScript value (not a wrapper object)
+- For primitives, returns the unwrapped value directly
+
+---
+
+## `effect(fn)`
+
+Creates a reactive effect that runs when dependencies change.
+
+```tsx
+const cleanup = effect(() => {
+  console.log("Count:", count());
+
+  // Optional cleanup
+  return () => console.log("Cleanup");
+});
+
+// Manually run effect
+cleanup.run();
+```
+
+**Returns:** Effect object with `run()` method
+
+---
+
+## `rx(expression)`
+
+Creates a reactive expression that re-renders when dependencies change.
+
+```tsx
+{
+  rx(() => <div>{count()}</div>);
+}
+
+// Can access multiple signals
+{
+  rx(() => (
+    <div>
+      {firstName()} {lastName()} - Count: {count()}
+    </div>
+  ));
+}
+```
+
+**Returns:** ReactNode
+
+---
+
+## `blox<Props>(builder)`
+
+Creates a reactive component.
+
+```tsx
+const MyComponent = blox<{ value: number }>((props) => {
+  const local = signal(props.value);
+
+  effect(() => {
+    console.log("Props changed:", props.value);
+  });
+
+  return <div>{rx(local)}</div>;
+});
+
+// With imperative ref
+interface CounterRef {
+  reset: () => void;
+}
+
+const MyComponent = blox<Props, CounterRef>((props, ref) => {
+  const count = signal(0);
+
+  ref({
+    reset: () => count.set(0),
+  });
+
+  return <div>{rx(count)}</div>;
+});
+
+const counterRef = useRef<CounterRef>();
+<MyComponent ref={counterRef} />;
+counterRef.current?.reset();
+```
+
+**Returns:** Memoized React component
+
+---
+
+## `blox.onRender(callback)`
+
+Execute code during React's render phase, enabling React hooks usage.
+
+```tsx
+const MyComponent = blox(() => {
+  const count = signal(0);
+
+  // Define variables to hold hook results
+  let history: ReturnType<typeof useHistory> | undefined;
+  let location: ReturnType<typeof useLocation> | undefined;
+
+  // Call React hooks inside blox.onRender()
+  blox.onRender(() => {
+    history = useHistory();
+    location = useLocation();
+
+    useEffect(() => {
+      // Note: No signal tracking in blox.onRender() context
+      console.log("Count:", count());
+    }, []);
+  });
+
+  // Use hook results in event handlers
+  const handleNavigate = () => {
+    history?.push("/home");
+  };
+
+  return (
+    <div>
+      {rx(() => (
+        <div>{count()}</div>
+      ))}
+      <button onClick={handleNavigate}>Go Home</button>
+    </div>
+  );
+});
+```
+
+**When to use:**
+
+- Integrating with React Router or other hook-based libraries
+- Using third-party custom hooks
+- Accessing React context via `useContext`
+
+**Important:** Signals accessed inside `blox.onRender()` are NOT tracked as dependencies - there is no tracking context in `blox.onRender()`.
+
+---
+
+## `blox.onMount(callback)`
+
+Execute code immediately after component mounts.
+
+```tsx
+const MyComponent = blox(() => {
+  blox.onMount(() => {
+    console.log("Component mounted");
+  });
+
+  return <div>Content</div>;
+});
+```
+
+---
+
+## `blox.onUnmount(callback)`
+
+Register cleanup callback that runs on component unmount.
+
+```tsx
+const MyComponent = blox(() => {
+  blox.onUnmount(() => {
+    console.log("Cleanup on unmount");
+  });
+
+  return <div>Content</div>;
+});
+```
+
+---
+
+## `blox.handle<T>(callback)`
+
+Creates a handle to capture values from React hooks during the render phase.
+
+This is useful in `blox` components where you need to use React hooks, but the component body only runs once. The callback runs on every render via `blox.onRender()`, and the returned value is accessible via `.current`.
+
+**Important**: The captured value is only available inside `rx()` expressions or event handlers, not in the component definition phase (which runs only once).
+
+```tsx
+import { blox, signal, rx } from "rxblox";
+import { useHistory, useLocation } from "react-router";
+
+const MyComponent = blox(() => {
+  const count = signal(0);
+
+  // Capture React hooks
+  const router = blox.handle(() => {
+    const history = useHistory();
+    const location = useLocation();
+    return { history, location };
+  });
+
+  const handleNavigate = () => {
+    // ✅ Available in event handlers
+    router.current?.history.push("/home");
+  };
+
+  return (
+    <div>
+      {/* ✅ Available in rx() expressions */}
+      {rx(() => (
+        <div>Path: {router.current?.location.pathname}</div>
+      ))}
+      <button onClick={handleNavigate}>Go Home</button>
+    </div>
+  );
+});
+```
+
+**Returns:** `Handle<T>` - An object with a `.current` property
+
+**Type:**
+
+```ts
+type Handle<T> = {
+  readonly current: T | undefined;
+};
+```
+
+**Notes:**
+
+- The `callback` runs on every component render
+- The value is `undefined` during the definition phase
+- Must use `rx()` to access the value in JSX
+- Can access directly in event handlers
+
+---
+
+## `provider<T>(name, initialValue, options?)`
+
+Creates a provider for dependency injection of reactive signals.
+
+**⚠️ This is NOT React Context!** Providers don't cause re-renders. Only `rx()` and `effect()` react to changes.
+
+```tsx
+const [withValue, ValueProvider] = provider("myValue", 0);
+
+// In parent
+<ValueProvider value={currentValue}>
+  <Child />
+</ValueProvider>;
+
+// In child (inside blox component)
+const Child = blox(() => {
+  const value = withValue(); // Returns Signal<T> (read-only)
+
+  // ❌ Wrong: Won't update
+  return <div>{value()}</div>;
+
+  // ✅ Correct: Use rx()
+  return rx(() => <div>{value()}</div>);
+});
+```
+
+**Returns:** `[withXXX, XXXProvider]` tuple:
+
+- `withXXX()` - Function that returns the signal (must be called inside provider tree)
+- `Provider` - React component with `{ value: T | Signal<T>; children: ReactNode }` props
+
+**Options:**
+
+- `equals?: (a: T, b: T) => boolean` - Custom equality function
+
+**Signal Support:**
+
+Providers accept both plain values and signals as the `value` prop:
+
+```tsx
+const [withTheme, ThemeProvider] = provider("theme", "light");
+
+// ✅ With plain value
+<ThemeProvider value="dark">
+  <Child />
+</ThemeProvider>;
+
+// ✅ With signal - updates consumers when signal changes
+const themeSignal = signal("dark");
+<ThemeProvider value={themeSignal}>
+  <Child />
+</ThemeProvider>;
+
+// Signal changes propagate to all consumers
+themeSignal.set("light"); // All consumers update automatically
+
+// ✅ With computed signal
+const isDark = signal(false);
+const theme = signal(() => (isDark() ? "dark" : "light"));
+<ThemeProvider value={theme}>
+  <Child />
+</ThemeProvider>;
+```
+
+**When to use signal values:**
+
+- ✅ Sharing global signals across the component tree
+- ✅ Providing computed/derived values to children
+- ✅ Coordinating state between parent and deeply nested children
+- ✅ Creating reactive themes, settings, or configuration
+
+The provider automatically:
+
+- Uses `.peek()` to get the initial value (avoids creating dependency)
+- Subscribes to signal changes
+- Updates all consumers when the signal changes
+- Cleans up subscriptions on unmount
+- Lazily creates the internal provider signal only when accessed
+
+---
+
+## `loadable(status, value, promise?)`
+
+Creates a Loadable object representing the state of an async operation.
+
+```tsx
+import { loadable } from "rxblox";
+
+// Loading state
+const loading = loadable("loading", promise);
+
+// Success state
+const success = loadable("success", data);
+
+// Error state
+const error = loadable("error", errorObj);
+```
+
+**Type:**
+
+```tsx
+type Loadable<T> =
+  | LoadingLoadable<T> // { status: "loading", value: undefined, error: undefined, loading: true, promise }
+  | SuccessLoadable<T> // { status: "success", value: T, error: undefined, loading: false, promise }
+  | ErrorLoadable<T>; // { status: "error", value: undefined, error: unknown, loading: false, promise }
+```
+
+---
+
+## `isLoadable(value)`
+
+Type guard to check if a value is a Loadable.
+
+```tsx
+import { isLoadable } from "rxblox";
+
+if (isLoadable(value)) {
+  // TypeScript knows value is Loadable<T>
+  switch (value.status) {
+    case "loading": // ...
+    case "success":
+      console.log(value.value);
+      break;
+    case "error":
+      console.log(value.error);
+      break;
+  }
+}
+```
+
+---
+
+## `wait` / `wait.all`
+
+Waits for all awaitables (signals or promises) to complete successfully.
+
+**⚠️ Valid contexts: `rx()`, `blox()`, `signal.async()`, `xxxLogic()`/`withXXX()`. NOT in regular `signal()`.**
+
+```tsx
+import { wait } from "rxblox";
+
+// ✅ In signal.async()
+const combined = signal.async(async () => wait([signal1, signal2]));
+
+// ✅ In rx()
+function Component() {
+  return rx(() => {
+    const data = wait(asyncSignal);
+    return <div>{data}</div>;
+  });
+}
+
+// ✅ In blox()
+const MyComponent = blox(() => {
+  const data = wait(asyncSignal);
+  return <div>{data}</div>;
+});
+
+// ✅ In custom logic
+function withData() {
+  return wait(asyncSignal);
+}
+
+// Single awaitable
+const result = wait(asyncSignal);
+
+// Array of awaitables
+const [data1, data2, data3] = wait([signal1, signal2, promise]);
+```
+
+**Throws:**
+
+- Throws promise if any awaitable is loading (for React Suspense)
+- Throws error if any awaitable fails (for ErrorBoundary)
+
+**Returns:** Unwrapped data when all awaitables are ready
+
+---
+
+## `wait.any(awaitables)`
+
+Waits for the first awaitable to succeed. Returns `[value, key]` tuple.
+
+**⚠️ Valid contexts: `rx()`, `blox()`, `signal.async()`, `xxxLogic()`/`withXXX()`. NOT in regular `signal()`.**
+
+```tsx
+const [data, source] = wait.any({
+  primary: primarySignal,
+  fallback: fallbackSignal,
+});
+
+console.log(`${source} succeeded first:`, data);
+```
+
+**Throws:**
+
+- Throws promise if all awaitables are loading (for React Suspense)
+- Throws error if all awaitables fail (for ErrorBoundary)
+
+**Returns:** `[value, key]` tuple when first awaitable succeeds
+
+---
+
+## `wait.race(awaitables)`
+
+Waits for the first awaitable to complete (success or error). Returns `[value, key]` tuple.
+
+**⚠️ Valid contexts: `rx()`, `blox()`, `signal.async()`, `xxxLogic()`/`withXXX()`. NOT in regular `signal()`.**
+
+```tsx
+const [data, source] = wait.race({
+  fast: fastSignal,
+  slow: slowSignal,
+});
+```
+
+**Throws:**
+
+- Throws promise if all awaitables are loading (for React Suspense)
+- Throws error if first completed awaitable fails (for ErrorBoundary)
+
+**Returns:** `[value, key]` tuple from first completed awaitable
+
+---
+
+## `wait.settled(awaitables)`
+
+Waits for all awaitables to settle. Returns array of `PromiseSettledResult`.
+
+**⚠️ Valid contexts: `rx()`, `blox()`, `signal.async()`, `xxxLogic()`/`withXXX()`. NOT in regular `signal()`.**
+
+```tsx
+// Single awaitable
+const result = wait.settled(asyncSignal);
+
+// Array of awaitables
+const results = wait.settled([signal1, signal2, promise]);
+
+results.forEach((r) => {
+  if (r.status === "fulfilled") {
+    console.log("Success:", r.value);
+  } else {
+    console.log("Error:", r.reason);
+  }
+});
+```
+
+**Throws:**
+
+- Throws promise if any awaitable is loading (for React Suspense)
+
+**Returns:** Array of `PromiseSettledResult` when all awaitables have settled (does not throw errors)
+
+**Awaitable Types:**
+
+- `Signal<Promise<T>>`
+- `Signal<Loadable<T>>`
+- `Promise<T>` or `PromiseLike<T>`
+
+---
+
+## `action<TResult, TArgs>(fn, options?)`
+
+Creates an action that tracks execution state.
+
+```tsx
+// Basic action
+const saveUser = action(async (user: User) => {
+  const response = await fetch("/api/users", {
+    method: "POST",
+    body: JSON.stringify(user),
+  });
+  return response.json();
+});
+
+await saveUser({ name: "John" });
+console.log(saveUser.status); // "success"
+console.log(saveUser.result); // User object
+
+// With callbacks
+const deleteUser = action(
+  async (id: number) => {
+    await fetch(`/api/users/${id}`, { method: "DELETE" });
+  },
+  {
+    on: {
+      success: () => console.log("Deleted"),
+      error: (err) => console.error(err),
+    },
+  }
+);
+```
+
+**Properties:**
+
+- `action.status` - Current status: `"idle" | "loading" | "success" | "error"`
+- `action.result` - Last successful result (undefined if no success yet)
+- `action.error` - Last error (undefined if no error yet)
+- `action.calls` - Number of times the action has been called
+- `action.on(listener)` - Subscribe to action state changes (returns unsubscribe function)
+- `action.reset()` - Reset to idle state
+
+**Subscribing to action state changes:**
+
+```tsx
+const saveUser = action(async (user: User) => {
+  const response = await fetch("/api/users", {
+    method: "POST",
+    body: JSON.stringify(user),
+  });
+  return response.json();
+});
+
+// Subscribe to all state changes
+const unsubscribe = saveUser.on((loadable) => {
+  if (!loadable) {
+    console.log("Action idle");
+  } else if (loadable.status === "loading") {
+    console.log("Saving user...");
+  } else if (loadable.status === "success") {
+    console.log("User saved:", loadable.value);
+  } else if (loadable.status === "error") {
+    console.error("Save failed:", loadable.error);
+  }
+});
+
+// The subscriber is called for every state change
+await saveUser({ name: "John" }); // Logs: "Saving user..." then "User saved: ..."
+
+// Unsubscribe when done
+unsubscribe();
+```
+
+The `on()` method receives a `Loadable<T>` object (or `undefined` for idle state) representing the current action state. This is useful for:
+
+- Reacting to action state changes in effects or other signals
+- Implementing custom loading indicators
+- Logging or analytics
+- Coordinating multiple actions
+
+**Note:** The `on()` subscription provides the full `Loadable` state, while event callbacks in `options.on` provide unwrapped values.
+
+---
+
+## `action.cancellable<TResult, TArgs>(fn, options?)`
+
+Creates a cancellable action with cancellation capabilities.
+
+The function receives `AbortSignal` as its first parameter.
+
+```tsx
+const fetchUser = action.cancellable(
+  async (signal: AbortSignal, userId: number) => {
+    const response = await fetch(`/api/users/${userId}`, { signal });
+    return response.json();
+  }
+);
+
+const promise = fetchUser(123);
+
+// Cancel the request
+fetchUser.cancel();
+
+// Check if cancelled
+console.log(fetchUser.cancelled); // true
+
+// Next call gets a fresh signal
+await fetchUser(456);
+```
+
+**Additional Properties:**
+
+- `action.cancel()` - Cancel the currently running action
+- `action.cancelled` - Whether the action has been cancelled
+
+**Options:**
+
+```tsx
+type ActionOptions<TResult> = {
+  on?: {
+    init?: () => void; // Called when action is invoked
+    loading?: () => void; // Called when async action starts
+    success?: (result: TResult) => void; // Called on success
+    error?: (error: unknown) => void; // Called on error
+    done?: (error: unknown | undefined, result: TResult | undefined) => void;
+    reset?: () => void; // Called when reset() is called
+  };
+};
+```
+
+---
+
+## `action.aborter()`
+
+Creates an AbortController wrapper with reset capability.
+
+Useful when you need manual control over AbortController lifecycle outside of `action.cancellable()`.
+
+```tsx
+import { action } from "rxblox";
+
+const ac = action.aborter();
+
+// Use the signal
+fetch("/api/data", { signal: ac.signal });
+
+// Abort
+ac.abort();
+
+// Reset to a fresh controller
+ac.reset();
+```
+
+---
+
+## `diff<T>(current, previous)`
+
+Compares two JavaScript values and returns only the changed properties.
+
+This utility works with **any** JavaScript values (not signal-specific). Useful for:
+- **Change tracking** - Detect what changed between states
+- **Optimized API calls** - Send only modified fields with PATCH requests
+- **Dirty checking** - Detect if form data was modified
+- **Undo/redo** - Track state changes over time
+
+```tsx
+import { diff } from "rxblox";
+
+const before = { count: 0, name: "John", age: 30 };
+const after = { count: 5, name: "John", age: 30 };
+
+const delta = diff(after, before);
+// { count: 5 }  (only changed properties)
+```
+
+**Returns:** `Partial<T> | undefined` - Object with only changed properties, or `undefined` if no changes
+
+**Key Features:**
+
+- ✅ **Deep comparison** - Handles nested objects and arrays
+- ✅ **Optimized** - Returns only what changed
+- ✅ **Flexible** - Works with any JavaScript values
+- ✅ **Array detection** - Returns entire array if any element changes
+
+**Examples:**
+
+```tsx
+// Nested object changes
+const before = {
+  user: { name: "John", age: 30 },
+  count: 5,
+};
+const after = {
+  user: { name: "Jane", age: 30 },
+  count: 5,
+};
+
+const delta = diff(after, before);
+// { user: { name: "Jane" } }  (only nested changes)
+
+// Detect new properties
+const delta2 = diff(
+  { count: 0, name: "John" },
+  { count: 0 }
+);
+// { name: "John" }
+
+// Detect deleted properties
+const delta3 = diff(
+  { count: 0 },
+  { count: 0, name: "John" }
+);
+// { name: undefined }
+
+// No changes returns undefined
+const delta4 = diff(
+  { count: 0, name: "John" },
+  { count: 0, name: "John" }
+);
+// undefined
+```
+
+**Real-World Use Cases:**
+
+```tsx
+// 1. Form change tracking with signals
+const FormWithChanges = blox(() => {
+  const name = signal("John");
+  const email = signal("john@example.com");
+  const age = signal(30);
+
+  const initial = signal.snapshot({ name, email, age });
+
+  const handleSubmit = async () => {
+    const current = signal.snapshot({ name, email, age });
+    const changes = diff(current, initial);
+
+    if (!changes) {
+      alert("No changes to save");
+      return;
+    }
+
+    // Send only changed fields
+    await fetch("/api/users/123", {
+      method: "PATCH",
+      body: JSON.stringify(changes),
+    });
+  };
+
+  return rx(() => (
+    <form onSubmit={handleSubmit}>
+      {/* form fields */}
+    </form>
+  ));
+});
+
+// 2. Optimistic updates with rollback
+const saveSettings = async (settings: any) => {
+  const before = signal.snapshot(settings);
+
+  try {
+    settings.theme.set("dark");
+    const after = signal.snapshot(settings);
+    const changes = diff(after, before);
+
+    // Send only changes to API
+    await api.updateSettings(changes);
+  } catch (error) {
+    // Rollback on error
+    Object.assign(settings, before);
+  }
+};
+
+// 3. Dirty check indicator
+const FormWithDirtyCheck = blox(() => {
+  const name = signal("John");
+  const email = signal("john@example.com");
+
+  const initial = signal.snapshot({ name, email });
+
+  const isDirty = signal(() => {
+    const current = signal.snapshot({ name, email });
+    return diff(current, initial) !== undefined;
+  });
+
+  const changes = signal(() => {
+    const current = signal.snapshot({ name, email });
+    return diff(current, initial);
+  });
+
+  return rx(() => (
+    <div>
+      <input value={name()} onChange={(e) => name.set(e.target.value)} />
+      <input value={email()} onChange={(e) => email.set(e.target.value)} />
+      {isDirty() && (
+        <div>
+          <p>Unsaved changes: {JSON.stringify(changes())}</p>
+          <button>Save Changes</button>
+        </div>
+      )}
+    </div>
+  ));
+});
+
+// 4. Change history tracking
+const changeHistory: any[] = [];
+
+const trackChange = () => {
+  const current = signal.snapshot(appState);
+  const previous = changeHistory[changeHistory.length - 1];
+
+  if (previous) {
+    const delta = diff(current, previous);
+    if (delta) {
+      changeHistory.push({ timestamp: Date.now(), changes: delta });
+    }
+  } else {
+    changeHistory.push(current);
+  }
+};
+```
+
+**Important Notes:**
+
+- `diff()` is **not signal-specific** - it works with any JavaScript values
+- Use with `signal.snapshot()` to compare reactive state
+- Arrays: Returns entire array if any element changed (not individual element diffs)
+- Returns `undefined` if values are identical
+- Handles `Date`, `RegExp`, and other special objects by reference
+
+---
+
+## `signal.history<T>(getValue, options?)`
+
+Tracks the history of a signal's values over time, recording each change with timestamp and sequential index.
+
+This utility automatically records snapshots of tracked values whenever they change, with optional debouncing and custom filtering. Useful for:
+- **Undo/redo** - Navigate through past states
+- **Time-travel debugging** - Review state changes over time
+- **Audit logs** - Track when and how values changed
+- **Form history** - Track user input changes
+- **Performance analysis** - See when and how often values change
+
+```tsx
+import { signal } from "rxblox";
+
+const count = signal(0);
+const history = signal.history(() => count(), { debounce: 300 });
+
+count.set(1);
+count.set(2);
+count.set(3);
+
+// After 300ms debounce
+console.log(history());
+// [
+//   { value: 0, timestamp: 1234567890000, index: 0 },
+//   { value: 3, timestamp: 1234567893000, index: 1 }
+// ]
+```
+
+**Parameters:**
+- `getValue: () => T` - Function that returns the value to track (typically reads signals)
+- `options?: HistoryOptions<T>` - Configuration options
+
+**Returns:** `Signal<Array<HistoryEntry<T>>> & HistoryQuery<T>` - A signal containing array of history entries with query utilities
+
+**`HistoryEntry<T>` Type:**
+```ts
+type HistoryEntry<T> = {
+  value: T;        // The captured value
+  timestamp: number; // Unix timestamp (ms) when recorded
+  index: number;    // Sequential index (0-based)
+};
+```
+
+**Options:**
+
+```ts
+type HistoryOptions<T> = {
+  // Debounce time in ms before recording (default: 0)
+  debounce?: number;
+
+  // Maximum entries to keep (default: Infinity)
+  maxLength?: number;
+
+  // Custom filter to decide if entry should be recorded
+  shouldRecord?: (
+    prev: HistoryEntry<T> | undefined,
+    next: HistoryEntry<T>
+  ) => boolean;
+};
+```
+
+### Query Utilities
+
+The history signal includes built-in query methods for easy data access:
+
+```tsx
+const history = signal.history(() => count());
+
+// Access methods
+history.latest();           // Get most recent entry
+history.oldest();           // Get first entry
+history.at(index);          // Get entry at index (negative = from end)
+history.slice(start, end);  // Get range of entries
+history.count();            // Total number of entries
+history.values();           // Extract just values (no metadata)
+history.clear();            // Clear all history
+
+// Filtering
+history.filter(entry => entry.value > 10);           // Custom filter
+history.find(entry => entry.value === targetValue);  // Find first match
+
+// Time-based queries
+history.between(startTime, endTime);  // Entries between timestamps
+history.since(timestamp);              // Entries after timestamp
+history.before(timestamp);             // Entries before timestamp
+```
+
+**Query API:**
+
+```ts
+type HistoryQuery<T> = {
+  clear(): void;
+  latest(): HistoryEntry<T> | undefined;
+  oldest(): HistoryEntry<T> | undefined;
+  at(index: number): HistoryEntry<T> | undefined;
+  slice(start?: number, end?: number): HistoryEntry<T>[];
+  filter(predicate: (entry: HistoryEntry<T>) => boolean): HistoryEntry<T>[];
+  find(predicate: (entry: HistoryEntry<T>) => boolean): HistoryEntry<T> | undefined;
+  between(startTime: number, endTime: number): HistoryEntry<T>[];
+  since(timestamp: number): HistoryEntry<T>[];
+  before(timestamp: number): HistoryEntry<T>[];
+  values(): T[];
+  count(): number;
+};
+```
+
+### Examples
+
+**Basic usage - track counter:**
+
+```tsx
+const count = signal(0);
+const history = signal.history(() => count());
+
+count.set(1);
+count.set(2);
+
+// Access history
+history()[0]; // { value: 0, timestamp: ..., index: 0 }
+history().at(-1); // Latest entry
+history.latest(); // Latest entry (convenience method)
+
+// Get all values
+history.values(); // [0, 1, 2]
+```
+
+**Form tracking with debounce:**
+
+```tsx
+const formData = {
+  name: signal("John"),
+  email: signal("john@example.com"),
+};
+
+const history = signal.history(
+  () => signal.snapshot({ name: formData.name, email: formData.email }),
+  { debounce: 500, maxLength: 50 }
+);
+
+// User types rapidly - only last value recorded after 500ms
+formData.name.set("Jane");
+// ... more typing ...
+
+// Access form history
+history().forEach(entry => {
+  console.log(`${new Date(entry.timestamp).toISOString()}: ${JSON.stringify(entry.value)}`);
+});
+```
+
+**Undo/redo functionality:**
+
+```tsx
+const appState = signal({ count: 0, text: "Hello" });
+const history = signal.history(() => appState(), { maxLength: 50 });
+
+let currentIndex = 0;
+
+const undo = () => {
+  const entries = history();
+  if (currentIndex > 0) {
+    currentIndex--;
+    appState.set(entries[currentIndex].value);
+  }
+};
+
+const redo = () => {
+  const entries = history();
+  if (currentIndex < entries.length - 1) {
+    currentIndex++;
+    appState.set(entries[currentIndex].value);
+  }
+};
+
+// Make changes
+appState.set({ count: 1, text: "World" });
+appState.set({ count: 2, text: "Foo" });
+
+// Go back
+undo(); // Restore { count: 1, text: "World" }
+undo(); // Restore { count: 0, text: "Hello" }
+
+// Go forward
+redo(); // Restore { count: 1, text: "World" }
+```
+
+**Custom filtering - only record significant changes:**
+
+```tsx
+const position = signal({ x: 0, y: 0 });
+
+const history = signal.history(
+  () => position(),
+  {
+    debounce: 100,
+    shouldRecord: (prev, next) => {
+      if (!prev) return true; // Always record first
+
+      // Only record if moved more than 10 units
+      const dx = next.value.x - prev.value.x;
+      const dy = next.value.y - prev.value.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      return distance > 10;
+    },
+  }
+);
+
+// Small movements ignored
+position.set({ x: 1, y: 1 });
+position.set({ x: 2, y: 2 });
+
+// Large movement recorded
+position.set({ x: 20, y: 20 });
+```
+
+**Audit log with timestamps:**
+
+```tsx
+const userActions = signal<string | null>(null);
+
+const auditLog = signal.history(
+  () => userActions(),
+  {
+    shouldRecord: (prev, next) => {
+      // Skip null values
+      return next.value !== null;
+    },
+  }
+);
+
+userActions.set("User logged in");
+userActions.set("User updated profile");
+userActions.set("User logged out");
+
+// Generate audit report
+const report = auditLog.values().map((action, i) => ({
+  action,
+  time: new Date(auditLog()[i].timestamp).toISOString(),
+  sequence: auditLog()[i].index,
+}));
+
+console.table(report);
+// ┌─────────┬────────────────────────┬──────────────────────────┬──────────┐
+// │ (index) │        action          │           time           │ sequence │
+// ├─────────┼────────────────────────┼──────────────────────────┼──────────┤
+// │    0    │ 'User logged in'       │ '2024-01-01T10:00:00Z'   │    0     │
+// │    1    │ 'User updated profile' │ '2024-01-01T10:05:00Z'   │    1     │
+// │    2    │ 'User logged out'      │ '2024-01-01T10:15:00Z'   │    2     │
+// └─────────┴────────────────────────┴──────────────────────────┴──────────┘
+```
+
+**Performance monitoring:**
+
+```tsx
+const renderCount = signal(0);
+
+const perfHistory = signal.history(() => renderCount(), { debounce: 1000 });
+
+// In component
+useEffect(() => {
+  renderCount.set(prev => prev + 1);
+});
+
+// Analyze render frequency
+const analyzePerformance = () => {
+  const entries = perfHistory();
+  if (entries.length < 2) return;
+
+  const intervals = [];
+  for (let i = 1; i < entries.length; i++) {
+    intervals.push(entries[i].timestamp - entries[i - 1].timestamp);
+  }
+
+  const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
+  console.log(`Average time between renders: ${avgInterval}ms`);
+  console.log(`Renders per second: ${1000 / avgInterval}`);
+};
+```
+
+**Time-based queries:**
+
+```tsx
+const events = signal<string>("");
+const eventHistory = signal.history(() => events());
+
+// Track events
+events.set("User clicked button");
+events.set("API request started");
+events.set("API request completed");
+
+// Query by time
+const now = Date.now();
+const lastMinute = eventHistory.since(now - 60000);
+const oldEvents = eventHistory.before(now - 3600000);
+const recentEvents = eventHistory.between(now - 300000, now);
+
+// Use with filter
+const errorEvents = eventHistory.filter(entry => 
+  entry.value.includes("error")
+);
+
+// Find specific event
+const firstError = eventHistory.find(entry => 
+  entry.value.includes("error")
+);
+```
+
+**Integration with UI components:**
+
+```tsx
+const FormWithHistory = blox(() => {
+  const name = signal("");
+  const email = signal("");
+
+  const formHistory = signal.history(
+    () => signal.snapshot({ name, email }),
+    { debounce: 1000, maxLength: 20 }
+  );
+
+  const canUndo = signal(() => formHistory.count() > 1);
+
+  const undo = () => {
+    const entries = formHistory();
+    if (entries.length > 1) {
+      const previous = entries[entries.length - 2];
+      name.set(previous.value.name);
+      email.set(previous.value.email);
+    }
+  };
+
+  return (
+    <div>
+      {rx(() => (
+        <>
+          <input 
+            value={name()} 
+            onChange={(e) => name.set(e.target.value)} 
+          />
+          <input 
+            value={email()} 
+            onChange={(e) => email.set(e.target.value)} 
+          />
+          
+          <button onClick={undo} disabled={!canUndo()}>
+            Undo
+          </button>
+          
+          <div>History: {formHistory.count()} entries</div>
+          
+          <details>
+            <summary>View History</summary>
+            <ul>
+              {formHistory().map((entry, i) => (
+                <li key={i}>
+                  {new Date(entry.timestamp).toLocaleTimeString()}: 
+                  {JSON.stringify(entry.value)}
+                </li>
+              ))}
+            </ul>
+          </details>
+        </>
+      ))}
+    </div>
+  );
+});
+```
+
+**Important Notes:**
+
+- Always applies debouncing (default 0ms means next tick)
+- Uses `snapshot(getValue(), false)` internally to enable reactive tracking
+- Automatically tracks all signal dependencies in `getValue()`
+- `maxLength` removes oldest entries when exceeded
+- `shouldRecord` receives `undefined` for `prev` on first entry
+- Indices are sequential and persist even when old entries are removed
+- Returns a signal, so you can reactively render history in UI
+- Query methods access the current history state
+- Call `history()` to get the array, or use query methods like `history.latest()`
+
+---
+
+[Back to Main Documentation](../README.md)
+
