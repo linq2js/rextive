@@ -572,9 +572,9 @@ describe("useTracked", () => {
         });
 
         // Type checks
-        const _countNum: number = tracked.count;
-        const _nameStr: string = tracked.name;
-        const _computedNum: number = tracked.computed;
+        tracked.count satisfies number;
+        tracked.name satisfies string;
+        tracked.computed satisfies number;
 
         return <div>Type test</div>;
       };
