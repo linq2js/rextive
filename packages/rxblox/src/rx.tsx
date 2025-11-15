@@ -92,9 +92,9 @@ export const Reactive = memo(function Reactive(props: { exp: () => unknown }) {
       rerender({});
     };
     try {
-      // Subscribe to all signals that were accessed during expression evaluation
-      for (const signal of dispatcher.signals) {
-        onCleanup.add(signal.on(recompute));
+      // Subscribe to all dependencies that were accessed during expression evaluation
+      for (const subscribable of dispatcher.subscribables) {
+        onCleanup.on(subscribable.on(recompute));
       }
     } catch (ex) {
       // If subscription fails, clean up and set error state
@@ -125,17 +125,17 @@ export const Reactive = memo(function Reactive(props: { exp: () => unknown }) {
    * to avoid unnecessary recomputations.
    */
   const result = useMemo(() => {
-    const prevSignals = new Set(dispatcher.signals);
+    const prevSubscribables = new Set(dispatcher.subscribables);
     dispatcher.clear();
 
     try {
       return withDispatchers([trackingToken(dispatcher)], props.exp);
     } finally {
-      const nextSignals = new Set(dispatcher.signals);
+      const nextSubscribables = new Set(dispatcher.subscribables);
 
-      // Update subscriptions if signal dependencies changed
+      // Update subscriptions if dependencies changed
       // Changing the recomputeToken triggers useLayoutEffect to re-run
-      if (isDiff(prevSignals, nextSignals)) {
+      if (isDiff(prevSubscribables, nextSubscribables)) {
         setRecomputeToken({});
       }
     }

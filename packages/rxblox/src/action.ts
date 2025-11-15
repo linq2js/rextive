@@ -235,7 +235,7 @@ export function action<TResult = void, TArgs extends readonly any[] = any[]>(
     token = {};
   };
 
-  getDispatcher(disposableToken)?.add(cleanup);
+  getDispatcher(disposableToken)?.on(cleanup);
 
   // Add reset method
   Object.assign(dispatch, {

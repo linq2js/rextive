@@ -434,6 +434,7 @@ const MyForm = blox(() => {
 
 - **[Lifecycle & Cleanup](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/lifecycle-cleanup.md)** - Avoid memory leaks
 - **[Performance Guide](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/performance.md)** - Make it blazing fast
+- **[Signal Persistence](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/PERSISTENCE.md)** - Automatic state persistence
 - **[Architecture](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/ARCHITECTURE.md)** - How it works internally
 
 ---

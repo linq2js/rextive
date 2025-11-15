@@ -55,7 +55,7 @@ export function emitter<T = void>() {
      * @param listener - Function to call when events are emitted
      * @returns An unsubscribe function that removes the listener
      */
-    add(listener: Listener<T>): VoidFunction {
+    on(listener: Listener<T>): VoidFunction {
       /**
        * Flag to track if this listener is still active.
        * Prevents double-unsubscription if unsubscribe is called multiple times.

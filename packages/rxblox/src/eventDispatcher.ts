@@ -36,7 +36,7 @@ function onEvent(type: keyof EventDispatcher, callbacks: VoidFunction[]) {
     );
   }
 
-  callbacks.forEach((callback) => dispatcher[type].add(callback));
+  callbacks.forEach((callback) => dispatcher[type].on(callback));
 }
 
 /**

@@ -1,4 +1,4 @@
-import { SignalDispatcher, Signal, TrackFunction } from "./types";
+import { TrackingDispatcher, Subscribable, TrackFunction } from "./types";
 import { dispatcherToken, withDispatchers } from "./dispatcher";
 import { Emitter } from "./emitter";
 
@@ -10,21 +10,24 @@ import { Emitter } from "./emitter";
  * - Retrieve dispatcher: `getDispatcher(trackingToken)`
  */
 export const trackingToken =
-  dispatcherToken<SignalDispatcher>("trackingDispatcher");
+  dispatcherToken<TrackingDispatcher>("trackingDispatcher");
 
 /**
- * Creates a new tracking dispatcher for tracking signal dependencies.
+ * Creates a new tracking dispatcher for tracking dependencies.
  *
- * A tracking dispatcher is used to collect all signals that are accessed
- * during the execution of a function (e.g., in computed signals or effects).
+ * A tracking dispatcher is used to collect all subscribables (signals, computed values, etc.)
+ * that are accessed during the execution of a function (e.g., in computed signals or effects).
  * This enables automatic dependency tracking and reactive updates.
  *
+ * The dispatcher uses a minimal `Subscribable` interface (only requires `on()` method),
+ * making it decoupled from the full Signal API and flexible for various reactive primitives.
+ *
  * The dispatcher:
- * - Maintains a Set of signals that were accessed
- * - Provides methods to add signals, get all signals, and clear the set
+ * - Maintains a Set of subscribables that were accessed
+ * - Provides methods to add, get, and clear tracked dependencies
  * - Is used in conjunction with `withDispatchers()` to track dependencies
  *
- * @param onUpdate - Optional callback invoked when tracked signals change
+ * @param onUpdate - Optional callback invoked when tracked subscribables change
  * @param onCleanup - Optional emitter for cleanup functions
  * @returns A new tracking dispatcher instance
  *
@@ -34,37 +37,39 @@ export const trackingToken =
  * import { emitter } from "./emitter";
  *
  * // Create dispatcher with callbacks
- * const onUpdate = () => console.log("signal changed");
+ * const onUpdate = () => console.log("dependency changed");
  * const onCleanup = emitter();
  * const dispatcher = trackingDispatcher(onUpdate, onCleanup);
  *
- * // Track signals accessed during function execution
+ * // Track subscribables accessed during function execution
  * const result = withDispatchers([trackingToken(dispatcher)], () => {
  *   const value1 = signal1(); // signal1 is added to dispatcher
  *   const value2 = signal2(); // signal2 is added to dispatcher
  *   return value1 + value2;
  * });
  *
- * // Get all signals that were accessed
- * const dependencies = dispatcher.signals; // [signal1, signal2]
+ * // Get all subscribables that were accessed
+ * const dependencies = dispatcher.subscribables; // [signal1, signal2]
  * ```
  */
 export function trackingDispatcher(
   onUpdate?: VoidFunction,
   onCleanup?: Emitter
-): SignalDispatcher {
+): TrackingDispatcher {
   /**
-   * Adds a signal to the dispatcher's tracking set.
+   * Adds a subscribable to the dispatcher's tracking set.
    *
-   * @param signal - The signal to track
+   * @param subscribable - The subscribable to track
+   * @returns True if added, false if already tracked
    */
-  const add = (signal: Signal<unknown>) => {
-    if (signals.has(signal)) {
+  const add = (subscribable: Subscribable) => {
+    if (subscribables.has(subscribable)) {
       return false;
     }
-    signals.add(signal);
+    subscribables.add(subscribable);
+
     if (onUpdate) {
-      onCleanup?.add(signal.on(onUpdate));
+      onCleanup?.on(subscribable.on(onUpdate));
     }
     return true;
   };
@@ -90,7 +95,7 @@ export function trackingDispatcher(
    * 3. When a property is accessed, execute its function with the dispatcher context
    * 4. This ensures tracking happens at access time, not at proxy creation time
    *
-   * @param signals - Object mapping property names to functions (signals or computed)
+   * @param getters - Object mapping property names to functions (signals or computed)
    * @returns A proxy that tracks dependencies lazily when properties are accessed
    *
    * @example
@@ -190,10 +195,10 @@ export function trackingDispatcher(
    * });
    * ```
    */
-  const track: TrackFunction = (signals) => {
-    return new Proxy(signals, {
+  const track: TrackFunction = (getters) => {
+    return new Proxy(getters, {
       get(_target, prop) {
-        const value = signals[prop as keyof typeof signals];
+        const value = getters[prop as keyof typeof getters];
         if (typeof value !== "function") {
           throw new Error(`Track prop ${prop as string} must be a function`);
         }
@@ -205,32 +210,32 @@ export function trackingDispatcher(
     }) as any;
   };
   /**
-   * Set of signals that have been accessed during tracking.
-   * Using a Set ensures each signal is only tracked once, even if accessed multiple times.
+   * Set of subscribables that have been accessed during tracking.
+   * Using a Set ensures each subscribable is only tracked once, even if accessed multiple times.
    */
-  const signals = new Set<Signal<unknown>>();
+  const subscribables = new Set<Subscribable>();
 
-  const dispatcher: SignalDispatcher = {
+  const dispatcher: TrackingDispatcher = {
     track,
     add,
     /**
-     * Gets all signals that have been tracked.
+     * Gets all subscribables that have been tracked.
      *
-     * Returns a readonly array copy of the signals set.
+     * Returns a readonly array copy of the subscribables set.
      * This prevents external modification while allowing iteration.
      *
-     * @returns A readonly array of all tracked signals
+     * @returns A readonly array of all tracked subscribables
      */
-    get signals(): readonly Signal<unknown>[] {
-      return Array.from(signals);
+    get subscribables(): readonly Subscribable[] {
+      return Array.from(subscribables);
     },
     /**
-     * Clears all tracked signals from the dispatcher.
+     * Clears all tracked subscribables from the dispatcher.
      *
      * Used to reset the dispatcher before tracking a new set of dependencies.
      */
     clear() {
-      signals.clear();
+      subscribables.clear();
     },
   };
 

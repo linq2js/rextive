@@ -40,3 +40,4 @@ export { provider } from "./provider";
 export * from "./loadable";
 export { wait, type Awaitable } from "./wait";
 export { diff } from "./diff";
+export type { Persistor, PersistStatus, PersistInfo } from "./types";

@@ -44,7 +44,7 @@ import { FC, ReactNode } from "react";
  * });
  * ```
  *
- * @see {@link SignalDispatcher.track} for implementation details
+ * @see {@link TrackingDispatcher.track} for implementation details
  */
 export type TrackFunction = <TTrackable extends Record<string, () => unknown>>(
   signals: TTrackable
@@ -213,6 +213,65 @@ export type Ref<T> = {
 };
 
 /**
+ * Persistor interface for signal storage.
+ *
+ * Persistors provide a minimal I/O interface for reading and writing signal values
+ * to persistent storage. They throw errors on failure, and the signal handles
+ * error tracking and status management.
+ *
+ * @template T - The type of value being persisted
+ */
+export interface Persistor<T> {
+  /**
+   * Retrieves the persisted value from storage.
+   *
+   * @returns Object with `value` property if found, `null` if no value stored, or a Promise resolving to either
+   * @throws Error if read operation fails
+   */
+  get(): { value: T } | null | Promise<{ value: T } | null>;
+
+  /**
+   * Saves a value to persistent storage.
+   *
+   * @param value - The value to persist
+   * @throws Error if write operation fails
+   */
+  set(value: T): void | Promise<void>;
+
+  /**
+   * Optional: Subscribe to external storage changes (e.g., from other tabs).
+   *
+   * @param callback - Function to call when storage changes externally
+   * @returns Unsubscribe function
+   */
+  on?(callback: VoidFunction): VoidFunction;
+}
+
+/**
+ * Status of persistence operations for a signal.
+ */
+export type PersistStatus =
+  | "idle" // No persist operation yet
+  | "reading" // Currently loading from storage
+  | "read-failed" // Failed to load (get() threw)
+  | "writing" // Currently saving to storage
+  | "write-failed" // Failed to save (set() threw)
+  | "synced"; // Value is up-to-date with storage
+
+/**
+ * Persistence information tracked by a signal.
+ */
+export type PersistInfo = {
+  /** Current persistence status */
+  status: PersistStatus;
+  /** Last error from read or write operation (present when status is *-failed) */
+  error?: unknown;
+
+  /** Promise that resolves when the current persistence operation completes */
+  promise?: Promise<unknown>;
+};
+
+/**
  * Function type for the `rx()` function that creates reactive expressions.
  *
  * `rx()` wraps an expression function and returns a React component that
@@ -247,39 +306,47 @@ export type SignalFactory = <T>(value: T | (() => T)) => MutableSignal<T>;
  */
 export type EffectFactory = (fn: () => void | VoidFunction) => Effect;
 
+export type Subscribable<T = unknown> = {
+  on(listener: (value: T) => void): VoidFunction;
+};
+
 /**
- * Dispatcher for tracking signal dependencies during expression evaluation.
+ * Dispatcher for tracking dependencies during expression evaluation.
  *
- * Signal dispatchers are used internally to track which signals are accessed
- * during the execution of computed signals, effects, or reactive expressions.
+ * Tracking dispatchers are used internally to track which subscribables (signals, etc.)
+ * are accessed during the execution of computed signals, effects, or reactive expressions.
  * This enables automatic dependency tracking and reactive updates.
+ *
+ * The dispatcher uses a minimal `Subscribable` interface, requiring only an `on()` method
+ * for subscription, making it flexible and decoupled from the full Signal API.
  */
-export type SignalDispatcher = {
+export type TrackingDispatcher = {
   /**
-   * Adds a signal to the dispatcher's tracking set.
-   * Called automatically when a signal is read within a tracking context.
+   * Adds a subscribable to the dispatcher's tracking set.
+   * Called automatically when a subscribable is accessed within a tracking context.
    *
-   * @param signal - The signal to track
+   * @param subscribable - The subscribable to track (signals, computed values, etc.)
+   * @returns True if added, false if already tracked
    */
-  add(signal: Signal<unknown>): boolean;
+  add(subscribable: Subscribable): boolean;
 
   /**
-   * Gets all signals that have been tracked.
+   * Gets all subscribables that have been tracked.
    * Returns a readonly array to prevent external modification.
    *
-   * @returns A readonly array of all tracked signals
+   * @returns A readonly array of all tracked subscribables
    */
-  get signals(): readonly Signal<unknown>[];
+  get subscribables(): readonly Subscribable[];
 
   /**
-   * Clears all tracked signals from the dispatcher.
+   * Clears all tracked subscribables from the dispatcher.
    * Used to reset the dispatcher before tracking a new set of dependencies.
    */
   clear(): void;
 
   /**
    * Creates a proxy for explicit dependency tracking.
-   * This enables lazy tracking
+   * Enables lazy tracking with full type safety.
    */
   track: TrackFunction;
 };

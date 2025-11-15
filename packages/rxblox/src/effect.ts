@@ -81,7 +81,7 @@ export function effect(
     );
     // Register the effect's cleanup function if one was returned
     if (typeof result === "function") {
-      onCleanup.add(result);
+      onCleanup.on(result);
     }
   };
 
@@ -112,7 +112,7 @@ export function effect(
       );
       // Register the effect's cleanup function if one was returned
       if (typeof result === "function") {
-        onCleanup.add(result);
+        onCleanup.on(result);
       }
       return cleanup;
     },
@@ -121,7 +121,7 @@ export function effect(
   // Register effect with dispatcher (default dispatcher runs it immediately)
   addEffect(effectImpl);
 
-  getDispatcher(disposableToken)?.add(cleanup);
+  getDispatcher(disposableToken)?.on(cleanup);
 
   // Return the effect object (for custom dispatchers that don't run immediately)
   return effectImpl;

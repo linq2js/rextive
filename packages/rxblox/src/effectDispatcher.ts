@@ -146,7 +146,7 @@ export function localEffectDispatcher(): EffectDispatcher {
       const onStop = emitter();
       // Run each effect and collect its cleanup function
       for (const effect of effects) {
-        onStop.add(effect.run());
+        onStop.on(effect.run());
       }
       // Return a function that calls all cleanup functions
       return onStop.emit;

@@ -196,7 +196,7 @@ export function cancellableAction<
     },
   });
 
-  getDispatcher(disposableToken)?.add(() => {
+  getDispatcher(disposableToken)?.on(() => {
     ac.abort();
   });
 

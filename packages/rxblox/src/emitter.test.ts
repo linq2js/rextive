@@ -6,7 +6,7 @@ describe("emitter", () => {
     it("should create an emitter", () => {
       const eventEmitter = emitter();
       expect(eventEmitter).toBeDefined();
-      expect(typeof eventEmitter.add).toBe("function");
+      expect(typeof eventEmitter.on).toBe("function");
       expect(typeof eventEmitter.emit).toBe("function");
       expect(typeof eventEmitter.clear).toBe("function");
     });
@@ -15,7 +15,7 @@ describe("emitter", () => {
       const eventEmitter = emitter<string>();
       const listener = vi.fn();
 
-      eventEmitter.add(listener);
+      eventEmitter.on(listener);
       eventEmitter.emit("test");
 
       expect(listener).toHaveBeenCalledWith("test");
@@ -28,9 +28,9 @@ describe("emitter", () => {
       const listener2 = vi.fn();
       const listener3 = vi.fn();
 
-      eventEmitter.add(listener1);
-      eventEmitter.add(listener2);
-      eventEmitter.add(listener3);
+      eventEmitter.on(listener1);
+      eventEmitter.on(listener2);
+      eventEmitter.on(listener3);
 
       eventEmitter.emit("message");
 
@@ -43,9 +43,9 @@ describe("emitter", () => {
       const eventEmitter = emitter<string>();
       const callOrder: string[] = [];
 
-      eventEmitter.add(() => callOrder.push("first"));
-      eventEmitter.add(() => callOrder.push("second"));
-      eventEmitter.add(() => callOrder.push("third"));
+      eventEmitter.on(() => callOrder.push("first"));
+      eventEmitter.on(() => callOrder.push("second"));
+      eventEmitter.on(() => callOrder.push("third"));
 
       eventEmitter.emit("test");
 
@@ -58,7 +58,7 @@ describe("emitter", () => {
       const eventEmitter = emitter<string>();
       const listener = vi.fn();
 
-      const unsubscribe = eventEmitter.add(listener);
+      const unsubscribe = eventEmitter.on(listener);
       eventEmitter.emit("first");
       expect(listener).toHaveBeenCalledTimes(1);
 
@@ -71,7 +71,7 @@ describe("emitter", () => {
       const eventEmitter = emitter<string>();
       const listener = vi.fn();
 
-      const unsubscribe = eventEmitter.add(listener);
+      const unsubscribe = eventEmitter.on(listener);
       unsubscribe();
       unsubscribe(); // Should be safe to call multiple times
       unsubscribe();
@@ -86,9 +86,9 @@ describe("emitter", () => {
       const listener2 = vi.fn();
       const listener3 = vi.fn();
 
-      const unsubscribe1 = eventEmitter.add(listener1);
-      eventEmitter.add(listener2);
-      eventEmitter.add(listener3);
+      const unsubscribe1 = eventEmitter.on(listener1);
+      eventEmitter.on(listener2);
+      eventEmitter.on(listener3);
 
       unsubscribe1();
       eventEmitter.emit("test");
@@ -106,9 +106,9 @@ describe("emitter", () => {
       const listener2 = vi.fn();
       const listener3 = vi.fn();
 
-      eventEmitter.add(listener1);
-      eventEmitter.add(listener2);
-      eventEmitter.add(listener3);
+      eventEmitter.on(listener1);
+      eventEmitter.on(listener2);
+      eventEmitter.on(listener3);
 
       eventEmitter.clear();
       eventEmitter.emit("test");
@@ -123,9 +123,9 @@ describe("emitter", () => {
       const listener1 = vi.fn();
       const listener2 = vi.fn();
 
-      eventEmitter.add(listener1);
+      eventEmitter.on(listener1);
       eventEmitter.clear();
-      eventEmitter.add(listener2);
+      eventEmitter.on(listener2);
 
       eventEmitter.emit("test");
 
@@ -143,12 +143,12 @@ describe("emitter", () => {
 
       let unsubscribe2: VoidFunction | undefined;
 
-      eventEmitter.add(listener1);
-      unsubscribe2 = eventEmitter.add(() => {
+      eventEmitter.on(listener1);
+      unsubscribe2 = eventEmitter.on(() => {
         listener2();
         unsubscribe2?.(); // Unsubscribe during emission
       });
-      eventEmitter.add(listener3);
+      eventEmitter.on(listener3);
 
       eventEmitter.emit("test");
 
@@ -162,10 +162,10 @@ describe("emitter", () => {
       const eventEmitter = emitter<string>();
       const newListener = vi.fn();
       const listener = vi.fn(() => {
-        eventEmitter.add(newListener);
+        eventEmitter.on(newListener);
       });
 
-      eventEmitter.add(listener);
+      eventEmitter.on(listener);
       eventEmitter.emit("test");
 
       expect(listener).toHaveBeenCalledWith("test");
@@ -181,7 +181,7 @@ describe("emitter", () => {
       const eventEmitter = emitter<void>();
       const listener = vi.fn();
 
-      eventEmitter.add(listener);
+      eventEmitter.on(listener);
       eventEmitter.emit(undefined);
 
       expect(listener).toHaveBeenCalledWith(undefined);
@@ -191,7 +191,7 @@ describe("emitter", () => {
       const eventEmitter = emitter<{ id: number; name: string }>();
       const listener = vi.fn();
 
-      eventEmitter.add(listener);
+      eventEmitter.on(listener);
       eventEmitter.emit({ id: 1, name: "test" });
 
       expect(listener).toHaveBeenCalledWith({ id: 1, name: "test" });
@@ -201,7 +201,7 @@ describe("emitter", () => {
       const eventEmitter = emitter<number>();
       const listener = vi.fn();
 
-      eventEmitter.add(listener);
+      eventEmitter.on(listener);
       eventEmitter.emit(42);
 
       expect(listener).toHaveBeenCalledWith(42);
@@ -234,9 +234,9 @@ describe("emitter", () => {
         .spyOn(console, "error")
         .mockImplementation(() => {});
 
-      eventEmitter.add(listener1);
-      eventEmitter.add(listener2);
-      eventEmitter.add(listener3);
+      eventEmitter.on(listener1);
+      eventEmitter.on(listener2);
+      eventEmitter.on(listener3);
 
       // Errors in listeners will propagate, but we can catch them
       // The implementation uses forEach which will stop on error
@@ -256,4 +256,3 @@ describe("emitter", () => {
     });
   });
 });
-

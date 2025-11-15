@@ -62,6 +62,14 @@ Master the fundamentals of rxblox:
   - Large lists & virtualization
   - Profiling tips
 
+- **[Signal Persistence](./PERSISTENCE.md)** - Automatic state persistence
+  - Persistor interface and architecture
+  - Zero-flicker synchronous hydration
+  - Race condition handling
+  - Cross-tab synchronization
+  - Reactive persistence status tracking
+  - localStorage, sessionStorage, IndexedDB examples
+
 ### Practical Guides
 
 Learn patterns and best practices:
@@ -128,6 +136,7 @@ Help make rxblox better:
 
 - **Learn the basics** → Start with [Core Concepts](./core-concepts.md)
 - **See all APIs** → Go to [API Reference](./api-reference.md)
+- **Persist state to storage** → Read [Signal Persistence](./PERSISTENCE.md)
 - **Solve a specific problem** → Check [Patterns & Best Practices](./patterns.md)
 - **Compare with other libraries** → Read [Comparisons](./comparisons.md)
 - **Optimize performance** → Review [Performance & Memory](./performance.md)
