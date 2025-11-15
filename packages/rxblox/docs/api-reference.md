@@ -26,6 +26,8 @@ Complete API documentation for all rxblox functions and utilities.
 - [action](#action)
 - [action.cancellable](#actioncancellable)
 - [action.aborter](#actionaborter)
+- [useSignals](#usesignalst)
+- [useTracked](#usetrackedt)
 
 ---
 
@@ -1429,6 +1431,239 @@ const FormWithHistory = blox(() => {
 - Returns a signal, so you can reactively render history in UI
 - Query methods access the current history state
 - Call `history()` to get the array, or use query methods like `history.latest()`
+
+---
+
+## `useSignals<T>(values, options?)`
+
+React hook that creates signals from an object of values **without automatic reactivity**.
+
+Provides maximum flexibility by giving you full control over when and how reactivity happens.
+
+```tsx
+const Component = () => {
+  // Create signals from values
+  const signals = useSignals({ 
+    count: 0, 
+    name: "Alice" 
+  });
+
+  // Manual updates (no automatic re-render)
+  const increment = () => signals.count.set(c => c + 1);
+
+  // Use with rx() for partial rendering
+  return (
+    <div>
+      <div>{rx(() => signals.count())}</div>
+      <button onClick={increment}>Increment</button>
+    </div>
+  );
+};
+```
+
+**Parameters:**
+
+- `values` - Object of values to convert to signals
+- `options.equals?` - Custom equality function (applied to all signals)
+- `options.autoSync?` - Auto-sync signal values on re-render (default: `false`)
+
+**Returns:** `UseSignalsResult<T>` - Proxy object where each property is a `MutableSignal`
+
+**Key Features:**
+
+- ✅ **No Automatic Reactivity**: Full manual control
+- ✅ **Lazy Creation**: Signals created only when first accessed
+- ✅ **Automatic Cleanup**: All signals disposed on unmount
+- ✅ **Type-Safe**: Full TypeScript support with mapped types
+
+**With autoSync:**
+
+```tsx
+const Component = ({ initialCount }: { initialCount: number }) => {
+  // Sync signal when prop changes
+  const signals = useSignals(
+    { count: initialCount },
+    { autoSync: true }
+  );
+
+  return <div>{rx(() => signals.count())}</div>;
+};
+```
+
+**With useTracked for conditional tracking:**
+
+```tsx
+const Component = () => {
+  const signals = useSignals({ count: 0, name: "Alice", age: 30 });
+  const [showDetails, setShowDetails] = useState(false);
+
+  const tracked = useTracked({
+    count: () => signals.count(),
+    name: () => signals.name(),
+    age: () => signals.age(),
+  });
+
+  if (!showDetails) {
+    // Only tracks 'count'
+    return <div>{tracked.count}</div>;
+  }
+
+  // Tracks all three when details shown
+  return (
+    <div>
+      <div>{tracked.count}</div>
+      <div>{tracked.name} - {tracked.age}</div>
+    </div>
+  );
+};
+```
+
+**Custom equality:**
+
+```tsx
+const signals = useSignals(
+  { user: { id: 1, name: "Alice" } },
+  { 
+    equals: (a, b) => a.id === b.id  // Compare by id
+  }
+);
+```
+
+**When to Use:**
+
+- Fine-grained control over reactivity
+- Combining manual and reactive updates
+- Using signals with `rx()` for partial rendering
+- Conditional tracking with `useTracked()`
+
+**When NOT to Use:**
+
+- Want automatic reactivity everywhere → use `blox`
+- Need simple local state → use `useState`
+- Want component-wide reactivity → use `rx()`
+
+---
+
+## `useTracked<T>(gettersOrSignals)`
+
+React hook for lazy signal tracking with conditional dependencies.
+
+Creates a reactive proxy that enables **conditional tracking** in React components and custom hooks. Unlike `rx()` or `blox` which track all accessed signals, `useTracked` only tracks signals when they're actually accessed through the proxy.
+
+```tsx
+const Component = () => {
+  const tracked = useTracked({
+    count: () => count(),
+    name: () => name()
+  });
+
+  // Only tracks 'count' - 'name' never accessed
+  return <div>{tracked.count}</div>;
+};
+```
+
+**Parameters:**
+
+- `gettersOrSignals` - Object mapping keys to getter functions
+  - Each value must be a function that returns the desired value
+  - For signals: `{ count: () => count() }`
+  - For computed: `{ double: () => count() * 2 }`
+
+**Returns:** `Tracked<T>` - Reactive proxy where each key returns the computed value
+
+**Key Features:**
+
+- ✅ **Lazy Tracking**: Only tracks signals when accessed
+- ✅ **Conditional Dependencies**: Different code paths track different signals
+- ✅ **Works Anywhere**: React components, custom hooks, event handlers
+- ✅ **Type-Safe**: Full TypeScript support with return type inference
+
+**Conditional tracking:**
+
+```tsx
+const Profile = () => {
+  const [showDetails, setShowDetails] = useState(false);
+  
+  const tracked = useTracked({
+    name: () => user().name,
+    email: () => user().email,
+    phone: () => user().phone
+  });
+
+  // Only tracks 'name' initially
+  if (!showDetails) {
+    return <div>{tracked.name}</div>;
+  }
+
+  // Tracks all three when details shown
+  return (
+    <div>
+      <div>{tracked.name}</div>
+      <div>{tracked.email}</div>
+      <div>{tracked.phone}</div>
+    </div>
+  );
+};
+```
+
+**In event handlers (no tracking):**
+
+```tsx
+const tracked = useTracked({ count: () => count() });
+
+const handleClick = () => {
+  // Access outside render - no tracking
+  console.log('Current:', tracked.count);
+  count.set(tracked.count + 1);
+};
+```
+
+**In custom hooks:**
+
+```tsx
+function useUserData() {
+  const tracked = useTracked({
+    user: () => currentUser(),
+    isAdmin: () => currentUser().role === 'admin'
+  });
+
+  useEffect(() => {
+    if (tracked.isAdmin) {
+      loadAdminPanel();
+    }
+  }, [tracked.isAdmin]); // Reactive dependency!
+
+  return tracked.user;
+}
+```
+
+**How It Works:**
+
+1. Creates a proxy that wraps your getters/signals
+2. During render: tracks which signals are accessed
+3. After render: subscribes to those specific signals
+4. On signal change: triggers component re-render
+5. Next render: clears old subscriptions, tracks new ones
+
+**Important Notes:**
+
+- Tracking only works during the **render phase**
+- Event handlers and effects access values **without** tracking
+- This prevents memory leaks from long-lived callbacks
+- Use `rx()` or manual subscriptions if you need tracking outside render
+
+**When to Use:**
+
+- Conditional signal access (if/else, switch, early returns)
+- Dynamic dependencies based on state
+- Event handlers that need reactive values
+- Custom hooks with reactive logic
+
+**When NOT to Use:**
+
+- Simple signal display → use `rx()`
+- Component-level reactivity → use `blox`
+- Async operations → use `signal.async()` with `track()`
 
 ---
 

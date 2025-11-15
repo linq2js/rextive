@@ -13,6 +13,7 @@ This guide covers practical patterns and best practices for building application
 - [Organizing Signals](#organizing-signals)
   - [Global Signals (Singleton State)](#global-signals-singleton-state)
   - [Local Signals (Component State)](#local-signals-component-state)
+  - [Flexible Reactivity with useSignals](#flexible-reactivity-with-usesignals)
   - [Signal Factories (Reusable Logic)](#signal-factories-reusable-logic)
 - [Composable Logic](#composable-logic)
 
@@ -369,6 +370,199 @@ const Counter = blox(() => {
 - ✅ Automatically cleaned up on unmount
 - ✅ Easy to reason about lifecycle
 - ✅ Testable as unit
+
+### Flexible Reactivity with `useSignals`
+
+`useSignals` provides maximum flexibility by creating signals **without automatic reactivity**. This gives you full control over when and how reactivity happens.
+
+**When to use:**
+
+- Fine-grained control over reactivity
+- Combining manual and reactive updates
+- Using signals with `rx()` for partial rendering
+- Conditional tracking with `useTracked()`
+- Performance optimization (avoid unnecessary re-renders)
+
+#### Pattern 1: Manual Control with Partial Rendering
+
+```tsx
+const DataTable = () => {
+  // Create signals without automatic reactivity
+  const signals = useSignals({
+    data: [],
+    loading: false,
+    filter: ""
+  });
+
+  const loadData = async () => {
+    signals.loading.set(true);
+    const result = await fetchData();
+    signals.data.set(result);
+    signals.loading.set(false);
+  };
+
+  const handleFilterChange = (e) => {
+    // Manual update - no re-render
+    signals.filter.set(e.target.value);
+  };
+
+  // Use rx() for partial rendering - only these parts re-render
+  return (
+    <div>
+      <input 
+        onChange={handleFilterChange}
+        placeholder="Filter..."
+      />
+      
+      {rx(() => 
+        signals.loading() ? (
+          <div>Loading...</div>
+        ) : (
+          <div>
+            {signals.data()
+              .filter(item => 
+                item.name.includes(signals.filter())
+              )
+              .map(item => (
+                <div key={item.id}>{item.name}</div>
+              ))
+            }
+          </div>
+        )
+      )}
+    </div>
+  );
+};
+```
+
+#### Pattern 2: Conditional Tracking with `useTracked`
+
+```tsx
+const UserDashboard = () => {
+  // Create signals
+  const signals = useSignals({
+    user: null,
+    posts: [],
+    comments: [],
+    notifications: []
+  });
+  
+  const [activeTab, setActiveTab] = useState('posts');
+
+  // Only track what's actually displayed
+  const tracked = useTracked({
+    user: () => signals.user(),
+    posts: () => signals.posts(),
+    comments: () => signals.comments(),
+    notifications: () => signals.notifications()
+  });
+
+  // Only the accessed signals trigger re-renders
+  return (
+    <div>
+      <h1>{tracked.user?.name}</h1>
+      
+      {activeTab === 'posts' && (
+        // Only tracks 'posts'
+        <div>{tracked.posts.length} posts</div>
+      )}
+      
+      {activeTab === 'comments' && (
+        // Only tracks 'comments'
+        <div>{tracked.comments.length} comments</div>
+      )}
+      
+      {activeTab === 'notifications' && (
+        // Only tracks 'notifications'
+        <div>{tracked.notifications.length} notifications</div>
+      )}
+    </div>
+  );
+};
+```
+
+#### Pattern 3: Auto-Sync with Props
+
+```tsx
+const SyncedComponent = ({ userId, theme }: Props) => {
+  // Auto-sync signals when props change
+  const signals = useSignals(
+    { userId, theme },
+    { autoSync: true }
+  );
+
+  // Signals automatically update when props change
+  return rx(() => (
+    <div className={signals.theme()}>
+      User ID: {signals.userId()}
+    </div>
+  ));
+};
+```
+
+#### Pattern 4: Combining with Custom Hooks
+
+```tsx
+function useFilteredData(initialData: Data[]) {
+  const signals = useSignals({
+    data: initialData,
+    filter: "",
+    sortBy: "name"
+  });
+
+  const tracked = useTracked({
+    filteredData: () => {
+      const data = signals.data();
+      const filter = signals.filter();
+      const sortBy = signals.sortBy();
+      
+      return data
+        .filter(item => item.name.includes(filter))
+        .sort((a, b) => a[sortBy].localeCompare(b[sortBy]));
+    }
+  });
+
+  return {
+    signals,
+    filteredData: tracked.filteredData,
+    setFilter: (filter: string) => signals.filter.set(filter),
+    setSortBy: (sortBy: string) => signals.sortBy.set(sortBy)
+  };
+}
+
+// Usage
+const DataList = () => {
+  const { filteredData, setFilter, setSortBy } = useFilteredData(data);
+  
+  return (
+    <div>
+      <input onChange={(e) => setFilter(e.target.value)} />
+      <select onChange={(e) => setSortBy(e.target.value)}>
+        <option value="name">Name</option>
+        <option value="date">Date</option>
+      </select>
+      <div>{filteredData.map(item => ...)}</div>
+    </div>
+  );
+};
+```
+
+**Benefits:**
+
+- ✅ Maximum flexibility
+- ✅ Fine-grained control over re-renders
+- ✅ Combine manual and reactive updates
+- ✅ Works with both `rx()` and `useTracked()`
+- ✅ Automatic cleanup on unmount
+
+**Comparison:**
+
+| Feature | `blox` + `signal` | `useSignals` + `rx()` | `useSignals` + `useTracked()` |
+|---------|-------------------|----------------------|------------------------------|
+| Reactivity | Automatic | Partial (rx only) | Conditional |
+| Re-renders | Component-wide | Localized | On-demand |
+| Control | Low | Medium | High |
+| Use Case | Simple UIs | Performance-critical | Complex conditional logic |
 
 ### Signal Factories (Reusable Logic)
 
