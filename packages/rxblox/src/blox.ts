@@ -24,7 +24,6 @@ import { EventDispatcher, eventToken } from "./eventDispatcher";
 import once from "lodash/once";
 import { trackingToken } from "./trackingDispatcher";
 import { disposableToken } from "./disposableDispatcher";
-import shallowEqual from "shallowequal";
 
 /**
  * Creates a reactive component that tracks props as signals and manages effects.

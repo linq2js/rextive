@@ -63,6 +63,7 @@ export type ComputedSignalContext = {
  * Options for configuring a signal's behavior.
  */
 export type SignalOptions<T = any> = {
+  name?: string;
   /**
    * Custom equality function to determine if the signal value has changed.
    * Defaults to Object.is for reference equality.
@@ -173,6 +174,7 @@ export function signal<T>(
   let current: { value: T } | undefined;
   const onCleanup = emitter<void>();
   const { equals = Object.is, persist } = options;
+  let hydrate = () => {};
 
   // Persistence state
   let persistInfo: PersistInfo = {
@@ -333,10 +335,6 @@ export function signal<T>(
     },
   });
 
-  Object.assign(s, {
-    readonly: s,
-  });
-
   getDispatcher(disposableToken)?.on(() => {
     onCleanup.emitAndClear();
   });
@@ -449,7 +447,7 @@ export function signal<T>(
      * is triggered multiple times (e.g., from external storage events).
      * Only the latest hydration's result will update the status.
      */
-    const hydrate = () => {
+    hydrate = () => {
       if (!persist.get) return;
 
       try {
@@ -542,6 +540,53 @@ export function signal<T>(
      * @see onPersistInfoChange - The emitter that notifies subscribers
      */
     Object.defineProperties(s, {
+      /**
+       * Manually reload the signal value from persistent storage.
+       *
+       * This method:
+       * 1. Clears the "dirty" flag (allows storage value to overwrite local changes)
+       * 2. Triggers the persistor's `get()` method
+       * 3. Updates the signal value if storage returns a value
+       * 4. Updates persistInfo.status to reflect the operation state
+       *
+       * **Use Cases:**
+       * - Retry after a read error
+       * - Manually refresh data from storage
+       * - Discard local changes and reload from storage
+       * - Sync with external storage updates
+       *
+       * **Example:**
+       * ```ts
+       * const user = signal(null, { persist: userPersistor });
+       *
+       * // Retry after error
+       * if (user.persistInfo.status === "read-failed") {
+       *   user.hydrate(); // Retry loading from storage
+       * }
+       *
+       * // Manual refresh
+       * button.onClick(() => {
+       *   user.hydrate(); // Refresh from storage
+       * });
+       *
+       * // Discard local changes
+       * user.set(localChanges);
+       * user.hydrate(); // Reload from storage (local changes discarded)
+       * ```
+       *
+       * @see persistInfo - For checking operation status
+       * @see Persistor - The storage interface
+       */
+      hydrate: {
+        value() {
+          // Clear dirty flag to allow hydrated value to overwrite
+          isDirty = false;
+          // Call the internal hydrate function
+          hydrate();
+        },
+        enumerable: true,
+        configurable: false,
+      },
       persistInfo: {
         get() {
           // Register persistInfo as a tracked dependency in reactive contexts
@@ -554,6 +599,11 @@ export function signal<T>(
       },
     });
   }
+
+  Object.assign(s, {
+    readonly: s,
+    displayName: options.name,
+  });
 
   return s;
 }

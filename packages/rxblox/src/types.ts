@@ -114,6 +114,8 @@ export type Signal<T> = {
    * @returns The current signal value as a JSON-serializable value
    */
   toJSON(): T;
+
+  readonly displayName?: string;
 };
 
 /**
@@ -138,6 +140,14 @@ export type MutableSignal<T> = Signal<T> & {
    * Resets the current signal value to the initial value.
    */
   reset(): void;
+
+  /**
+   * Hydrates the signal value from storage.
+   * Only present when the signal is created with a `persist` option.
+   * @see Persistor
+   */
+  hydrate?(): void;
+
   /**
    * Casts the current signal to a readonly signal, preventing consumers from calling mutation methods
    * @returns A readonly signal that prevents consumers from calling mutation methods

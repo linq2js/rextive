@@ -8,6 +8,7 @@ Complete API documentation for all rxblox functions and utilities.
 - [signal.async](#signalasynct)
 - [signal.snapshot](#signalsnapshott)
 - [signal.history](#signalhistoryt)
+- [Signal Persistence](#signal-persistence)
 - [diff](#difft)
 - [effect](#effect)
 - [rx](#rx)
@@ -63,6 +64,7 @@ const user = signal(
 - `signal.set(value | updater)` - Update value
 - `signal.on(listener)` - Subscribe to changes (returns unsubscribe function)
 - `signal.reset()` - Clear cache and recompute (for computed signals)
+- `signal.hydrate()` - Reload value from storage (only for persisted signals)
 
 **Context Parameter (for computed signals):**
 
@@ -1073,6 +1075,370 @@ const UserDetail = ({ userId }) => {
 - `action.reset()` - Reset to idle state
 - `action.cancel()` - Cancel running action (for cancellable actions only)
 - `action.cancelled` - Whether action was cancelled (for cancellable actions only)
+
+---
+
+## Signal Persistence
+
+Signals can automatically persist their values to storage (localStorage, IndexedDB, server, etc.) and hydrate on initialization.
+
+### Creating a Persisted Signal
+
+```tsx
+import { signal } from "rxblox";
+import type { Persistor } from "rxblox";
+
+// Define a persistor for localStorage
+const createLocalStoragePersistor = <T>(key: string): Persistor<T> => ({
+  get: () => {
+    const item = localStorage.getItem(key);
+    return item ? { value: JSON.parse(item) } : null;
+  },
+  set: (value: T) => {
+    localStorage.setItem(key, JSON.stringify(value));
+  },
+  on: (callback: VoidFunction) => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === key) callback();
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  },
+});
+
+// Create a persisted signal
+const count = signal(0, {
+  persist: createLocalStoragePersistor("count"),
+});
+
+// Signal automatically:
+// - Hydrates from storage on initialization
+// - Persists to storage on every set()
+// - Re-hydrates when storage changes externally (e.g., other tabs)
+```
+
+### Persistor Interface
+
+```ts
+interface Persistor<T> {
+  /**
+   * Retrieves the persisted value.
+   * Can be sync or async.
+   * Return null if no value exists in storage.
+   */
+  get(): { value: T } | null | Promise<{ value: T } | null>;
+
+  /**
+   * Persists the value to storage.
+   * Can be sync or async.
+   * Throw an error if persistence fails.
+   */
+  set(value: T): void | Promise<void>;
+
+  /**
+   * Optional: Subscribe to external storage changes.
+   * Called when storage changes outside this signal (e.g., other tabs).
+   * Return an unsubscribe function.
+   */
+  on?(callback: VoidFunction): VoidFunction;
+}
+```
+
+### Persistence Status
+
+Persisted signals have a `persistInfo` property that tracks persistence status:
+
+```tsx
+const count = signal(0, { persist: myPersistor });
+
+// Access persistence status (reactive!)
+rx(() => {
+  const { status, error, promise } = count.persistInfo;
+  
+  if (status === "reading") return <Spinner />;
+  if (status === "read-failed") return <Error error={error} />;
+  if (status === "writing") return <SavingIndicator />;
+  
+  return <div>{count()}</div>;
+});
+```
+
+**PersistStatus Values:**
+
+- `"idle"` - No persistence configured
+- `"reading"` - Loading from storage
+- `"read-failed"` - Failed to load from storage
+- `"writing"` - Saving to storage
+- `"write-failed"` - Failed to save to storage
+- `"synced"` - Successfully synchronized with storage
+
+**PersistInfo Type:**
+
+```ts
+type PersistInfo = {
+  status: PersistStatus;
+  error?: unknown;           // Error from last failed operation
+  promise?: Promise<unknown>; // Current async operation (if any)
+};
+```
+
+### Manual Hydration with `signal.hydrate()`
+
+Persisted signals expose a `hydrate()` method to manually reload from storage:
+
+```tsx
+const user = signal(null, { persist: userPersistor });
+
+// Reload from storage
+user.hydrate();
+
+// Use cases:
+// 1. Retry after error
+if (user.persistInfo.status === "read-failed") {
+  user.hydrate(); // Retry loading
+}
+
+// 2. Manual refresh
+button.onClick(() => {
+  user.hydrate(); // Refresh from storage
+});
+
+// 3. Clear dirty flag and reload
+user.set(localChanges);
+// ... user makes more changes ...
+user.hydrate(); // Discard local changes, reload from storage
+```
+
+**Key Features:**
+
+- ✅ Clears the "dirty" flag (allows hydrated value to overwrite local changes)
+- ✅ Triggers loading status (`"reading"`)
+- ✅ Works with both sync and async persistors
+- ✅ Handles errors gracefully
+- ✅ Safe to call multiple times (race conditions handled)
+
+### Advanced Features
+
+#### Zero-Flicker Hydration
+
+Synchronous persistors apply values **immediately** (no loading state):
+
+```tsx
+const persistor: Persistor<number> = {
+  get: () => {
+    const item = localStorage.getItem("count");
+    return item ? { value: JSON.parse(item) } : null;
+  },
+  set: (value) => localStorage.setItem("count", JSON.stringify(value)),
+};
+
+const count = signal(0, { persist: persistor });
+
+// count() is already hydrated (no flicker!)
+console.log(count()); // Value from localStorage
+console.log(count.persistInfo.status); // "synced" (not "reading")
+```
+
+#### Dirty Tracking
+
+If you modify a signal before async hydration completes, the signal becomes "dirty" and hydration won't overwrite your changes:
+
+```tsx
+const persistor: Persistor<number> = {
+  get: async () => {
+    await delay(100);
+    return { value: 42 };
+  },
+  set: vi.fn(),
+};
+
+const count = signal(0, { persist: persistor });
+
+// Modify before hydration completes
+count.set(100);
+
+// Wait for hydration
+await delay(150);
+
+// Value NOT overwritten (dirty flag protected it)
+console.log(count()); // 100 (not 42)
+```
+
+Use `signal.hydrate()` to explicitly reload and clear the dirty flag:
+
+```tsx
+count.hydrate(); // Clears dirty flag and reloads
+await delay(10);
+console.log(count()); // 42 (from storage)
+```
+
+#### External Changes (Cross-Tab Sync)
+
+Use `persistor.on` to sync when storage changes externally:
+
+```tsx
+const persistor: Persistor<number> = {
+  get: () => {
+    const item = localStorage.getItem("count");
+    return item ? { value: JSON.parse(item) } : null;
+  },
+  set: (value) => {
+    localStorage.setItem("count", JSON.stringify(value));
+  },
+  on: (callback) => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === "count") callback();
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  },
+};
+
+const count = signal(0, { persist: persistor });
+
+// Now count auto-updates when localStorage changes in other tabs!
+```
+
+#### Race Condition Handling
+
+Multiple concurrent operations are handled safely:
+
+```tsx
+// Scenario: Multiple writes in rapid succession
+count.set(1);
+count.set(2);
+count.set(3);
+
+// All writes are triggered, but status reflects the LATEST operation
+// Stale promises don't overwrite newer status
+```
+
+### Examples
+
+**LocalStorage Persistence:**
+
+```tsx
+const createLocalStoragePersistor = <T>(key: string): Persistor<T> => ({
+  get: () => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? { value: JSON.parse(item) } : null;
+    } catch {
+      return null;
+    }
+  },
+  set: (value: T) => {
+    localStorage.setItem(key, JSON.stringify(value));
+  },
+  on: (callback) => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === key) callback();
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  },
+});
+
+// Usage
+const theme = signal("light", {
+  persist: createLocalStoragePersistor("theme"),
+});
+```
+
+**IndexedDB Persistence:**
+
+```tsx
+const createIndexedDBPersistor = <T>(
+  dbName: string,
+  storeName: string,
+  key: string
+): Persistor<T> => ({
+  get: async () => {
+    const db = await openDB(dbName, 1);
+    const tx = db.transaction(storeName, "readonly");
+    const value = await tx.objectStore(storeName).get(key);
+    return value ? { value } : null;
+  },
+  set: async (value: T) => {
+    const db = await openDB(dbName, 1);
+    const tx = db.transaction(storeName, "readwrite");
+    await tx.objectStore(storeName).put(value, key);
+  },
+});
+
+// Usage
+const userData = signal({ name: "", email: "" }, {
+  persist: createIndexedDBPersistor("myApp", "users", "currentUser"),
+});
+```
+
+**Server Persistence:**
+
+```tsx
+const createServerPersistor = <T>(url: string): Persistor<T> => ({
+  get: async () => {
+    const response = await fetch(url);
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error("Failed to load");
+    const value = await response.json();
+    return { value };
+  },
+  set: async (value: T) => {
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(value),
+    });
+    if (!response.ok) throw new Error("Failed to save");
+  },
+});
+
+// Usage
+const settings = signal({ theme: "light", locale: "en" }, {
+  persist: createServerPersistor("/api/settings"),
+});
+```
+
+**UI with Loading States:**
+
+```tsx
+const user = signal(null, {
+  persist: createServerPersistor("/api/user"),
+});
+
+export const UserProfile = blox(() => {
+  return rx(() => {
+    const info = user.persistInfo;
+    
+    // Show loading spinner
+    if (info.status === "reading") {
+      return <Spinner />;
+    }
+    
+    // Show error with retry button
+    if (info.status === "read-failed") {
+      return (
+        <div>
+          <p>Failed to load user: {String(info.error)}</p>
+          <button onClick={() => user.hydrate()}>Retry</button>
+        </div>
+      );
+    }
+    
+    // Show saving indicator
+    const currentUser = user();
+    return (
+      <div>
+        <h1>{currentUser?.name}</h1>
+        {info.status === "writing" && <span>Saving...</span>}
+        {info.status === "write-failed" && (
+          <span>Failed to save: {String(info.error)}</span>
+        )}
+      </div>
+    );
+  });
+});
+```
 
 ---
 

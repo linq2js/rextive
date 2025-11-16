@@ -634,6 +634,310 @@ describe("signal persistence", () => {
     });
   });
 
+  describe("manual hydration (hydrate method)", () => {
+    it("should expose hydrate method for persisted signals", () => {
+      const persistor: Persistor<number> = {
+        get: () => ({ value: 42 }),
+        set: vi.fn(),
+      };
+
+      const count = signal(0, { persist: persistor });
+
+      expect(typeof count.hydrate).toBe("function");
+    });
+
+    it("should not have hydrate method for non-persisted signals", () => {
+      const count = signal(0);
+
+      expect((count as any).hydrate).toBeUndefined();
+    });
+
+    it("should reload from storage when hydrate is called", async () => {
+      let storageValue = 42;
+      const persistor: Persistor<number> = {
+        get: () => ({ value: storageValue }),
+        set: vi.fn(),
+      };
+
+      const count = signal(0, { persist: persistor });
+
+      expect(count()).toBe(42);
+
+      // Change storage value
+      storageValue = 100;
+
+      // Manual hydration
+      count.hydrate();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(count()).toBe(100);
+      expect(count.persistInfo.status).toBe("synced");
+    });
+
+    it("should handle async hydrate correctly", async () => {
+      let storageValue = 42;
+      const persistor: Persistor<number> = {
+        get: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          return { value: storageValue };
+        },
+        set: vi.fn(),
+      };
+
+      const count = signal(0, { persist: persistor });
+
+      // Wait for initial hydration
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(count()).toBe(42);
+
+      // Change storage
+      storageValue = 200;
+
+      // Manual hydration
+      count.hydrate();
+
+      // Status should be reading
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(count.persistInfo.status).toBe("reading");
+
+      // Wait for completion
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(count()).toBe(200);
+      expect(count.persistInfo.status).toBe("synced");
+    });
+
+    it("should trigger listeners when hydrate updates value", async () => {
+      let storageValue = 42;
+      const persistor: Persistor<number> = {
+        get: () => ({ value: storageValue }),
+        set: vi.fn(),
+      };
+
+      const count = signal(0, { persist: persistor });
+      const listener = vi.fn();
+      count.on(listener);
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      listener.mockClear();
+
+      // Change storage and hydrate
+      storageValue = 100;
+      count.hydrate();
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(listener).toHaveBeenCalledWith(100);
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it("should not trigger listeners if hydrated value is unchanged", async () => {
+      const persistor: Persistor<number> = {
+        get: () => ({ value: 42 }),
+        set: vi.fn(),
+      };
+
+      const count = signal(0, { persist: persistor });
+      const listener = vi.fn();
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      count.on(listener);
+      listener.mockClear();
+
+      // Hydrate with same value
+      count.hydrate();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it("should handle hydrate errors gracefully", async () => {
+      let shouldFail = false;
+      const persistor: Persistor<number> = {
+        get: () => {
+          if (shouldFail) throw new Error("Hydrate failed");
+          return { value: 42 };
+        },
+        set: vi.fn(),
+      };
+
+      const count = signal(0, { persist: persistor });
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(count()).toBe(42);
+      expect(count.persistInfo.status).toBe("synced");
+
+      // Trigger error
+      shouldFail = true;
+      count.hydrate();
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(count()).toBe(42); // Value unchanged
+      expect(count.persistInfo.status).toBe("read-failed");
+      expect((count.persistInfo.error as Error).message).toBe("Hydrate failed");
+    });
+
+    it("should recover from read-failed status on successful hydrate", async () => {
+      let shouldFail = true;
+      const persistor: Persistor<number> = {
+        get: () => {
+          if (shouldFail) throw new Error("Read failed");
+          return { value: 100 };
+        },
+        set: vi.fn(),
+      };
+
+      const count = signal(0, { persist: persistor });
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(count.persistInfo.status).toBe("read-failed");
+
+      // Fix the error and retry
+      shouldFail = false;
+      count.hydrate();
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(count()).toBe(100);
+      expect(count.persistInfo.status).toBe("synced");
+      expect(count.persistInfo.error).toBeUndefined();
+    });
+
+    it("should clear dirty flag and reload when hydrate is called explicitly", async () => {
+      let storageValue = 42;
+      const persistor: Persistor<number> = {
+        get: () => ({ value: storageValue }),
+        set: vi.fn(),
+      };
+
+      const count = signal(0, { persist: persistor });
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(count()).toBe(42);
+
+      // Make signal dirty
+      count.set(999);
+      expect(count()).toBe(999);
+
+      // Change storage and call hydrate explicitly
+      storageValue = 100;
+      count.hydrate();
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Manual hydrate() clears dirty flag and reloads from storage
+      expect(count()).toBe(100);
+      expect(count.persistInfo.status).toBe("synced");
+    });
+
+    it("should work with hydrate in reactive contexts", async () => {
+      let storageValue = 42;
+      const persistor: Persistor<number> = {
+        get: () => ({ value: storageValue }),
+        set: vi.fn(),
+      };
+
+      const count = signal(0, { persist: persistor });
+      const doubled = signal(() => count() * 2);
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(doubled()).toBe(84);
+
+      // Change storage and hydrate
+      storageValue = 50;
+      count.hydrate();
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(count()).toBe(50);
+      expect(doubled()).toBe(100);
+    });
+
+    it("should handle multiple rapid hydrate calls", async () => {
+      let getCount = 0;
+      const persistor: Persistor<number> = {
+        get: async () => {
+          const count = ++getCount;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          return { value: count * 10 };
+        },
+        set: vi.fn(),
+      };
+
+      const count = signal(0, { persist: persistor });
+
+      // Wait for initial hydration
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(count()).toBe(10);
+
+      // Trigger multiple hydrations rapidly
+      count.hydrate();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      count.hydrate();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      count.hydrate();
+
+      // Wait for all to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Should use the latest hydration result (race condition handled)
+      expect(count()).toBe(40); // Last hydration (4th call)
+      expect(count.persistInfo.status).toBe("synced");
+    });
+
+    it("should allow hydrate during write operations", async () => {
+      let storageValue = 42;
+      const persistor: Persistor<number> = {
+        get: () => ({ value: storageValue }),
+        set: vi.fn(
+          (_value: unknown) =>
+            new Promise<void>((resolve) => setTimeout(resolve, 100))
+        ),
+      };
+
+      const count = signal(0, { persist: persistor });
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(count()).toBe(42);
+
+      // Start a write operation
+      count.set(100);
+      expect(count.persistInfo.status).toBe("writing");
+
+      // Hydrate during write (synchronous hydration)
+      storageValue = 200;
+      count.hydrate();
+
+      // Manual hydrate() clears dirty flag, so value updates from storage
+      // Since get() is sync, value and status update immediately
+      expect(count()).toBe(200);
+      expect(count.persistInfo.status).toBe("synced");
+
+      // Wait for write to complete (stale write, should not change status)
+      await new Promise((resolve) => setTimeout(resolve, 110));
+      expect(count.persistInfo.status).toBe("synced");
+      expect(count()).toBe(200);
+    });
+
+    it("should do nothing if persistor has no get method", () => {
+      const persistor: Persistor<number> = {
+        set: vi.fn(),
+      };
+
+      const count = signal(0, { persist: persistor });
+
+      expect(count()).toBe(0);
+      expect(count.persistInfo.status).toBe("idle");
+
+      // Hydrate should be safe to call but do nothing
+      count.hydrate();
+
+      expect(count()).toBe(0);
+      expect(count.persistInfo.status).toBe("idle");
+    });
+  });
+
   describe("race condition handling", () => {
     it("should handle concurrent write operations correctly", async () => {
       let writeCount = 0;
