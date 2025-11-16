@@ -408,7 +408,7 @@ describe("tag", () => {
   describe("type safety", () => {
     it("should maintain type information", () => {
       const stringTag = tag<string>();
-      const s1 = signal("hello", { tags: [stringTag] });
+      signal("hello", { tags: [stringTag] });
 
       stringTag.forEach((s) => {
         // TypeScript should infer s as MutableSignal<string>
