@@ -291,6 +291,7 @@ export function signal<T>(
   let s: MutableSignal<T> & { persistInfo: PersistInfo } = Object.assign(get, {
     readonly: undefined as unknown as Signal<T>,
     persistInfo,
+    hydrate,
     toJSON() {
       return s.peek();
     },
