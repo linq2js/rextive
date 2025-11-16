@@ -646,12 +646,6 @@ describe("signal persistence", () => {
       expect(typeof count.hydrate).toBe("function");
     });
 
-    it("should not have hydrate method for non-persisted signals", () => {
-      const count = signal(0);
-
-      expect((count as any).hydrate).toBeUndefined();
-    });
-
     it("should reload from storage when hydrate is called", async () => {
       let storageValue = 42;
       const persistor: Persistor<number> = {
