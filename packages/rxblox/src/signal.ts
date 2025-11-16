@@ -8,6 +8,7 @@ import type {
   Signal,
   TrackFunction,
 } from "./types";
+import type { Tag } from "./tag";
 import { trackingDispatcher, trackingToken } from "./trackingDispatcher";
 import { emitter } from "./emitter";
 import { getDispatcher, withDispatchers } from "./dispatcher";
@@ -69,6 +70,22 @@ export type SignalOptions<T = any> = {
    * Defaults to Object.is for reference equality.
    */
   equals?: (a: NoInfer<T>, b: NoInfer<T>) => boolean;
+
+  /**
+   * Optional tags for grouping signals together.
+   * Tags allow batch operations on multiple signals.
+   *
+   * @example
+   * ```ts
+   * const formTag = tag<string>();
+   * const name = signal("", { tags: [formTag] });
+   * const email = signal("", { tags: [formTag] });
+   *
+   * // Reset all form fields
+   * formTag.forEach(signal => signal.reset());
+   * ```
+   */
+  tags?: readonly Tag<T>[];
 
   /**
    * Optional persistor for storing signal value.
@@ -173,7 +190,7 @@ export function signal<T>(
   // Cache for the current computed value (for computed signals)
   let current: { value: T } | undefined;
   const onCleanup = emitter<void>();
-  const { equals = Object.is, persist } = options;
+  const { equals = Object.is, persist, tags } = options;
   let hydrate = () => {};
 
   // Persistence state
@@ -193,8 +210,7 @@ export function signal<T>(
    */
   const compute = () => {
     // Clean up previous subscriptions
-    onCleanup.emit();
-    onCleanup.clear();
+    onCleanup.emitAndClear();
 
     if (typeof value === "function") {
       // This is a computed signal - track dependencies
@@ -605,6 +621,16 @@ export function signal<T>(
     readonly: s,
     displayName: options.name,
   });
+
+  // Register signal with tags
+  if (tags && tags.length > 0) {
+    tags.forEach((tag) => tag._add(s));
+
+    // Remove from tags on disposal
+    getDispatcher(disposableToken)?.on(() => {
+      tags.forEach((tag) => tag._remove(s));
+    });
+  }
 
   return s;
 }

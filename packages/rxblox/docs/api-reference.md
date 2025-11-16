@@ -9,6 +9,7 @@ Complete API documentation for all rxblox functions and utilities.
 - [signal.snapshot](#signalsnapshott)
 - [signal.history](#signalhistoryt)
 - [Signal Persistence](#signal-persistence)
+- [Signal Tagging](#signal-tagging)
 - [diff](#difft)
 - [effect](#effect)
 - [rx](#rx)
@@ -1438,6 +1439,319 @@ export const UserProfile = blox(() => {
     );
   });
 });
+```
+
+---
+
+## Signal Tagging
+
+Tags allow you to group signals together and perform batch operations on them. This is useful for:
+- Resetting form fields
+- Disposing resources
+- Debugging and logging
+- Batch updates
+
+### Creating and Using Tags
+
+```tsx
+import { tag, signal } from "rxblox";
+
+// Create a tag for grouping signals
+const formTag = tag<string>();
+
+// Create signals with tags
+const name = signal("", { tags: [formTag] });
+const email = signal("", { tags: [formTag] });
+const phone = signal("", { tags: [formTag] });
+
+// Reset all form fields at once
+const resetForm = () => {
+  formTag.forEach(signal => signal.reset());
+};
+```
+
+### Tag API
+
+```ts
+// Create a tag
+function tag<T>(): Tag<T>;
+
+// Tag instance methods
+type Tag<T> = {
+  forEach(fn: (signal: MutableSignal<T>) => void): void;
+  signals(): MutableSignal<T>[];
+  has(signal: MutableSignal<T>): boolean;
+  delete(signal: MutableSignal<T>): boolean;
+  clear(): void;
+  readonly size: number;
+};
+
+// Static methods for multi-tag operations
+namespace tag {
+  function forEach<T extends readonly Tag<any>[]>(
+    tags: T,
+    fn: (signal: MutableSignal<UnionOfTagTypes<T>>) => void
+  ): void;
+
+  function signals<T extends readonly Tag<any>[]>(
+    tags: T
+  ): MutableSignal<UnionOfTagTypes<T>>[];
+}
+```
+
+### Instance Methods
+
+#### `tag.forEach(fn)`
+
+Iterates over all signals in the tag.
+
+```tsx
+const counterTag = tag<number>();
+const count1 = signal(0, { tags: [counterTag] });
+const count2 = signal(0, { tags: [counterTag] });
+
+// Increment all counters
+counterTag.forEach(signal => {
+  signal.set(prev => prev + 1);
+});
+```
+
+#### `tag.signals()`
+
+Returns all signals in the tag as an array.
+
+```tsx
+const formTag = tag<string>();
+const fields = formTag.signals();
+console.log(`Form has ${fields.length} fields`);
+```
+
+#### `tag.has(signal)`
+
+Checks if a signal belongs to the tag.
+
+```tsx
+const myTag = tag<string>();
+const s1 = signal("a", { tags: [myTag] });
+
+if (myTag.has(s1)) {
+  console.log("Signal is in tag");
+}
+```
+
+#### `tag.delete(signal)`
+
+Removes a signal from the tag.
+
+```tsx
+myTag.delete(s1);
+console.log(myTag.has(s1)); // false
+```
+
+#### `tag.clear()`
+
+Removes all signals from the tag.
+
+```tsx
+myTag.clear();
+console.log(myTag.size); // 0
+```
+
+#### `tag.size`
+
+Returns the number of signals in the tag.
+
+```tsx
+console.log(`Tag has ${myTag.size} signals`);
+```
+
+### Multi-Tag Operations
+
+#### `tag.forEach([tags], fn)`
+
+Static method to iterate over signals from multiple tags.
+
+The callback receives signals typed as a union of all tag types.
+
+```tsx
+const stringTag = tag<string>();
+const numberTag = tag<number>();
+
+signal("hello", { tags: [stringTag] });
+signal(42, { tags: [numberTag] });
+
+// Iterate over both tags
+tag.forEach([stringTag, numberTag], (signal) => {
+  // signal type: MutableSignal<string | number>
+  console.log(signal.peek());
+});
+```
+
+**Deduplication:** If a signal belongs to multiple tags, it appears only once in the iteration.
+
+```tsx
+const tag1 = tag<string>();
+const tag2 = tag<string>();
+
+const shared = signal("shared", { tags: [tag1, tag2] });
+signal("only1", { tags: [tag1] });
+signal("only2", { tags: [tag2] });
+
+const count = { value: 0 };
+tag.forEach([tag1, tag2], () => {
+  count.value++;
+});
+
+console.log(count.value); // 3 (not 4 - shared counted once)
+```
+
+#### `tag.signals([tags])`
+
+Static method to get all signals from multiple tags as an array.
+
+```tsx
+const allSignals = tag.signals([stringTag, numberTag]);
+// allSignals: MutableSignal<string | number>[]
+```
+
+### Multiple Tags per Signal
+
+Signals can belong to multiple tags simultaneously.
+
+```tsx
+const requiredTag = tag<string>();
+const validatedTag = tag<string>();
+
+const name = signal("", { tags: [requiredTag, validatedTag] });
+const email = signal("", { tags: [requiredTag, validatedTag] });
+const bio = signal("", { tags: [validatedTag] }); // Optional field
+
+// Validate only required fields
+const hasEmptyRequired = requiredTag
+  .signals()
+  .some(s => s.peek() === "");
+```
+
+### Automatic Cleanup
+
+Signals are automatically removed from tags when disposed via `disposableToken`.
+
+```tsx
+import { disposable, tag, signal } from "rxblox";
+
+const resourceTag = tag<Connection>();
+
+disposable(() => {
+  const conn1 = signal(connection1, { tags: [resourceTag] });
+  const conn2 = signal(connection2, { tags: [resourceTag] });
+
+  console.log(resourceTag.size); // 2
+
+  // When disposable scope ends, signals are removed from tags
+});
+
+console.log(resourceTag.size); // 0
+```
+
+### Examples
+
+**Form Reset:**
+
+```tsx
+const formTag = tag<string | boolean>();
+const name = signal("", { tags: [formTag] });
+const email = signal("", { tags: [formTag] });
+const agreed = signal(false, { tags: [formTag] });
+
+const resetForm = () => {
+  formTag.forEach(signal => signal.reset());
+};
+```
+
+**Batch Updates:**
+
+```tsx
+const counterTag = tag<number>();
+const count1 = signal(0, { tags: [counterTag] });
+const count2 = signal(0, { tags: [counterTag] });
+const count3 = signal(0, { tags: [counterTag] });
+
+const incrementAll = () => {
+  counterTag.forEach(s => s.set(prev => prev + 1));
+};
+```
+
+**Resource Disposal:**
+
+```tsx
+const resourceTag = tag<Connection>();
+const connections = [conn1, conn2, conn3].map(conn =>
+  signal(conn, { tags: [resourceTag] })
+);
+
+onCleanup(() => {
+  resourceTag.forEach(s => s.peek()?.close());
+  resourceTag.clear();
+});
+```
+
+**Debugging:**
+
+```tsx
+const debugTag = tag<unknown>();
+const count = signal(0, { tags: [debugTag] });
+const name = signal("Alice", { tags: [debugTag] });
+const active = signal(true, { tags: [debugTag] });
+
+effect(() => {
+  console.group("Debug Signals");
+  debugTag.forEach((signal, index) => {
+    console.log(`Signal ${index}:`, signal.peek());
+  });
+  console.groupEnd();
+});
+```
+
+**Conditional Operations:**
+
+```tsx
+const numberTag = tag<number>();
+const a = signal(5, { tags: [numberTag] });
+const b = signal(10, { tags: [numberTag] });
+const c = signal(15, { tags: [numberTag] });
+
+// Reset only values > 10
+numberTag.forEach(s => {
+  if (s.peek() > 10) {
+    s.reset();
+  }
+});
+```
+
+**Form Validation with Multiple Tags:**
+
+```tsx
+const requiredTag = tag<string>();
+const emailTag = tag<string>();
+
+const name = signal("", { tags: [requiredTag] });
+const email = signal("", { tags: [requiredTag, emailTag] });
+const phone = signal(""); // Optional, no tags
+
+const validateRequired = () => {
+  return requiredTag.signals().every(s => s.peek() !== "");
+};
+
+const validateEmails = () => {
+  return emailTag.signals().every(s => {
+    const value = s.peek();
+    return value.includes("@");
+  });
+};
+
+const isFormValid = () => {
+  return validateRequired() && validateEmails();
+};
 ```
 
 ---

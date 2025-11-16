@@ -1,6 +1,7 @@
 import { isPromiseLike } from "./isPromiseLike";
 import { loadable, Loadable } from "./loadable";
 import { ComputedSignalContext, signal } from "./signal";
+import { Tag } from "./tag";
 import { Signal } from "./types";
 import { getLoadable } from "./wait";
 
@@ -39,6 +40,15 @@ export type AsyncSignal<T> = Signal<Loadable<T>> & {};
  */
 export type AsyncSignalContext = ComputedSignalContext & {
   abortSignal: AbortSignal;
+};
+
+/**
+ * Options for configuring an async signal's behavior.
+ * @property name - The name of the async signal.
+ */
+export type AsyncSignalOptions<T> = {
+  name?: string;
+  tags?: readonly Tag<NoInfer<Loadable<T>>>[];
 };
 
 /**
@@ -133,7 +143,10 @@ export type AsyncSignalFunction<T> = (
  * userId.set(2);
  * ```
  */
-export function asyncSignal<T>(fn: AsyncSignalFunction<T>): AsyncSignal<T> {
+export function asyncSignal<T>(
+  fn: AsyncSignalFunction<T>,
+  options: AsyncSignalOptions<T> = {}
+): AsyncSignal<T> {
   // Token tracks the current computation to handle cancellation
   let token:
     | { abortController: AbortController; context: AsyncSignalContext }
@@ -245,7 +258,7 @@ export function asyncSignal<T>(fn: AsyncSignalFunction<T>): AsyncSignal<T> {
       // If regular error, wrap in error loadable immediately
       return loadable("error", error);
     }
-  });
+  }, options);
 
   return inner;
 }
