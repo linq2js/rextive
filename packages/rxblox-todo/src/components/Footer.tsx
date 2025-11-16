@@ -21,18 +21,15 @@ export const Footer = blox(() => {
       Active
     </a>
   ));
-  const completedFilter = rx(() => {
-    console.log("rendering completedFilter");
-    return (
-      <a
-        className={todoStore.filter() === "completed" ? "selected" : ""}
-        onClick={todoStore.setFilterCompleted}
-        style={{ cursor: "pointer" }}
-      >
-        Completed
-      </a>
-    );
-  });
+  const completedFilter = rx(() => (
+    <a
+      className={todoStore.filter() === "completed" ? "selected" : ""}
+      onClick={todoStore.setFilterCompleted}
+      style={{ cursor: "pointer" }}
+    >
+      Completed
+    </a>
+  ));
   const clearCompletedButton = rx(
     () =>
       todoStore.completed().length > 0 && (

@@ -393,9 +393,9 @@ describe("batch", () => {
       b satisfies boolean;
 
       // Use the values (this would fail if types were wrong)
-      const _sum: number = n + 1;
-      const _upper: string = s.toUpperCase();
-      const _not: boolean = !b;
+      void ((n + 1) satisfies number);
+      void (s.toUpperCase() satisfies string);
+      void (!b satisfies boolean);
     });
   });
 });
