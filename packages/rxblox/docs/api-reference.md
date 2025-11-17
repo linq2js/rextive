@@ -559,7 +559,10 @@ Returns a `BloxRef<T>` object compatible with React's ref system, with an additi
 ```ts
 interface BloxRef<T> {
   readonly current: T | null;
-  ready(callback: (element: T) => void): void;
+  ready<R, E = undefined>(
+    callback: (element: T) => R,
+    orElse?: () => E
+  ): R | E;
 }
 ```
 
@@ -640,11 +643,42 @@ const MyComponent = blox(() => {
 });
 ```
 
+**Example: With Fallback Value**
+
+```tsx
+const MyComponent = blox(() => {
+  const canvasRef = blox.ref<HTMLCanvasElement>();
+
+  blox.onMount(() => {
+    // Provide fallback when ref isn't ready
+    const width = canvasRef.ready(
+      (canvas) => canvas.width,
+      () => 0  // Fallback value
+    );
+    // Type: number (always defined, never undefined)
+    console.log("Canvas width:", width);
+
+    // Or with fallback error handling
+    const ctx = canvasRef.ready(
+      (canvas) => canvas.getContext('2d'),
+      () => {
+        console.warn("Canvas not ready");
+        return null;
+      }
+    );
+    // Type: CanvasRenderingContext2D | null
+  });
+
+  return <canvas ref={canvasRef} />;
+});
+```
+
 **Key Features:**
 
 - ✅ **Type-safe**: Automatic type narrowing from `T | null` to `T`
 - ✅ **No null checking**: `ready()` callback only runs when ref is set
 - ✅ **Returns callback result**: Get values directly from the callback
+- ✅ **Fallback support**: Optional `orElse` callback for default values
 - ✅ **Simple**: Just a synchronous null check wrapper
 - ✅ **Flexible**: Use in `blox.onMount()` or `effect()`
 
@@ -664,7 +698,7 @@ const MyComponent = blox(() => {
 
 ---
 
-## `blox.ready(refs, callback)`
+## `blox.ready(refs, callback, orElse?)`
 
 Executes a callback when all refs are ready (not null or undefined).
 
@@ -675,11 +709,17 @@ Provides automatic null/undefined checking and type narrowing for multiple refs.
 **Signature:**
 
 ```ts
-function ready<T extends readonly BloxRef<any>[]>(
+function ready<T extends readonly BloxRef<any>[], R, E = undefined>(
   refs: T,
-  callback: (...elements: ExtractedTypes<T>) => void
-): void;
+  callback: (...elements: ExtractedTypes<T>) => R,
+  orElse?: () => E
+): R | E;
 ```
+
+**Parameters:**
+- `refs` - Array of BloxRef objects to check
+- `callback` - Function to execute when all refs are ready (receives all elements as arguments)
+- `orElse` (optional) - Fallback function to call if any ref is null/undefined
 
 **Example: Multiple Refs**
 
@@ -764,11 +804,49 @@ const MyComponent = blox(() => {
 });
 ```
 
+**Example: With Fallback Value**
+
+```tsx
+const MyComponent = blox(() => {
+  const videoRef = blox.ref<HTMLVideoElement>();
+  const audioRef = blox.ref<HTMLAudioElement>();
+
+  blox.onMount(() => {
+    // Always get a result, even if refs aren't ready
+    const result = blox.ready(
+      [videoRef, audioRef],
+      (video, audio) => {
+        video.play();
+        audio.play();
+        return { success: true };
+      },
+      () => {
+        console.warn("Media elements not ready yet");
+        return { success: false };
+      }
+    );
+    // Type: { success: boolean } (always defined)
+
+    if (result.success) {
+      console.log("Media started playing");
+    }
+  });
+
+  return (
+    <>
+      <video ref={videoRef} src="video.mp4" />
+      <audio ref={audioRef} src="audio.mp3" />
+    </>
+  );
+});
+```
+
 **Key Features:**
 
 - ✅ **Type-safe tuple inference**: Each element has correct type
 - ✅ **Returns callback result**: Get values from all refs in one call
 - ✅ **No null checking**: Callback only runs when all refs are set
+- ✅ **Fallback support**: Optional `orElse` callback for default values
 - ✅ **Simple**: Just a synchronous check of all refs
 - ✅ **Flexible**: Use in `blox.onMount()` or `effect()`
 

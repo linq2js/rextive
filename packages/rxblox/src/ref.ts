@@ -20,7 +20,9 @@ export interface BloxRef<T> {
    * @param callback - Function to execute when the value is ready.
    *                   Receives the non-nullable value as argument.
    *                   Can return a value that will be returned by `ready()`.
-   * @returns The callback's return value, or `undefined` if ref is null/undefined.
+   * @param orElse - Optional fallback function to call when ref is null/undefined.
+   *                 If provided, returns its result instead of undefined.
+   * @returns The callback's return value if ready, or `orElse()` result (or `undefined` if `orElse` not provided).
    *
    * @example
    * ```tsx
@@ -47,8 +49,26 @@ export interface BloxRef<T> {
    *   console.log(width);
    * });
    * ```
+   *
+   * @example
+   * ```tsx
+   * // With orElse fallback
+   * const canvasRef = blox.ref<HTMLCanvasElement>();
+   *
+   * blox.onMount(() => {
+   *   const width = canvasRef.ready(
+   *     (canvas) => canvas.width,
+   *     () => 0  // Fallback value
+   *   );
+   *   // Type: number (always defined)
+   *   console.log("Canvas width:", width);
+   * });
+   * ```
    */
-  ready<R>(callback: (value: Exclude<T, null | undefined>) => R): R | undefined;
+  ready<R, E = undefined>(
+    callback: (value: Exclude<T, null | undefined>) => R,
+    orElse?: () => E
+  ): R | E;
 }
 
 /**
@@ -112,15 +132,17 @@ export function ref<T>(): BloxRef<T> {
   // Create a plain ref object (no hooks needed)
   const bloxRef: any = {
     current: null as T | null,
-    ready<R>(
-      callback: (value: Exclude<T, null | undefined>) => R
-    ): R | undefined {
+    ready<R, E = undefined>(
+      callback: (value: Exclude<T, null | undefined>) => R,
+      orElse?: () => E
+    ): R | E {
       // Simply check if ref is ready and call callback
       // No lifecycle registration - caller should use effect() or blox.onMount()
       if (bloxRef.current != null) {
         return callback(bloxRef.current as Exclude<T, null | undefined>);
       }
-      return undefined;
+
+      return orElse?.() as E;
     },
   };
 
@@ -148,11 +170,13 @@ type ExtractRefTypes<T extends readonly BloxRef<any>[]> = {
  *
  * @template T - Tuple of BloxRef types
  * @template R - Return type of callback
+ * @template E - Return type of orElse callback
  * @param refs - Array of BloxRef objects to wait for
  * @param callback - Function to execute when all values are ready.
  *                   Receives all non-nullable values as arguments.
  *                   Can return a value that will be returned by `ready()`.
- * @returns The callback's return value, or `undefined` if any ref is null/undefined.
+ * @param orElse - Optional fallback function to call when any ref is null/undefined.
+ * @returns The callback's return value, or `orElse()` result (or `undefined` if `orElse` not provided).
  *
  * @example
  * ```tsx
@@ -195,10 +219,15 @@ type ExtractRefTypes<T extends readonly BloxRef<any>[]> = {
  * });
  * ```
  */
-export function ready<const T extends readonly BloxRef<any>[], R>(
+export function ready<
+  const T extends readonly BloxRef<any>[],
+  R,
+  E = undefined
+>(
   refs: T,
-  callback: (...values: ExtractRefTypes<T>) => R
-): R | undefined {
+  callback: (...values: ExtractRefTypes<T>) => R,
+  orElse?: () => E
+): R | E {
   // Simply check if all refs are ready and call callback
   // No lifecycle registration - caller should use effect() or blox.onMount()
   const allReady = refs.every((ref) => ref.current != null);
@@ -206,5 +235,5 @@ export function ready<const T extends readonly BloxRef<any>[], R>(
     const values = refs.map((ref) => ref.current) as ExtractRefTypes<T>;
     return callback(...values);
   }
-  return undefined;
+  return orElse?.() as E;
 }
