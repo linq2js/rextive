@@ -37,18 +37,17 @@ const clearCompletedButtonPart = rx(
       </button>
     )
 );
+const activeCountPart = rx(() => (
+  <>
+    <strong>{todoStore.active().length}</strong>{" "}
+    {todoStore.active().length === 1 ? "item" : "items"} left
+  </>
+));
 
 export const Footer = blox(() => {
   return (
     <footer className="footer">
-      <span className="todo-count">
-        {rx(() => (
-          <>
-            <strong>{todoStore.active().length}</strong>{" "}
-            {todoStore.active().length === 1 ? "item" : "items"} left
-          </>
-        ))}
-      </span>
+      <span className="todo-count">{activeCountPart}</span>
       <ul className="filters">
         <li>{allFilterPart}</li>
         <li>{activeFilterPart}</li>

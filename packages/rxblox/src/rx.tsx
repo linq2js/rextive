@@ -35,21 +35,30 @@ export const Reactive = memo((props: { exp: () => unknown }) => {
   const rerender = useRerender<{
     error?: unknown;
   }>();
-  // Signal dispatcher is stable across renders - created once and reused
-  // We use useMemo instead of useState to pass required parameters
+
+  // Create stable ref object containing dispatcher, subscription state, and utility functions
+  // Using useState ensures this is created once and persists across renders
   const [ref] = useState(() => {
     const onCleanup = emitter();
     const dispatcher = trackingDispatcher();
-    // one this token changed, re-subscribe to all subscribables
+    // Token that changes when dependencies change, triggering useLayoutEffect to re-subscribe
     const subscribeToken = { current: {} };
+
     const recompute = () => {
+      // Skip if already rendering to prevent redundant re-renders in same cycle
+      // This enables debouncing when multiple signals change synchronously
       if (rerender.rendering()) {
         return;
       }
 
       try {
+        // Re-evaluate expression and check if dependencies changed
         const { value: nextValue, dependencyChanged } = ref.getValue();
 
+        // Trigger re-render if:
+        // 1. Dependencies changed (need to re-subscribe)
+        // 2. This is the first evaluation (!ref.result)
+        // 3. Value changed (result !== nextValue)
         if (
           dependencyChanged ||
           !ref.result ||
@@ -59,6 +68,7 @@ export const Reactive = memo((props: { exp: () => unknown }) => {
           rerender({});
         }
       } catch (ex) {
+        // On error: cleanup subscriptions, clear dispatcher, and trigger immediate error re-render
         onCleanup.emitAndClear();
         dispatcher.clear();
         rerender.immediate({ error: ex });
@@ -70,23 +80,26 @@ export const Reactive = memo((props: { exp: () => unknown }) => {
       subscribeToken,
       dispatcher,
       subscribe() {
-        // clear previous subscriptions
+        // Clear previous subscriptions before setting up new ones
+        // This prevents accumulating duplicate subscriptions across re-subscriptions
         onCleanup.emitAndClear();
 
         try {
-          // Subscribe to all dependencies that were accessed during expression evaluation
+          // Subscribe to all signals that were accessed during the most recent evaluation
+          // Each signal will call recompute() when it changes
           for (const subscribable of dispatcher.subscribables) {
             onCleanup.on(subscribable.on(recompute));
           }
         } catch (ex) {
-          // If subscription fails, clean up and set error state
+          // If subscription fails, clean up and trigger immediate error re-render
           // Errors should be handled immediately, not debounced
           onCleanup.emitAndClear();
           rerender.immediate({ error: ex });
           return;
         }
 
-        // Cleanup function: unsubscribe from all signals when effect re-runs or component unmounts
+        // Return cleanup function that will be called by useLayoutEffect
+        // when dependencies change or component unmounts
         return () => {
           // Cancel any pending debounced rerender to prevent updates after unmount
           rerender.cancel();
@@ -94,11 +107,14 @@ export const Reactive = memo((props: { exp: () => unknown }) => {
         };
       },
       getValue() {
-        // take snapshot of current dependencies
+        // Take snapshot of current dependencies before clearing
         const prevSubscribables = new Set(dispatcher.subscribables);
-        // clear previous dependencies
+
+        // Clear dispatcher to track new dependencies during evaluation
         dispatcher.clear();
 
+        // Evaluate the expression with tracking enabled
+        // syncOnly ensures the expression is synchronous (no promises/async)
         const value = syncOnly(
           () =>
             withDispatchers([trackingToken(dispatcher)], props.exp, {
@@ -114,32 +130,37 @@ export const Reactive = memo((props: { exp: () => unknown }) => {
           }
         );
 
+        // Compare old and new dependencies to detect changes
         let dependencyChanged = false;
-        // check if dependencies changed
         const nextSubscribables = new Set(dispatcher.subscribables);
         if (isDiff(prevSubscribables, nextSubscribables)) {
           dependencyChanged = true;
+          // Update token to trigger useLayoutEffect re-subscription
           subscribeToken.current = {};
         }
+
         return { value, dependencyChanged };
       },
     };
   });
 
-  // Re-throw errors so ErrorBoundary can catch them
+  // Re-throw errors caught during expression evaluation
+  // This allows ErrorBoundary components to catch and handle them
   if (rerender.data?.error) {
     throw rerender.data.error;
   }
 
-  // initialize the value
+  // Initialize on first render: evaluate expression and track dependencies
   if (!ref.result) {
     const { value } = ref.getValue();
     ref.result = { value };
   }
 
+  // Subscribe to all tracked signals
+  // Re-runs when subscribeToken.current changes (i.e., when dependencies change)
   useLayoutEffect(() => {
     return ref.subscribe();
-  }, [ref.subscribeToken.current]); // subscribe again once subscribables change
+  }, [ref.subscribeToken.current]);
 
   const result = ref.result?.value;
 
@@ -283,16 +304,17 @@ export function rx(exp: () => unknown): ReactNode;
 /**
  * Implementation of rx() with multiple overloads.
  *
- * This function dispatches to different implementations based on the arguments:
- * 1. rx([signals], fn) - Explicit signal dependencies with callback
- * 2. rx(component, props) - Auto-reactive component creation
- * 3. rx(() => ...) - Original expression-based reactive rendering
+ * This function dispatches to different implementations based on argument patterns:
+ * 1. Array as first arg → rx([signals], fn) - Explicit signal dependencies
+ * 2. Single function arg → rx(() => ...) - Expression-based reactive rendering
+ * 3. Two args → rx(component, props) - Auto-reactive component creation
  *
- * All overloads ultimately create a Reactive component that tracks signal
- * dependencies and re-renders when they change.
+ * All overloads construct an expression function that is passed to the Reactive
+ * component, which handles dependency tracking and re-rendering.
  */
 export function rx(...args: any[]): ReactNode {
-  // Check for nested rx() blocks - this is an anti-pattern
+  // Validate context: nested rx() blocks are not allowed
+  // They create unnecessary overhead and complicate dependency tracking
   if (getContextType() === "rx") {
     throw new Error(
       "Nested rx() blocks detected. This is inefficient and unnecessary.\n\n" +
@@ -310,7 +332,7 @@ export function rx(...args: any[]): ReactNode {
   let exp: () => ReactNode;
 
   // Overload 1: rx([signals], fn)
-  // Unwraps an array of signals and passes their values to the callback
+  // Explicit dependency list - unwraps signals and passes values to callback
   if (Array.isArray(args[0])) {
     const maybeSignals = args[0] as readonly (
       | Signal<any>
@@ -320,19 +342,20 @@ export function rx(...args: any[]): ReactNode {
     )[];
     const fn = args[1] as (...args: any[]) => ReactNode;
 
-    // Create expression that unwraps each signal (or returns undefined for non-signals)
+    // Build expression that unwraps each signal (or undefined for non-signals)
+    // and passes them as arguments to the callback
     exp = () =>
       fn(
         ...maybeSignals.map((s) => (typeof s === "function" ? s() : undefined))
       );
   }
-  // Overload 3: rx(() => ...)
-  // Simple expression function - the original and most flexible overload
+  // Overload 2: rx(() => ...)
+  // Expression-based - automatically tracks accessed signals
   else if (args.length === 1) {
     exp = args[0];
   }
-  // Overload 2: rx(component, props)
-  // Auto-reactive component with signal props automatically unwrapped
+  // Overload 3: rx(component, props)
+  // Component-based - auto-unwraps signal props during render
   else {
     if (!args[1]) {
       throw new Error("Invalid arguments");
@@ -341,21 +364,21 @@ export function rx(...args: any[]): ReactNode {
     const componentType = args[0] as ComponentType<any>;
     const componentProps: ComponentProps<typeof componentType> = args[1];
 
-    // Separate props into static (non-signal) and dynamic (signal) props
+    // Separate static props (primitives, objects) from dynamic props (signals)
     const staticProps: Record<string, any> = {};
     const dynamicProps: [string, Signal<any>][] = [];
 
     Object.entries(componentProps).forEach(([key, value]) => {
       if (isSignal(value)) {
-        // Store signal props separately for unwrapping during render
+        // Signals are stored separately and unwrapped on each render
         dynamicProps.push([key, value]);
       } else {
-        // Static props can be copied directly
+        // Static values are copied once
         staticProps[key] = value;
       }
     });
 
-    // Create expression that unwraps dynamic props and merges with static props
+    // Build expression that merges static props with unwrapped dynamic props
     exp = () => {
       const finalProps = { ...staticProps };
       // Unwrap each signal prop by calling it
@@ -366,6 +389,7 @@ export function rx(...args: any[]): ReactNode {
     };
   }
 
-  // All overloads create a Reactive component with the constructed expression
+  // Create Reactive component with the constructed expression
+  // The Reactive component handles tracking, subscribing, and re-rendering
   return <Reactive exp={exp} />;
 }

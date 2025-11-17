@@ -759,36 +759,44 @@ const TodoApp = blox(() => {
 | Tab selection        | Local (usually) | Unless needs to sync across instances                |
 | Data fetching        | **Both**        | Global for shared data, local for component-specific |
 
-**Organizing Signal Code:**
+**Organizing Code:**
 
 Recommended structure:
 
 ```plaintext
 src/
-├── store/              # Global signals
+├── stores/             # Global state stores
 │   ├── auth.ts         # authStore
 │   ├── cart.ts         # cartStore
 │   └── theme.ts        # themeStore
 │
-├── signalFactories/    # Reusable signal factories
-│   ├── counter.ts      # createCounter()
-│   ├── formField.ts    # createFormField()
-│   └── asyncData.ts    # createAsyncData()
+├── factories/          # Reusable store factories
+│   ├── counter.ts      # createCounterStore()
+│   ├── formField.ts    # createFormFieldStore()
+│   └── asyncData.ts    # createAsyncDataStore()
+│
+├── utils/              # Component utilities
+│   ├── withWebSocket.ts
+│   ├── withAutoSave.ts
+│   └── withTimer.ts
 │
 └── components/
-    └── Counter.tsx     # Components with local signals
+    └── Counter.tsx     # Components with local state
 ```
 
 **Best practices:**
 
-- ✅ Global signals in `store/` directory
-- ✅ Signal factories in `signalFactories/` or `factories/`
+- ✅ Global stores in `stores/` directory
+- ✅ Store factories in `factories/` directory
+- ✅ Component utilities in `utils/` with `with` prefix
 - ✅ Local signals inside component definition
 - ✅ Name global stores with `Store` suffix: `authStore`, `cartStore`
-- ✅ Name factories with `create` prefix: `createCounter()`, `createFormField()`
+- ✅ Name factories with `create` prefix: `createCounterStore()`, `createFormFieldStore()`
+- ✅ Name component utilities with `with` prefix: `withWebSocket()`, `withAutoSave()`
 - ✅ Export both factory and global instance if needed
-- ❌ Don't create global signals inside components
+- ❌ Don't create global stores inside components
 - ❌ Don't pass local signals between components (use props or global instead)
+- ❌ Don't use `useXXX` prefix (reserved for React hooks)
 
 ---
 
@@ -798,25 +806,26 @@ One of the most powerful features of `blox` is the ability to extract and reuse 
 
 ### Naming Conventions
 
-**Universal Logic** (plain names or `xxxLogic` suffix)
+**Global State** (`xxxStore` suffix)
 
-- Can be called anywhere
-- Only uses: `signal()`, `effect()`, `rx()`
-- Example: `counterLogic()`, `formState()`, `timer()`
+- Created outside components, shared across the app
+- Only uses: `signal()`, `effect()`, actions
+- Example: `authStore`, `cartStore`, `todoStore`
+- Factory functions: `createAuthStore()`, `createTodoStore()`
 
-**Blox-only Logic** (`withXXX` prefix)
+**Component Utilities** (`withXXX` prefix)
 
-- Must be called inside `blox()` components
+- Called inside `blox()` components only
 - Uses blox APIs: `blox.onMount()`, `blox.onUnmount()`, `blox.onRender()`, `blox.handle()`
-- Example: `withWebSocket()`, `withCleanup()`, `withReactRouter()`
+- Example: `withWebSocket()`, `withAutoSave()`, `withKeyboardShortcuts()`
 
 ⚠️ **Never use `useXXX`** - Reserved for React hooks only!
 
 ### Basic Example
 
 ```tsx
-// Universal logic - can use anywhere
-function counterLogic(initialValue = 0) {
+// Store factory - can create global or local instances
+function createCounterStore(initialValue = 0) {
   const count = signal(initialValue);
   const doubled = signal(() => count() * 2);
 
@@ -827,9 +836,12 @@ function counterLogic(initialValue = 0) {
   return { count, doubled, increment, decrement, reset };
 }
 
-// Use in components
+// Global store - shared across app
+export const counterStore = createCounterStore(0);
+
+// Or use locally in component
 const Counter = blox(() => {
-  const counter = counterLogic(0);
+  const counter = createCounterStore(0);
 
   return (
     <div>
@@ -842,12 +854,12 @@ const Counter = blox(() => {
 });
 ```
 
-### Blox-only Logic with Cleanup
+### Component Utilities with Cleanup
 
-Use `blox.onUnmount()` for cleanup in blox-only logic:
+Use `blox.onUnmount()` for cleanup in component utilities:
 
 ```tsx
-// Blox-only logic - uses blox.onUnmount()
+// Component utility - uses blox.onUnmount()
 function withWebSocket(url: string) {
   const messages = signal<string[]>([]);
   const connected = signal(false);
@@ -878,13 +890,13 @@ const Chat = blox<{ roomId: string }>((props) => {
 });
 ```
 
-### Complex State Logic
+### Complex Store Logic
 
-Extract business logic into reusable functions:
+Extract business logic into reusable store factories:
 
 ```tsx
-// Universal logic - no blox APIs, can use anywhere
-function authStateLogic() {
+// Store factory - creates auth state management
+function createAuthStore() {
   const user = signal<User | null>(null);
   const loading = signal(false);
   const error = signal<string | null>(null);
@@ -911,14 +923,17 @@ function authStateLogic() {
 
   return { user, loading, error, isAuthenticated, login, logout };
 }
+
+// Create global auth store
+export const authStore = createAuthStore();
 ```
 
-### Composing Multiple Functions
+### Composing Stores and Utilities
 
-Combine smaller logic functions into larger ones:
+Combine store factories and component utilities:
 
 ```tsx
-// Blox-only - uses blox.onUnmount()
+// Component utility - uses blox.onUnmount()
 function withTimer(interval = 1000) {
   const elapsed = signal(0);
   const timer = setInterval(() => elapsed.set((p) => p + interval), interval);
@@ -926,18 +941,21 @@ function withTimer(interval = 1000) {
   return { elapsed };
 }
 
-// Universal - can use anywhere
-function timedCounterLogic() {
-  const counter = counterLogic(0);
+// Store factory - can use anywhere
+function createTimedCounterStore() {
+  const counter = createCounterStore(0);
 
-  effect(() => counter.increment()); // Auto-increment
+  effect(() => {
+    // Auto-increment every second
+    counter.increment();
+  });
 
   return counter;
 }
 
-// Blox-only - combines both
+// Component utility - combines store + utility
 function withTimedCounter() {
-  const counter = counterLogic(0);
+  const counter = createCounterStore(0);
   const timer = withTimer(1000);
 
   effect(() => counter.increment()); // Auto-increment every second
@@ -948,12 +966,12 @@ function withTimedCounter() {
 
 **Key Benefits:**
 
-- ✅ **Reusability** - Write logic once, use in multiple components
-- ✅ **Testability** - Logic functions can be tested independently
-- ✅ **Separation of concerns** - Keep business logic separate from UI
+- ✅ **Reusability** - Write once, use in multiple components
+- ✅ **Testability** - Stores and utilities can be tested independently
+- ✅ **Separation of concerns** - Keep state logic separate from UI
 - ✅ **No hooks rules** - Call these functions anywhere, in any order
-- ✅ **Automatic cleanup** - `blox.onUnmount()` ensures resources are freed
-- ✅ **Clear naming** - `withXXX` = blox-only, plain/`xxxLogic` = universal
+- ✅ **Automatic cleanup** - `blox.onUnmount()` in utilities ensures resources are freed
+- ✅ **Clear naming** - `withXXX` = component utilities, `xxxStore` = state containers
 - ✅ **Namespaced API** - All blox-specific APIs live under `blox.*`
 
 ---
