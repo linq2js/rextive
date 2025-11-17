@@ -46,10 +46,75 @@ import { FC, ReactNode } from "react";
  *
  * @see {@link TrackingDispatcher.track} for implementation details
  */
-export type TrackFunction = <TTrackable extends Record<string, () => unknown>>(
-  signals: TTrackable
-) => {
-  [k in keyof TTrackable]: TTrackable[k] extends () => infer T ? T : never;
+export type TrackFunction = {
+  /**
+   * Creates a lazy tracking proxy for explicit dependency management.
+   *
+   * The proxy enables fine-grained, conditional dependency tracking by only
+   * subscribing to signals when their properties are accessed. This is useful
+   * for conditional logic where you don't want to track all signals.
+   *
+   * @param signals - Record mapping property names to functions (signals or computed)
+   * @returns A proxy that tracks dependencies lazily when properties are accessed
+   *
+   * @example
+   * ```ts
+   * const count = signal(5);
+   *
+   * effect(({ track }) => {
+   *   const tracked = track({
+   *     count,
+   *     doubled: () => count() * 2,
+   *   });
+   *
+   *   console.log(tracked.count, tracked.doubled);
+   * });
+   * ```
+   */
+  <const TTrackable extends Record<string, () => unknown>>(
+    signals: TTrackable
+  ): {
+    [k in keyof TTrackable]: TTrackable[k] extends () => infer T ? T : never;
+  };
+
+  /**
+   * Creates a lazy trackable expression that is only tracked when called.
+   *
+   * This overload enables conditional dependency tracking with custom equality
+   * comparison to prevent unnecessary recomputations. The expression function
+   * is wrapped and only executed (and tracked) when the returned function is called.
+   * @param exp - The expression to track
+   * @param equals - The equality function to use for tracking
+   * @returns A function that tracks the expression when called
+   *
+   * @example
+   * ```ts
+   * import { shallowEqual } from 'rxblox';
+   *
+   * const users = signal([{ id: 1, name: 'John' }]);
+   *
+   * effect(({ track }) => {
+   *   // Use shallowEqual to only recompute when array structure changes
+   *   // (new/removed items), not when individual objects are mutated
+   *   const userIds = track(() => users().map(u => u.id), shallowEqual);
+   *
+   *   console.log('IDs changed:', userIds);
+   *   // Can call track() multiple times as needed
+   * });
+   * ```
+   */
+  <T = unknown>(exp: () => T, equals: (a: T, b: T) => boolean): {
+    /**
+     * Reads the current expression value with tracking it as a dependency.
+     * @returns The current expression value
+     */
+    (): T;
+    /**
+     * Reads the current expression value without tracking it as a dependency.
+     * @returns The current expression value
+     */
+    peek(): T;
+  };
 };
 
 /**

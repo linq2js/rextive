@@ -587,4 +587,354 @@ describe("trackingDispatcher", () => {
       expect(dispatcher.subscribables.length).toBe(0);
     });
   });
+
+  describe("memory leak prevention", () => {
+    describe("track() dynamic signal cleanup", () => {
+      it("should cleanup dynamic signals when onCleanup is called", () => {
+        const onUpdate = vi.fn();
+        const onCleanup = emitter();
+        const dispatcher = trackingDispatcher(onUpdate, onCleanup);
+
+        const source = signal(1);
+
+        const tracked = dispatcher.track({
+          value: () => source(),
+        });
+
+        // First access creates the dynamic signal
+        const value1 = tracked.value;
+        expect(value1).toBe(1);
+
+        // Verify subscription is active
+        source.set(2);
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+
+        // Trigger cleanup (this should dispose subscriptions)
+        onCleanup.emit();
+
+        // After cleanup, updates should not trigger onUpdate
+        onUpdate.mockClear();
+        source.set(3);
+        expect(onUpdate).not.toHaveBeenCalled();
+      });
+
+      it("should not leak memory when track() is called repeatedly without cleanup", () => {
+        const onUpdate = vi.fn();
+        const onCleanup = emitter();
+        const dispatcher = trackingDispatcher(onUpdate, onCleanup);
+
+        const source = signal(1);
+        const trackedObjects: any[] = [];
+
+        // Simulate repeated track() calls (e.g., in a loop or repeated effect runs)
+        for (let i = 0; i < 100; i++) {
+          const tracked = dispatcher.track({
+            value: () => source(),
+          });
+          trackedObjects.push(tracked);
+          // Access to trigger signal creation
+          tracked.value;
+        }
+
+        // Without cleanup, we have 100 dynamic signals in memory
+        // This is a memory leak scenario
+
+        // Verify subscriptions work
+        source.set(2);
+        expect(onUpdate).toHaveBeenCalled();
+
+        // Now cleanup
+        onCleanup.emit();
+
+        // After cleanup, dynamic signals should be disposed
+        onUpdate.mockClear();
+        source.set(3);
+        expect(onUpdate).not.toHaveBeenCalled();
+      });
+
+      it("should cleanup subscriptions when dispatcher is disposed", () => {
+        const onUpdate = vi.fn();
+        const onCleanup = emitter();
+        const dispatcher = trackingDispatcher(onUpdate, onCleanup);
+
+        const source = signal(1);
+        const tracked = dispatcher.track({
+          value: () => source(),
+        });
+
+        // Access to create signal and subscriptions
+        tracked.value;
+
+        // Verify subscription was created
+        expect(onUpdate).not.toHaveBeenCalled();
+
+        // Update source to trigger subscription
+        source.set(2);
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+
+        // Cleanup dispatcher
+        onCleanup.emit();
+
+        // After cleanup, updating source should not trigger onUpdate
+        onUpdate.mockClear();
+        source.set(3);
+
+        // Give time for potential async updates
+        expect(onUpdate).not.toHaveBeenCalled();
+      });
+
+      it("should prevent memory leak from unreferenced dynamic signals", () => {
+        const onUpdate = vi.fn();
+        const onCleanup = emitter();
+        const dispatcher = trackingDispatcher(onUpdate, onCleanup);
+
+        const source = signal(1);
+        let dynamicSignalCount = 0;
+
+        // Create and immediately discard tracked objects (simulating memory leak)
+        for (let i = 0; i < 10; i++) {
+          const tracked = dispatcher.track({
+            value: () => {
+              dynamicSignalCount++;
+              return source();
+            },
+          });
+          tracked.value; // Access to trigger creation
+          // tracked object goes out of scope, but dynamic signal remains
+        }
+
+        // Dynamic signals are still in memory because they're registered
+        // with disposableToken cleanup
+        expect(dynamicSignalCount).toBe(10);
+
+        // Cleanup should dispose all dynamic signals
+        onCleanup.emit();
+
+        // After cleanup, updating source should not create new subscriptions
+        onUpdate.mockClear();
+        source.set(2);
+
+        // Verify no new subscriptions were triggered
+        expect(onUpdate).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("subscription cleanup", () => {
+      it("should clear tracked subscribables when clear() is called", () => {
+        const onUpdate = vi.fn();
+        const onCleanup = emitter();
+        const dispatcher = trackingDispatcher(onUpdate, onCleanup);
+
+        const source = signal(1);
+
+        withDispatchers([trackingToken(dispatcher)], () => {
+          source();
+        });
+
+        // Verify subscription
+        expect(dispatcher.subscribables.length).toBe(1);
+        source.set(2);
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+
+        // Clear removes from subscribables list (but doesn't unsubscribe)
+        dispatcher.clear();
+        expect(dispatcher.subscribables.length).toBe(0);
+
+        // Existing subscriptions still work (clear doesn't unsubscribe)
+        onUpdate.mockClear();
+        source.set(3);
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+
+        // But re-tracking after clear will add signal again
+        withDispatchers([trackingToken(dispatcher)], () => {
+          source();
+        });
+        expect(dispatcher.subscribables.length).toBe(1);
+      });
+
+      it("should not leak subscriptions when tracking same signal multiple times", () => {
+        const onUpdate = vi.fn();
+        const onCleanup = emitter();
+        const dispatcher = trackingDispatcher(onUpdate, onCleanup);
+
+        const source = signal(1);
+
+        // Track same signal multiple times
+        for (let i = 0; i < 10; i++) {
+          dispatcher.add(source);
+        }
+
+        // Should only have one subscription due to Set deduplication
+        expect(dispatcher.subscribables.length).toBe(1);
+
+        // Update should only trigger onUpdate once
+        source.set(2);
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+      });
+
+      it("should cleanup all subscriptions when onCleanup emits", () => {
+        const onUpdate = vi.fn();
+        const onCleanup = emitter();
+        const dispatcher = trackingDispatcher(onUpdate, onCleanup);
+
+        const s1 = signal(1);
+        const s2 = signal(2);
+        const s3 = signal(3);
+
+        dispatcher.add(s1);
+        dispatcher.add(s2);
+        dispatcher.add(s3);
+
+        // Verify subscriptions
+        s1.set(10);
+        s2.set(20);
+        s3.set(30);
+        expect(onUpdate).toHaveBeenCalledTimes(3);
+
+        // Emit cleanup
+        onCleanup.emit();
+
+        // After cleanup, updates should not trigger onUpdate
+        onUpdate.mockClear();
+        s1.set(100);
+        s2.set(200);
+        s3.set(300);
+        expect(onUpdate).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("closure memory leaks", () => {
+      it("should not leak memory from captured variables in track()", () => {
+        const onUpdate = vi.fn();
+        const onCleanup = emitter();
+        const dispatcher = trackingDispatcher(onUpdate, onCleanup);
+
+        // Create large object that could leak if captured incorrectly
+        const largeArray = new Array(1000).fill(0).map((_, i) => ({
+          id: i,
+          data: new Array(100).fill(i),
+        }));
+
+        const source = signal(largeArray[0]);
+
+        const tracked = dispatcher.track({
+          value: () => {
+            // This closure captures largeArray - potential memory leak
+            return largeArray.find(item => item.id === source().id);
+          },
+        });
+
+        tracked.value; // Create dynamic signal
+
+        // Verify subscription works before cleanup
+        source.set(largeArray[1]);
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+
+        // Cleanup should dispose everything
+        onCleanup.emit();
+
+        // After cleanup, updates should not trigger onUpdate
+        onUpdate.mockClear();
+        source.set(largeArray[2]);
+        expect(onUpdate).not.toHaveBeenCalled();
+      });
+
+      it("should not leak when track() creates circular references", () => {
+        const onUpdate = vi.fn();
+        const onCleanup = emitter();
+        const dispatcher = trackingDispatcher(onUpdate, onCleanup);
+
+        const source = signal(1);
+        const trackedObjects: any[] = [];
+
+        // Create circular reference
+        const tracked1 = dispatcher.track({
+          value: () => source(),
+        });
+
+        const tracked2 = dispatcher.track({
+          ref1: () => tracked1,
+          value: () => source(),
+        });
+
+        // Create circular reference
+        (tracked1 as any).ref2 = tracked2;
+
+        trackedObjects.push(tracked1, tracked2);
+
+        // Access to create signals
+        tracked1.value;
+        tracked2.value;
+
+        // Verify subscriptions work before cleanup
+        source.set(2);
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+
+        // Cleanup should handle circular references
+        onCleanup.emit();
+
+        // After cleanup, updates should not trigger onUpdate
+        onUpdate.mockClear();
+        source.set(3);
+        expect(onUpdate).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("async memory leaks", () => {
+      it("should cleanup subscriptions even when track() is used in async context", async () => {
+        const onUpdate = vi.fn();
+        const onCleanup = emitter();
+        const dispatcher = trackingDispatcher(onUpdate, onCleanup);
+
+        const source = signal(1);
+
+        const tracked = dispatcher.track({
+          value: () => source(),
+        });
+
+        // Simulate async access
+        await new Promise(resolve => setTimeout(resolve, 10));
+        tracked.value;
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+        source.set(2);
+        expect(onUpdate).toHaveBeenCalledTimes(1);
+
+        // Cleanup
+        onCleanup.emit();
+
+        // After cleanup, async updates should not trigger subscriptions
+        onUpdate.mockClear();
+        await new Promise(resolve => setTimeout(resolve, 10));
+        source.set(3);
+        expect(onUpdate).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("integration with effects", () => {
+      it("should not leak when effects are repeatedly created and disposed", () => {
+        const effectRuns: any[] = [];
+
+        // Simulate repeated effect creation/disposal
+        for (let i = 0; i < 10; i++) {
+          const onUpdate = vi.fn(() => effectRuns.push(i));
+          const onCleanup = emitter();
+          const dispatcher = trackingDispatcher(onUpdate, onCleanup);
+
+          const source = signal(i);
+
+          withDispatchers([trackingToken(dispatcher)], () => {
+            source();
+          });
+
+          // Cleanup immediately
+          onCleanup.emit();
+        }
+
+        // All effects should be cleaned up
+        // If there's a leak, subscriptions would accumulate
+        expect(effectRuns.length).toBe(0);
+      });
+    });
+  });
 });

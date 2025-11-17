@@ -64,3 +64,5 @@ export type { ContextType } from "./dispatcher";
 
 // Development utilities
 export { devLog, devWarn, devError, devOnly, devAssert } from "./utils/dev";
+export { syncOnly } from "./utils/syncOnly";
+export type { SyncOnlyOptions } from "./utils/syncOnly";

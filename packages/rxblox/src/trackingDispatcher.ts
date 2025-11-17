@@ -1,6 +1,13 @@
-import { TrackingDispatcher, Subscribable, TrackFunction } from "./types";
+import {
+  TrackingDispatcher,
+  Subscribable,
+  TrackFunction,
+  MutableSignal,
+} from "./types";
 import { dispatcherToken } from "./dispatcher";
-import { Emitter } from "./emitter";
+import { emitter, Emitter } from "./emitter";
+import { disposableToken } from "./disposableDispatcher";
+import { signal } from "./signal";
 
 /**
  * Dispatcher token for dependency tracking.
@@ -56,6 +63,7 @@ export function trackingDispatcher(
   onUpdate?: VoidFunction,
   onCleanup?: Emitter
 ): TrackingDispatcher {
+  const onCleanupDynamicTracking = emitter<void>();
   /**
    * Adds a subscribable to the dispatcher's tracking set.
    *
@@ -71,7 +79,79 @@ export function trackingDispatcher(
     if (onUpdate) {
       onCleanup?.on(subscribable.on(onUpdate));
     }
+
     return true;
+  };
+
+  /**
+   * Creates a lazily-initialized trackable expression with automatic cleanup.
+   *
+   * This function creates a computed signal that is:
+   * 1. **Lazy**: Only created when first accessed
+   * 2. **Trackable**: Accesses are tracked by the dispatcher
+   * 3. **Disposable**: Automatically cleaned up when dispatcher is disposed
+   *
+   * **How it works:**
+   * - Returns a getter function that lazily creates a signal on first call
+   * - The signal is wrapped with `disposableToken` for cleanup tracking
+   * - Each access uses `trackingToken` to ensure proper dependency tracking
+   * - The signal computes its value by executing `exp()` with tracking enabled
+   *
+   * **Memory management:**
+   * - The `dynamicSignal` is stored in the closure (potential memory leak if never cleaned up)
+   * - Cleanup happens when `onCleanupDynamicTracking.emit()` is called
+   * - This is typically triggered when the parent tracking dispatcher is disposed
+   * - Without cleanup, the signal and all its subscriptions remain in memory
+   *
+   * @param exp - Function to compute the expression value (can access other signals)
+   * @param equals - Equality function to determine if value changed
+   * @returns A getter function that lazily creates and accesses the trackable signal
+   *
+   * @example
+   * ```ts
+   * const dispatcher = trackingDispatcher(onUpdate);
+   *
+   * // Create a trackable expression (not executed yet)
+   * const getter = createTrackableExpression(
+   *   () => signal1() + signal2(),
+   *   (a, b) => a === b
+   * );
+   *
+   * // First call: creates signal and tracks signal1, signal2
+   * const value1 = getter(); // Creates signal, computes value
+   *
+   * // Subsequent calls: reuses existing signal
+   * const value2 = getter(); // Reuses signal, returns cached/recomputed value
+   *
+   * // Cleanup to prevent memory leak
+   * onCleanupDynamicTracking.emit();
+   * ```
+   *
+   * @internal
+   */
+  const createTrackableExpression = (
+    exp: () => unknown,
+    equals: (a: unknown, b: unknown) => boolean
+  ) => {
+    // Signal is undefined until first access (lazy initialization)
+    // ⚠️ MEMORY LEAK RISK: This closure captures the signal permanently
+    // until onCleanupDynamicTracking is called
+    let dynamicSignal: MutableSignal<unknown> | undefined;
+
+    return () => {
+      // Lazy initialization: create signal on first access
+      if (!dynamicSignal) {
+        // Create signal with disposable context for cleanup
+        // The signal will be disposed when onCleanupDynamicTracking.emit() is called
+        dynamicSignal = disposableToken.with(onCleanupDynamicTracking, () =>
+          signal(exp, { equals })
+        );
+      }
+
+      // Access signal value with tracking enabled
+      // This ensures the current tracking context registers this access
+      return trackingToken.with(dispatcher, dynamicSignal.get);
+    };
   };
 
   /**
@@ -195,7 +275,14 @@ export function trackingDispatcher(
    * });
    * ```
    */
-  const track: TrackFunction = (getters) => {
+  const track: TrackFunction = (
+    getters: Record<string, () => unknown> | (() => unknown),
+    equals?: (a: unknown, b: unknown) => boolean
+  ) => {
+    if (typeof getters === "function") {
+      return createTrackableExpression(getters, equals!);
+    }
+
     return new Proxy(getters, {
       get(_target, prop) {
         const value = getters[prop as keyof typeof getters];
@@ -236,6 +323,7 @@ export function trackingDispatcher(
      */
     clear() {
       subscribables.clear();
+      onCleanupDynamicTracking.emitAndClear();
     },
   };
 

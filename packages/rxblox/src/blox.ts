@@ -24,7 +24,7 @@ import { EventDispatcher, eventToken } from "./eventDispatcher";
 import once from "lodash/once";
 import { trackingToken } from "./trackingDispatcher";
 import { disposableToken } from "./disposableDispatcher";
-import { isPromiseLike } from "./isPromiseLike";
+import { syncOnly } from "./utils/syncOnly";
 
 /**
  * Creates a reactive component that tracks props as signals and manages effects.
@@ -298,35 +298,31 @@ export function blox<TProps extends object, TRef>(
     const [result] = useState(() => {
       // Apply dispatchers to the builder function
       // This provides context for effects, events, providers, blox APIs, etc.
-      const result = withDispatchers(
-        [
-          providerToken(providerResolver),
-          effectToken(effectDispatcher),
-          eventToken(eventDispatcher.emitters),
-          disposableToken(eventDispatcher.emitters.unmount),
-          // no tracking when builder is called
-          trackingToken(),
-        ],
-        () => {
-          return builder(propsProxy as PropsWithoutRef<TProps>, ref.set);
-        },
-        { contextType: "blox" }
-      );
-
-      // Validate that the builder doesn't return a promise
-      // Async builders won't work correctly because:
-      // 1. React expects synchronous rendering
-      // 2. The component would render incomplete/loading state
-      // 3. Effects and signals would be in inconsistent state
-      if (isPromiseLike(result)) {
-        throw new Error(
-          "blox() builder function cannot return a promise. " +
+      return syncOnly(
+        () =>
+          withDispatchers(
+            [
+              providerToken(providerResolver),
+              effectToken(effectDispatcher),
+              eventToken(eventDispatcher.emitters),
+              disposableToken(eventDispatcher.emitters.unmount),
+              // no tracking when builder is called
+              trackingToken(),
+            ],
+            () => {
+              return builder(propsProxy as PropsWithoutRef<TProps>, ref.set);
+            },
+            { contextType: "blox" }
+          ),
+        {
+          message:
+            "blox() builder function cannot return a promise. " +
             "React components must render synchronously. " +
-            "If you need async data, use signal.async() or handle async operations in effects."
-        );
-      }
-
-      return result;
+            "If you need async data, use signal.async() or handle async operations in effects.",
+          context: "blox()",
+          mode: "error",
+        }
+      );
     });
 
     /**
