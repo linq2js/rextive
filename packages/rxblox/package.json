@@ -60,6 +60,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^14.1.2",
+    "@types/node": "^24.10.1",
     "@types/react": "^18.2.45",
     "@types/shallowequal": "^1.1.5",
     "@vitejs/plugin-react": "^4.2.1",

@@ -223,7 +223,7 @@ export function signal<T>(
       // The dispatcher tracks implicit accesses (signal calls)
       // The track() proxy tracks explicit accesses (proxy property access)
       current = {
-        value: withDispatchers([trackingToken(dispatcher)], () =>
+        value: trackingToken.with(dispatcher, () =>
           (value as (context: ComputedSignalContext) => T)(context)
         ),
       };

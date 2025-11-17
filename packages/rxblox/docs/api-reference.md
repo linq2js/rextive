@@ -19,6 +19,8 @@ Complete API documentation for all rxblox functions and utilities.
 - [blox.onMount](#bloxonmount)
 - [blox.onUnmount](#bloxonunmount)
 - [blox.handle](#bloxhandlet)
+- [blox.slot](#bloxslot)
+- [blox.fill](#bloxfill)
 - [provider](#providert)
 - [loadable](#loadable)
 - [isLoadable](#isloadable)
@@ -462,6 +464,213 @@ type Handle<T> = {
 - The value is `undefined` during the definition phase
 - Must use `rx()` to access the value in JSX
 - Can access directly in event handlers
+
+---
+
+## `blox.slot()`
+
+Creates a slot with logic and dynamic content filling.
+
+**Must be called inside a `blox` component.**
+
+A slot allows you to:
+1. Run logic and computations once during component initialization
+2. Conditionally fill the slot with content using `blox.fill()`
+3. Return a result value from the logic
+4. Render the filled content in your component
+
+**Signature:**
+
+```ts
+function slot<T>(fn: () => T): [ReactNode, T];
+function slot<T>(fn: () => T, options: SlotOptions): [ReactNode, T];
+```
+
+**Parameters:**
+- `fn: () => T` - Function containing logic that may call `blox.fill()`
+- `options?: SlotOptions` - Optional configuration:
+  - `mode?: "replace" | "once" | "append"` - How to handle multiple fills (default: `"replace"`)
+
+**Returns:**
+
+`[slotComponent, result]` tuple where:
+- `slotComponent`: ReactNode to render (the filled content)
+- `result`: Return value from the function
+
+**Modes:**
+
+| Mode | Behavior |
+|------|----------|
+| `"replace"` | Latest `fill()` wins (default) |
+| `"once"` | Throws error if `fill()` called multiple times |
+| `"append"` | Collects all fills into an array |
+
+**Example: Basic Usage**
+
+```tsx
+const MyComponent = blox<{ items: Item[] }>((props) => {
+  // Create slot with logic
+  const [ItemList, count] = blox.slot(() => {
+    const filtered = props.items.filter(item => item.active);
+    
+    if (filtered.length === 0) {
+      blox.fill(<p>No active items</p>);
+    } else {
+      blox.fill(
+        <ul>
+          {filtered.map(item => <li key={item.id}>{item.name}</li>)}
+        </ul>
+      );
+    }
+    
+    return filtered.length;
+  });
+
+  return (
+    <div>
+      <h2>Active Items: {count}</h2>
+      {ItemList}
+    </div>
+  );
+});
+```
+
+**Example: With Modes**
+
+```tsx
+// Strict mode - throw on multiple fills
+const [Content, data] = blox.slot(() => {
+  const result = compute();
+  blox.fill(<div>{result}</div>);
+  // blox.fill(<div>Another</div>); // ❌ Error!
+  return result;
+}, { mode: "once" });
+
+// Append mode - collect all fills
+const [Items, count] = blox.slot(() => {
+  items.forEach(item => {
+    blox.fill(<Item key={item.id} {...item} />);
+  });
+  return items.length;
+}, { mode: "append" });
+```
+
+**Example: Reactive Content with `rx()`**
+
+```tsx
+const [TodoList, total] = blox.slot(() => {
+  const todos = signal([{ id: 1, text: "Buy milk" }]);
+  
+  // Fill with reactive content
+  blox.fill(rx(() => {
+    const items = todos();
+    return (
+      <ul>
+        {items.map(todo => (
+          <li key={todo.id}>{todo.text}</li>
+        ))}
+      </ul>
+    );
+  }));
+  
+  return todos().length;
+});
+
+// The TodoList updates reactively when todos signal changes
+```
+
+**Key Features:**
+
+- ✅ Logic runs once at component initialization
+- ✅ Content is static once filled (use `rx()` for reactivity)
+- ✅ Multiple slots per component
+- ✅ Type-safe return values
+- ✅ Conditional rendering without JSX ternaries
+
+**When to Use:**
+
+- Encapsulate complex logic with associated UI
+- Compute derived values while rendering content
+- Conditional layouts with logic separation
+- Multiple fill patterns (replace/once/append)
+
+---
+
+## `blox.fill()`
+
+Fills the current active slot with content.
+
+**Must be called inside a `blox.slot()` callback.**
+
+**Signature:**
+
+```ts
+function fill(content: ReactNode): void;
+```
+
+**Parameters:**
+- `content: ReactNode` - React node to render in the slot
+
+**Behavior:**
+
+The behavior depends on the slot's mode:
+- `replace` (default): Latest fill wins, replaces previous content
+- `once`: Throws error if called multiple times
+- `append`: Collects all fills into an array
+
+**Example: Conditional Fills**
+
+```tsx
+const [Slot, value] = blox.slot(() => {
+  const result = compute();
+  
+  if (result > 10) {
+    blox.fill(<HighValue value={result} />);
+  } else {
+    blox.fill(<LowValue value={result} />);
+  }
+  
+  return result;
+});
+```
+
+**Example: Dynamic Reactive Content**
+
+```tsx
+const [DynamicContent, count] = blox.slot(() => {
+  const items = signal(['apple', 'banana']);
+  
+  blox.fill(rx(() => {
+    // This updates reactively when items() changes
+    return (
+      <ul>
+        {items().map((item, i) => <li key={i}>{item}</li>)}
+      </ul>
+    );
+  }));
+  
+  return items().length;
+});
+```
+
+**Example: Append Mode**
+
+```tsx
+const [ItemList, total] = blox.slot(() => {
+  items.forEach(item => {
+    blox.fill(<li key={item.id}>{item.name}</li>);
+  });
+  return items.length;
+}, { mode: "append" });
+// Renders all items
+```
+
+**Notes:**
+
+- Must be called within a `blox.slot()` callback
+- Can be called with `ReactNode`, including `rx()` expressions
+- Multiple calls behavior determined by slot mode
+- Content is filled once (use `rx()` for reactive updates)
 
 ---
 

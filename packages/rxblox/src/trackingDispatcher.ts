@@ -205,7 +205,7 @@ export function trackingDispatcher(
         // Execute function with dispatcher context to perform tracking
         // This ensures tracking happens at property access time, maintaining
         // the dispatcher context even in async scenarios
-        return withDispatchers([trackingToken(dispatcher)], value);
+        return trackingToken.with(dispatcher, value);
       },
     }) as any;
   };

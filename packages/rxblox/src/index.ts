@@ -10,6 +10,7 @@ import { cancellableAction, aborter } from "./cancellableAction";
 import { snapshot } from "./snapshot";
 import { history } from "./history";
 import { createRef } from "./ref";
+import { slot, fill } from "./slot";
 
 export const blox = Object.assign(createBlox, {
   handle,
@@ -17,6 +18,8 @@ export const blox = Object.assign(createBlox, {
   onUnmount,
   onRender,
   ref: createRef,
+  slot,
+  fill,
 });
 
 export const signal = Object.assign(createSignal, {
@@ -53,3 +56,11 @@ export { tag } from "./tag";
 export type { Tag } from "./tag";
 export { batch } from "./batch";
 export type { InferSignalValues } from "./batch";
+export type { SlotOptions, SlotMode } from "./slot";
+
+// Dispatcher system
+export { getContextType } from "./dispatcher";
+export type { ContextType } from "./dispatcher";
+
+// Development utilities
+export { devLog, devWarn, devError, devOnly, devAssert } from "./utils/dev";

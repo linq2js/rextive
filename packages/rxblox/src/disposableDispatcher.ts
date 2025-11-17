@@ -1,4 +1,4 @@
-import { dispatcherToken, withDispatchers } from "./dispatcher";
+import { dispatcherToken } from "./dispatcher";
 import { emitter, Emitter } from "./emitter";
 
 /**
@@ -42,6 +42,6 @@ export const disposableToken = dispatcherToken<DisposableDispatcher>(
  */
 export function disposable<T>(fn: () => T): [T, VoidFunction] {
   const e = emitter();
-  const result = withDispatchers([disposableToken(e)], fn);
+  const result = disposableToken.with(e, fn);
   return [result, e.emit];
 }

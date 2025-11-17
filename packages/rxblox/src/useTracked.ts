@@ -182,7 +182,7 @@ export function useTracked<T extends Record<string, () => unknown>>(
           }
 
           // During render phase: track this getter as a dependency
-          return withDispatchers([trackingToken(dispatcher)], getter);
+          return trackingToken.with(dispatcher, getter);
         },
         ownKeys() {
           return Object.keys(gettersRef.current);

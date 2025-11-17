@@ -76,7 +76,7 @@ export function effect(
 
     // Track which signals are accessed during execution
     const dispatcher = trackingDispatcher(run, onCleanup);
-    const result = withDispatchers([trackingToken(dispatcher)], () =>
+    const result = trackingToken.with(dispatcher, () =>
       fn({ track: dispatcher.track })
     );
     // Register the effect's cleanup function if one was returned
@@ -107,7 +107,7 @@ export function effect(
 
       // Track which signals are accessed during execution
       const dispatcher = trackingDispatcher(run, onCleanup);
-      const result = withDispatchers([trackingToken(dispatcher)], () =>
+      const result = trackingToken.with(dispatcher, () =>
         fn({ track: dispatcher.track })
       );
       // Register the effect's cleanup function if one was returned

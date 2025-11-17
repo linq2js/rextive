@@ -230,7 +230,7 @@ export function useSignals<T extends object>(
 
             // Create signal with disposable dispatcher so it can be cleaned up
             // when the component unmounts via onCleanup.emitAndClear()
-            s = withDispatchers([disposableToken(onCleanup)], () =>
+            s = disposableToken.with(onCleanup, () =>
               signal(initialValue, {
                 equals: optionsRef.current.equals,
               })

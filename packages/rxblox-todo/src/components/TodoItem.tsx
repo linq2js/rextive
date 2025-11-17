@@ -70,7 +70,6 @@ export const TodoItem = blox((props: TodoItemProps) => {
   );
 
   const textPart = rx(() => {
-    console.log("rendering textPart", Math.random());
     return <label onDoubleClick={handleDoubleClick}>{todo().text}</label>;
   });
 

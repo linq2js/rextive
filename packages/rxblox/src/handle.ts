@@ -1,4 +1,5 @@
 import { onRender } from "./eventDispatcher";
+import { getContextType } from "./dispatcher";
 
 /**
  * A handle to capture and access values from React hooks or render-phase logic.
@@ -52,6 +53,15 @@ export type Handle<T> = {
  * @returns A handle with a `.current` property containing the captured value
  */
 export function handle<T>(callback: () => T): Handle<T> {
+  // Check if we're inside a blox component
+  const contextType = getContextType();
+  if (contextType !== "blox") {
+    throw new Error(
+      "blox.handle() must be called inside a blox component. " +
+        "It relies on blox.onRender() which is only available in blox components."
+    );
+  }
+
   let current: T | undefined;
 
   onRender(() => {

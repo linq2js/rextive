@@ -215,7 +215,7 @@ export function history<T>(
 
   // Use effect to reactively track changes
   // Use global effect dispatcher to ensure the effect runs immediately
-  withDispatchers([effectToken(globalEffectDispatcher())], () =>
+  effectToken.with(globalEffectDispatcher(), () =>
     effect(() => {
       // Call snapshot with peek=false to enable reactive tracking
       const value = snapshot(getValue(), false);

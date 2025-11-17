@@ -295,18 +295,21 @@ export function blox<TProps extends object, TRef>(
      * instance. Effects handle reactivity, not the builder result itself.
      */
     const [result] = useState(() => {
-      // Apply the effect dispatcher to the builder function
-      // This collects all effects created by the builder function
+      // Apply dispatchers to the builder function
+      // This provides context for effects, events, providers, blox APIs, etc.
       return withDispatchers(
         [
           providerToken(providerResolver),
           effectToken(effectDispatcher),
           eventToken(eventDispatcher.emitters),
           disposableToken(eventDispatcher.emitters.unmount),
+          // no tracking when builder is called
+          trackingToken(),
         ],
         () => {
           return builder(propsProxy as PropsWithoutRef<TProps>, ref.set);
-        }
+        },
+        { contextType: "blox" }
       );
     });
 

@@ -3,6 +3,7 @@ import {
   dispatcherToken,
   getDispatcher,
   withDispatchers,
+  getContextType,
 } from "./dispatcher";
 
 describe("dispatcher", () => {
@@ -381,5 +382,340 @@ describe("dispatcher", () => {
       });
     });
   });
-});
 
+  describe("getContextType", () => {
+    it("should return undefined when no context is set", () => {
+      expect(getContextType()).toBeUndefined();
+    });
+
+    it("should return the context type when set via withDispatchers", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      withDispatchers(
+        [testToken("value")],
+        () => {
+          expect(getContextType()).toBe("blox");
+        },
+        { contextType: "blox" }
+      );
+    });
+
+    it("should support all context types", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      const contextTypes: Array<
+        "blox" | "effect" | "slot" | "signal" | "batch"
+      > = ["blox", "effect", "slot", "signal", "batch"];
+
+      for (const contextType of contextTypes) {
+        withDispatchers(
+          [testToken("value")],
+          () => {
+            expect(getContextType()).toBe(contextType);
+          },
+          { contextType }
+        );
+      }
+    });
+
+    it("should inherit context type from parent when not overridden", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      withDispatchers(
+        [testToken("outer")],
+        () => {
+          expect(getContextType()).toBe("blox");
+
+          // Inner withDispatchers without contextType option
+          withDispatchers([testToken("inner")], () => {
+            expect(getContextType()).toBe("blox"); // Should inherit
+          });
+        },
+        { contextType: "blox" }
+      );
+    });
+
+    it("should override parent context type when explicitly set", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      withDispatchers(
+        [testToken("outer")],
+        () => {
+          expect(getContextType()).toBe("blox");
+
+          // Inner withDispatchers with different contextType
+          withDispatchers(
+            [testToken("inner")],
+            () => {
+              expect(getContextType()).toBe("slot"); // Should override
+            },
+            { contextType: "slot" }
+          );
+
+          // Back to parent context
+          expect(getContextType()).toBe("blox");
+        },
+        { contextType: "blox" }
+      );
+    });
+
+    it("should restore context type after withDispatchers completes", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      expect(getContextType()).toBeUndefined();
+
+      withDispatchers(
+        [testToken("value")],
+        () => {
+          expect(getContextType()).toBe("effect");
+        },
+        { contextType: "effect" }
+      );
+
+      expect(getContextType()).toBeUndefined();
+    });
+
+    it("should work without contextType option (backward compatibility)", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      withDispatchers([testToken("value")], () => {
+        expect(getContextType()).toBeUndefined();
+      });
+    });
+
+    it("should allow nested contexts with different types", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      withDispatchers(
+        [testToken("1")],
+        () => {
+          expect(getContextType()).toBe("blox");
+
+          withDispatchers(
+            [testToken("2")],
+            () => {
+              expect(getContextType()).toBe("effect");
+
+              withDispatchers(
+                [testToken("3")],
+                () => {
+                  expect(getContextType()).toBe("slot");
+                },
+                { contextType: "slot" }
+              );
+
+              expect(getContextType()).toBe("effect");
+            },
+            { contextType: "effect" }
+          );
+
+          expect(getContextType()).toBe("blox");
+        },
+        { contextType: "blox" }
+      );
+
+      expect(getContextType()).toBeUndefined();
+    });
+  });
+
+  describe("disabling dispatchers with token()", () => {
+    it("should remove dispatcher when called without arguments", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      withDispatchers([testToken("outer")], () => {
+        expect(getDispatcher(testToken)).toBe("outer");
+
+        // Disable the dispatcher
+        withDispatchers([testToken()], () => {
+          expect(getDispatcher(testToken)).toBeUndefined();
+        });
+
+        // Back to outer value
+        expect(getDispatcher(testToken)).toBe("outer");
+      });
+    });
+
+    it("should distinguish between token() and token(undefined)", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      withDispatchers([testToken("outer")], () => {
+        expect(getDispatcher(testToken)).toBe("outer");
+
+        // token(undefined) keeps the existing value
+        withDispatchers([testToken(undefined)], () => {
+          expect(getDispatcher(testToken)).toBe("outer");
+        });
+
+        // token() removes the dispatcher
+        withDispatchers([testToken()], () => {
+          expect(getDispatcher(testToken)).toBeUndefined();
+        });
+      });
+    });
+
+    it("should work with multiple dispatchers", () => {
+      const token1 = dispatcherToken<string>("token1");
+      const token2 = dispatcherToken<number>("token2");
+
+      withDispatchers([token1("value1"), token2(42)], () => {
+        expect(getDispatcher(token1)).toBe("value1");
+        expect(getDispatcher(token2)).toBe(42);
+
+        // Disable token1 but keep token2
+        withDispatchers([token1(), token2(undefined)], () => {
+          expect(getDispatcher(token1)).toBeUndefined();
+          expect(getDispatcher(token2)).toBe(42); // kept from parent
+        });
+      });
+    });
+
+    it("should allow re-enabling a disabled dispatcher", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      withDispatchers([testToken("initial")], () => {
+        expect(getDispatcher(testToken)).toBe("initial");
+
+        // Disable
+        withDispatchers([testToken()], () => {
+          expect(getDispatcher(testToken)).toBeUndefined();
+
+          // Re-enable with new value
+          withDispatchers([testToken("re-enabled")], () => {
+            expect(getDispatcher(testToken)).toBe("re-enabled");
+          });
+
+          // Still disabled here
+          expect(getDispatcher(testToken)).toBeUndefined();
+        });
+
+        // Back to initial
+        expect(getDispatcher(testToken)).toBe("initial");
+      });
+    });
+
+    it("should handle nested disable/enable correctly", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      withDispatchers([testToken("level1")], () => {
+        expect(getDispatcher(testToken)).toBe("level1");
+
+        withDispatchers([testToken()], () => {
+          expect(getDispatcher(testToken)).toBeUndefined();
+
+          withDispatchers([testToken("level3")], () => {
+            expect(getDispatcher(testToken)).toBe("level3");
+          });
+
+          expect(getDispatcher(testToken)).toBeUndefined();
+        });
+
+        expect(getDispatcher(testToken)).toBe("level1");
+      });
+    });
+
+    it("should disable even when there is no parent context", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      // No parent context
+      expect(getDispatcher(testToken)).toBeUndefined();
+
+      withDispatchers([testToken()], () => {
+        // Still undefined, but explicitly disabled
+        expect(getDispatcher(testToken)).toBeUndefined();
+      });
+    });
+  });
+
+  describe("shortcut methods: with() and without()", () => {
+    it("should provide token.with() as a shortcut", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      const result = testToken.with("myValue", () => {
+        expect(getDispatcher(testToken)).toBe("myValue");
+        return 42;
+      });
+
+      expect(result).toBe(42);
+      expect(getDispatcher(testToken)).toBeUndefined();
+    });
+
+    it("should provide token.without() as a shortcut", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      withDispatchers([testToken("outer")], () => {
+        expect(getDispatcher(testToken)).toBe("outer");
+
+        const result = testToken.without(() => {
+          expect(getDispatcher(testToken)).toBeUndefined();
+          return "disabled";
+        });
+
+        expect(result).toBe("disabled");
+        expect(getDispatcher(testToken)).toBe("outer");
+      });
+    });
+
+    it("should allow nesting with.with() and without()", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      testToken.with("level1", () => {
+        expect(getDispatcher(testToken)).toBe("level1");
+
+        testToken.without(() => {
+          expect(getDispatcher(testToken)).toBeUndefined();
+
+          testToken.with("level3", () => {
+            expect(getDispatcher(testToken)).toBe("level3");
+          });
+
+          expect(getDispatcher(testToken)).toBeUndefined();
+        });
+
+        expect(getDispatcher(testToken)).toBe("level1");
+      });
+    });
+
+    it("should work with multiple tokens using shortcuts", () => {
+      const token1 = dispatcherToken<string>("token1");
+      const token2 = dispatcherToken<number>("token2");
+
+      token1.with("value1", () => {
+        expect(getDispatcher(token1)).toBe("value1");
+
+        token2.with(42, () => {
+          expect(getDispatcher(token1)).toBe("value1");
+          expect(getDispatcher(token2)).toBe(42);
+        });
+
+        expect(getDispatcher(token2)).toBeUndefined();
+      });
+    });
+
+    it("should return the correct type from shortcuts", () => {
+      const testToken = dispatcherToken<string>("test");
+
+      // Test that TypeScript infers correct return type
+      const stringResult: string = testToken.with("test", () => "hello");
+      const numberResult: number = testToken.without(() => 42);
+      const objectResult: { foo: string } = testToken.with("test", () => ({
+        foo: "bar",
+      }));
+
+      expect(stringResult).toBe("hello");
+      expect(numberResult).toBe(42);
+      expect(objectResult).toEqual({ foo: "bar" });
+    });
+
+    it("should work with async functions", async () => {
+      const testToken = dispatcherToken<string>("test");
+
+      const result = await testToken.with("async-value", async () => {
+        expect(getDispatcher(testToken)).toBe("async-value");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return "async-result";
+      });
+
+      expect(result).toBe("async-result");
+    });
+  });
+});

@@ -150,6 +150,6 @@ export function batch(...args: any[]): any {
       // Always flush notifications, even if function throws
       dispatcher.flush();
     }
-  });
+  }, { contextType: "batch" });
 }
 

@@ -1,7 +1,11 @@
+/// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { resolve } from "path";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import dts from "vite-plugin-dts";
+
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
   plugins: [
@@ -10,6 +14,9 @@ export default defineConfig({
       insertTypesEntry: true,
     }),
   ],
+  // Don't define __DEV__ at library build time - let the consuming application
+  // define it based on their build mode. This ensures proper tree-shaking
+  // in the consumer's production build, not the library's build.
   build: {
     lib: {
       entry: resolve(__dirname, "src/index.ts"),
@@ -53,7 +60,7 @@ export default defineConfig({
     onConsoleLog(log, type) {
       // Suppress React warning about functions not being valid children in tests
       if (
-        type === "warn" &&
+        type === "stderr" &&
         log.includes("Functions are not valid as a React child")
       ) {
         return false;

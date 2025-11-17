@@ -13,7 +13,6 @@ import {
 import { trackingDispatcher, trackingToken } from "./trackingDispatcher";
 import { emitter } from "./emitter";
 import { useRerender } from "./useRerender";
-import { withDispatchers } from "./dispatcher";
 import { Signal } from "./types";
 import { isSignal } from "./signal";
 
@@ -102,7 +101,7 @@ export const Reactive = memo((props: { exp: () => unknown }) => {
    */
   const result = useMemo(() => {
     dispatcher.clear();
-    return withDispatchers([trackingToken(dispatcher)], props.exp);
+    return trackingToken.with(dispatcher, props.exp);
   }, [dispatcher, props.exp, rerender.data]);
 
   resultEvaluated.current = true;
