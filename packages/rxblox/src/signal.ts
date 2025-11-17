@@ -11,7 +11,7 @@ import type {
 import type { Tag } from "./tag";
 import { trackingDispatcher, trackingToken } from "./trackingDispatcher";
 import { emitter } from "./emitter";
-import { getDispatcher, withDispatchers } from "./dispatcher";
+import { getDispatcher } from "./dispatcher";
 import { disposableToken } from "./disposableDispatcher";
 import { isPromiseLike } from "./isPromiseLike";
 import { batchToken } from "./batchDispatcher";

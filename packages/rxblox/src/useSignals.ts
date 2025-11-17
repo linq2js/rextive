@@ -3,7 +3,6 @@ import { MutableSignal } from "./types";
 import { useUnmount } from "./useUnmount";
 import { signal } from "./signal";
 import { emitter } from "./emitter";
-import { withDispatchers } from "./dispatcher";
 import { disposableToken } from "./disposableDispatcher";
 
 /**

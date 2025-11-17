@@ -406,9 +406,6 @@ describe("batch", () => {
     const trackedSignals: any[] = [];
 
     // Manually track what would happen if tracking were enabled
-    const mockDispatcher = {
-      add: (s: any) => trackedSignals.push(s),
-    };
 
     batch(() => {
       // Access signals during batch
@@ -426,7 +423,6 @@ describe("batch", () => {
   it("should prevent effects from tracking dependencies created during batch", () => {
     const count = signal(0);
     let effectRunCount = 0;
-    let trackedInEffect = false;
 
     const cleanup = count.on(() => {
       effectRunCount++;
@@ -440,7 +436,6 @@ describe("batch", () => {
       // because trackingToken is disabled during batch
       const value = count();
       expect(value).toBe(0);
-      trackedInEffect = false;
 
       // Update the signal
       count.set(5);

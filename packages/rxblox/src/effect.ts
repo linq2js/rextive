@@ -1,4 +1,4 @@
-import { getDispatcher, withDispatchers } from "./dispatcher";
+import { getDispatcher } from "./dispatcher";
 import { disposableToken } from "./disposableDispatcher";
 import { addEffect } from "./effectDispatcher";
 import { emitter } from "./emitter";

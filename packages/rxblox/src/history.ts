@@ -3,7 +3,6 @@ import { signal as createSignal } from "./signal";
 import { effect } from "./effect";
 import { snapshot } from "./snapshot";
 import type { Signal } from "./types";
-import { withDispatchers } from "./dispatcher";
 import { effectToken, globalEffectDispatcher } from "./effectDispatcher";
 
 /**

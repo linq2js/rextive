@@ -1,5 +1,5 @@
 import { TrackingDispatcher, Subscribable, TrackFunction } from "./types";
-import { dispatcherToken, withDispatchers } from "./dispatcher";
+import { dispatcherToken } from "./dispatcher";
 import { Emitter } from "./emitter";
 
 /**

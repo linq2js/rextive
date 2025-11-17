@@ -678,20 +678,20 @@ describe("blox", () => {
   describe("async validation", () => {
     it("should throw error when builder returns a promise", () => {
       expect(() => {
-        const Component = blox(async () => {
+        const Component = blox((async () => {
           return <div>Async content</div>;
-        });
+        }) as any);
         render(<Component />);
       }).toThrow("blox() builder function cannot return a promise");
     });
 
     it("should throw error when builder returns promise-like object", () => {
       expect(() => {
-        const Component = blox(() => {
+        const Component = blox((() => {
           return {
-            then: (resolve: (val: any) => void) => resolve(<div>Thenable</div>)
+            then: (resolve: (val: any) => void) => resolve(<div>Thenable</div>),
           };
-        });
+        }) as any);
         render(<Component />);
       }).toThrow("blox() builder function cannot return a promise");
     });

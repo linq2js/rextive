@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { useRerender } from "./useRerender";
 import { trackingDispatcher, trackingToken } from "./trackingDispatcher";
-import { withDispatchers } from "./dispatcher";
 import { emitter } from "./emitter";
 
 /**
