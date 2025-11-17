@@ -2177,6 +2177,34 @@ batch(() => {
 3. **Stale Values During Batch** - Accessing computed signals during batch returns last computed value
 4. **Nested Batch Support** - Automatically tracks batch depth for nested batches
 5. **Error Handling** - Notifications flush even if `fn` throws an error
+6. **Tracking Disabled** - Signal tracking is automatically disabled during batches to prevent creating dependencies on stale computed values
+
+**Tracking Disabled During Batch:**
+
+Signal tracking is automatically disabled inside `batch()` to prevent effects and computed signals from creating dependencies on intermediate states:
+
+```tsx
+const a = signal(1);
+const b = signal(2);
+const sum = signal(() => a() + b());
+
+effect(() => {
+  batch(() => {
+    a.set(10);
+    b.set(20);
+    
+    // ❌ This would be problematic if tracking were enabled:
+    // - sum() might return stale value
+    // - Creating an effect here would track intermediate state
+    // - Could lead to race conditions and inconsistent updates
+    
+    const value = sum(); // Access is fine, but tracking is disabled
+    console.log(value);
+  });
+});
+```
+
+**Why?** During a batch, computed signals may be marked as dirty but haven't recomputed yet. If tracking were enabled, you could accidentally create dependencies on stale or intermediate states.
 
 **Preventing Inconsistent State:**
 

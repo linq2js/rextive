@@ -15,6 +15,7 @@ import { emitter } from "./emitter";
 import { useRerender } from "./useRerender";
 import { Signal } from "./types";
 import { isSignal } from "./signal";
+import { isPromiseLike } from "./isPromiseLike";
 
 /**
  * Reactive component that automatically re-renders when its signal dependencies change.
@@ -101,7 +102,22 @@ export const Reactive = memo((props: { exp: () => unknown }) => {
    */
   const result = useMemo(() => {
     dispatcher.clear();
-    return trackingToken.with(dispatcher, props.exp);
+    const value = trackingToken.with(dispatcher, props.exp);
+
+    // Validate that the expression doesn't return a promise
+    // Async expressions won't work correctly because:
+    // 1. React expects synchronous rendering
+    // 2. The component would render incomplete/loading state
+    // 3. Signal subscriptions would be in inconsistent state
+    if (isPromiseLike(value)) {
+      throw new Error(
+        "rx() expression cannot return a promise. " +
+          "React components must render synchronously. " +
+          "If you need async data, use signal.async() or handle async operations in effects."
+      );
+    }
+
+    return value;
   }, [dispatcher, props.exp, rerender.data]);
 
   resultEvaluated.current = true;

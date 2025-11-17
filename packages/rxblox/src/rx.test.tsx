@@ -1239,4 +1239,43 @@ describe("rx", () => {
       expect(queryByTestId("details")).not.toBeNull();
     });
   });
+
+  describe("async validation", () => {
+    it("should throw error when expression returns a promise", () => {
+      expect(() => {
+        render(
+          rx(async () => {
+            return <div>Async content</div>;
+          })
+        );
+      }).toThrow("rx() expression cannot return a promise");
+    });
+
+    it("should throw error when expression returns promise-like object", () => {
+      expect(() => {
+        render(
+          rx(() => {
+            return {
+              then: (resolve: (val: any) => void) => resolve(<div>Thenable</div>)
+            };
+          })
+        );
+      }).toThrow("rx() expression cannot return a promise");
+    });
+
+    it("should not throw when expression returns valid ReactNode", () => {
+      expect(() => {
+        const { container } = render(rx(() => <div>Sync content</div>));
+        expect(container.textContent).toBe("Sync content");
+      }).not.toThrow();
+    });
+
+    it("should not throw when expression returns a signal value", () => {
+      const count = signal(42);
+      expect(() => {
+        const { container } = render(rx(() => count()));
+        expect(container.textContent).toBe("42");
+      }).not.toThrow();
+    });
+  });
 });

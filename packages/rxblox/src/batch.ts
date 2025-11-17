@@ -1,6 +1,9 @@
 import { getDispatcher, withDispatchers } from "./dispatcher";
 import { MutableSignal, Signal } from "./types";
 import { batchToken, batchDispatcher } from "./batchDispatcher";
+import { trackingToken } from "./trackingDispatcher";
+import { devWarn } from "./utils/dev";
+import { isPromiseLike } from "./isPromiseLike";
 
 /**
  * Type utility to infer value types from an array of signals.
@@ -142,14 +145,46 @@ export function batch(...args: any[]): any {
 
   // Create a new batch context
   const dispatcher = batchDispatcher();
-  return withDispatchers([batchToken(dispatcher)], () => {
-    try {
-      // Execute the function with batch context active
-      return fn();
-    } finally {
-      // Always flush notifications, even if function throws
-      dispatcher.flush();
-    }
-  }, { contextType: "batch" });
+  return withDispatchers(
+    [
+      batchToken(dispatcher),
+      trackingToken(), // Disable tracking during batch to prevent tracking stale computed values
+    ],
+    () => {
+      try {
+        // Execute the function with batch context active
+        const result = fn();
+        
+        // Validate that the function doesn't return a promise
+        // Async functions won't work correctly with batch because:
+        // 1. The batch ends immediately (before async work completes)
+        // 2. Signal updates inside the async function happen outside the batch
+        // 3. This defeats the purpose of batching
+        if (isPromiseLike(result)) {
+          // Option 1: Throw error (strict, catches bugs early)
+          throw new Error(
+            "batch() does not support async functions. " +
+            "The batch ends before the async work completes, so signal updates " +
+            "inside the async function won't be batched. " +
+            "Use a synchronous function instead, or batch individual sync operations."
+          );
+          
+          // Option 2: Dev warning (lenient, allows code to run but warns in dev)
+          // devWarn(
+          //   "batch() called with async function. " +
+          //   "The batch will end before async work completes, so signal updates " +
+          //   "inside the async function won't be batched. " +
+          //   "Consider using a synchronous function or batching individual operations instead."
+          // );
+        }
+        
+        return result;
+      } finally {
+        // Always flush notifications, even if function throws
+        dispatcher.flush();
+      }
+    },
+    { contextType: "batch" }
+  );
 }
 

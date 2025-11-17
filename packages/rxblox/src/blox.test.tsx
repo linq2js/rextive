@@ -674,4 +674,34 @@ describe("blox", () => {
       expect(container.textContent).toBe("2");
     });
   });
+
+  describe("async validation", () => {
+    it("should throw error when builder returns a promise", () => {
+      expect(() => {
+        const Component = blox(async () => {
+          return <div>Async content</div>;
+        });
+        render(<Component />);
+      }).toThrow("blox() builder function cannot return a promise");
+    });
+
+    it("should throw error when builder returns promise-like object", () => {
+      expect(() => {
+        const Component = blox(() => {
+          return {
+            then: (resolve: (val: any) => void) => resolve(<div>Thenable</div>)
+          };
+        });
+        render(<Component />);
+      }).toThrow("blox() builder function cannot return a promise");
+    });
+
+    it("should not throw when builder returns valid ReactNode", () => {
+      expect(() => {
+        const Component = blox(() => <div>Sync content</div>);
+        const { container } = render(<Component />);
+        expect(container.textContent).toBe("Sync content");
+      }).not.toThrow();
+    });
+  });
 });

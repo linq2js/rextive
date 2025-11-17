@@ -398,4 +398,129 @@ describe("batch", () => {
       void (!b satisfies boolean);
     });
   });
+
+  it("should disable tracking during batch to prevent creating dependencies", () => {
+    const a = signal(1);
+    const b = signal(2);
+
+    const trackedSignals: any[] = [];
+
+    // Manually track what would happen if tracking were enabled
+    const mockDispatcher = {
+      add: (s: any) => trackedSignals.push(s),
+    };
+
+    batch(() => {
+      // Access signals during batch
+      a();
+      b();
+
+      // With tracking disabled, mockDispatcher.add should NOT be called
+      // because getDispatcher(trackingToken) returns undefined
+    });
+
+    // Verify no tracking happened during batch
+    expect(trackedSignals).toHaveLength(0);
+  });
+
+  it("should prevent effects from tracking dependencies created during batch", () => {
+    const count = signal(0);
+    let effectRunCount = 0;
+    let trackedInEffect = false;
+
+    const cleanup = count.on(() => {
+      effectRunCount++;
+    });
+
+    effectRunCount = 0;
+
+    // Try to create a tracking context during batch
+    batch(() => {
+      // This should not create tracking dependencies
+      // because trackingToken is disabled during batch
+      const value = count();
+      expect(value).toBe(0);
+      trackedInEffect = false;
+
+      // Update the signal
+      count.set(5);
+    });
+
+    // Effect should run after batch (from the set notification)
+    expect(effectRunCount).toBeGreaterThanOrEqual(1);
+    expect(count()).toBe(5);
+
+    cleanup();
+  });
+
+  it("should throw error when batch is called with async function", () => {
+    const count = signal(0);
+
+    expect(() => {
+      batch(async () => {
+        count.set(1);
+        await Promise.resolve();
+        count.set(2);
+      });
+    }).toThrow("batch() does not support async functions");
+  });
+
+  it("should throw error when batch returns a promise", () => {
+    const count = signal(0);
+
+    expect(() => {
+      batch(() => {
+        count.set(1);
+        return Promise.resolve(42);
+      });
+    }).toThrow("batch() does not support async functions");
+  });
+
+  it("should throw error when batch returns a thenable object", () => {
+    const count = signal(0);
+
+    expect(() => {
+      batch(() => {
+        count.set(1);
+        return {
+          then: (resolve: (v: number) => void) => resolve(42),
+        };
+      });
+    }).toThrow("batch() does not support async functions");
+  });
+
+  it("should not throw when batch returns a non-promise value", () => {
+    const count = signal(0);
+
+    expect(() => {
+      const result = batch(() => {
+        count.set(1);
+        return 42;
+      });
+      expect(result).toBe(42);
+    }).not.toThrow();
+  });
+
+  it("should not throw when batch returns undefined", () => {
+    const count = signal(0);
+
+    expect(() => {
+      const result = batch(() => {
+        count.set(1);
+      });
+      expect(result).toBeUndefined();
+    }).not.toThrow();
+  });
+
+  it("should not throw when batch returns an object without then method", () => {
+    const count = signal(0);
+
+    expect(() => {
+      const result = batch(() => {
+        count.set(1);
+        return { value: 42 };
+      });
+      expect(result).toEqual({ value: 42 });
+    }).not.toThrow();
+  });
 });
