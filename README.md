@@ -263,7 +263,7 @@ export const UserProfile = blox<Props>((props) => {
   );
 });
 
-const UserHeader = blox<{ user: User }>((props) => {
+const UserHeader = blox((props: { user: User }) => {
   const user = signal(() => props.user, { equals: shallowEqual });
   
   return rx(() => {
@@ -277,7 +277,7 @@ const UserHeader = blox<{ user: User }>((props) => {
   });
 });
 
-const UserBio = blox<{ user: User }>((props) => {
+const UserBio = blox((props: { user: User }) => {
   const user = signal(() => props.user, { equals: shallowEqual });
   
   return rx(() => (
@@ -285,7 +285,7 @@ const UserBio = blox<{ user: User }>((props) => {
   ));
 });
 
-const UserStatus = blox<{ user: User }>((props) => {
+const UserStatus = blox((props: { user: User }) => {
   const user = signal(() => props.user, { equals: shallowEqual });
   
   return rx(() => (

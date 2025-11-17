@@ -373,7 +373,7 @@ See [Best Practices](#best-practices) for more details.
 Creates a reactive component.
 
 ```tsx
-const MyComponent = blox<{ value: number }>((props) => {
+const MyComponent = blox((props: { value: number }) => {
   const local = signal(props.value);
 
   effect(() => {
@@ -388,7 +388,7 @@ interface CounterRef {
   reset: () => void;
 }
 
-const MyComponent = blox<Props, CounterRef>((props, ref) => {
+const MyComponent = blox((props: Props, ref: Ref<CounterRef>) => {
   const count = signal(0);
 
   ref({
@@ -829,7 +829,7 @@ function slot<T>(fn: () => T, options: SlotOptions): [ReactNode, T];
 **Example: Basic Usage**
 
 ```tsx
-const MyComponent = blox<{ items: Item[] }>((props) => {
+const MyComponent = blox((props: { items: Item[] }) => {
   // Create slot with logic
   const [ItemList, count] = blox.slot(() => {
     const filtered = props.items.filter(item => item.active);

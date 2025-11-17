@@ -328,8 +328,8 @@ function Counter({ label, onCountChange }) {
 
 ```tsx
 // ✅ rxblox - Simple and Performant
-const Counter = blox<{ label: string; onCountChange: (n: number) => void }>(
-  (props) => {
+const Counter = blox(
+  (props: { label: string; onCountChange: (n: number) => void }) => {
     const count = signal(0);
 
     // No useCallback needed - functions never re-create
@@ -743,7 +743,7 @@ const data = signal.async(async ({ track }) => {
 A powerful use case is tracking `blox` component props in async contexts:
 
 ```tsx
-const UserProfile = blox<{ userId: number; status: string }>((props) => {
+const UserProfile = blox((props: { userId: number; status: string }) => {
   const userData = signal.async(async ({ track }) => {
     // Track props as dependencies
     const tracked = track({
@@ -1186,7 +1186,7 @@ console.log(saveUser.calls); // Number of times called
 Actions track their state automatically:
 
 ```tsx
-const UserProfile = blox<{ userId: number }>((props) => {
+const UserProfile = blox((props: { userId: number }) => {
   const fetchUser = action(async (id: number) => {
     const response = await fetch(`/api/users/${id}`);
     return response.json();

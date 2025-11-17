@@ -117,7 +117,7 @@ const UserList = blox(() => {
 **With dependencies:**
 
 ```tsx
-const UserPosts = blox<{ userId: number }>((props) => {
+const UserPosts = blox((props: { userId: number }) => {
   const posts = signal.async(async ({ track }) => {
     const tracked = track({ userId: props.userId });
 
@@ -180,7 +180,7 @@ interface InputHandle {
   clear: () => void;
 }
 
-const CustomInput = blox<{ placeholder: string }, InputHandle>((props, ref) => {
+const CustomInput = blox((props: { placeholder: string }, ref: Ref<InputHandle>) => {
   const inputRef = createRef<HTMLInputElement>();
   const value = signal("");
 
@@ -225,7 +225,7 @@ function Parent() {
 Update UI immediately, revert on error:
 
 ```tsx
-const TodoItem = blox<{ todo: Todo }>((props) => {
+const TodoItem = blox((props: { todo: Todo }) => {
   const completed = signal(props.todo.completed);
 
   const toggle = async () => {
@@ -617,7 +617,7 @@ export const globalUsers = createAsyncData(() =>
 );
 
 // Use locally
-const UserList = blox<{ filter: string }>((props) => {
+const UserList = blox((props: { filter: string }) => {
   const users = createAsyncData(async () => {
     const response = await fetch(`/api/users?filter=${props.filter}`);
     return response.json();
@@ -874,7 +874,7 @@ function withWebSocket(url: string) {
   return { messages, connected, send: (msg: string) => ws.send(msg) };
 }
 
-const Chat = blox<{ roomId: string }>((props) => {
+const Chat = blox((props: { roomId: string }) => {
   const ws = withWebSocket(`wss://example.com/${props.roomId}`);
 
   return rx(() => (
