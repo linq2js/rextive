@@ -174,7 +174,6 @@ describe("shared", () => {
         });
 
         // Same instance should still exist
-        const logic = createLogic(1);
         expect(callCount).toBe(1); // No new instance created
       });
 
@@ -243,7 +242,6 @@ describe("shared", () => {
         await Promise.resolve();
 
         // New instance should be created
-        const logic = createLogic(1);
         expect(callCount).toBe(2); // New instance created
       });
 
@@ -276,7 +274,6 @@ describe("shared", () => {
         await Promise.resolve(); // Wait for cleanup
 
         // Instance should still exist
-        const logic = createLogic(1);
         expect(callCount).toBe(1); // Same instance
 
         // Unmount second component - refs should reach 0
@@ -286,7 +283,6 @@ describe("shared", () => {
         await Promise.resolve(); // Wait for cleanup
 
         // Now instance should be GC'd
-        const newLogic = createLogic(1);
         expect(callCount).toBe(2); // New instance created
       });
 
@@ -325,7 +321,6 @@ describe("shared", () => {
         await Promise.resolve(); // Wait for cleanup
 
         // New instance created
-        const logic3 = createLogic(1);
         expect(callCount).toBe(2);
       });
     });
@@ -370,7 +365,6 @@ describe("shared", () => {
         await Promise.resolve(); // Wait for cleanup
 
         // New instance should be created
-        const logic = createLogic(1);
         expect(callCount).toBe(2);
       });
     });
