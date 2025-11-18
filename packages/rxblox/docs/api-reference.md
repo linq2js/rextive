@@ -2717,6 +2717,434 @@ state.set((draft) => {
 
 ---
 
+## `pool<K, R>(fn, options?)`
+
+Creates a pool for reactive logic instances with automatic caching, reference counting, and lifecycle management.
+
+Instances are automatically pooled based on key equality - multiple calls with the same key return the same cached instance. Perfect for sharing expensive logic (WebSocket connections, data subscriptions, etc.) across components.
+
+**Parameters:**
+- `fn: (key: K) => R` - Factory function to create instances (must be synchronous, must return object)
+- `options?: PoolOptions<K>` - Configuration options
+
+**Returns:** `PoolFunction<K, R>` - Pool factory function with `.once()` method
+
+```tsx
+import { pool, signal, effect } from "rxblox";
+
+const createConnection = pool((url: string) => {
+  const ws = new WebSocket(url);
+  const messages = signal<string[]>([]);
+  const status = signal<'connecting' | 'connected' | 'disconnected'>('connecting');
+
+  ws.onopen = () => status.set('connected');
+  ws.onclose = () => status.set('disconnected');
+  ws.onmessage = (e) => messages.set(prev => [...prev, e.data]);
+
+  // Cleanup when instance is disposed
+  getDispatcher(disposableToken)?.on(() => ws.close());
+
+  return { ws, messages, status };
+});
+
+// Multiple components share same pooled instance
+const Component1 = blox(() => {
+  const conn = createConnection("wss://api.example.com");
+  return <div>Status: {rx(() => conn.status())}</div>;
+});
+
+const Component2 = blox(() => {
+  const conn = createConnection("wss://api.example.com"); // Same instance!
+  return <div>Messages: {rx(() => conn.messages().length)}</div>;
+});
+```
+
+**Options:**
+
+```ts
+type PoolOptions<K> = {
+  // Custom equality function for key comparison
+  // Default: shallowEquals
+  equals?: (a: K, b: K) => boolean;
+
+  // Disposal strategy for pooled instances
+  // - "auto": Automatically dispose when reference count reaches zero
+  // - "never": Keep instance forever (never garbage collect)
+  // Default: "auto" in blox/effect scope, "never" in global scope
+  dispose?: "auto" | "never";
+};
+```
+
+**Key Features:**
+
+1. **Automatic Pooling** - Same key returns same cached instance
+2. **Reference Counting** - Tracks how many components are using each instance
+3. **Automatic Cleanup** - Disposes instances when no longer in use (with `dispose: "auto"`)
+4. **Type Safety** - Full TypeScript support with generics
+5. **Proxy Protection** - Throws error if accessing deleted instance
+6. **`.once()` Method** - Create one-off instances that bypass the pool
+
+### Basic Usage
+
+**Simple pooling:**
+
+```tsx
+const createUserStore = pool((userId: number) => {
+  const user = signal<User | null>(null);
+  const loading = signal(true);
+
+  effect(() => {
+    fetch(`/api/users/${userId}`)
+      .then(r => r.json())
+      .then(data => {
+        user.set(data);
+        loading.set(false);
+      });
+  });
+
+  return { user, loading };
+});
+
+// All components accessing user 1 share the same store
+const UserProfile = blox((props: { userId: number }) => {
+  const store = createUserStore(props.userId);
+  
+  return rx(() => (
+    <div>
+      {store.loading() ? (
+        <div>Loading...</div>
+      ) : (
+        <div>{store.user()?.name}</div>
+      )}
+    </div>
+  ));
+});
+```
+
+**With custom equality:**
+
+```tsx
+import { shallowEquals } from "rxblox";
+
+const createDataStore = pool(
+  (config: { endpoint: string; params: Record<string, any> }) => {
+    const data = signal.async(() => fetch(config.endpoint, config.params));
+    return { data };
+  },
+  {
+    equals: shallowEquals  // Compare by shallow equality
+  }
+);
+
+// These share the same instance (shallow equal keys)
+const store1 = createDataStore({ endpoint: "/api", params: { id: 1 } });
+const store2 = createDataStore({ endpoint: "/api", params: { id: 1 } });
+// store1 === store2
+```
+
+### `.once()` Method
+
+Create a one-off instance that is **not pooled** and must be manually disposed.
+
+**Signature:**
+```ts
+poolFn.once(key: K): [R, () => void]
+```
+
+**Returns:** A tuple of `[instance, dispose function]`
+
+**Use cases:**
+- Temporary operations that shouldn't be cached
+- Testing with isolated instances
+- Manual lifecycle control
+- One-time background tasks
+
+```tsx
+const createTask = pool((taskId: number) => {
+  const status = signal<'pending' | 'running' | 'done'>('pending');
+  const result = signal<any>(null);
+
+  const run = async () => {
+    status.set('running');
+    const data = await fetchTask(taskId);
+    result.set(data);
+    status.set('done');
+  };
+
+  return { status, result, run };
+});
+
+// Pooled instance (shared, auto-managed)
+const task1 = createTask(1);
+
+// One-off instance (not pooled, manual dispose)
+const [task2, dispose] = createTask.once(2);
+await task2.run();
+dispose(); // Manual cleanup
+
+// Verify they're different
+const task3 = createTask.once(2); // NEW instance, not task2
+```
+
+**Important:** One-off instances:
+- Are **not cached** - each call creates a new instance
+- Must be **manually disposed** - call the dispose function when done
+- Are **independent** - don't affect pooled instances
+- Will **throw errors** if accessed after disposal
+
+### Disposal Strategies
+
+**Default behavior:**
+
+```tsx
+// Global scope - permanent (never GC)
+const globalConfig = createConfig(); // dispose: "never"
+
+// Inside blox - auto-disposed
+const Component = blox(() => {
+  const config = createConfig(); // dispose: "auto"
+  // Disposed when component unmounts
+});
+```
+
+**Force `dispose: "never"` (permanent):**
+
+```tsx
+const createPermanent = pool(
+  (id: number) => ({ value: signal(id) }),
+  { dispose: "never" }
+);
+
+const Component = blox(() => {
+  const logic = createPermanent(1);
+  return <div>{rx(() => logic.value())}</div>;
+});
+
+// Instance persists even after all components unmount
+const { unmount } = render(<Component />);
+unmount(); // Instance is NOT garbage collected
+```
+
+**Force `dispose: "auto"` (always ref-counted):**
+
+```tsx
+const createAutoDispose = pool(
+  (id: number) => ({ value: signal(id) }),
+  { dispose: "auto" }
+);
+
+// Even in global scope, uses ref counting
+const logic = createAutoDispose(1); // refs = 0, not disposed yet
+
+// Use in component to start tracking
+const Component = blox(() => {
+  const logic = createAutoDispose(1); // refs++
+  return <div>{rx(() => logic.value())}</div>;
+});
+
+// When component unmounts, refs reaches 0, triggers GC
+```
+
+### Advanced Examples
+
+**WebSocket connection pool:**
+
+```tsx
+const createWSConnection = pool((url: string) => {
+  const ws = new WebSocket(url);
+  const messages = signal<Message[]>([]);
+  const connected = signal(false);
+
+  ws.onopen = () => connected.set(true);
+  ws.onclose = () => connected.set(false);
+  ws.onerror = (e) => console.error('WS Error:', e);
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    messages.set(prev => [...prev, msg]);
+  };
+
+  const send = (data: any) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(data));
+    }
+  };
+
+  // Cleanup on disposal
+  getDispatcher(disposableToken)?.on(() => {
+    ws.close();
+    console.log('WebSocket closed:', url);
+  });
+
+  return { ws, messages, connected, send };
+});
+
+// All components sharing same URL use same WebSocket
+const ChatRoom = blox((props: { room: string }) => {
+  const conn = createWSConnection(`wss://chat.example.com/${props.room}`);
+
+  const sendMessage = (text: string) => {
+    conn.send({ type: 'message', text, room: props.room });
+  };
+
+  return rx(() => (
+    <div>
+      <div>Status: {conn.connected() ? '🟢' : '🔴'}</div>
+      <ul>
+        {conn.messages().map((msg, i) => (
+          <li key={i}>{msg.text}</li>
+        ))}
+      </ul>
+      <button onClick={() => sendMessage('Hello')}>Send</button>
+    </div>
+  ));
+});
+```
+
+**Database query pool:**
+
+```tsx
+const createQuery = pool(
+  (sql: string) => {
+    const data = signal.async(async () => {
+      const result = await db.query(sql);
+      return result.rows;
+    });
+
+    return { 
+      data,
+      refetch: () => data.refetch(),
+      isLoading: signal(() => data().status === 'pending')
+    };
+  },
+  {
+    equals: (a, b) => a.trim() === b.trim() // Ignore whitespace
+  }
+);
+
+// Shared query across components
+const UserList = blox(() => {
+  const query = createQuery('SELECT * FROM users');
+  
+  return rx(() => (
+    <div>
+      {query.isLoading() ? (
+        <div>Loading...</div>
+      ) : (
+        <ul>
+          {query.data().value?.map(user => (
+            <li key={user.id}>{user.name}</li>
+          ))}
+        </ul>
+      )}
+      <button onClick={query.refetch}>Refresh</button>
+    </div>
+  ));
+});
+```
+
+**Background task with `.once()`:**
+
+```tsx
+const createTask = pool((taskId: number) => {
+  const progress = signal(0);
+  const result = signal<any>(null);
+
+  const execute = async () => {
+    for (let i = 0; i <= 100; i += 10) {
+      await delay(100);
+      progress.set(i);
+    }
+    result.set({ success: true, data: '...' });
+  };
+
+  return { progress, result, execute };
+});
+
+// One-off task that doesn't need to be pooled
+async function runBackgroundTask(id: number) {
+  const [task, dispose] = createTask.once(id);
+  
+  try {
+    await task.execute();
+    console.log('Task completed:', task.result());
+  } finally {
+    dispose(); // Always cleanup
+  }
+}
+```
+
+**Testing with isolated instances:**
+
+```tsx
+describe('UserStore', () => {
+  it('should load user data', async () => {
+    // Use .once() for isolated test instance
+    const [store, dispose] = createUserStore.once(123);
+
+    await waitFor(() => expect(store.loading()).toBe(false));
+    expect(store.user()?.id).toBe(123);
+
+    dispose(); // Cleanup after test
+  });
+
+  it('should handle errors', async () => {
+    const [store, dispose] = createUserStore.once(999); // Non-existent user
+
+    await waitFor(() => expect(store.loading()).toBe(false));
+    expect(store.error()).toBeTruthy();
+
+    dispose();
+  });
+});
+```
+
+### Important Notes
+
+**Result Type Constraint:**
+- The result **must extend `object`** (not primitives)
+- This enables Proxy protection for deleted instances
+- Primitives like `number`, `string`, `boolean` are not allowed
+
+**Synchronous Factory:**
+- Factory function must be synchronous
+- For async logic, use `signal.async()` or `action()` inside
+
+**Proxy Protection:**
+```tsx
+const createLogic = pool((id: number) => ({ value: signal(0) }));
+
+const Component = blox(() => {
+  const logic = createLogic(1);
+  return <div>{rx(() => logic.value())}</div>;
+});
+
+const { unmount } = render(<Component />);
+unmount(); // Auto GC deletes instance
+
+// Accessing deleted instance throws error
+// logic.value(); // ❌ Error: Cannot access deleted pooled instance
+```
+
+**Best Practices:**
+
+✅ **Do:**
+- Pool expensive resources (WebSocket, database connections)
+- Use for shared state across components
+- Use `.once()` for temporary operations
+- Always dispose `.once()` instances
+
+❌ **Don't:**
+- Pool simple values (use `signal` instead)
+- Forget to dispose `.once()` instances
+- Assume pooled instances are immediately disposed
+- Store references to pooled instances outside components
+
+**See Also:**
+- [Patterns Guide](./patterns.md) - Global vs Local state patterns
+- [Performance Best Practices](../README.md#performance-best-practices)
+
+---
+
 ## `signal.history<T>(getValue, options?)`
 
 Tracks the history of a signal's values over time, recording each change with timestamp and sequential index.

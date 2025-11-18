@@ -59,8 +59,8 @@ export type { Tag } from "./tag";
 export { batch } from "./batch";
 export type { InferSignalValues } from "./batch";
 export type { SlotOptions, SlotMode } from "./slot";
-export { shared } from "./shared";
-export type { SharedFunction, SharedOptions } from "./shared";
+export { pool } from "./pool";
+export type { PoolFunction, PoolOptions } from "./pool";
 
 // Dispatcher system
 export { getContextType, withContextType } from "./dispatcher";
@@ -72,6 +72,6 @@ export { syncOnly } from "./utils/syncOnly";
 export type { SyncOnlyOptions } from "./utils/syncOnly";
 export { shallowEquals } from "./utils/shallowEquals";
 export {
-  objectKeyedCollection as createObjectKeyedCollection,
+  objectKeyedCollection,
   type ObjectKeyedCollection,
 } from "./utils/objectKeyedCollection";

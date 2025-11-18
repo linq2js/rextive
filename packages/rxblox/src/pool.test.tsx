@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "@testing-library/react";
 import { act } from "react";
-import { shared } from "./shared";
+import { pool } from "./pool";
 import { signal } from "./signal";
 import { blox } from "./blox";
+import { effect } from "./effect";
+import { getDispatcher } from "./dispatcher";
+import { disposableToken } from "./disposableDispatcher";
 
-describe("shared", () => {
+describe("pool", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
@@ -17,7 +20,7 @@ describe("shared", () => {
 
   describe("basic functionality", () => {
     it("should create and return instances", () => {
-      const createUser = shared((id: number) => {
+      const createUser = pool((id: number) => {
         return { id, name: `User ${id}` };
       });
 
@@ -27,7 +30,7 @@ describe("shared", () => {
     });
 
     it("should share instances with same key", () => {
-      const createUser = shared((id: number) => {
+      const createUser = pool((id: number) => {
         return { id, name: `User ${id}` };
       });
 
@@ -38,7 +41,7 @@ describe("shared", () => {
     });
 
     it("should create different instances for different keys", () => {
-      const createUser = shared((id: number) => {
+      const createUser = pool((id: number) => {
         return { id, name: `User ${id}` };
       });
 
@@ -51,7 +54,7 @@ describe("shared", () => {
     });
 
     it("should share signals across calls", () => {
-      const createCounter = shared((id: string) => {
+      const createCounter = pool((id: string) => {
         const count = signal(0);
         return { id, count };
       });
@@ -70,7 +73,7 @@ describe("shared", () => {
   describe("garbage collection", () => {
     it("should never GC global instances", () => {
       let callCount = 0;
-      const createLogic = shared((id: number) => {
+      const createLogic = pool((id: number) => {
         callCount++;
         return { id, callCount };
       });
@@ -88,7 +91,7 @@ describe("shared", () => {
 
   describe("proxy protection", () => {
     it("should allow normal access to non-deleted entries", () => {
-      const createLogic = shared((id: number) => {
+      const createLogic = pool((id: number) => {
         return { id, value: signal(0) };
       });
 
@@ -102,7 +105,7 @@ describe("shared", () => {
     });
 
     it("should return same proxy reference for same key", () => {
-      const createLogic = shared((id: number) => {
+      const createLogic = pool((id: number) => {
         return { id, value: signal(0) };
       });
 
@@ -114,7 +117,7 @@ describe("shared", () => {
     });
 
     it("should share the same underlying object", () => {
-      const createLogic = shared((id: number) => {
+      const createLogic = pool((id: number) => {
         return { id, value: signal(0) };
       });
 
@@ -130,7 +133,7 @@ describe("shared", () => {
   describe("custom equality", () => {
     it("should use custom equals function", () => {
       let callCount = 0;
-      const createLogic = shared(
+      const createLogic = pool(
         (config: { id: number; type: string }) => {
           callCount++;
           return { config, callCount };
@@ -152,7 +155,7 @@ describe("shared", () => {
     describe('dispose: "never"', () => {
       it("should keep instance forever in blox scope", () => {
         let callCount = 0;
-        const createLogic = shared(
+        const createLogic = pool(
           (id: number) => {
             callCount++;
             return { id, value: signal(id) };
@@ -180,7 +183,7 @@ describe("shared", () => {
 
       it("should keep instance forever even with multiple mount/unmount cycles", () => {
         let callCount = 0;
-        const createLogic = shared(
+        const createLogic = pool(
           (id: number) => {
             callCount++;
             return { id, value: signal(id) };
@@ -218,7 +221,7 @@ describe("shared", () => {
     describe('dispose: "auto"', () => {
       it("should auto-dispose in blox scope when refs reach 0", async () => {
         let callCount = 0;
-        const createLogic = shared(
+        const createLogic = pool(
           (id: number) => {
             callCount++;
             return { id, value: signal(id) };
@@ -249,7 +252,7 @@ describe("shared", () => {
 
       it("should not dispose while refs > 0", async () => {
         let callCount = 0;
-        const createLogic = shared(
+        const createLogic = pool(
           (id: number) => {
             callCount++;
             return { id, value: signal(id) };
@@ -292,7 +295,7 @@ describe("shared", () => {
 
       it("should work with no initial context (global scope)", async () => {
         let callCount = 0;
-        const createLogic = shared(
+        const createLogic = pool(
           (id: number) => {
             callCount++;
             return { id, value: signal(id) };
@@ -333,7 +336,7 @@ describe("shared", () => {
     describe("default behavior", () => {
       it("should use 'never' for global scope by default", () => {
         let callCount = 0;
-        const createLogic = shared((id: number) => {
+        const createLogic = pool((id: number) => {
           callCount++;
           return { id, value: signal(id) };
         });
@@ -350,7 +353,7 @@ describe("shared", () => {
 
       it("should use 'auto' for blox scope by default", async () => {
         let callCount = 0;
-        const createLogic = shared((id: number) => {
+        const createLogic = pool((id: number) => {
           callCount++;
           return { id, value: signal(id) };
         });
@@ -376,19 +379,137 @@ describe("shared", () => {
     });
   });
 
+  describe(".once() method", () => {
+    it("should create one-off instance not in pool", () => {
+      let callCount = 0;
+      const createLogic = pool((id: number) => {
+        callCount++;
+        return { id, value: signal(id) };
+      });
+
+      // Create with .once()
+      const [logic1, dispose1] = createLogic.once(1);
+      expect(callCount).toBe(1);
+      expect(logic1.id).toBe(1);
+
+      // Create again with .once() - should be NEW instance
+      const [logic2, dispose2] = createLogic.once(1);
+      expect(callCount).toBe(2); // New instance created
+      expect(logic2.id).toBe(1);
+      expect(logic1).not.toBe(logic2); // Different instances
+
+      // Cleanup
+      dispose1();
+      dispose2();
+    });
+
+    it("should return dispose function", () => {
+      const cleanup = vi.fn();
+      const createLogic = pool((id: number) => {
+        const value = signal(id);
+        getDispatcher(disposableToken)?.on(cleanup);
+        return { value };
+      });
+
+      const [logic, dispose] = createLogic.once(1);
+      expect(cleanup).not.toHaveBeenCalled();
+
+      dispose();
+      expect(cleanup).toHaveBeenCalledTimes(1);
+    });
+
+    it("should not affect pooled instances", () => {
+      let callCount = 0;
+      const createLogic = pool((id: number) => {
+        callCount++;
+        return { id, value: signal(id) };
+      });
+
+      // Pooled instance
+      const pooled1 = createLogic(1);
+      expect(callCount).toBe(1);
+
+      // One-off instance
+      const [once1, dispose1] = createLogic.once(1);
+      expect(callCount).toBe(2); // Different instance
+
+      // Pooled instance again - should be same as pooled1
+      const pooled2 = createLogic(1);
+      expect(callCount).toBe(2); // Still 2, reused from pool
+      expect(pooled1).toBe(pooled2);
+
+      // One-off should be different
+      expect(once1).not.toBe(pooled1);
+      expect(once1.id).toBe(pooled1.id); // Same key though
+
+      dispose1();
+    });
+
+    it("should cleanup signals when disposed", async () => {
+      const createLogic = pool((id: number) => {
+        const count = signal(0);
+        let effectRuns = 0;
+        effect(() => {
+          count(); // Track
+          effectRuns++;
+        });
+        return { count, effectRuns: () => effectRuns };
+      });
+
+      const [logic, dispose] = createLogic.once(1);
+      const initialRuns = logic.effectRuns();
+
+      logic.count.set(1);
+      await Promise.resolve(); // Wait for effect
+
+      expect(logic.effectRuns()).toBeGreaterThan(initialRuns);
+
+      dispose();
+
+      // After dispose, effect should not run
+      const runsBeforeSet = logic.effectRuns();
+      logic.count.set(2);
+      await Promise.resolve();
+
+      expect(logic.effectRuns()).toBe(runsBeforeSet); // No new runs
+    });
+
+    it("should work with different keys", () => {
+      let callCount = 0;
+      const createLogic = pool((id: number) => {
+        callCount++;
+        return { id, value: signal(id) };
+      });
+
+      const [logic1, dispose1] = createLogic.once(1);
+      const [logic2, dispose2] = createLogic.once(2);
+      const [logic3, dispose3] = createLogic.once(1); // Same key as logic1
+
+      expect(callCount).toBe(3); // All are separate instances
+      expect(logic1.id).toBe(1);
+      expect(logic2.id).toBe(2);
+      expect(logic3.id).toBe(1);
+      expect(logic1).not.toBe(logic3); // Different despite same key
+
+      dispose1();
+      dispose2();
+      dispose3();
+    });
+  });
+
   describe("error handling", () => {
     it("should throw error for async functions", () => {
       expect(() => {
-        shared(async (id: number) => {
+        pool(async (id: number) => {
           return { id };
         });
-      }).toThrow("shared() function must be synchronous");
+      }).toThrow("pool() function must be synchronous");
     });
 
     it("should enforce object return type at runtime", () => {
       // TypeScript enforces this at compile time, but we can't
       // test runtime enforcement without casting
-      const createLogic = shared((id: number) => {
+      const createLogic = pool((id: number) => {
         return { id, value: "test" };
       });
 

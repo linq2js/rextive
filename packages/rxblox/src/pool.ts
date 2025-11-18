@@ -5,9 +5,9 @@ import { shallowEquals } from "./utils/shallowEquals";
 import { objectKeyedCollection } from "./utils/objectKeyedCollection";
 
 /**
- * Options for configuring shared instance behavior.
+ * Options for configuring pool instance behavior.
  */
-export type SharedOptions<K> = {
+export type PoolOptions<K> = {
   /**
    * Custom equality function for key comparison.
    * @default shallowEquals
@@ -15,7 +15,7 @@ export type SharedOptions<K> = {
   equals?: (a: K, b: K) => boolean;
 
   /**
-   * Disposal strategy for shared instances.
+   * Disposal strategy for pooled instances.
    *
    * - `"auto"`: Automatically dispose when reference count reaches zero
    * - `"never"`: Keep instance forever (never garbage collect)
@@ -37,16 +37,50 @@ type InternalEntry<R extends object> = {
 };
 
 /**
- * A shared factory function that returns the same instance for equal keys.
+ * A pool factory function that returns pooled instances for equal keys,
+ * with a `.once()` method for one-off, manually disposable instances.
  */
-export type SharedFunction<K, R extends object> = (key: K) => R;
+export type PoolFunction<K, R extends object> = {
+  /**
+   * Get a pooled instance for the given key.
+   * Instances are cached and reused based on key equality.
+   */
+  (key: K): R;
+
+  /**
+   * Create a one-off instance that is not pooled.
+   * Returns a tuple of [instance, dispose function].
+   *
+   * The instance will not be cached or shared, and must be
+   * manually disposed by calling the dispose function.
+   *
+   * @param key - The key to pass to the factory function
+   * @returns A tuple of [instance, dispose function]
+   *
+   * @example
+   * ```ts
+   * const createConnection = pool((url: string) => {
+   *   const ws = new WebSocket(url);
+   *   return { ws };
+   * });
+   *
+   * // One-off connection, not pooled
+   * const [conn, dispose] = createConnection.once("wss://temp");
+   * await doSomething(conn);
+   * dispose(); // Manual cleanup
+   * ```
+   */
+  once(key: K): [R, () => void];
+};
 
 /**
- * Creates a factory for shared reactive logic instances.
+ * Creates a pool for reactive logic instances.
  *
- * Instances are automatically shared based on key equality - multiple
- * calls with the same key return the same instance. Includes automatic
+ * Instances are automatically pooled based on key equality - multiple
+ * calls with the same key return the same cached instance. Includes automatic
  * reference counting and cleanup when instances are no longer in use.
+ *
+ * For one-off instances that should not be pooled, use the `.once()` method.
  *
  * ## Result Type Constraint
  *
@@ -69,11 +103,11 @@ export type SharedFunction<K, R extends object> = (key: K) => R;
  *
  * @param fn - Factory function to create instances (must be synchronous, must return object)
  * @param options - Configuration options
- * @returns A shared factory function
+ * @returns A pool factory function with `.once()` method
  *
- * @example Basic usage - shared across components
+ * @example Basic usage - pooled across components
  * ```ts
- * const createUserLogic = shared((userId: number) => {
+ * const createUserLogic = pool((userId: number) => {
  *   const name = signal(`User ${userId}`)
  *   const email = signal(`user${userId}@email.com`)
  *
@@ -84,21 +118,21 @@ export type SharedFunction<K, R extends object> = (key: K) => R;
  *   return { name, email }
  * })
  *
- * // Multiple components share same instance
+ * // Multiple components share same pooled instance
  * const Component1 = blox(() => {
  *   const user = createUserLogic(1) // First component
  *   return <div>{user.name()}</div>
  * })
  *
  * const Component2 = blox(() => {
- *   const user = createUserLogic(1) // Same instance!
+ *   const user = createUserLogic(1) // Same pooled instance!
  *   return <div>{user.email()}</div>
  * })
  * ```
  *
  * @example Global scope (never GC by default)
  * ```ts
- * const createConfig = shared(() => {
+ * const createConfig = pool(() => {
  *   return { apiUrl: signal('https://api.example.com') }
  * })
  *
@@ -108,7 +142,7 @@ export type SharedFunction<K, R extends object> = (key: K) => R;
  *
  * @example Force permanent instance (never dispose)
  * ```ts
- * const createPermanent = shared((id: number) => {
+ * const createPermanent = pool((id: number) => {
  *   return { value: signal(id) }
  * }, { dispose: "never" })
  *
@@ -124,7 +158,7 @@ export type SharedFunction<K, R extends object> = (key: K) => R;
  *
  * @example Force auto-disposal in global scope
  * ```ts
- * const createAutoDispose = shared((id: number) => {
+ * const createAutoDispose = pool((id: number) => {
  *   return { value: signal(id) }
  * }, { dispose: "auto" })
  *
@@ -140,7 +174,7 @@ export type SharedFunction<K, R extends object> = (key: K) => R;
  *
  * @example WebSocket connection (auto-cleanup)
  * ```ts
- * const createConnection = shared((url: string) => {
+ * const createConnection = pool((url: string) => {
  *   const ws = new WebSocket(url)
  *   const messages = signal<string[]>([])
  *
@@ -155,9 +189,27 @@ export type SharedFunction<K, R extends object> = (key: K) => R;
  * // when all components unmount
  * ```
  *
+ * @example One-off instance with .once()
+ * ```ts
+ * const createTask = pool((taskId: number) => {
+ *   const status = signal<'pending' | 'running' | 'done'>('pending')
+ *   const result = signal<any>(null)
+ *
+ *   return { status, result, run: async () => { ... } }
+ * })
+ *
+ * // Pooled instance (shared, auto-managed)
+ * const task1 = createTask(1)
+ *
+ * // One-off instance (not pooled, manual dispose)
+ * const [task2, dispose] = createTask.once(2)
+ * await task2.run()
+ * dispose() // Manual cleanup
+ * ```
+ *
  * @example Accessing deleted entry throws error
  * ```ts
- * const createLogic = shared((id: number) => {
+ * const createLogic = pool((id: number) => {
  *   return { value: signal(0) }
  * })
  *
@@ -171,25 +223,25 @@ export type SharedFunction<K, R extends object> = (key: K) => R;
  *
  * const logic = createLogic(1) // New instance
  * // Old reference throws if accessed:
- * // oldLogic.value() // Error: Cannot access deleted shared instance
+ * // oldLogic.value() // Error: Cannot access deleted pooled instance
  * ```
  */
-export function shared<K, R extends object>(
+export function pool<K, R extends object>(
   fn: (key: K) => R,
-  options: SharedOptions<K> = {}
-): SharedFunction<K, R> {
+  options: PoolOptions<K> = {}
+): PoolFunction<K, R> {
   // Validate fn is not async
   if (fn.constructor.name === "AsyncFunction") {
     throw new Error(
-      "shared() function must be synchronous. " +
+      "pool() function must be synchronous. " +
         "For async logic, use signal.async() or action() inside the function.\n\n" +
         "❌ Don't do this:\n" +
-        "  shared(async (id) => {\n" +
+        "  pool(async (id) => {\n" +
         "    const data = await fetch(...)\n" +
         "    return data\n" +
         "  })\n\n" +
         "✅ Instead, use signal.async():\n" +
-        "  shared((id) => {\n" +
+        "  pool((id) => {\n" +
         "    const data = signal.async(() => fetch(...))\n" +
         "    return { data }\n" +
         "  })"
@@ -217,7 +269,7 @@ export function shared<K, R extends object>(
       get(target, prop, receiver) {
         if (entry.deleted) {
           throw new Error(
-            `Cannot access deleted shared instance. ` +
+            `Cannot access deleted pooled instance. ` +
               `The instance was garbage collected when all components stopped using it.\n\n` +
               `This usually happens when:\n` +
               `1. You stored a reference to the instance\n` +
@@ -232,7 +284,7 @@ export function shared<K, R extends object>(
       set(target, prop, value, receiver) {
         if (entry.deleted) {
           throw new Error(
-            `Cannot modify deleted shared instance. ` +
+            `Cannot modify deleted pooled instance. ` +
               `The instance was garbage collected when all components stopped using it.`
           );
         }
@@ -241,7 +293,7 @@ export function shared<K, R extends object>(
     });
   };
 
-  const sharedFn = (key: K): R => {
+  const poolFn = (key: K): R => {
     // Find existing entry with equal key
     const existingEntry = cache.get(key); // Automatically moves to end (LRU)
 
@@ -341,5 +393,14 @@ export function shared<K, R extends object>(
     return entry.proxy;
   };
 
-  return sharedFn;
+  // Implement .once() method for one-off, non-pooled instances
+  poolFn.once = (key: K): [R, () => void] => {
+    // Create instance without caching
+    const cleanup = emitter();
+    const result = withDispatchers([disposableToken(cleanup)], () => fn(key));
+
+    return [result, () => cleanup.emitAndClear()];
+  };
+
+  return poolFn;
 }
