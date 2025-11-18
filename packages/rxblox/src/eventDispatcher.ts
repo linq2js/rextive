@@ -25,14 +25,14 @@ export const eventToken = dispatcherToken<EventDispatcher>("eventDispatcher");
  *
  * @param type - The event type (unmount, mount, or render)
  * @param callbacks - Callbacks to register for this event
- * @throws {Error} If called outside a blox or slot context
+ * @throws {Error} If called outside a blox context
  */
 function onEvent(type: keyof EventDispatcher, callbacks: VoidFunction[]) {
   const contextType = getContextType();
 
-  if (contextType !== "blox" && contextType !== "slot") {
+  if (contextType !== "blox") {
     throw new Error(
-      `blox.on${type.charAt(0).toUpperCase() + type.slice(1)}() must be called inside a blox component or blox.slot() callback.\n\n` +
+      `blox.on${type.charAt(0).toUpperCase() + type.slice(1)}() must be called inside a blox component.\n\n` +
       `Current context: ${contextType || "none"}\n\n` +
       `❌ Don't do this:\n` +
       `  function MyComponent() {\n` +
@@ -62,11 +62,11 @@ function onEvent(type: keyof EventDispatcher, callbacks: VoidFunction[]) {
 /**
  * Registers callbacks to run when the component unmounts.
  *
- * Must be called inside a `blox` component or `blox.slot()` callback.
+ * Must be called inside a `blox` component.
  * Exported as `blox.onUnmount()`.
  *
  * @param callbacks - Functions to call on component unmount
- * @throws {Error} If called outside a blox or slot context
+ * @throws {Error} If called outside a blox context
  *
  * @example
  * ```tsx
@@ -78,6 +78,7 @@ function onEvent(type: keyof EventDispatcher, callbacks: VoidFunction[]) {
  *
  * @example
  * ```tsx
+ * // Works inside blox.slot() too (inherits blox context)
  * const MyComponent = blox(() => {
  *   const [slot] = blox.slot(() => {
  *     blox.onUnmount(() => console.log("Cleanup"));
@@ -94,11 +95,11 @@ export function onUnmount(...callbacks: VoidFunction[]) {
 /**
  * Registers callbacks to run when the component mounts.
  *
- * Must be called inside a `blox` component or `blox.slot()` callback.
+ * Must be called inside a `blox` component.
  * Exported as `blox.onMount()`.
  *
  * @param callbacks - Functions to call on component mount
- * @throws {Error} If called outside a blox or slot context
+ * @throws {Error} If called outside a blox context
  *
  * @example
  * ```tsx
@@ -126,12 +127,12 @@ export function onMount(...callbacks: VoidFunction[]) {
 /**
  * Registers callbacks to run on each render.
  *
- * Must be called inside a `blox` component or `blox.slot()` callback during the definition phase.
+ * Must be called inside a `blox` component during the definition phase.
  * The callback executes during React's render phase, enabling React hooks usage.
  * Exported as `blox.onRender()`.
  *
  * @param callbacks - Functions to call on each render
- * @throws {Error} If called outside a blox or slot context
+ * @throws {Error} If called outside a blox context
  *
  * @example
  * ```tsx

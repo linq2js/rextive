@@ -52,6 +52,13 @@ Master the fundamentals of rxblox:
   - `action()` / `action.cancellable()` - Trackable actions
   - `loadable()` / `isLoadable()` - Loadable state utilities
 
+- **[Context and Scope](./context-and-scope.md)** - Where can you use each API?
+  - Context types (`blox`, `effect`, `signal`, `rx`, etc.)
+  - API context requirements reference tables
+  - Context hierarchy and valid nesting
+  - Common patterns and anti-patterns
+  - Quick reference matrix
+
 - **[Lifecycle & Cleanup](./lifecycle-cleanup.md)** - Memory management and cleanup
   - Automatic cleanup in `blox` components
   - Effect cleanup and lifecycle

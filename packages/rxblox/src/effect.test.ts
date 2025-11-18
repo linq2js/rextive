@@ -864,4 +864,48 @@ describe("effectDispatcher", () => {
       }).not.toThrow();
     });
   });
+
+  describe("batch scope validation", () => {
+    it("should throw when creating effect inside batch()", async () => {
+      const { batch } = await import("./batch");
+      const count = signal(0);
+
+      expect(() => {
+        batch(() => {
+          effect(() => {
+            console.log(count());
+          }); // Should throw
+        });
+      }).toThrow("Cannot create effects inside batch() blocks");
+    });
+
+    it("should throw with helpful error message", async () => {
+      const { batch } = await import("./batch");
+
+      expect(() => {
+        batch(() => {
+          effect(() => {});
+        });
+      }).toThrow(/batch\(\) is for grouping signal updates/);
+    });
+
+    it("should not throw when creating effect outside batch", async () => {
+      const { batch } = await import("./batch");
+      const count = signal(0);
+      let runCount = 0;
+
+      expect(() => {
+        effect(() => {
+          runCount++;
+          console.log(count());
+        }); // Created outside batch
+        batch(() => {
+          count.set(1); // Just updating inside
+          count.set(2);
+        });
+      }).not.toThrow();
+
+      expect(runCount).toBeGreaterThan(0);
+    });
+  });
 });

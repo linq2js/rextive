@@ -313,9 +313,9 @@ export function rx(exp: () => unknown): ReactNode;
  * component, which handles dependency tracking and re-rendering.
  */
 export function rx(...args: any[]): ReactNode {
-  // Validate context: nested rx() blocks are not allowed
-  // They create unnecessary overhead and complicate dependency tracking
-  if (getContextType() === "rx") {
+  // Validate context: nested rx() blocks and rx() in batch() are not allowed
+  const contextType = getContextType();
+  if (contextType === "rx") {
     throw new Error(
       "Nested rx() blocks detected. This is inefficient and unnecessary.\n\n" +
         "❌ Don't do this:\n" +
@@ -326,6 +326,25 @@ export function rx(...args: any[]): ReactNode {
         "  const block = rx(() => <span>independent</span>);\n" +
         "  return <div>{block}</div>;\n\n" +
         "See: https://github.com/linq2js/rxblox#best-practices"
+    );
+  }
+
+  if (contextType === "batch") {
+    throw new Error(
+      "Cannot create rx() blocks inside batch(). " +
+        "batch() is for grouping signal updates, not creating reactive UI.\n\n" +
+        "❌ Don't do this:\n" +
+        "  batch(() => {\n" +
+        "    const view = rx(() => <div>{count()}</div>);  // Wrong scope!\n" +
+        "    count.set(1);\n" +
+        "  })\n\n" +
+        "✅ Instead, create rx() outside batch:\n" +
+        "  const view = rx(() => <div>{count()}</div>);  // Create outside\n" +
+        "  batch(() => {\n" +
+        "    count.set(1);  // Just update signals inside\n" +
+        "    count.set(2);\n" +
+        "  });\n\n" +
+        "See: https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/context-and-scope.md"
     );
   }
 

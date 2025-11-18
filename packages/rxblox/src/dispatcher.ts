@@ -18,13 +18,7 @@ const REMOVE_DISPATCHER = Symbol("removeDispatcher");
  * All possible context types in rxblox.
  * Each context type represents a different execution scope.
  */
-export type ContextType =
-  | "blox"
-  | "effect"
-  | "slot"
-  | "signal"
-  | "batch"
-  | "rx";
+export type ContextType = "blox" | "effect" | "signal" | "batch" | "rx";
 
 /**
  * Options for withDispatchers function.

@@ -243,9 +243,7 @@ export function slot<T>(...args: any[]): [ReactNode, T] {
   try {
     // Wrap the callback with slot dispatcher context
     // This makes blox.fill() available inside the callback
-    result = withDispatchers([slotToken(dispatcher)], fn, {
-      contextType: "slot",
-    });
+    result = withDispatchers([slotToken(dispatcher)], fn);
   } finally {
     dispatcher.setActiveSlot(null);
   }

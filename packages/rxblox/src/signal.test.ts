@@ -813,4 +813,38 @@ describe("signal", () => {
       }).not.toThrow();
     });
   });
+
+  describe("batch scope validation", () => {
+    it("should throw when creating signal inside batch()", async () => {
+      const { batch } = await import("./batch");
+
+      expect(() => {
+        batch(() => {
+          signal(0); // Should throw
+        });
+      }).toThrow("Cannot create signals inside batch() blocks");
+    });
+
+    it("should throw with helpful error message", async () => {
+      const { batch } = await import("./batch");
+
+      expect(() => {
+        batch(() => {
+          signal(0);
+        });
+      }).toThrow(/batch\(\) is for grouping signal updates/);
+    });
+
+    it("should not throw when creating signal outside batch", async () => {
+      const { batch } = await import("./batch");
+
+      expect(() => {
+        const count = signal(0); // Created outside batch
+        batch(() => {
+          count.set(1); // Just updating inside
+          count.set(2);
+        });
+      }).not.toThrow();
+    });
+  });
 });

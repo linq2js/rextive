@@ -221,8 +221,9 @@ export function signal<T>(
   value: T | ((context: ComputedSignalContext) => T),
   options: SignalOptions<NoInfer<T>> = {}
 ): MutableSignal<T> & { persistInfo: PersistInfo } {
-  // Prevent signal creation inside rx() blocks - this would create memory leaks
-  if (getContextType() === "rx") {
+  // Prevent signal creation inside rx() or batch() blocks
+  const contextType = getContextType();
+  if (contextType === "rx") {
     throw new Error(
       "Cannot create signals inside rx() blocks. " +
         "Signals created in rx() would be recreated on every re-render, causing memory leaks.\n\n" +
@@ -237,6 +238,25 @@ export function signal<T>(
         "    return <div>{rx(() => <span>{count()}</span>)}</div>;\n" +
         "  });\n\n" +
         "See: https://github.com/linq2js/rxblox#best-practices"
+    );
+  }
+
+  if (contextType === "batch") {
+    throw new Error(
+      "Cannot create signals inside batch() blocks. " +
+        "batch() is for grouping signal updates, not creating new signals.\n\n" +
+        "❌ Don't do this:\n" +
+        "  batch(() => {\n" +
+        "    const count = signal(0);  // Wrong scope!\n" +
+        "    count.set(1);\n" +
+        "  })\n\n" +
+        "✅ Instead, create signals outside batch:\n" +
+        "  const count = signal(0);  // Create outside\n" +
+        "  batch(() => {\n" +
+        "    count.set(1);  // Just update inside\n" +
+        "    count.set(2);\n" +
+        "  });\n\n" +
+        "See: https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/context-and-scope.md"
     );
   }
 

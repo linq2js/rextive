@@ -1385,4 +1385,43 @@ describe("rx", () => {
       }).toThrow("Nested rx() blocks detected");
     });
   });
+
+  describe("batch scope validation", () => {
+    it("should throw when creating rx() inside batch()", async () => {
+      const { batch } = await import("./batch");
+      const count = signal(0);
+
+      expect(() => {
+        batch(() => {
+          const view = rx(() => <div>{count()}</div>); // Should throw
+          count.set(1);
+        });
+      }).toThrow("Cannot create rx() blocks inside batch()");
+    });
+
+    it("should throw with helpful error message", async () => {
+      const { batch } = await import("./batch");
+      const count = signal(0);
+
+      expect(() => {
+        batch(() => {
+          rx(() => <div>{count()}</div>);
+        });
+      }).toThrow(/batch\(\) is for grouping signal updates/);
+    });
+
+    it("should not throw when creating rx() outside batch", async () => {
+      const { batch } = await import("./batch");
+      const count = signal(0);
+
+      expect(() => {
+        const view = rx(() => <div>{count()}</div>); // Created outside
+        batch(() => {
+          count.set(1); // Just updating inside
+          count.set(2);
+        });
+        render(view);
+      }).not.toThrow();
+    });
+  });
 });

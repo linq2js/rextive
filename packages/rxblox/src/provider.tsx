@@ -236,8 +236,9 @@ export function provider<T>(
   initialValue: T,
   options: ProviderOptions<T> = {}
 ) {
-  // Prevent provider creation inside rx() blocks
-  if (getContextType() === "rx") {
+  // Prevent provider creation inside rx() or batch() blocks
+  const contextType = getContextType();
+  if (contextType === "rx") {
     throw new Error(
       "Cannot create providers inside rx() blocks. " +
         "Providers created in rx() would be recreated on every re-render, causing memory leaks.\n\n" +
@@ -252,6 +253,25 @@ export function provider<T>(
         "    return <ValueProvider value={0}><Child /></ValueProvider>;\n" +
         "  });\n\n" +
         "See: https://github.com/linq2js/rxblox#best-practices"
+    );
+  }
+  
+  if (contextType === "batch") {
+    throw new Error(
+      "Cannot create providers inside batch() blocks. " +
+        "batch() is for grouping signal updates, not creating new providers.\n\n" +
+        "❌ Don't do this:\n" +
+        "  batch(() => {\n" +
+        "    const [useValue, ValueProvider] = provider('value', 0);  // Wrong scope!\n" +
+        "    count.set(1);\n" +
+        "  })\n\n" +
+        "✅ Instead, create providers at module level:\n" +
+        "  const [useValue, ValueProvider] = provider('value', 0);  // Create once\n" +
+        "  batch(() => {\n" +
+        "    count.set(1);  // Just update signals inside\n" +
+        "    count.set(2);\n" +
+        "  });\n\n" +
+        "See: https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/context-and-scope.md"
     );
   }
 

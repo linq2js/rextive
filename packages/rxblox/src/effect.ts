@@ -84,8 +84,9 @@ export type EffectContext = {
 export function effect(
   fn: (context: EffectContext) => void | Promise<void> | VoidFunction
 ): Effect {
-  // Prevent effect creation inside rx() blocks - this would create subscription leaks
-  if (getContextType() === "rx") {
+  // Prevent effect creation inside rx() or batch() blocks
+  const contextType = getContextType();
+  if (contextType === "rx") {
     throw new Error(
       "Cannot create effects inside rx() blocks. " +
         "Effects created in rx() would be recreated on every re-render, causing subscription leaks.\n\n" +
@@ -100,6 +101,25 @@ export function effect(
         "    return <div>{rx(() => <span>Content</span>)}</div>;\n" +
         "  });\n\n" +
         "See: https://github.com/linq2js/rxblox#best-practices"
+    );
+  }
+  
+  if (contextType === "batch") {
+    throw new Error(
+      "Cannot create effects inside batch() blocks. " +
+        "batch() is for grouping signal updates, not creating new effects.\n\n" +
+        "❌ Don't do this:\n" +
+        "  batch(() => {\n" +
+        "    effect(() => console.log('wrong'));  // Wrong scope!\n" +
+        "    count.set(1);\n" +
+        "  })\n\n" +
+        "✅ Instead, create effects outside batch:\n" +
+        "  effect(() => console.log('right'));  // Create outside\n" +
+        "  batch(() => {\n" +
+        "    count.set(1);  // Just update inside\n" +
+        "    count.set(2);\n" +
+        "  });\n\n" +
+        "See: https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/context-and-scope.md"
     );
   }
 

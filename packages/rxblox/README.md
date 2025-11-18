@@ -1,9 +1,6 @@
 # 🎯 rxblox
 
-**The React state library you wish existed from day one.**
-
-Stop memorizing rules. Stop fighting re-renders. Stop debugging dependency arrays.  
-Just build what you imagined—clean, fast, and actually enjoyable.
+**State management that feels like magic.**
 
 [![npm version](https://img.shields.io/npm/v/rxblox.svg)](https://www.npmjs.com/package/rxblox)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -14,20 +11,189 @@ npm install rxblox
 
 ---
 
-## If you've ever thought...
+## Your First rxblox App
 
-- 💭 "Why does my entire component re-render when one value changes?"
-- 💭 "I just need to fetch data when X changes... why is this so hard?"
-- 💭 "Did I forget a dependency again? Is that why it's broken?"
-- 💭 "This should be 5 lines, not 50..."
+```tsx
+import { signal, rx } from "rxblox";
 
-**You're not alone. And there's a better way.**
+const count = signal(0);
+
+const App = () => <h1 onClick={() => count.set((x) => x + 1)}>{rx(count)}</h1>;
+```
+
+**That's it.** A fully reactive counter in **3 lines**.
+
+- No hooks
+- No `useState`
+- No component re-renders
+- Click the heading. Only the number updates.
+
+---
+
+## "Wait... That Seems Too Simple"
+
+You're right to be skeptical. Let's see what makes this special.
+
+### The Global State Superpower
+
+Try using that `count` in **multiple components**:
+
+```tsx
+const count = signal(0);
+
+// Use it anywhere - no prop drilling, no context, no providers
+const Counter = () => <div>Count: {rx(count)}</div>;
+const Display = () => <div>Double: {rx(() => count() * 2)}</div>;
+const Reset = () => <button onClick={() => count.set(0)}>Reset</button>;
+
+const App = () => (
+  <div>
+    <Counter />
+    <Display />
+    <Reset />
+  </div>
+);
+```
+
+**Every component sees the same `count`. Change it anywhere, updates everywhere.**
+
+**No Context. No Provider. No prop drilling. Just works.**
+
+---
+
+### The Re-render Magic
+
+Here's where it gets interesting:
+
+```tsx
+const count = signal(0);
+const name = signal("Alice");
+
+const App = () => {
+  console.log("🔵 App rendered"); // Only logs ONCE
+
+  return (
+    <div>
+      {/* Only updates when count changes */}
+      <h1>Count: {rx(count)}</h1>
+
+      {/* Only updates when name changes */}
+      {rx(() => (
+        <input value={name()} onChange={(e) => name.set(e.target.value)} />
+      ))}
+
+      {/* Never updates */}
+      <footer>Static content</footer>
+    </div>
+  );
+};
+```
+
+**Change count? Only `<h1>` updates.**  
+**Change name? Only `<input>` updates.**  
+**The rest? Frozen in time.**
+
+This is **fine-grained reactivity**. The component runs once. Individual parts update independently.
+
+---
+
+## Now Add `blox()` for Component Superpowers
+
+Want per-component state? Use `blox()`:
+
+```tsx
+import { signal, blox, rx } from "rxblox";
+
+const Counter = blox(() => {
+  // Local state - unique to each Counter instance
+  const count = signal(0);
+
+  console.log("✅ Runs ONCE per instance");
+
+  return (
+    <div>
+      <h2>Count: {rx(count)}</h2>
+      <button onClick={() => count.set((x) => x + 1)}>+1</button>
+    </div>
+  );
+});
+
+const App = () => (
+  <div>
+    <Counter /> {/* Independent counter */}
+    <Counter /> {/* Independent counter */}
+  </div>
+);
+```
+
+**Features you just got for free:**
+
+- ✅ Builder runs once (like a constructor)
+- ✅ Fine-grained updates (only reactive parts re-render)
+- ✅ Auto-memoization (no `React.memo` needed)
+- ✅ No `useCallback` or `useMemo` ever
+- ✅ Works with global AND local state
+
+---
+
+## The "Holy Sh\*t" Moment
+
+Now watch this:
+
+```tsx
+const userId = signal(1);
+
+// Auto-refetches when userId changes
+const user = signal.async(async ({ track, abortSignal }) => {
+  const tracked = track({ userId });
+
+  const res = await fetch(`/api/users/${tracked.userId}`, {
+    signal: abortSignal, // Auto-cancelled on re-fetch
+  });
+  return res.json();
+});
+
+const UserCard = blox(() => {
+  return (
+    <div>
+      <button onClick={() => userId.set((id) => id + 1)}>Next User</button>
+
+      {rx(() => {
+        const u = user();
+
+        if (u.status === "loading") return <Spinner />;
+        if (u.status === "error") return <Error error={u.error} />;
+        return <Profile user={u.value} />;
+      })}
+    </div>
+  );
+});
+```
+
+**You just built:**
+
+- ✅ Auto-refetch on dependency change
+- ✅ Auto-cancellation of previous requests
+- ✅ Loading/error state tracking
+- ✅ Type-safe async data
+- ✅ **Zero dependency arrays**
+- ✅ **Zero manual cleanup**
+
+**Change `userId`? Refetches. Previous request? Cancelled. All automatic.**
+
+---
+
+## "OK, I'm Listening..."
+
+At this point, you're probably wondering: **"What's the catch?"**
+
+There isn't one. But let's compare what you're used to:
 
 ---
 
 ## The React Tax You're Paying
 
-Every React developer knows this dance:
+Here's what the same features look like in vanilla React:
 
 ```tsx
 // 😫 You wanted simple logic
@@ -82,7 +248,6 @@ const user = signal.async(async ({ track, abortSignal }) => {
 const UserProfile = blox(() => {
   return rx(() => {
     const u = user();
-
     if (u.status === "loading") return <Spinner />;
     if (u.status === "error") return <Error error={u.error} />;
     return <div>{u.value.name}</div>;
@@ -90,9 +255,9 @@ const UserProfile = blox(() => {
 });
 ```
 
-**5 lines. Type-safe. Auto-cancellation. Error handling. No arrays.**
+**8 lines. With error handling. With auto-cancellation. With type safety. Zero dependency arrays.**
 
-Change `userId`? It refetches. Previous request? Cancelled automatically.  
+Change `userId`? Auto-refetches. Previous request? Auto-cancelled. Errors? Handled.  
 **It just works.**
 
 ---
@@ -342,9 +507,9 @@ import { signal, blox, rx, action } from "rxblox";
 const SearchBox = blox(() => {
   const query = signal("");
 
-  // Auto-cancels previous searches. Auto-tracks loading/error states.
+  // Cancellable action - auto-tracks loading/error states
   const search = action.cancellable(async (abortSignal, q: string) => {
-    await new Promise((resolve) => setTimeout(resolve, 300)); // Manual debounce
+    await new Promise((resolve) => setTimeout(resolve, 300)); // Debounce
     const res = await fetch(`/api/search?q=${q}`, { signal: abortSignal });
     return res.json();
   });
@@ -352,21 +517,22 @@ const SearchBox = blox(() => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     query.set(value);
-    if (value.length > 2) search(value);
+    if (value.length > 2) {
+      search.cancel(); // Cancel previous search
+      search(value); // Start new search
+    }
   };
 
   return (
     <div>
-      {/* First reactive block - only updates when query changes */}
-      {rx(() => (
-        <input
-          value={query()}
-          onChange={handleChange}
-          placeholder="Search..."
-        />
-      ))}
+      {/* Reactive input - only updates when query changes */}
+      {rx("input", {
+        value: query,
+        onChange: handleChange,
+        placeholder: "Search...",
+      })}
 
-      {/* Second reactive block - only updates when search status/result changes */}
+      {/* Reactive results - only updates when search status/result changes */}
       {rx(() => {
         if (search.status === "loading") return <Spinner />;
         if (search.status === "error") return <Error error={search.error} />;
@@ -546,7 +712,7 @@ No arrays. No bugs. Just works.
 
 ---
 
-## Getting Started
+## Ready to Try It?
 
 ### Installation
 
@@ -554,32 +720,37 @@ No arrays. No bugs. Just works.
 npm install rxblox
 ```
 
-### Your First Component (30 seconds)
+### Quick Start (Literally 30 Seconds)
+
+Remember that 3-line counter from the top? That's a real, working app:
 
 ```tsx
-import { signal, blox, rx } from "rxblox";
+import { signal, rx } from "rxblox";
 
-// 1. Create a signal (can be global or local)
 const count = signal(0);
 
-// 2. Use it in a blox component
+const App = () => <h1 onClick={() => count.set((x) => x + 1)}>{rx(count)}</h1>;
+```
+
+**Copy. Paste. Run.** It just works.
+
+Want local state? Wrap it in `blox()`:
+
+```tsx
 const Counter = blox(() => {
-  // This definition runs ONCE on mount
-  const increment = () => count.set((x) => x + 1);
+  const count = signal(0); // Local to this instance
 
   return (
-    <div>
-      <button onClick={increment}>Count: {rx(count)}</button>
-    </div>
+    <button onClick={() => count.set((x) => x + 1)}>Count: {rx(count)}</button>
   );
 });
 ```
 
-**That's it.** You just built a reactive counter with zero boilerplate.
+**That's the entire API you need to get started.**
 
 ---
 
-## Core Concepts (2 minutes)
+## Core Concepts (The Full Picture)
 
 ### 📦 Signals: Reactive Values
 
@@ -745,6 +916,7 @@ const MyComponent = blox(() => {
 
 - **[Core Concepts](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/core-concepts.md)** - Deep dive into signals, effects, and reactivity
 - **[API Reference](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/api-reference.md)** - Every function, every parameter, every option
+- **[Context and Scope](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/context-and-scope.md)** - Where can you use each API? Complete reference
 - **[Patterns & Best Practices](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/patterns.md)** - Real-world patterns that work
 - **[vs. Other Libraries](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/comparisons.md)** - How rxblox compares to SolidJS, Preact, Jotai, Zustand, MobX
 

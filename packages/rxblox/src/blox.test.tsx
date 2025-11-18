@@ -267,7 +267,7 @@ describe("blox", () => {
     it("should throw error when called outside blox component", () => {
       expect(() => {
         blox.onUnmount(() => {});
-      }).toThrow("must be called inside a blox component or blox.slot()");
+      }).toThrow("must be called inside a blox component");
     });
 
     it("should register callback when called inside blox component", async () => {

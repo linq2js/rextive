@@ -36,7 +36,7 @@ describe("eventDispatcher", () => {
     it("should throw error when called outside blox component", () => {
       expect(() => {
         blox.onMount(() => {});
-      }).toThrow("must be called inside a blox component or blox.slot()");
+      }).toThrow("must be called inside a blox component");
     });
 
     it("should work inside blox.slot()", async () => {
@@ -89,7 +89,7 @@ describe("eventDispatcher", () => {
     it("should throw error when called outside blox component", () => {
       expect(() => {
         blox.onRender(() => {});
-      }).toThrow("must be called inside a blox component or blox.slot()");
+      }).toThrow("must be called inside a blox component");
     });
 
     it("should work inside blox.slot()", () => {
@@ -136,7 +136,7 @@ describe("eventDispatcher", () => {
     it("should throw error when called outside blox component", () => {
       expect(() => {
         blox.onUnmount(() => {});
-      }).toThrow("must be called inside a blox component or blox.slot()");
+      }).toThrow("must be called inside a blox component");
     });
 
     it("should work inside blox.slot()", async () => {
@@ -166,7 +166,7 @@ describe("eventDispatcher", () => {
         effect(() => {
           blox.onMount(() => {});
         });
-      }).toThrow("must be called inside a blox component or blox.slot()");
+      }).toThrow("must be called inside a blox component");
     });
 
     it("should throw error when onRender called in signal context", async () => {
@@ -178,7 +178,7 @@ describe("eventDispatcher", () => {
         });
         // Access the computed signal to trigger the computation
         computed();
-      }).toThrow("must be called inside a blox component or blox.slot()");
+      }).toThrow("must be called inside a blox component");
     });
 
     it("should throw error when onUnmount called in batch context", async () => {
@@ -191,7 +191,7 @@ describe("eventDispatcher", () => {
           blox.onUnmount(() => {});
           count.set(1);
         });
-      }).toThrow("must be called inside a blox component or blox.slot()");
+      }).toThrow("must be called inside a blox component");
     });
   });
 });
