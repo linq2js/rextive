@@ -1,6 +1,5 @@
-import { blox, rx, signal } from "rxblox";
+import { blox, rx, signal, shallowEquals } from "rxblox";
 import { todoStore } from "../store/todoStore";
-import shallowEqual from "shallowequal";
 
 interface TodoItemProps {
   id: string;
@@ -8,7 +7,7 @@ interface TodoItemProps {
 
 export const TodoItem = blox((props: TodoItemProps) => {
   const todo = signal(() => todoStore.values()[props.id], {
-    equals: shallowEqual,
+    equals: shallowEquals,
   });
 
   // Use signals instead of useState in blox components

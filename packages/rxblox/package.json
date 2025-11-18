@@ -54,15 +54,13 @@
   "dependencies": {
     "@types/lodash": "^4.17.20",
     "immer": "^10.2.0",
-    "lodash": "^4.17.21",
-    "shallowequal": "^1.1.0"
+    "lodash": "^4.17.21"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^14.1.2",
     "@types/node": "^24.10.1",
     "@types/react": "^18.2.45",
-    "@types/shallowequal": "^1.1.5",
     "@vitejs/plugin-react": "^4.2.1",
     "@vitest/coverage-v8": "^1.1.0",
     "@vitest/ui": "^1.1.0",

@@ -77,8 +77,7 @@ When working with complex props in `blox` components, create signals with custom
 #### Use `shallowEqual` for Object Props
 
 ```tsx
-import { blox, rx, signal } from "rxblox";
-import shallowEqual from "shallowequal";
+import { blox, rx, signal, shallowEquals } from "rxblox";
 
 interface Props {
   user: { id: number; name: string; email: string };
@@ -86,10 +85,10 @@ interface Props {
 }
 
 export const UserCard = blox<Props>((props) => {
-  // ✅ GOOD: Use shallowEqual to avoid re-renders when object identity changes
+  // ✅ GOOD: Use shallowEquals to avoid re-renders when object identity changes
   // but contents are the same
-  const user = signal(() => props.user, { equals: shallowEqual });
-  const config = signal(() => props.config, { equals: shallowEqual });
+  const user = signal(() => props.user, { equals: shallowEquals });
+  const config = signal(() => props.config, { equals: shallowEquals });
 
   return rx(() => {
     // Now these only re-render when user/config contents actually change

@@ -1,6 +1,5 @@
 import { debounce, remove } from "lodash-es";
-import { batch, Persistor, signal } from "rxblox";
-import shallowEqual from "shallowequal";
+import { batch, Persistor, signal, shallowEquals } from "rxblox";
 /**
  * Filter types for displaying todos.
  */
@@ -88,7 +87,7 @@ export function createTodoStore() {
       const v = values();
       return k.filter((k) => !v[k].completed);
     },
-    { equals: shallowEqual }
+    { equals: shallowEquals }
   );
 
   const completed = signal(
@@ -97,7 +96,7 @@ export function createTodoStore() {
       const v = values();
       return k.filter((k) => v[k].completed);
     },
-    { equals: shallowEqual }
+    { equals: shallowEquals }
   );
 
   const allCompleted = signal(() => {

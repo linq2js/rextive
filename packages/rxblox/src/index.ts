@@ -59,6 +59,8 @@ export type { Tag } from "./tag";
 export { batch } from "./batch";
 export type { InferSignalValues } from "./batch";
 export type { SlotOptions, SlotMode } from "./slot";
+export { shared } from "./shared";
+export type { SharedFunction, SharedOptions } from "./shared";
 
 // Dispatcher system
 export { getContextType, withContextType } from "./dispatcher";
@@ -68,3 +70,4 @@ export type { ContextType } from "./dispatcher";
 export { devLog, devWarn, devError, devOnly, devAssert } from "./utils/dev";
 export { syncOnly } from "./utils/syncOnly";
 export type { SyncOnlyOptions } from "./utils/syncOnly";
+export { shallowEquals } from "./utils/shallowEquals";
