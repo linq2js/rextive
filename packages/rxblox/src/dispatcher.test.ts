@@ -403,9 +403,12 @@ describe("dispatcher", () => {
     it("should support all context types", () => {
       const testToken = dispatcherToken<string>("test");
 
-      const contextTypes: Array<
-        "blox" | "effect" | "slot" | "signal" | "batch"
-      > = ["blox", "effect", "slot", "signal", "batch"];
+      const contextTypes: Array<"blox" | "effect" | "signal" | "batch"> = [
+        "blox",
+        "effect",
+        "signal",
+        "batch",
+      ];
 
       for (const contextType of contextTypes) {
         withDispatchers(
@@ -447,9 +450,9 @@ describe("dispatcher", () => {
           withDispatchers(
             [testToken("inner")],
             () => {
-              expect(getContextType()).toBe("slot"); // Should override
+              expect(getContextType()).toBe("effect"); // Should override
             },
-            { contextType: "slot" }
+            { contextType: "effect" }
           );
 
           // Back to parent context
@@ -499,9 +502,9 @@ describe("dispatcher", () => {
               withDispatchers(
                 [testToken("3")],
                 () => {
-                  expect(getContextType()).toBe("slot");
+                  expect(getContextType()).toBe("batch");
                 },
-                { contextType: "slot" }
+                { contextType: "batch" }
               );
 
               expect(getContextType()).toBe("effect");

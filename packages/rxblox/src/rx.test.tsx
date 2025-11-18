@@ -1393,7 +1393,7 @@ describe("rx", () => {
 
       expect(() => {
         batch(() => {
-          const view = rx(() => <div>{count()}</div>); // Should throw
+          rx(() => <div>{count()}</div>); // Should throw
           count.set(1);
         });
       }).toThrow("Cannot create rx() blocks inside batch()");
