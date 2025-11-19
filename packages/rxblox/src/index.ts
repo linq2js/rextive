@@ -63,6 +63,7 @@ export type { InferSignalValues } from "./batch";
 export type { SlotOptions, SlotMode } from "./slot";
 export { pool } from "./pool";
 export type { PoolFunction, PoolOptions } from "./pool";
+export { defer } from "./defer";
 
 // Dispatcher system
 export { getContextType, withContextType } from "./dispatcher";
