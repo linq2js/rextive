@@ -750,22 +750,17 @@ export function signal<T>(
 
   Object.defineProperty(s, "proxy", {
     get() {
-      const currentValue = s();
-
-      // Only create proxy for objects and functions
-      if (currentValue && typeof currentValue === "object") {
-        if (!cachedProxy) {
-          cachedProxy = createProxy({
-            get: () => s(),
-            // No set option = readonly
-          });
-        }
-        return cachedProxy;
+      if (!cachedProxy) {
+        // The proxy calls s() on every property access, making all reads reactive.
+        // This ensures that any property access (e.g., `signal.proxy.count`)
+        // will register the signal as a dependency in reactive contexts
+        // (effects, computed signals, rx expressions).
+        cachedProxy = createProxy({
+          get: s.get,
+          // No set option = readonly
+        });
       }
-
-      // For primitives, return never (will cause TypeScript error)
-      // This matches the type definition: T extends object | Function ? Readonly<T> : never
-      return currentValue;
+      return cachedProxy;
     },
     enumerable: true,
     configurable: false,
