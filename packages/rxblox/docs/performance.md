@@ -70,7 +70,7 @@ const MyComponent = blox(() => {
   const count = signal(0);
   const sub = count.on((value) => apiCall(value));
 
-  blox.onUnmount(() => sub());
+  blox.on({ unmount: () => sub() });
 
   return <div />;
 });

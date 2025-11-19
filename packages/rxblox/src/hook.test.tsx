@@ -82,9 +82,9 @@ describe("hook", () => {
     expect(screen.getByTestId("captured")).toHaveTextContent("3");
   });
 
-  it("should be undefined in builder phase, available in event handlers", () => {
+  it("should be null in builder phase, available after render", () => {
     let capturedHook: ReturnType<typeof hook<string>> | undefined;
-    let builderPhaseValue: string | undefined;
+    let builderPhaseValue: string | null | undefined;
 
     const Component = blox(() => {
       capturedHook = blox.hook(() => {
@@ -106,8 +106,8 @@ describe("hook", () => {
 
     render(<Component />);
 
-    // In builder phase, it was undefined
-    expect(builderPhaseValue).toBe(undefined);
+    // In builder phase, it was null (ref() initializes to null)
+    expect(builderPhaseValue).toBe(null);
 
     // But in JSX with rx(), it's available
     expect(screen.getByTestId("captured")).toHaveTextContent("value");

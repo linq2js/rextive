@@ -1,6 +1,6 @@
 // Main entry point for rxblox
 
-import { onEvent, onMount, onUnmount, onRender } from "./eventDispatcher";
+import { onEvent } from "./eventDispatcher";
 import { hook } from "./hook";
 import { asyncSignal, type AsyncSignalContext } from "./asyncSignal";
 import { signal as createSignal } from "./signal";
@@ -16,9 +16,6 @@ export const blox = Object.assign(createBlox, {
   hook,
   onEvent,
   on: onEvent, // Alias for onEvent
-  onMount,
-  onUnmount,
-  onRender,
   slot,
   fill,
 });

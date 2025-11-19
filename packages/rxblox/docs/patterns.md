@@ -816,7 +816,7 @@ One of the most powerful features of `blox` is the ability to extract and reuse 
 **Component Utilities** (`withXXX` prefix)
 
 - Called inside `blox()` components only
-- Uses blox APIs: `blox.onMount()`, `blox.onUnmount()`, `blox.onRender()`, `blox.hook()`
+- Uses blox APIs: `blox.on()`, `blox.hook()`
 - Example: `withWebSocket()`, `withAutoSave()`, `withKeyboardShortcuts()`
 
 ⚠️ **Never use `useXXX`** - Reserved for React hooks only!
@@ -856,10 +856,10 @@ const Counter = blox(() => {
 
 ### Component Utilities with Cleanup
 
-Use `blox.onUnmount()` for cleanup in component utilities:
+Use `blox.on({ unmount })` for cleanup in component utilities:
 
 ```tsx
-// Component utility - uses blox.onUnmount()
+// Component utility - uses blox.on({ unmount })
 function withWebSocket(url: string) {
   const messages = signal<string[]>([]);
   const connected = signal(false);
@@ -869,7 +869,9 @@ function withWebSocket(url: string) {
   ws.onclose = () => connected.set(false);
   ws.onmessage = (e) => messages.set((prev) => [...prev, e.data]);
 
-  blox.onUnmount(() => ws.close()); // ✅ Cleanup on unmount
+  blox.on({
+    unmount: () => ws.close() // ✅ Cleanup on unmount
+  });
 
   return { messages, connected, send: (msg: string) => ws.send(msg) };
 }
@@ -933,11 +935,13 @@ export const authStore = createAuthStore();
 Combine store factories and component utilities:
 
 ```tsx
-// Component utility - uses blox.onUnmount()
+// Component utility - uses blox.on({ unmount })
 function withTimer(interval = 1000) {
   const elapsed = signal(0);
   const timer = setInterval(() => elapsed.set((p) => p + interval), interval);
-  blox.onUnmount(() => clearInterval(timer)); // ✅ Cleanup
+  blox.on({
+    unmount: () => clearInterval(timer) // ✅ Cleanup
+  });
   return { elapsed };
 }
 
@@ -970,7 +974,7 @@ function withTimedCounter() {
 - ✅ **Testability** - Stores and utilities can be tested independently
 - ✅ **Separation of concerns** - Keep state logic separate from UI
 - ✅ **No hooks rules** - Call these functions anywhere, in any order
-- ✅ **Automatic cleanup** - `blox.onUnmount()` in utilities ensures resources are freed
+- ✅ **Automatic cleanup** - `blox.on({ unmount })` in utilities ensures resources are freed
 - ✅ **Clear naming** - `withXXX` = component utilities, `xxxStore` = state containers
 - ✅ **Namespaced API** - All blox-specific APIs live under `blox.*`
 

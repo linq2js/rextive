@@ -167,11 +167,13 @@ const MyComponent = blox(() => {
 
 ```tsx
 const MyComponent = blox(() => {
-  blox.onMount(() => {
-    // Effect created here runs on mount
-    effect(() => {
-      console.log("Runs on mount");
-    });
+  blox.on({
+    mount: () => {
+      // Effect created here runs on mount
+      effect(() => {
+        console.log("Runs on mount");
+      });
+    }
   });
   
   return <div>Content</div>;
@@ -235,7 +237,7 @@ const Counter = blox<Props>((props, expose) => {
   // - Create signals
   // - Set up effects
   // - Define event handlers
-  // - Register cleanup with blox.onUnmount()
+  // - Register cleanup with blox.on({ unmount })
   const count = signal(0);
 
   effect(() => {
@@ -449,18 +451,20 @@ const Counter = blox<Props>((props) => {
 - **Undefined in definition phase** - `blox.hook().current` is `undefined` during the definition phase
 - **Runs on every render** - The callback passed to `blox.hook()` executes during React's render phase
 
-**Alternative: Manual pattern with `blox.onRender()`:**
+**Alternative: Manual pattern with `blox.on({ render })`:**
 
-If you prefer more control, you can manually use `blox.onRender()`:
+If you prefer more control, you can manually use `blox.on({ render })`:
 
 ```tsx
 const MyComponent = blox(() => {
   // Define variable in blox scope
   let someHookResult: SomeType | undefined;
 
-  blox.onRender(() => {
-    // Assign hook result to outer variable
-    someHookResult = useSomeHook();
+  blox.on({
+    render: () => {
+      // Assign hook result to outer variable
+      someHookResult = useSomeHook();
+    }
   });
 
   // Now you can use someHookResult in event handlers
@@ -1218,8 +1222,10 @@ const UserProfile = blox((props: { userId: number }) => {
   });
 
   // Fetch on mount
-  blox.onMount(() => {
-    fetchUser(props.userId());
+  blox.on({
+    mount: () => {
+      fetchUser(props.userId());
+    }
   });
 
   return rx(() => {

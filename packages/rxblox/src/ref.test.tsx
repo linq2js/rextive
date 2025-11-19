@@ -29,10 +29,15 @@ describe("ref", () => {
       expect(capturedRef.current).toBeInstanceOf(HTMLInputElement);
     });
 
-    it("should throw error when called outside blox component", () => {
-      expect(() => {
-        ref<HTMLInputElement>();
-      }).toThrow("ref() must be called inside a blox component");
+    it("should work when called outside blox component", () => {
+      // ref() can now be called anywhere
+      const myRef = ref<HTMLInputElement>();
+      expect(myRef.current).toBeNull();
+
+      // Can manually set it
+      const element = document.createElement("input");
+      myRef.current = element;
+      expect(myRef.current).toBe(element);
     });
   });
 
@@ -43,10 +48,12 @@ describe("ref", () => {
       const Component = blox(() => {
         const inputRef = ref<HTMLInputElement>();
 
-        blox.onMount(() => {
-          inputRef.ready((input) => {
-            callback(input);
-          });
+        blox.on({
+          mount: () => {
+            inputRef.ready((input) => {
+              callback(input);
+            });
+          },
         });
 
         return <input ref={inputRef} />;
@@ -62,12 +69,14 @@ describe("ref", () => {
       const Component = blox(() => {
         const inputRef = ref<HTMLInputElement>();
 
-        blox.onMount(() => {
-          inputRef.ready((input) => {
-            // TypeScript should not require null checking
-            expect(input.tagName).toBe("INPUT");
-            expect(input.focus).toBeDefined();
-          });
+        blox.on({
+          mount: () => {
+            inputRef.ready((input) => {
+              // TypeScript should not require null checking
+              expect(input.tagName).toBe("INPUT");
+              expect(input.focus).toBeDefined();
+            });
+          },
         });
 
         return <input ref={inputRef} />;
@@ -82,10 +91,12 @@ describe("ref", () => {
       const Component = blox(() => {
         const inputRef = ref<HTMLInputElement>();
 
-        blox.onMount(() => {
-          inputRef.ready((input) => {
-            callback(input);
-          });
+        blox.on({
+          mount: () => {
+            inputRef.ready((input) => {
+              callback(input);
+            });
+          },
         });
 
         // Don't attach ref to any element
@@ -104,9 +115,11 @@ describe("ref", () => {
       const Component = blox(() => {
         const inputRef = ref<HTMLInputElement>();
 
-        blox.onMount(() => {
-          inputRef.ready((input) => callback1(input));
-          inputRef.ready((input) => callback2(input));
+        blox.on({
+          mount: () => {
+            inputRef.ready((input) => callback1(input));
+            inputRef.ready((input) => callback2(input));
+          },
         });
 
         return <input ref={inputRef} />;
@@ -123,8 +136,10 @@ describe("ref", () => {
         const inputRef = ref<HTMLInputElement>();
         let capturedValue: string | undefined;
 
-        blox.onMount(() => {
-          capturedValue = inputRef.ready((input) => input.value);
+        blox.on({
+          mount: () => {
+            capturedValue = inputRef.ready((input) => input.value);
+          },
         });
 
         void capturedValue;
@@ -143,9 +158,11 @@ describe("ref", () => {
         const inputRef = ref<HTMLInputElement>();
         let result: number | undefined;
 
-        blox.onMount(() => {
-          result = inputRef.ready((input) => input.value.length);
-          expect(result).toBeUndefined();
+        blox.on({
+          mount: () => {
+            result = inputRef.ready((input) => input.value.length);
+            expect(result).toBeUndefined();
+          },
         });
 
         // Don't attach ref
@@ -161,15 +178,19 @@ describe("ref", () => {
       const Component = blox(() => {
         const videoRef = ref<HTMLVideoElement>();
 
-        blox.onMount(() => {
-          videoRef.ready((video) => {
-            video.play();
-          });
+        blox.on({
+          mount: () => {
+            videoRef.ready((video) => {
+              video.play();
+            });
+          },
         });
 
         // Cleanup in unmount callback
-        blox.onUnmount(() => {
-          cleanupFn();
+        blox.on({
+          unmount: () => {
+            cleanupFn();
+          },
         });
 
         return <video ref={videoRef} />;
@@ -192,10 +213,12 @@ describe("ref", () => {
         const inputRef = ref<HTMLInputElement>();
         const buttonRef = ref<HTMLButtonElement>();
 
-        blox.onMount(() => {
-          ref.ready([inputRef, buttonRef], (input, button) => {
-            callback(input, button);
-          });
+        blox.on({
+          mount: () => {
+            ref.ready([inputRef, buttonRef], (input, button) => {
+              callback(input, button);
+            });
+          },
         });
 
         return (
@@ -222,10 +245,12 @@ describe("ref", () => {
         const inputRef = ref<HTMLInputElement>();
         const buttonRef = ref<HTMLButtonElement>();
 
-        blox.onMount(() => {
-          ref.ready([inputRef, buttonRef], (input, button) => {
-            callback(input, button);
-          });
+        blox.on({
+          mount: () => {
+            ref.ready([inputRef, buttonRef], (input, button) => {
+              callback(input, button);
+            });
+          },
         });
 
         // Only attach one ref
@@ -248,13 +273,15 @@ describe("ref", () => {
         const buttonRef = ref<HTMLButtonElement>();
         const divRef = ref<HTMLDivElement>();
 
-        blox.onMount(() => {
-          ref.ready([inputRef, buttonRef, divRef], (input, button, div) => {
-            // TypeScript should infer correct types
-            expect(input.tagName).toBe("INPUT");
-            expect(button.tagName).toBe("BUTTON");
-            expect(div.tagName).toBe("DIV");
-          });
+        blox.on({
+          mount: () => {
+            ref.ready([inputRef, buttonRef, divRef], (input, button, div) => {
+              // TypeScript should infer correct types
+              expect(input.tagName).toBe("INPUT");
+              expect(button.tagName).toBe("BUTTON");
+              expect(div.tagName).toBe("DIV");
+            });
+          },
         });
 
         return (
@@ -275,10 +302,12 @@ describe("ref", () => {
       const Component = blox(() => {
         const inputRef = ref<HTMLInputElement>();
 
-        blox.onMount(() => {
-          ref.ready([inputRef], (input) => {
-            callback(input);
-          });
+        blox.on({
+          mount: () => {
+            ref.ready([inputRef], (input) => {
+              callback(input);
+            });
+          },
         });
 
         return <input ref={inputRef} />;
@@ -299,10 +328,12 @@ describe("ref", () => {
         const ref4 = ref<HTMLSpanElement>();
         const ref5 = ref<HTMLLabelElement>();
 
-        blox.onMount(() => {
-          ref.ready([ref1, ref2, ref3, ref4, ref5], (r1, r2, r3, r4, r5) => {
-            callback(r1, r2, r3, r4, r5);
-          });
+        blox.on({
+          mount: () => {
+            ref.ready([ref1, ref2, ref3, ref4, ref5], (r1, r2, r3, r4, r5) => {
+              callback(r1, r2, r3, r4, r5);
+            });
+          },
         });
 
         return (
@@ -333,15 +364,17 @@ describe("ref", () => {
         const divRef = ref<HTMLDivElement>();
         let result: { inputValue: string; divWidth: number } | undefined;
 
-        blox.onMount(() => {
-          result = ref.ready([inputRef, divRef], (input, div) => ({
-            inputValue: input.value,
-            divWidth: div.clientWidth,
-          }));
+        blox.on({
+          mount: () => {
+            result = ref.ready([inputRef, divRef], (input, div) => ({
+              inputValue: input.value,
+              divWidth: div.clientWidth,
+            }));
 
-          expect(result).toBeDefined();
-          expect(result?.inputValue).toBe("test");
-          expect(typeof result?.divWidth).toBe("number");
+            expect(result).toBeDefined();
+            expect(result?.inputValue).toBe("test");
+            expect(typeof result?.divWidth).toBe("number");
+          },
         });
 
         return (
@@ -361,12 +394,14 @@ describe("ref", () => {
         const divRef = ref<HTMLDivElement>();
         let result: { value: string } | undefined;
 
-        blox.onMount(() => {
-          result = ref.ready([inputRef, divRef], (_input, _div) => ({
-            value: "test",
-          }));
+        blox.on({
+          mount: () => {
+            result = ref.ready([inputRef, divRef], (_input, _div) => ({
+              value: "test",
+            }));
 
-          expect(result).toBeUndefined();
+            expect(result).toBeUndefined();
+          },
         });
 
         // Only attach one ref
@@ -382,10 +417,12 @@ describe("ref", () => {
       const Component = blox(() => {
         const inputRef = ref<HTMLInputElement>();
 
-        blox.onMount(() => {
-          inputRef.ready((input) => {
-            input.focus();
-          });
+        blox.on({
+          mount: () => {
+            inputRef.ready((input) => {
+              input.focus();
+            });
+          },
         });
 
         return <input ref={inputRef} />;
@@ -404,18 +441,22 @@ describe("ref", () => {
       const Component = blox(() => {
         const buttonRef = ref<HTMLButtonElement>();
 
-        blox.onMount(() => {
-          buttonRef.ready((button) => {
-            button.addEventListener("click", handleClick);
-          });
+        blox.on({
+          mount: () => {
+            buttonRef.ready((button) => {
+              button.addEventListener("click", handleClick);
+            });
+          },
         });
 
         // Cleanup registered separately
-        blox.onUnmount(() => {
-          if (buttonRef.current) {
-            buttonRef.current.removeEventListener("click", handleClick);
-          }
-          cleanupFn();
+        blox.on({
+          unmount: () => {
+            if (buttonRef.current) {
+              buttonRef.current.removeEventListener("click", handleClick);
+            }
+            cleanupFn();
+          },
         });
 
         return <button ref={buttonRef}>Click Me</button>;
@@ -439,11 +480,13 @@ describe("ref", () => {
         const inputRef = ref<HTMLInputElement>();
         const buttonRef = ref<HTMLButtonElement>();
 
-        blox.onMount(() => {
-          ref.ready([inputRef, buttonRef], (input, button) => {
-            input.focus();
-            button.disabled = false;
-          });
+        blox.on({
+          mount: () => {
+            ref.ready([inputRef, buttonRef], (input, button) => {
+              input.focus();
+              button.disabled = false;
+            });
+          },
         });
 
         return (
@@ -468,12 +511,14 @@ describe("ref", () => {
       const Component = blox(() => {
         const divRef = ref<HTMLDivElement>();
 
-        blox.onMount(() => {
-          divRef.ready((div) => {
-            div.style.backgroundColor = "red";
-            div.style.width = "100px";
-            div.style.height = "100px";
-          });
+        blox.on({
+          mount: () => {
+            divRef.ready((div) => {
+              div.style.backgroundColor = "red";
+              div.style.width = "100px";
+              div.style.height = "100px";
+            });
+          },
         });
 
         return <div ref={divRef}>Content</div>;
@@ -497,12 +542,14 @@ describe("ref", () => {
         const before: HTMLInputElement | null = inputRef.current;
         expect(before).toBeDefined();
 
-        blox.onMount(() => {
-          inputRef.ready((input) => {
-            // Inside ready(), parameter is T (not T | null)
-            const inside: HTMLInputElement = input;
-            expect(inside).toBeDefined();
-          });
+        blox.on({
+          mount: () => {
+            inputRef.ready((input) => {
+              // Inside ready(), parameter is T (not T | null)
+              const inside: HTMLInputElement = input;
+              expect(inside).toBeDefined();
+            });
+          },
         });
 
         return <input ref={inputRef} />;
@@ -517,17 +564,19 @@ describe("ref", () => {
         const buttonRef = ref<HTMLButtonElement>();
         const divRef = ref<HTMLDivElement>();
 
-        blox.onMount(() => {
-          ref.ready([inputRef, buttonRef, divRef], (input, button, div) => {
-            // TypeScript should infer correct types
-            const i: HTMLInputElement = input;
-            const b: HTMLButtonElement = button;
-            const d: HTMLDivElement = div;
+        blox.on({
+          mount: () => {
+            ref.ready([inputRef, buttonRef, divRef], (input, button, div) => {
+              // TypeScript should infer correct types
+              const i: HTMLInputElement = input;
+              const b: HTMLButtonElement = button;
+              const d: HTMLDivElement = div;
 
-            expect(i).toBeDefined();
-            expect(b).toBeDefined();
-            expect(d).toBeDefined();
-          });
+              expect(i).toBeDefined();
+              expect(b).toBeDefined();
+              expect(d).toBeDefined();
+            });
+          },
         });
 
         return (

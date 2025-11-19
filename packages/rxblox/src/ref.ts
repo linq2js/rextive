@@ -77,7 +77,7 @@ export interface BloxRef<T> {
  * Returns a ref object with a `ready()` method for type-safe value access.
  * Commonly used for DOM elements, but can store any value.
  *
- * **Must be called inside a `blox` component.**
+ * **Can be called anywhere** - Inside or outside `blox` components.
  *
  * @template T - The type of value to store
  * @returns A BloxRef object with `.current` and `.ready()` method
@@ -154,15 +154,6 @@ export interface BloxRef<T> {
  * ```
  */
 export function ref<T>(): BloxRef<T> {
-  // Check if we're inside a blox component
-  const contextType = getContextType();
-  if (contextType !== "blox") {
-    throw new Error(
-      "ref() must be called inside a blox component. " +
-        "Refs are managed within the blox component lifecycle."
-    );
-  }
-
   // Create a plain ref object (no hooks needed)
   const r: any = {
     current: null as T | null,

@@ -257,9 +257,7 @@ Each documentation file follows a consistent structure:
 - `effect(fn)`
 - `rx(expression)`
 - `blox<Props>(builder)`
-- `blox.onRender(callback)`
-- `blox.onMount(callback)`
-- `blox.onUnmount(callback)`
+- `blox.on(events)` / `blox.onEvent(events)`
 - `blox.hook<T>(callback)`
 - `provider<T>(name, initialValue, options?)`
 - `loadable(status, value, promise?)`

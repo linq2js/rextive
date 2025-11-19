@@ -1,6 +1,6 @@
 import { onEvent } from "./eventDispatcher";
 import { getContextType } from "./dispatcher";
-import { BloxRef, ref } from "./ref";
+import type { BloxRef } from "./ref";
 
 /**
  * Creates a ref to capture values from React hooks during the render phase.
@@ -50,7 +50,19 @@ export function hook<T>(callback: () => T): BloxRef<T> {
     );
   }
 
-  const result = ref<T>();
+  // Create ref object directly (doesn't need blox context)
+  const result: BloxRef<T> = {
+    current: null,
+    ready<R, E = undefined>(
+      cb: (value: Exclude<T, null | undefined>) => R,
+      orElse?: () => E
+    ): R | E {
+      if (result.current != null) {
+        return cb(result.current as Exclude<T, null | undefined>);
+      }
+      return orElse?.() as E;
+    },
+  };
 
   onEvent({
     render: () => {

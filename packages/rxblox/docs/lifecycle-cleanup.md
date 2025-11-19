@@ -17,7 +17,7 @@ Understanding lifecycle and cleanup is crucial for preventing memory leaks and e
 When a `blox` component unmounts, the following are automatically cleaned up:
 
 - All `effect()` subscriptions created in the definition phase
-- All `blox.onUnmount()` callbacks
+- All `blox.on({ unmount })` callbacks
 - Signal subscriptions are NOT automatically cleaned up unless explicitly managed
 
 **Important**: Signal subscriptions created with `.on()` must be manually unsubscribed:
@@ -36,7 +36,9 @@ const MyComponent = blox(() => {
   const count = signal(0);
   const unsubscribe = count.on((value) => console.log(value));
 
-  blox.onUnmount(() => unsubscribe());
+  blox.on({
+    unmount: () => unsubscribe()
+  });
 
   return <div />;
 });
@@ -99,8 +101,8 @@ unsubscribe();
 ## Cleanup Checklist
 
 - ✅ Effects in `blox` components clean up automatically
-- ✅ `blox.onUnmount()` callbacks run automatically
-- ⚠️ Manual `.on()` subscriptions need `blox.onUnmount()` cleanup
+- ✅ `blox.on({ unmount })` callbacks run automatically
+- ⚠️ Manual `.on()` subscriptions need `blox.on({ unmount })` cleanup
 - ⚠️ Global signal subscriptions must be manually unsubscribed
 - ⚠️ Resources (timers, listeners, connections) need explicit cleanup
 

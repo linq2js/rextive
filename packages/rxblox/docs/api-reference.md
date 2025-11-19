@@ -15,9 +15,7 @@ Complete API documentation for all rxblox functions and utilities.
 - [effect](#effect)
 - [rx](#rx)
 - [blox](#blox)
-- [blox.onRender](#bloxonrender)
-- [blox.onMount](#bloxonmount)
-- [blox.onUnmount](#bloxonunmount)
+- [blox.on / blox.onEvent](#bloxon--bloxonevent)
 - [blox.hook](#bloxhookt)
 - [blox.slot](#bloxslot)
 - [blox.fill](#bloxfill)
@@ -324,11 +322,13 @@ const MyComponent = blox(() => {
 const MyComponent = blox(() => {
   const count = signal(0);
   
-  blox.onMount(() => {
-    // Effect created here runs on mount and cleans up on unmount
-    effect(() => {
-      console.log("Runs on mount:", count());
-    });
+  blox.on({
+    mount: () => {
+      // Effect created here runs on mount and cleans up on unmount
+      effect(() => {
+        console.log("Runs on mount:", count());
+      });
+    }
   });
   
   return <div>{count()}</div>;
@@ -524,9 +524,93 @@ counterRef.current?.reset();
 
 ---
 
-## `blox.onRender(callback)`
+## `blox.on()` / `blox.onEvent()`
 
-Execute code during React's render phase, enabling React hooks usage.
+Register lifecycle event handlers for blox components.
+
+**Must be called inside a `blox` component.**
+
+### Signature
+
+```ts
+blox.on(events: {
+  mount?: VoidFunction | VoidFunction[];
+  unmount?: VoidFunction | VoidFunction[];
+  render?: VoidFunction | VoidFunction[];
+}): VoidFunction
+```
+
+### Supported Events
+
+- **`mount`**: Called when component mounts
+- **`unmount`**: Called when component unmounts  
+- **`render`**: Called on each render (can use React hooks here)
+
+### Basic Usage
+
+```tsx
+const MyComponent = blox(() => {
+  // Register lifecycle handlers
+  blox.on({
+    mount: () => console.log('Mounted!'),
+    unmount: () => console.log('Cleanup!'),
+    render: () => {
+      // React hooks can be used in render callbacks
+      const params = useParams();
+      console.log('Rendered with:', params);
+    }
+  });
+
+  return <div>Content</div>;
+});
+```
+
+### Multiple Callbacks
+
+You can register multiple callbacks for the same event:
+
+```tsx
+blox.on({
+  mount: [
+    () => console.log('Mount handler 1'),
+    () => console.log('Mount handler 2')
+  ],
+  unmount: () => cleanup()
+});
+```
+
+### Partial Events
+
+Register only the events you need:
+
+```tsx
+// Only unmount handler
+blox.on({
+  unmount: () => cleanup()
+});
+
+// Only mount handler
+blox.on({
+  mount: () => initialize()
+});
+```
+
+### Manual Cleanup
+
+The function returns a cleanup function to unregister all handlers:
+
+```tsx
+const unregister = blox.on({
+  mount: () => console.log('Mounted')
+});
+
+// Later: manually unregister
+unregister();
+```
+
+### Using React Hooks
+
+The `render` event is where you can use React hooks:
 
 ```tsx
 const MyComponent = blox(() => {
@@ -536,15 +620,17 @@ const MyComponent = blox(() => {
   let history: ReturnType<typeof useHistory> | undefined;
   let location: ReturnType<typeof useLocation> | undefined;
 
-  // Call React hooks inside blox.onRender()
-  blox.onRender(() => {
-    history = useHistory();
-    location = useLocation();
+  // Call React hooks inside render callback
+  blox.on({
+    render: () => {
+      history = useHistory();
+      location = useLocation();
 
-    useEffect(() => {
-      // Note: No signal tracking in blox.onRender() context
-      console.log("Count:", count());
-    }, []);
+      useEffect(() => {
+        // Note: No signal tracking in render context
+        console.log("Count:", count());
+      }, []);
+    }
   });
 
   // Use hook results in event handlers
@@ -563,45 +649,7 @@ const MyComponent = blox(() => {
 });
 ```
 
-**When to use:**
-
-- Integrating with React Router or other hook-based libraries
-- Using third-party custom hooks
-- Accessing React context via `useContext`
-
-**Important:** Signals accessed inside `blox.onRender()` are NOT tracked as dependencies - there is no tracking context in `blox.onRender()`.
-
----
-
-## `blox.onMount(callback)`
-
-Execute code immediately after component mounts.
-
-```tsx
-const MyComponent = blox(() => {
-  blox.onMount(() => {
-    console.log("Component mounted");
-  });
-
-  return <div>Content</div>;
-});
-```
-
----
-
-## `blox.onUnmount(callback)`
-
-Register cleanup callback that runs on component unmount.
-
-```tsx
-const MyComponent = blox(() => {
-  blox.onUnmount(() => {
-    console.log("Cleanup on unmount");
-  });
-
-  return <div>Content</div>;
-});
-```
+**Note:** Signals accessed inside `render` callbacks are NOT tracked as dependencies - there is no tracking context in render callbacks.
 
 ---
 
@@ -689,11 +737,13 @@ interface BloxRef<T> {
 const MyComponent = blox(() => {
   const inputRef = ref<HTMLInputElement>();
 
-  blox.onMount(() => {
-    inputRef.ready((input) => {
-      // Type: HTMLInputElement (not null/undefined)
-      input.focus();
-    });
+  blox.on({
+    mount: () => {
+      inputRef.ready((input) => {
+        // Type: HTMLInputElement (not null/undefined)
+        input.focus();
+      });
+    }
   });
 
   return <input ref={inputRef} />;
@@ -706,17 +756,18 @@ const MyComponent = blox(() => {
 const MyComponent = blox(() => {
   const buttonRef = ref<HTMLButtonElement>();
 
-  blox.onMount(() => {
-    buttonRef.ready((button) => {
-      const handleClick = () => console.log("clicked");
-      button.addEventListener("click", handleClick);
-    });
-  });
-
-  // Cleanup registered separately
-  blox.onUnmount(() => {
-    if (buttonRef.current) {
-      buttonRef.current.removeEventListener("click", handleClick);
+  blox.on({
+    mount: () => {
+      buttonRef.ready((button) => {
+        const handleClick = () => console.log("clicked");
+        button.addEventListener("click", handleClick);
+      });
+    },
+    // Cleanup registered in same call
+    unmount: () => {
+      if (buttonRef.current) {
+        buttonRef.current.removeEventListener("click", handleClick);
+      }
     }
   });
 
@@ -747,12 +798,14 @@ const MyComponent = blox(() => {
 const MyComponent = blox(() => {
   const divRef = ref<HTMLDivElement>();
 
-  blox.onMount(() => {
-    const width = divRef.ready((div) => div.clientWidth);
-    // Type: number | undefined
-    
-    if (width) {
-      console.log("Div width:", width);
+  blox.on({
+    mount: () => {
+      const width = divRef.ready((div) => div.clientWidth);
+      // Type: number | undefined
+      
+      if (width) {
+        console.log("Div width:", width);
+      }
     }
   });
 
@@ -766,14 +819,17 @@ const MyComponent = blox(() => {
 const MyComponent = blox(() => {
   const canvasRef = ref<HTMLCanvasElement>();
 
-  blox.onMount(() => {
-    // Provide fallback when ref isn't ready
-    const width = canvasRef.ready(
-      (canvas) => canvas.width,
-      () => 0  // Fallback value
-    );
-    // Type: number (always defined, never undefined)
-    console.log("Canvas width:", width);
+  blox.on({
+    mount: () => {
+      // Provide fallback when ref isn't ready
+      const width = canvasRef.ready(
+        (canvas) => canvas.width,
+        () => 0  // Fallback value
+      );
+      // Type: number (always defined, never undefined)
+      console.log("Canvas width:", width);
+    }
+  });
 
     // Or with fallback error handling
     const ctx = canvasRef.ready(
@@ -797,7 +853,7 @@ const MyComponent = blox(() => {
 - ✅ **Returns callback result**: Get values directly from the callback
 - ✅ **Fallback support**: Optional `orElse` callback for default values
 - ✅ **Simple**: Just a synchronous null check wrapper
-- ✅ **Flexible**: Use in `blox.onMount()` or `effect()`
+- ✅ **Flexible**: Use in `blox.on({ mount })` or `effect()`
 
 **When to Use:**
 
@@ -809,9 +865,9 @@ const MyComponent = blox(() => {
 
 **Notes:**
 
-- `ready()` must be called inside `blox.onMount()` or `effect()` where refs are already set
+- `ready()` must be called inside `blox.on({ mount })` or `effect()` where refs are already set
 - `ready()` is synchronous - it checks immediately and calls the callback if ref is not null
-- For cleanup, use `blox.onUnmount()` or effect's return function
+- For cleanup, use `blox.on({ unmount })` or effect's return function
 
 ---
 
@@ -819,7 +875,7 @@ const MyComponent = blox(() => {
 
 Executes a callback when all refs are ready (not null or undefined).
 
-**Must be called inside `blox.onMount()` or `effect()`** where refs are already set.
+**Must be called inside `blox.on({ mount })` or `effect()`** where refs are already set.
 
 Provides automatic null/undefined checking and type narrowing for multiple refs.
 
@@ -846,13 +902,15 @@ const MyComponent = blox(() => {
   const buttonRef = ref<HTMLButtonElement>();
   const divRef = ref<HTMLDivElement>();
 
-  blox.onMount(() => {
-    ref.ready([inputRef, buttonRef, divRef], (input, button, div) => {
-      // All types are non-nullable
-      input.focus();
-      button.disabled = false;
-      div.style.opacity = "1";
-    });
+  blox.on({
+    mount: () => {
+      ref.ready([inputRef, buttonRef, divRef], (input, button, div) => {
+        // All types are non-nullable
+        input.focus();
+        button.disabled = false;
+        div.style.opacity = "1";
+      });
+    }
   });
 
   return (
@@ -872,16 +930,18 @@ const MyComponent = blox(() => {
   const canvasRef = ref<HTMLCanvasElement>();
   const containerRef = ref<HTMLDivElement>();
 
-  blox.onMount(() => {
-    ref.ready([canvasRef, containerRef], (canvas, container) => {
-      // Set canvas size based on container
-      canvas.width = container.clientWidth;
-      canvas.height = container.clientHeight;
+  blox.on({
+    mount: () => {
+      ref.ready([canvasRef, containerRef], (canvas, container) => {
+        // Set canvas size based on container
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
 
-      // Start rendering
-      const ctx = canvas.getContext("2d");
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    });
+        // Start rendering
+        const ctx = canvas.getContext("2d");
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      });
+    }
   });
 
   return (
@@ -899,17 +959,19 @@ const MyComponent = blox(() => {
   const canvasRef = ref<HTMLCanvasElement>();
   const containerRef = ref<HTMLDivElement>();
 
-  blox.onMount(() => {
-    const dimensions = ref.ready([canvasRef, containerRef], (canvas, container) => ({
-      canvasWidth: canvas.width,
-      canvasHeight: canvas.height,
-      containerWidth: container.clientWidth,
-      containerHeight: container.clientHeight,
-    }));
-    // Type: { canvasWidth: number; ... } | undefined
+  blox.on({
+    mount: () => {
+      const dimensions = ref.ready([canvasRef, containerRef], (canvas, container) => ({
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height,
+        containerWidth: container.clientWidth,
+        containerHeight: container.clientHeight,
+      }));
+      // Type: { canvasWidth: number; ... } | undefined
 
-    if (dimensions) {
-      console.log("Setup complete:", dimensions);
+      if (dimensions) {
+        console.log("Setup complete:", dimensions);
+      }
     }
   });
 
@@ -928,12 +990,13 @@ const MyComponent = blox(() => {
   const videoRef = ref<HTMLVideoElement>();
   const audioRef = ref<HTMLAudioElement>();
 
-  blox.onMount(() => {
-    // Always get a result, even if refs aren't ready
-    const result = ref.ready(
-      [videoRef, audioRef],
-      (video, audio) => {
-        video.play();
+  blox.on({
+    mount: () => {
+      // Always get a result, even if refs aren't ready
+      const result = ref.ready(
+        [videoRef, audioRef],
+        (video, audio) => {
+          video.play();
         audio.play();
         return { success: true };
       },
@@ -965,7 +1028,7 @@ const MyComponent = blox(() => {
 - ✅ **No null checking**: Callback only runs when all refs are set
 - ✅ **Fallback support**: Optional `orElse` callback for default values
 - ✅ **Simple**: Just a synchronous check of all refs
-- ✅ **Flexible**: Use in `blox.onMount()` or `effect()`
+- ✅ **Flexible**: Use in `blox.on({ mount })` or `effect()`
 
 **When to Use:**
 
@@ -979,7 +1042,7 @@ const MyComponent = blox(() => {
 
 - Callback is NOT called if any ref is null/undefined
 - All refs must be ready for callback to execute
-- For cleanup, use `blox.onUnmount()` separately
+- For cleanup, use `blox.on({ unmount })` separately or in the same call
 
 ---
 
