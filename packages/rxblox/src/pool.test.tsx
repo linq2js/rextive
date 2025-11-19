@@ -360,6 +360,222 @@ describe("pool", () => {
         expect(callCount).toBe(2); // New instance created
       });
     });
+
+    describe("delayed disposal", () => {
+      it("should delay disposal by specified milliseconds", async () => {
+        vi.useFakeTimers();
+
+        let callCount = 0;
+        const createLogic = pool(
+          (id: number) => {
+            callCount++;
+            return { id, value: signal(id) };
+          },
+          { dispose: 1000 } // 1 second delay
+        );
+
+        const Component = blox(() => {
+          const logic = createLogic(1);
+          return <div>{logic.value()}</div>;
+        });
+
+        const { unmount } = render(<Component />);
+        expect(callCount).toBe(1);
+
+        // Unmount - should NOT trigger immediate GC
+        act(() => {
+          unmount();
+        });
+        await Promise.resolve();
+
+        // Still cached (within grace period)
+        createLogic(1);
+        expect(callCount).toBe(1); // Same instance
+
+        // Advance time past delay
+        act(() => {
+          vi.advanceTimersByTime(1100);
+        });
+        await Promise.resolve();
+
+        // Now should create new instance
+        createLogic(1);
+        expect(callCount).toBe(2); // New instance created
+
+        vi.useRealTimers();
+      });
+
+      it("should cancel disposal if refs go back up during grace period", async () => {
+        vi.useFakeTimers();
+
+        let callCount = 0;
+        const createLogic = pool(
+          (id: number) => {
+            callCount++;
+            return { id, value: signal(id) };
+          },
+          { dispose: 1000 }
+        );
+
+        const Component = blox(() => {
+          const logic = createLogic(1);
+          return <div>{logic.value()}</div>;
+        });
+
+        // Mount first component
+        const { unmount: unmount1 } = render(<Component />);
+        expect(callCount).toBe(1);
+
+        // Unmount - grace period starts
+        act(() => {
+          unmount1();
+        });
+
+        // Wait 500ms (halfway through grace period)
+        act(() => {
+          vi.advanceTimersByTime(500);
+        });
+
+        // Mount second component - should cancel GC timer
+        const { unmount: unmount2 } = render(<Component />);
+        expect(callCount).toBe(1); // Same instance reused
+
+        // Wait another 600ms (total 1100ms from first unmount)
+        act(() => {
+          vi.advanceTimersByTime(600);
+        });
+
+        // Should still be alive (timer was canceled)
+        act(() => {
+          unmount2();
+        });
+        await Promise.resolve();
+
+        act(() => {
+          vi.advanceTimersByTime(1100);
+        });
+        await Promise.resolve();
+
+        // Now it should be disposed - mount to trigger ref counting
+        const { unmount: unmount3 } = render(<Component />);
+        expect(callCount).toBe(2); // New instance
+
+        unmount3();
+        vi.useRealTimers();
+      });
+
+      it("should handle multiple rapid mount/unmount cycles", async () => {
+        vi.useFakeTimers();
+
+        let callCount = 0;
+        const createLogic = pool(
+          (id: number) => {
+            callCount++;
+            return { id, value: signal(id) };
+          },
+          { dispose: 500 }
+        );
+
+        const Component = blox(() => {
+          const logic = createLogic(1);
+          return <div>{logic.value()}</div>;
+        });
+
+        // Rapid mount/unmount cycles
+        for (let i = 0; i < 5; i++) {
+          const { unmount } = render(<Component />);
+          act(() => {
+            vi.advanceTimersByTime(100); // Only 100ms between cycles
+          });
+          act(() => {
+            unmount();
+          });
+        }
+        await Promise.resolve();
+
+        // Should still be same instance (all within grace period)
+        expect(callCount).toBe(1);
+
+        // Wait for full grace period
+        act(() => {
+          vi.advanceTimersByTime(600);
+        });
+        await Promise.resolve();
+
+        // Now should create new instance - mount to trigger ref counting
+        const { unmount: finalUnmount } = render(<Component />);
+        expect(callCount).toBe(2);
+
+        finalUnmount();
+        vi.useRealTimers();
+      });
+
+      it("should work with dispose: 0 (immediate)", async () => {
+        let callCount = 0;
+        const createLogic = pool(
+          (id: number) => {
+            callCount++;
+            return { id, value: signal(id) };
+          },
+          { dispose: 0 } // Explicit 0 = immediate
+        );
+
+        const Component = blox(() => {
+          const logic = createLogic(1);
+          return <div>{logic.value()}</div>;
+        });
+
+        const { unmount } = render(<Component />);
+        expect(callCount).toBe(1);
+
+        // Unmount should trigger immediate GC
+        act(() => {
+          unmount();
+        });
+        await Promise.resolve();
+
+        // New instance should be created
+        createLogic(1);
+        expect(callCount).toBe(2);
+      });
+
+      it("should not delay disposal when dispose is 'never'", async () => {
+        vi.useFakeTimers();
+
+        let callCount = 0;
+        const createLogic = pool(
+          (id: number) => {
+            callCount++;
+            return { id, value: signal(id) };
+          },
+          { dispose: "never" }
+        );
+
+        const Component = blox(() => {
+          const logic = createLogic(1);
+          return <div>{logic.value()}</div>;
+        });
+
+        const { unmount } = render(<Component />);
+        expect(callCount).toBe(1);
+
+        act(() => {
+          unmount();
+        });
+
+        // Wait a long time
+        act(() => {
+          vi.advanceTimersByTime(10000);
+        });
+        await Promise.resolve();
+
+        // Should still be same instance (never disposed)
+        createLogic(1);
+        expect(callCount).toBe(1);
+
+        vi.useRealTimers();
+      });
+    });
   });
 
   describe(".once() method", () => {

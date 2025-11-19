@@ -17,12 +17,29 @@ export type PoolOptions<K> = {
   /**
    * Disposal strategy for pooled instances.
    *
-   * - `"auto"`: Enable automatic reference counting and GC when refs reach 0
+   * - `"auto"`: Immediate disposal when refs reach 0
    * - `"never"`: Keep instance forever (never garbage collect)
+   * - `number`: Delay in milliseconds before disposal after refs reach 0
    *
-   * @default "auto" (automatic disposal is enabled by default)
+   * When a number is provided, the instance enters a "grace period" after the last
+   * reference is released. If accessed again during this period, it's reused immediately.
+   * If the grace period expires, the instance is disposed.
+   *
+   * @default "auto" (immediate disposal when refs reach 0)
+   *
+   * @example
+   * ```ts
+   * // Immediate disposal
+   * pool(fn, { dispose: "auto" })
+   *
+   * // 5 second grace period for back navigation
+   * pool(fn, { dispose: 5000 })
+   *
+   * // Never dispose
+   * pool(fn, { dispose: "never" })
+   * ```
    */
-  dispose?: "auto" | "never";
+  dispose?: "auto" | "never" | number;
 };
 
 /**
@@ -32,6 +49,7 @@ type InternalEntry<R extends object> = {
   result: R;
   refs: number;
   cleanup: VoidFunction;
+  gcTimer?: ReturnType<typeof setTimeout>;
 };
 
 /**
@@ -231,13 +249,33 @@ export function pool<K = void, R extends object = {}>(
 
   const cache = objectKeyedCollection<K, InternalEntry<R>>(equals);
 
+  // Determine disposal delay
+  const disposeDelay = typeof dispose === "number" ? dispose : 0;
+
   // Schedule GC for entry when refs reach 0
   const scheduleGC = (key: K, entry: InternalEntry<R>) => {
     if (entry.refs > 0) return;
 
-    // Immediate GC
-    if (cache.delete(key)) {
-      entry.cleanup();
+    // Clear any existing timer
+    if (entry.gcTimer !== undefined) {
+      clearTimeout(entry.gcTimer);
+      entry.gcTimer = undefined;
+    }
+
+    // Schedule disposal with delay
+    if (disposeDelay > 0) {
+      entry.gcTimer = setTimeout(() => {
+        entry.gcTimer = undefined;
+        // Double-check refs haven't changed during grace period
+        if (entry.refs === 0 && cache.delete(key)) {
+          entry.cleanup();
+        }
+      }, disposeDelay);
+    } else {
+      // Immediate GC
+      if (cache.delete(key)) {
+        entry.cleanup();
+      }
     }
   };
 
@@ -257,6 +295,12 @@ export function pool<K = void, R extends object = {}>(
           contextType === "blox" || contextType === "effect";
 
         if (isDisposableContext) {
+          // Cancel any pending GC timer when refs go back up
+          if (existingEntry.gcTimer !== undefined) {
+            clearTimeout(existingEntry.gcTimer);
+            existingEntry.gcTimer = undefined;
+          }
+
           existingEntry.refs++;
 
           // Register decrement on cleanup
