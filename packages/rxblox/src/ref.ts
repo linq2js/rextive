@@ -1,5 +1,3 @@
-import { getContextType } from "./dispatcher";
-
 /**
  * A reactive ref that can hold any value with a `ready()` helper.
  *
@@ -15,7 +13,7 @@ export interface BloxRef<T> {
    * Executes a callback when the ref is ready (not null or undefined).
    *
    * Provides automatic null/undefined checking and type narrowing.
-   * **Must be called inside `blox.onMount()` or `effect()`** where the ref is already set.
+   * **Must be called inside `blox.on({ mount })` or `effect()`** where the ref is already set.
    *
    * @param callback - Function to execute when the value is ready.
    *                   Receives the non-nullable value as argument.
@@ -28,11 +26,13 @@ export interface BloxRef<T> {
    * ```tsx
    * const inputRef = ref<HTMLInputElement>();
    *
-   * blox.onMount(() => {
-   *   inputRef.ready((input) => {
-   *     // Type: HTMLInputElement (not null/undefined)
-   *     input.focus();
-   *   });
+   * blox.on({
+   *   mount: () => {
+   *     inputRef.ready((input) => {
+   *       // Type: HTMLInputElement (not null/undefined)
+   *       input.focus();
+   *     });
+   *   }
    * });
    *
    * return <input ref={inputRef} />;
@@ -43,10 +43,12 @@ export interface BloxRef<T> {
    * // With return value
    * const divRef = ref<HTMLDivElement>();
    *
-   * blox.onMount(() => {
-   *   const width = divRef.ready((div) => div.clientWidth);
-   *   // Type: number | undefined
-   *   console.log(width);
+   * blox.on({
+   *   mount: () => {
+   *     const width = divRef.ready((div) => div.clientWidth);
+   *     // Type: number | undefined
+   *     console.log(width);
+   *   }
    * });
    * ```
    *
@@ -55,13 +57,15 @@ export interface BloxRef<T> {
    * // With orElse fallback
    * const canvasRef = ref<HTMLCanvasElement>();
    *
-   * blox.onMount(() => {
-   *   const width = canvasRef.ready(
-   *     (canvas) => canvas.width,
-   *     () => 0  // Fallback value
-   *   );
-   *   // Type: number (always defined)
-   *   console.log("Canvas width:", width);
+   * blox.on({
+   *   mount: () => {
+   *     const width = canvasRef.ready(
+   *       (canvas) => canvas.width,
+   *       () => 0  // Fallback value
+   *     );
+   *     // Type: number (always defined)
+   *     console.log("Canvas width:", width);
+   *   }
    * });
    * ```
    */
@@ -89,10 +93,12 @@ export interface BloxRef<T> {
  * const MyComponent = blox(() => {
  *   const inputRef = ref<HTMLInputElement>();
  *
- *   blox.onMount(() => {
- *     inputRef.ready((input) => {
- *       input.focus(); // Type-safe, no null checking needed
- *     });
+ *   blox.on({
+ *     mount: () => {
+ *       inputRef.ready((input) => {
+ *         input.focus(); // Type-safe, no null checking needed
+ *       });
+ *     }
  *   });
  *
  *   return <input ref={inputRef} />;
@@ -111,14 +117,16 @@ export interface BloxRef<T> {
  * const ChatComponent = blox(() => {
  *   const wsRef = ref<WebSocketClient>();
  *
- *   blox.onMount(() => {
- *     const ws = new WebSocket('ws://localhost:8080');
- *     wsRef.current = {
- *       send: (data) => ws.send(data),
- *       close: () => ws.close()
- *     };
+ *   blox.on({
+ *     mount: () => {
+ *       const ws = new WebSocket('ws://localhost:8080');
+ *       wsRef.current = {
+ *         send: (data) => ws.send(data),
+ *         close: () => ws.close()
+ *       };
  *
- *     return () => wsRef.current?.close();
+ *       return () => wsRef.current?.close();
+ *     }
  *   });
  *
  *   const sendMessage = (msg: string) => {
@@ -137,11 +145,13 @@ export interface BloxRef<T> {
  *   const inputRef = ref<HTMLInputElement>();
  *   const buttonRef = ref<HTMLButtonElement>();
  *
- *   blox.onMount(() => {
- *     ref.ready([inputRef, buttonRef], (input, button) => {
- *       input.focus();
- *       button.disabled = false;
- *     });
+ *   blox.on({
+ *     mount: () => {
+ *       ref.ready([inputRef, buttonRef], (input, button) => {
+ *         input.focus();
+ *         button.disabled = false;
+ *       });
+ *     }
  *   });
  *
  *   return (
@@ -162,7 +172,7 @@ export function ref<T>(): BloxRef<T> {
       orElse?: () => E
     ): R | E {
       // Simply check if ref is ready and call callback
-      // No lifecycle registration - caller should use effect() or blox.onMount()
+      // No lifecycle registration - caller should use effect() or blox.on({ mount })
       if (r.current != null) {
         return callback(r.current as Exclude<T, null | undefined>);
       }
@@ -190,7 +200,7 @@ type ExtractRefTypes<T extends readonly BloxRef<any>[]> = {
  *
  * Provides automatic null/undefined checking and type narrowing for multiple refs.
  * Works with any ref type - DOM elements, objects, or any other values.
- * **Must be called inside `blox.onMount()` or `effect()`** where refs are already set.
+ * **Must be called inside `blox.on({ mount })` or `effect()`** where refs are already set.
  *
  * Exported as `ref.ready()`.
  *
@@ -213,13 +223,15 @@ type ExtractRefTypes<T extends readonly BloxRef<any>[]> = {
  *   const buttonRef = ref<HTMLButtonElement>();
  *   const divRef = ref<HTMLDivElement>();
  *
- *   blox.onMount(() => {
- *     ref.ready([inputRef, buttonRef, divRef], (input, button, div) => {
- *       // All types are non-nullable
- *       input.focus();
- *       button.disabled = false;
- *       div.style.opacity = "1";
- *     });
+ *   blox.on({
+ *     mount: () => {
+ *       ref.ready([inputRef, buttonRef, divRef], (input, button, div) => {
+ *         // All types are non-nullable
+ *         input.focus();
+ *         button.disabled = false;
+ *         div.style.opacity = "1";
+ *       });
+ *     }
  *   });
  *
  *   return (
@@ -250,16 +262,18 @@ type ExtractRefTypes<T extends readonly BloxRef<any>[]> = {
  *   const audioRef = ref<AudioPlayer>();
  *   const videoRef = ref<VideoPlayer>();
  *
- *   blox.onMount(() => {
- *     // Initialize refs
- *     audioRef.current = createAudioPlayer();
- *     videoRef.current = createVideoPlayer();
+ *   blox.on({
+ *     mount: () => {
+ *       // Initialize refs
+ *       audioRef.current = createAudioPlayer();
+ *       videoRef.current = createVideoPlayer();
  *
- *     // Use when both are ready
- *     ref.ready([audioRef, videoRef], (audio, video) => {
- *       audio.play();
- *       video.play();
- *     });
+ *       // Use when both are ready
+ *       ref.ready([audioRef, videoRef], (audio, video) => {
+ *         audio.play();
+ *         video.play();
+ *       });
+ *     }
  *   });
  *
  *   return <div>Media Content</div>;
@@ -274,14 +288,16 @@ type ExtractRefTypes<T extends readonly BloxRef<any>[]> = {
  *   const canvas = ref<HTMLCanvasElement>();
  *   const container = ref<HTMLDivElement>();
  *
- *   blox.onMount(() => {
- *     const dimensions = ref.ready([canvas, container], (canvas, container) => ({
- *       canvasWidth: canvas.width,
- *       containerWidth: container.clientWidth,
- *     }));
- *     // Type: { canvasWidth: number; containerWidth: number } | undefined
- *     if (dimensions) {
- *       console.log(dimensions);
+ *   blox.on({
+ *     mount: () => {
+ *       const dimensions = ref.ready([canvas, container], (canvas, container) => ({
+ *         canvasWidth: canvas.width,
+ *         containerWidth: container.clientWidth,
+ *       }));
+ *       // Type: { canvasWidth: number; containerWidth: number } | undefined
+ *       if (dimensions) {
+ *         console.log(dimensions);
+ *       }
  *     }
  *   });
  *
@@ -304,7 +320,7 @@ export function ready<
   orElse?: () => E
 ): R | E {
   // Simply check if all refs are ready and call callback
-  // No lifecycle registration - caller should use effect() or blox.onMount()
+  // No lifecycle registration - caller should use effect() or blox.on({ mount })
   const allReady = refs.every((ref) => ref.current != null);
   if (allReady) {
     const values = refs.map((ref) => ref.current) as ExtractRefTypes<T>;

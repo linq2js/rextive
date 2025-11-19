@@ -33,11 +33,13 @@ export type EffectContext = {
  * **If you need effects to run on mount instead:**
  * ```ts
  * const MyComponent = blox(() => {
- *   blox.onMount(() => {
- *     effect(() => {
- *       // This effect runs on mount and cleans up on unmount
- *       console.log('Mounted');
- *     });
+ *   blox.on({
+ *     mount: () => {
+ *       effect(() => {
+ *         // This effect runs on mount and cleans up on unmount
+ *         console.log('Mounted');
+ *       });
+ *     }
  *   });
  *   return <div>Content</div>;
  * });

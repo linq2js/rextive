@@ -979,6 +979,8 @@ const MyComponent = blox(() => {
 
 📚 **[Complete Documentation](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/README.md)** - Everything in detail
 
+🤖 **[AI Assistant Guide](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/AI_ASSISTANT_GUIDE.md)** - Quick reference for AI assistants (Claude, GPT, etc.)
+
 ### For React Developers
 
 - **[React-Compatible Hooks](https://github.com/linq2js/rxblox/blob/main/packages/rxblox/docs/react-compatible-hooks.md)** - Use rxblox with familiar React patterns

@@ -20,7 +20,7 @@ export type PoolOptions<K> = {
    * - `"auto"`: Enable automatic reference counting and GC when refs reach 0
    * - `"never"`: Keep instance forever (never garbage collect)
    *
-   * @default "never" (instances are permanent by default)
+   * @default "auto" (automatic disposal is enabled by default)
    */
   dispose?: "auto" | "never";
 };
@@ -83,19 +83,19 @@ export type PoolFunction<K, R extends object> = {
  * ## Disposal Strategy
  *
  * **By default (`dispose` not specified):**
- * - Instances are permanent and never garbage collected
- * - This is the safest default - no surprise cleanups
- * - Pooled instances persist until manually cleared or app closes
- *
- * **With `dispose: "auto"`:**
- * - Automatic reference counting is enabled
+ * - Automatic reference counting is enabled (`dispose: "auto"`)
  * - In **blox/effect scope**: Instances are garbage collected when all
  *   components/effects stop using them (refs reach 0)
  * - In **global scope**: Instance created with refs=0, GC'd when all refs are released
  *
- * **With `dispose: "never"`:**
- * - Explicitly keep instances forever (same as default, but explicit)
+ * **With `dispose: "auto"`:**
+ * - Explicitly enable automatic reference counting (same as default)
  * - Useful when you want to be clear about the intention
+ *
+ * **With `dispose: "never"`:**
+ * - Keep instances forever (never garbage collect)
+ * - Pooled instances persist until manually cleared or app closes
+ * - Useful for truly global singletons that should never be cleaned up
  *
  * @param fn - Factory function to create instances (must be synchronous, must return object)
  * @param options - Configuration options
@@ -126,13 +126,14 @@ export type PoolFunction<K, R extends object> = {
  * })
  * ```
  *
- * @example Global scope (never GC by default)
+ * @example Global scope (auto-dispose by default)
  * ```ts
  * const createConfig = pool(() => {
  *   return { apiUrl: signal('https://api.example.com') }
  * })
  *
- * // Created in global scope = permanent instance (never GC)
+ * // Created in global scope with auto-dispose (refs = 0)
+ * // Will be GC'd when all refs are released
  * const globalConfig = createConfig()
  * ```
  *
@@ -152,16 +153,16 @@ export type PoolFunction<K, R extends object> = {
  * unmount() // Instance is NOT garbage collected
  * ```
  *
- * @example Force auto-disposal in global scope
+ * @example Default auto-disposal behavior
  * ```ts
  * const createAutoDispose = pool((id: number) => {
  *   return { value: signal(id) }
- * }, { dispose: "auto" })
+ * })
  *
- * // Even in global scope, you can force ref counting
- * const logic = createAutoDispose(1) // refs = 0, but no cleanup yet
+ * // Auto-dispose is the default behavior
+ * const logic = createAutoDispose(1) // refs = 0 in global scope
  *
- * // Use in component to start tracking
+ * // Use in component to increment refs
  * const Component = blox(() => {
  *   const logic = createAutoDispose(1) // refs++
  *   return <div>{logic.value()}</div>
@@ -282,14 +283,14 @@ export function pool<K = void, R extends object = {}>(
     let shouldAutoDispose = false;
     let initialRefs = 0;
 
-    if (dispose === "auto") {
-      // Explicit "auto" - enable ref counting and auto-disposal
-      shouldAutoDispose = true;
-      initialRefs = isDisposableContext ? 1 : 0;
-    } else {
-      // Default or explicit "never" - permanent instance
+    if (dispose === "never") {
+      // Explicit "never" - permanent instance
       shouldAutoDispose = false;
       initialRefs = -1; // Never GC
+    } else {
+      // Default or explicit "auto" - enable ref counting and auto-disposal
+      shouldAutoDispose = true;
+      initialRefs = isDisposableContext ? 1 : 0;
     }
 
     // Create placeholder entry (will update result later)

@@ -334,7 +334,7 @@ describe("pool", () => {
     });
 
     describe("default behavior", () => {
-      it("should use 'never' by default (permanent instances)", async () => {
+      it("should use 'auto' by default (auto-dispose)", async () => {
         let callCount = 0;
         const createLogic = pool((id: number) => {
           callCount++;
@@ -349,15 +349,15 @@ describe("pool", () => {
         const { unmount } = render(<Component />);
         expect(callCount).toBe(1);
 
-        // Unmount should NOT trigger GC (default: never)
+        // Unmount should trigger GC (default: auto)
         act(() => {
           unmount();
         });
         await Promise.resolve(); // Wait for cleanup
 
-        // Same instance should be returned (not GC'd)
+        // New instance should be created (old one was GC'd)
         createLogic(1);
-        expect(callCount).toBe(1); // Still 1 - same instance
+        expect(callCount).toBe(2); // New instance created
       });
     });
   });

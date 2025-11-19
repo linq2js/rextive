@@ -2950,7 +2950,7 @@ type PoolOptions<K> = {
   // Disposal strategy for pooled instances
   // - "auto": Enable automatic reference counting and GC when refs reach 0
   // - "never": Keep instance forever (never garbage collect)
-  // Default: "never" (instances are permanent by default)
+  // Default: "auto" (automatic disposal is enabled by default)
   dispose?: "auto" | "never";
 };
 ```
@@ -3077,21 +3077,21 @@ const task3 = createTask.once(2); // NEW instance, not task2
 **Default behavior (no `dispose` option):**
 
 ```tsx
-// By default, instances are permanent and never GC'd
+// By default, instances use auto-disposal (dispose: "auto")
 const createConfig = pool((id: number) => ({ value: signal(id) }));
 
-// Global scope - permanent
+// Global scope - refs = 0, will be GC'd when all refs released
 const globalConfig = createConfig(1);
 
-// Inside blox - still permanent (default: never GC)
+// Inside blox - auto-tracking enabled (default: auto-dispose)
 const Component = blox(() => {
-  const config = createConfig(1); // Same instance as globalConfig
+  const config = createConfig(1); // refs++, same instance as globalConfig
   return <div>{rx(() => config.value())}</div>;
-  // NOT disposed when component unmounts (default behavior)
+  // Automatically disposed when all components unmount (default behavior)
 });
 ```
 
-**Explicit `dispose: "never"` (same as default, but clear intent):**
+**Explicit `dispose: "never"` (keep instance forever):**
 
 ```tsx
 const createPermanent = pool(
@@ -3109,12 +3109,12 @@ const { unmount } = render(<Component />);
 unmount(); // Instance is NOT garbage collected
 ```
 
-**Enable `dispose: "auto"` (automatic reference counting):**
+**Explicit `dispose: "auto"` (same as default, but clear intent):**
 
 ```tsx
 const createAutoDispose = pool(
   (id: number) => ({ value: signal(id) }),
-  { dispose: "auto" }  // Enable auto-disposal
+  { dispose: "auto" }  // Explicit: auto-disposal (this is the default)
 );
 
 // In blox/effect scope - auto-tracking starts

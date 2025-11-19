@@ -9,6 +9,10 @@ Complete documentation for rxblox - Fine-grained reactive state management for R
 
 ## 📚 Documentation Index
 
+### 🤖 For AI Assistants
+
+**[AI Assistant Guide](./AI_ASSISTANT_GUIDE.md)** - Quick reference optimized for AI assistants helping with rxblox code. Contains concise API overview, patterns, constraints, and pointers to detailed docs.
+
 ### Getting Started
 
 Start here if you're new to rxblox:
@@ -27,6 +31,7 @@ Start here if you're new to rxblox:
 Master the fundamentals of rxblox:
 
 - **[Core Concepts](./core-concepts.md)** - Essential building blocks
+
   - Signals - Reactive state primitives
   - Computed Signals - Derived state with automatic tracking
   - Effects - Side effects with auto-tracking
@@ -39,6 +44,7 @@ Master the fundamentals of rxblox:
   - Actions - Stateful, trackable functions
 
 - **[API Reference](./api-reference.md)** - Complete API documentation
+
   - `signal()` - Create reactive state
   - `signal.async()` - Manage async operations
   - `signal.snapshot()` - Extract signal values
@@ -53,6 +59,7 @@ Master the fundamentals of rxblox:
   - `loadable()` / `isLoadable()` - Loadable state utilities
 
 - **[Context and Scope](./context-and-scope.md)** - Where can you use each API?
+
   - Context types (`blox`, `effect`, `signal`, `rx`, etc.)
   - API context requirements reference tables
   - Context hierarchy and valid nesting
@@ -60,6 +67,7 @@ Master the fundamentals of rxblox:
   - Quick reference matrix
 
 - **[Lifecycle & Cleanup](./lifecycle-cleanup.md)** - Memory management and cleanup
+
   - Automatic cleanup in `blox` components
   - Effect cleanup and lifecycle
   - Signal lifecycle and garbage collection
@@ -67,6 +75,7 @@ Master the fundamentals of rxblox:
   - Cleanup checklist
 
 - **[Performance & Memory](./performance.md)** - Optimization guide
+
   - Subscription overhead
   - Dependency tracking characteristics
   - Update batching
@@ -87,6 +96,7 @@ Master the fundamentals of rxblox:
 Learn patterns and best practices:
 
 - **[Patterns & Best Practices](./patterns.md)** - Real-world patterns
+
   - Common Patterns
     - Global state management
     - Form state handling
@@ -160,6 +170,7 @@ Help make rxblox better:
 ### By Experience Level
 
 **Beginner** (New to rxblox)
+
 1. [Why rxblox?](../README.md#why-rxblox)
 2. [Quick Start](../README.md#quick-start)
 3. Choose your path:
@@ -168,12 +179,14 @@ Help make rxblox better:
 4. [Common Patterns](./patterns.md#common-patterns)
 
 **Intermediate** (Building apps)
+
 1. [Organizing Signals](./patterns.md#organizing-signals)
 2. [Async Signals](./core-concepts.md#7-async-signals---signalasync)
 3. [Lifecycle & Cleanup](./lifecycle-cleanup.md)
 4. [API Reference](./api-reference.md) - Full reference
 
 **Advanced** (Optimizing & scaling)
+
 1. [Performance & Memory](./performance.md)
 2. [Architecture](./ARCHITECTURE.md)
 3. [Composable Logic](./patterns.md#composable-logic)
@@ -276,6 +289,7 @@ Each documentation file follows a consistent structure:
 <summary><strong>Patterns & Best Practices</strong> (Click to expand)</summary>
 
 **Common Patterns:**
+
 - Global State
 - Form State
 - Async Data Loading
@@ -283,6 +297,7 @@ Each documentation file follows a consistent structure:
 - Optimistic Updates
 
 **Organizing Signals:**
+
 - Global Signals (Singleton State)
 - Local Signals (Component State)
 - Signal Factories (Reusable Logic)
@@ -292,6 +307,7 @@ Each documentation file follows a consistent structure:
   - Pattern 4: Store Factory
 
 **Composable Logic:**
+
 - Naming Conventions
 - Basic Example
 - Blox-only Logic with Cleanup
@@ -305,4 +321,3 @@ Each documentation file follows a consistent structure:
 Made with ❤️ for the React community
 
 **[Back to npm package](../README.md)** | **[View on GitHub](https://github.com/linq2js/rxblox)**
-
