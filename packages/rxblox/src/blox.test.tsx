@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import React, { act, createRef } from "react";
-import { blox, Ref } from "./index";
+import { blox, Expose } from "./index";
 import { signal } from "./signal";
 import { effect } from "./effect";
 import { rx } from "./rx";
@@ -121,7 +121,7 @@ describe("blox", () => {
 
   describe("handle functionality", () => {
     it("should provide a handle object", () => {
-      let receivedHandle: Ref<number> | undefined;
+      let receivedHandle: Expose<number> | undefined;
       const Component = blox<{}, number>((_props, handle) => {
         receivedHandle = handle;
         return <div>Test</div>;

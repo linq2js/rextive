@@ -1,15 +1,15 @@
 import { getContextType } from "./dispatcher";
 
 /**
- * A reactive ref for DOM elements with a `ready()` helper.
+ * A reactive ref that can hold any value with a `ready()` helper.
  *
- * @template T - The type of DOM element
+ * @template T - The type of value to store
  */
 export interface BloxRef<T> {
   /**
-   * The current DOM element reference, or `null` if not yet mounted.
+   * The current value, or `null` if not yet set.
    */
-  readonly current: T | null;
+  current: T | null;
 
   /**
    * Executes a callback when the ref is ready (not null or undefined).
@@ -26,7 +26,7 @@ export interface BloxRef<T> {
    *
    * @example
    * ```tsx
-   * const inputRef = blox.ref<HTMLInputElement>();
+   * const inputRef = ref<HTMLInputElement>();
    *
    * blox.onMount(() => {
    *   inputRef.ready((input) => {
@@ -41,7 +41,7 @@ export interface BloxRef<T> {
    * @example
    * ```tsx
    * // With return value
-   * const divRef = blox.ref<HTMLDivElement>();
+   * const divRef = ref<HTMLDivElement>();
    *
    * blox.onMount(() => {
    *   const width = divRef.ready((div) => div.clientWidth);
@@ -53,7 +53,7 @@ export interface BloxRef<T> {
    * @example
    * ```tsx
    * // With orElse fallback
-   * const canvasRef = blox.ref<HTMLCanvasElement>();
+   * const canvasRef = ref<HTMLCanvasElement>();
    *
    * blox.onMount(() => {
    *   const width = canvasRef.ready(
@@ -72,19 +72,22 @@ export interface BloxRef<T> {
 }
 
 /**
- * Creates a reactive ref for DOM elements.
+ * Creates a reactive ref that can hold any value.
  *
- * Returns a ref object with a `ready()` method for type-safe element access.
+ * Returns a ref object with a `ready()` method for type-safe value access.
+ * Commonly used for DOM elements, but can store any value.
  *
- * **Must be called inside a `blox` component.** Exported as `blox.ref()`.
+ * **Must be called inside a `blox` component.**
  *
- * @template T - The type of DOM element
+ * @template T - The type of value to store
  * @returns A BloxRef object with `.current` and `.ready()` method
  *
- * @example
+ * @example DOM element usage
  * ```tsx
+ * import { blox, ref } from "rxblox";
+ *
  * const MyComponent = blox(() => {
- *   const inputRef = blox.ref<HTMLInputElement>();
+ *   const inputRef = ref<HTMLInputElement>();
  *
  *   blox.onMount(() => {
  *     inputRef.ready((input) => {
@@ -96,15 +99,46 @@ export interface BloxRef<T> {
  * });
  * ```
  *
- * @example
+ * @example Storing non-DOM values
  * ```tsx
- * // Multiple refs with blox.ready()
- * const MyComponent = blox(() => {
- *   const inputRef = blox.ref<HTMLInputElement>();
- *   const buttonRef = blox.ref<HTMLButtonElement>();
+ * import { blox, ref } from "rxblox";
+ *
+ * interface WebSocketClient {
+ *   send: (data: string) => void;
+ *   close: () => void;
+ * }
+ *
+ * const ChatComponent = blox(() => {
+ *   const wsRef = ref<WebSocketClient>();
  *
  *   blox.onMount(() => {
- *     blox.ready([inputRef, buttonRef], (input, button) => {
+ *     const ws = new WebSocket('ws://localhost:8080');
+ *     wsRef.current = {
+ *       send: (data) => ws.send(data),
+ *       close: () => ws.close()
+ *     };
+ *
+ *     return () => wsRef.current?.close();
+ *   });
+ *
+ *   const sendMessage = (msg: string) => {
+ *     wsRef.ready((ws) => ws.send(msg));
+ *   };
+ *
+ *   return <button onClick={() => sendMessage('Hello')}>Send</button>;
+ * });
+ * ```
+ *
+ * @example Multiple refs with ref.ready()
+ * ```tsx
+ * import { blox, ref } from "rxblox";
+ *
+ * const MyComponent = blox(() => {
+ *   const inputRef = ref<HTMLInputElement>();
+ *   const buttonRef = ref<HTMLButtonElement>();
+ *
+ *   blox.onMount(() => {
+ *     ref.ready([inputRef, buttonRef], (input, button) => {
  *       input.focus();
  *       button.disabled = false;
  *     });
@@ -124,13 +158,13 @@ export function ref<T>(): BloxRef<T> {
   const contextType = getContextType();
   if (contextType !== "blox") {
     throw new Error(
-      "blox.ref() must be called inside a blox component. " +
-        "It relies on blox.onRender() which is only available in blox components."
+      "ref() must be called inside a blox component. " +
+        "Refs are managed within the blox component lifecycle."
     );
   }
 
   // Create a plain ref object (no hooks needed)
-  const bloxRef: any = {
+  const r: any = {
     current: null as T | null,
     ready<R, E = undefined>(
       callback: (value: Exclude<T, null | undefined>) => R,
@@ -138,19 +172,19 @@ export function ref<T>(): BloxRef<T> {
     ): R | E {
       // Simply check if ref is ready and call callback
       // No lifecycle registration - caller should use effect() or blox.onMount()
-      if (bloxRef.current != null) {
-        return callback(bloxRef.current as Exclude<T, null | undefined>);
+      if (r.current != null) {
+        return callback(r.current as Exclude<T, null | undefined>);
       }
 
       return orElse?.() as E;
     },
   };
 
-  return bloxRef as BloxRef<T>;
+  return r as BloxRef<T>;
 }
 
 /**
- * Extract element types from an array of BloxRef objects.
+ * Extract value types from an array of BloxRef objects.
  *
  * @template T - Tuple of BloxRef types
  */
@@ -164,9 +198,10 @@ type ExtractRefTypes<T extends readonly BloxRef<any>[]> = {
  * Executes a callback when all refs are ready (not null or undefined).
  *
  * Provides automatic null/undefined checking and type narrowing for multiple refs.
+ * Works with any ref type - DOM elements, objects, or any other values.
  * **Must be called inside `blox.onMount()` or `effect()`** where refs are already set.
  *
- * Exported as `blox.ready()`.
+ * Exported as `ref.ready()`.
  *
  * @template T - Tuple of BloxRef types
  * @template R - Return type of callback
@@ -178,15 +213,17 @@ type ExtractRefTypes<T extends readonly BloxRef<any>[]> = {
  * @param orElse - Optional fallback function to call when any ref is null/undefined.
  * @returns The callback's return value, or `orElse()` result (or `undefined` if `orElse` not provided).
  *
- * @example
+ * @example DOM elements
  * ```tsx
+ * import { blox, ref } from "rxblox";
+ *
  * const MyComponent = blox(() => {
- *   const inputRef = blox.ref<HTMLInputElement>();
- *   const buttonRef = blox.ref<HTMLButtonElement>();
- *   const divRef = blox.ref<HTMLDivElement>();
+ *   const inputRef = ref<HTMLInputElement>();
+ *   const buttonRef = ref<HTMLButtonElement>();
+ *   const divRef = ref<HTMLDivElement>();
  *
  *   blox.onMount(() => {
- *     blox.ready([inputRef, buttonRef, divRef], (input, button, div) => {
+ *     ref.ready([inputRef, buttonRef, divRef], (input, button, div) => {
  *       // All types are non-nullable
  *       input.focus();
  *       button.disabled = false;
@@ -204,18 +241,65 @@ type ExtractRefTypes<T extends readonly BloxRef<any>[]> = {
  * });
  * ```
  *
- * @example
+ * @example Non-DOM values
  * ```tsx
- * // With return value
- * blox.onMount(() => {
- *   const dimensions = blox.ready([canvas, container], (canvas, container) => ({
- *     canvasWidth: canvas.width,
- *     containerWidth: container.clientWidth,
- *   }));
- *   // Type: { canvasWidth: number; containerWidth: number } | undefined
- *   if (dimensions) {
- *     console.log(dimensions);
- *   }
+ * import { blox, ref } from "rxblox";
+ *
+ * interface AudioPlayer {
+ *   play: () => void;
+ *   pause: () => void;
+ * }
+ *
+ * interface VideoPlayer {
+ *   play: () => void;
+ *   stop: () => void;
+ * }
+ *
+ * const MediaComponent = blox(() => {
+ *   const audioRef = ref<AudioPlayer>();
+ *   const videoRef = ref<VideoPlayer>();
+ *
+ *   blox.onMount(() => {
+ *     // Initialize refs
+ *     audioRef.current = createAudioPlayer();
+ *     videoRef.current = createVideoPlayer();
+ *
+ *     // Use when both are ready
+ *     ref.ready([audioRef, videoRef], (audio, video) => {
+ *       audio.play();
+ *       video.play();
+ *     });
+ *   });
+ *
+ *   return <div>Media Content</div>;
+ * });
+ * ```
+ *
+ * @example With return value
+ * ```tsx
+ * import { blox, ref } from "rxblox";
+ *
+ * const MyComponent = blox(() => {
+ *   const canvas = ref<HTMLCanvasElement>();
+ *   const container = ref<HTMLDivElement>();
+ *
+ *   blox.onMount(() => {
+ *     const dimensions = ref.ready([canvas, container], (canvas, container) => ({
+ *       canvasWidth: canvas.width,
+ *       containerWidth: container.clientWidth,
+ *     }));
+ *     // Type: { canvasWidth: number; containerWidth: number } | undefined
+ *     if (dimensions) {
+ *       console.log(dimensions);
+ *     }
+ *   });
+ *
+ *   return (
+ *     <>
+ *       <canvas ref={canvas} />
+ *       <div ref={container}>Container</div>
+ *     </>
+ *   );
  * });
  * ```
  */

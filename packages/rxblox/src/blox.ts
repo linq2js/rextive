@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Ref, MutableSignal } from "./types";
+import { Expose, MutableSignal } from "./types";
 import { signal } from "./signal";
 import { providerToken, useProviderResolver } from "./provider";
 import { useRerender } from "./useRerender";
@@ -40,7 +40,7 @@ import { createProxy } from "./utils/proxy/createProxy";
  * with their own lifecycle and effect management. Each prop becomes a signal,
  * allowing effects to track individual prop changes rather than the entire props object.
  *
- * @param builder - Function that receives props (as a proxy) and a ref object.
+ * @param builder - Function that receives props (as a proxy) and an expose function.
  *                The function can create effects that will be automatically managed.
  * @returns A memoized React component with forwardRef support
  *
@@ -54,11 +54,11 @@ import { createProxy } from "./utils/proxy/createProxy";
  *   return <div>{props.count}</div>;
  * });
  *
- * // Component with handle for imperative access
- * const Timer = blox<{}, { start: () => void; stop: () => void }>((_props, handle) => {
+ * // Component with expose for imperative access
+ * const Timer = blox<{}, { start: () => void; stop: () => void }>((_props, expose) => {
  *   let interval: number | undefined;
  *
- *   handle({
+ *   expose({
  *     start: () => {
  *       interval = setInterval(() => console.log('tick'), 1000);
  *     },
@@ -80,10 +80,10 @@ export function blox<TProps extends object>(
   builder: (props: PropsWithoutRef<TProps>) => ReactNode
 ): FC<PropsWithoutRef<TProps>>;
 export function blox<TProps extends object, TRef>(
-  builder: (props: PropsWithoutRef<TProps>, ref: Ref<TRef>) => ReactNode
+  builder: (props: PropsWithoutRef<TProps>, expose: Expose<TRef>) => ReactNode
 ): FC<PropsWithoutRef<TProps> & { ref?: ForwardedRef<TRef | undefined> }>;
 export function blox<TProps extends object, TRef>(
-  builder: (props: PropsWithoutRef<TProps>, ref: Ref<TRef>) => ReactNode
+  builder: (props: PropsWithoutRef<TProps>, expose: Expose<TRef>) => ReactNode
 ): FC<PropsWithoutRef<TProps> & { ref?: ForwardedRef<TRef | undefined> }> {
   /**
    * Internal component that manages reactive props and effects.
@@ -121,22 +121,22 @@ export function blox<TProps extends object, TRef>(
     useUnmount(eventDispatcher.emitUnmount);
 
     /**
-     * State used to trigger re-renders when ref.current changes.
+     * State used to trigger re-renders when expose.current changes.
      * The state value itself is not used, only the setter to trigger updates.
      */
     const rerender = useRerender();
 
     /**
-     * Ref object that provides imperative access to component state.
+     * Expose object that provides imperative access to component state.
      *
-     * The ref:
+     * The expose object:
      * - Has a `current` property that can be set/get
      * - Automatically triggers a re-render when `current` is set to a new value
      * - Is exposed via forwardedRef using useImperativeHandle
      *
      * Created once per component instance and reused across renders.
      */
-    const [ref] = useState(() => {
+    const [expose] = useState(() => {
       let value: TRef;
 
       return {
@@ -308,7 +308,7 @@ export function blox<TProps extends object, TRef>(
               trackingToken(),
             ],
             () => {
-              return builder(propsProxy as PropsWithoutRef<TProps>, ref.set);
+              return builder(propsProxy as PropsWithoutRef<TProps>, expose.set);
             },
             { contextType: "blox" }
           ),
@@ -342,10 +342,10 @@ export function blox<TProps extends object, TRef>(
     }, [rerender, eventDispatcher]);
 
     /**
-     * Exposes the ref.current value via the forwarded ref.
-     * Updates whenever ref.current changes.
+     * Exposes the expose.current value via the forwarded ref.
+     * Updates whenever expose.current changes.
      */
-    useImperativeHandle(props.forwardedRef, ref.get, [ref.get()]);
+    useImperativeHandle(props.forwardedRef, expose.get, [expose.get()]);
 
     eventDispatcher.emitRender();
 

@@ -230,7 +230,7 @@ function App() {
 A `blox` component has two distinct parts with different execution behavior:
 
 ```tsx
-const Counter = blox<Props>((props, ref) => {
+const Counter = blox<Props>((props, expose) => {
   // 🔵 DEFINITION PHASE: Runs once per mount (twice in Strict Mode)
   // - Create signals
   // - Set up effects

@@ -19,10 +19,12 @@ export const blox = Object.assign(createBlox, {
   onMount,
   onUnmount,
   onRender,
-  ref: createRef,
-  ready: readyMultiple,
   slot,
   fill,
+});
+
+export const ref = Object.assign(createRef, {
+  ready: readyMultiple,
 });
 
 export const signal = Object.assign(createSignal, {

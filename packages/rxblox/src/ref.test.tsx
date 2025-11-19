@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
-import { blox } from "./index";
+import { blox, ref } from "./index";
 
-describe("blox.ref", () => {
+describe("ref", () => {
   describe("basic functionality", () => {
     it("should create a ref with null initial value", () => {
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
+        const inputRef = ref<HTMLInputElement>();
         expect(inputRef.current).toBeNull();
         return <input ref={inputRef} />;
       });
@@ -18,7 +18,7 @@ describe("blox.ref", () => {
       let capturedRef: any;
 
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
+        const inputRef = ref<HTMLInputElement>();
         capturedRef = inputRef;
         return <input ref={inputRef} />;
       });
@@ -31,8 +31,8 @@ describe("blox.ref", () => {
 
     it("should throw error when called outside blox component", () => {
       expect(() => {
-        blox.ref<HTMLInputElement>();
-      }).toThrow("blox.ref() must be called inside a blox component");
+        ref<HTMLInputElement>();
+      }).toThrow("ref() must be called inside a blox component");
     });
   });
 
@@ -41,7 +41,7 @@ describe("blox.ref", () => {
       const callback = vi.fn();
 
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
+        const inputRef = ref<HTMLInputElement>();
 
         blox.onMount(() => {
           inputRef.ready((input) => {
@@ -60,7 +60,7 @@ describe("blox.ref", () => {
 
     it("should provide non-nullable element type", () => {
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
+        const inputRef = ref<HTMLInputElement>();
 
         blox.onMount(() => {
           inputRef.ready((input) => {
@@ -80,7 +80,7 @@ describe("blox.ref", () => {
       const callback = vi.fn();
 
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
+        const inputRef = ref<HTMLInputElement>();
 
         blox.onMount(() => {
           inputRef.ready((input) => {
@@ -102,7 +102,7 @@ describe("blox.ref", () => {
       const callback2 = vi.fn();
 
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
+        const inputRef = ref<HTMLInputElement>();
 
         blox.onMount(() => {
           inputRef.ready((input) => callback1(input));
@@ -120,7 +120,7 @@ describe("blox.ref", () => {
 
     it("should return callback result when ref is ready", () => {
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
+        const inputRef = ref<HTMLInputElement>();
         let capturedValue: string | undefined;
 
         blox.onMount(() => {
@@ -140,7 +140,7 @@ describe("blox.ref", () => {
 
     it("should return undefined when ref is null", () => {
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
+        const inputRef = ref<HTMLInputElement>();
         let result: number | undefined;
 
         blox.onMount(() => {
@@ -159,7 +159,7 @@ describe("blox.ref", () => {
       const cleanupFn = vi.fn();
 
       const Component = blox(() => {
-        const videoRef = blox.ref<HTMLVideoElement>();
+        const videoRef = ref<HTMLVideoElement>();
 
         blox.onMount(() => {
           videoRef.ready((video) => {
@@ -184,16 +184,16 @@ describe("blox.ref", () => {
     });
   });
 
-  describe("blox.ready() static method", () => {
+  describe("ref.ready() static method", () => {
     it("should call callback when all refs are ready", () => {
       const callback = vi.fn();
 
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
-        const buttonRef = blox.ref<HTMLButtonElement>();
+        const inputRef = ref<HTMLInputElement>();
+        const buttonRef = ref<HTMLButtonElement>();
 
         blox.onMount(() => {
-          blox.ready([inputRef, buttonRef], (input, button) => {
+          ref.ready([inputRef, buttonRef], (input, button) => {
             callback(input, button);
           });
         });
@@ -219,11 +219,11 @@ describe("blox.ref", () => {
       const callback = vi.fn();
 
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
-        const buttonRef = blox.ref<HTMLButtonElement>();
+        const inputRef = ref<HTMLInputElement>();
+        const buttonRef = ref<HTMLButtonElement>();
 
         blox.onMount(() => {
-          blox.ready([inputRef, buttonRef], (input, button) => {
+          ref.ready([inputRef, buttonRef], (input, button) => {
             callback(input, button);
           });
         });
@@ -244,12 +244,12 @@ describe("blox.ref", () => {
 
     it("should provide correct types for all elements", () => {
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
-        const buttonRef = blox.ref<HTMLButtonElement>();
-        const divRef = blox.ref<HTMLDivElement>();
+        const inputRef = ref<HTMLInputElement>();
+        const buttonRef = ref<HTMLButtonElement>();
+        const divRef = ref<HTMLDivElement>();
 
         blox.onMount(() => {
-          blox.ready([inputRef, buttonRef, divRef], (input, button, div) => {
+          ref.ready([inputRef, buttonRef, divRef], (input, button, div) => {
             // TypeScript should infer correct types
             expect(input.tagName).toBe("INPUT");
             expect(button.tagName).toBe("BUTTON");
@@ -273,10 +273,10 @@ describe("blox.ref", () => {
       const callback = vi.fn();
 
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
+        const inputRef = ref<HTMLInputElement>();
 
         blox.onMount(() => {
-          blox.ready([inputRef], (input) => {
+          ref.ready([inputRef], (input) => {
             callback(input);
           });
         });
@@ -293,14 +293,14 @@ describe("blox.ref", () => {
       const callback = vi.fn();
 
       const Component = blox(() => {
-        const ref1 = blox.ref<HTMLInputElement>();
-        const ref2 = blox.ref<HTMLButtonElement>();
-        const ref3 = blox.ref<HTMLDivElement>();
-        const ref4 = blox.ref<HTMLSpanElement>();
-        const ref5 = blox.ref<HTMLLabelElement>();
+        const ref1 = ref<HTMLInputElement>();
+        const ref2 = ref<HTMLButtonElement>();
+        const ref3 = ref<HTMLDivElement>();
+        const ref4 = ref<HTMLSpanElement>();
+        const ref5 = ref<HTMLLabelElement>();
 
         blox.onMount(() => {
-          blox.ready([ref1, ref2, ref3, ref4, ref5], (r1, r2, r3, r4, r5) => {
+          ref.ready([ref1, ref2, ref3, ref4, ref5], (r1, r2, r3, r4, r5) => {
             callback(r1, r2, r3, r4, r5);
           });
         });
@@ -329,12 +329,12 @@ describe("blox.ref", () => {
 
     it("should return callback result from ready()", () => {
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
-        const divRef = blox.ref<HTMLDivElement>();
+        const inputRef = ref<HTMLInputElement>();
+        const divRef = ref<HTMLDivElement>();
         let result: { inputValue: string; divWidth: number } | undefined;
 
         blox.onMount(() => {
-          result = blox.ready([inputRef, divRef], (input, div) => ({
+          result = ref.ready([inputRef, divRef], (input, div) => ({
             inputValue: input.value,
             divWidth: div.clientWidth,
           }));
@@ -357,12 +357,12 @@ describe("blox.ref", () => {
 
     it("should return undefined when any ref is null", () => {
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
-        const divRef = blox.ref<HTMLDivElement>();
+        const inputRef = ref<HTMLInputElement>();
+        const divRef = ref<HTMLDivElement>();
         let result: { value: string } | undefined;
 
         blox.onMount(() => {
-          result = blox.ready([inputRef, divRef], (_input, _div) => ({
+          result = ref.ready([inputRef, divRef], (_input, _div) => ({
             value: "test",
           }));
 
@@ -380,7 +380,7 @@ describe("blox.ref", () => {
   describe("real-world use cases", () => {
     it("should support focus management", () => {
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
+        const inputRef = ref<HTMLInputElement>();
 
         blox.onMount(() => {
           inputRef.ready((input) => {
@@ -402,7 +402,7 @@ describe("blox.ref", () => {
       const cleanupFn = vi.fn();
 
       const Component = blox(() => {
-        const buttonRef = blox.ref<HTMLButtonElement>();
+        const buttonRef = ref<HTMLButtonElement>();
 
         blox.onMount(() => {
           buttonRef.ready((button) => {
@@ -436,11 +436,11 @@ describe("blox.ref", () => {
 
     it("should support multiple refs for coordinated setup", () => {
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
-        const buttonRef = blox.ref<HTMLButtonElement>();
+        const inputRef = ref<HTMLInputElement>();
+        const buttonRef = ref<HTMLButtonElement>();
 
         blox.onMount(() => {
-          blox.ready([inputRef, buttonRef], (input, button) => {
+          ref.ready([inputRef, buttonRef], (input, button) => {
             input.focus();
             button.disabled = false;
           });
@@ -466,7 +466,7 @@ describe("blox.ref", () => {
 
     it("should work with DOM manipulation", () => {
       const Component = blox(() => {
-        const divRef = blox.ref<HTMLDivElement>();
+        const divRef = ref<HTMLDivElement>();
 
         blox.onMount(() => {
           divRef.ready((div) => {
@@ -491,7 +491,7 @@ describe("blox.ref", () => {
   describe("type safety", () => {
     it("should narrow type from T | null to T", () => {
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
+        const inputRef = ref<HTMLInputElement>();
 
         // Before ready(), current is T | null
         const before: HTMLInputElement | null = inputRef.current;
@@ -513,12 +513,12 @@ describe("blox.ref", () => {
 
     it("should infer correct tuple types for multiple refs", () => {
       const Component = blox(() => {
-        const inputRef = blox.ref<HTMLInputElement>();
-        const buttonRef = blox.ref<HTMLButtonElement>();
-        const divRef = blox.ref<HTMLDivElement>();
+        const inputRef = ref<HTMLInputElement>();
+        const buttonRef = ref<HTMLButtonElement>();
+        const divRef = ref<HTMLDivElement>();
 
         blox.onMount(() => {
-          blox.ready([inputRef, buttonRef, divRef], (input, button, div) => {
+          ref.ready([inputRef, buttonRef, divRef], (input, button, div) => {
             // TypeScript should infer correct types
             const i: HTMLInputElement = input;
             const b: HTMLButtonElement = button;

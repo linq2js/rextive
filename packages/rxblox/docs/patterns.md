@@ -180,12 +180,12 @@ interface InputHandle {
   clear: () => void;
 }
 
-const CustomInput = blox((props: { placeholder: string }, ref: Ref<InputHandle>) => {
+const CustomInput = blox((props: { placeholder: string }, expose: Expose<InputHandle>) => {
   const inputRef = createRef<HTMLInputElement>();
   const value = signal("");
 
-  // Expose methods via ref
-  ref({
+  // Expose methods via expose function
+  expose({
     focus: () => inputRef.current?.focus(),
     clear: () => value.set(""),
   });

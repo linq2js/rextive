@@ -19,10 +19,10 @@ Complete API documentation for all rxblox functions and utilities.
 - [blox.onMount](#bloxonmount)
 - [blox.onUnmount](#bloxonunmount)
 - [blox.hook](#bloxhookt)
-- [blox.ref](#bloxreft)
-- [blox.ready](#bloxready)
 - [blox.slot](#bloxslot)
 - [blox.fill](#bloxfill)
+- [ref](#reft)
+- [ref.ready](#refready)
 - [provider](#providert)
 - [loadable](#loadable)
 - [isLoadable](#isloadable)
@@ -663,13 +663,13 @@ type Ref<T> = {
 
 ---
 
-## `blox.ref<T>()`
+## `ref<T>()`
 
-Creates a reactive ref for DOM elements with automatic null/undefined checking.
+Creates a reactive ref that can hold any value with automatic null/undefined checking.
 
 **Must be called inside a `blox` component.**
 
-Returns a `BloxRef<T>` object compatible with React's ref system, with an additional `ready()` helper method.
+Commonly used for DOM elements, but can store any value. Returns a `BloxRef<T>` object compatible with React's ref system, with an additional `ready()` helper method.
 
 **Type:**
 
@@ -687,7 +687,7 @@ interface BloxRef<T> {
 
 ```tsx
 const MyComponent = blox(() => {
-  const inputRef = blox.ref<HTMLInputElement>();
+  const inputRef = ref<HTMLInputElement>();
 
   blox.onMount(() => {
     inputRef.ready((input) => {
@@ -704,7 +704,7 @@ const MyComponent = blox(() => {
 
 ```tsx
 const MyComponent = blox(() => {
-  const buttonRef = blox.ref<HTMLButtonElement>();
+  const buttonRef = ref<HTMLButtonElement>();
 
   blox.onMount(() => {
     buttonRef.ready((button) => {
@@ -728,7 +728,7 @@ const MyComponent = blox(() => {
 
 ```tsx
 const MyComponent = blox(() => {
-  const videoRef = blox.ref<HTMLVideoElement>();
+  const videoRef = ref<HTMLVideoElement>();
 
   effect(() => {
     videoRef.ready((video) => {
@@ -745,7 +745,7 @@ const MyComponent = blox(() => {
 
 ```tsx
 const MyComponent = blox(() => {
-  const divRef = blox.ref<HTMLDivElement>();
+  const divRef = ref<HTMLDivElement>();
 
   blox.onMount(() => {
     const width = divRef.ready((div) => div.clientWidth);
@@ -764,7 +764,7 @@ const MyComponent = blox(() => {
 
 ```tsx
 const MyComponent = blox(() => {
-  const canvasRef = blox.ref<HTMLCanvasElement>();
+  const canvasRef = ref<HTMLCanvasElement>();
 
   blox.onMount(() => {
     // Provide fallback when ref isn't ready
@@ -815,7 +815,7 @@ const MyComponent = blox(() => {
 
 ---
 
-## `blox.ready(refs, callback, orElse?)`
+## `ref.ready(refs, callback, orElse?)`
 
 Executes a callback when all refs are ready (not null or undefined).
 
@@ -842,12 +842,12 @@ function ready<T extends readonly BloxRef<any>[], R, E = undefined>(
 
 ```tsx
 const MyComponent = blox(() => {
-  const inputRef = blox.ref<HTMLInputElement>();
-  const buttonRef = blox.ref<HTMLButtonElement>();
-  const divRef = blox.ref<HTMLDivElement>();
+  const inputRef = ref<HTMLInputElement>();
+  const buttonRef = ref<HTMLButtonElement>();
+  const divRef = ref<HTMLDivElement>();
 
   blox.onMount(() => {
-    blox.ready([inputRef, buttonRef, divRef], (input, button, div) => {
+    ref.ready([inputRef, buttonRef, divRef], (input, button, div) => {
       // All types are non-nullable
       input.focus();
       button.disabled = false;
@@ -869,11 +869,11 @@ const MyComponent = blox(() => {
 
 ```tsx
 const MyComponent = blox(() => {
-  const canvasRef = blox.ref<HTMLCanvasElement>();
-  const containerRef = blox.ref<HTMLDivElement>();
+  const canvasRef = ref<HTMLCanvasElement>();
+  const containerRef = ref<HTMLDivElement>();
 
   blox.onMount(() => {
-    blox.ready([canvasRef, containerRef], (canvas, container) => {
+    ref.ready([canvasRef, containerRef], (canvas, container) => {
       // Set canvas size based on container
       canvas.width = container.clientWidth;
       canvas.height = container.clientHeight;
@@ -896,11 +896,11 @@ const MyComponent = blox(() => {
 
 ```tsx
 const MyComponent = blox(() => {
-  const canvasRef = blox.ref<HTMLCanvasElement>();
-  const containerRef = blox.ref<HTMLDivElement>();
+  const canvasRef = ref<HTMLCanvasElement>();
+  const containerRef = ref<HTMLDivElement>();
 
   blox.onMount(() => {
-    const dimensions = blox.ready([canvasRef, containerRef], (canvas, container) => ({
+    const dimensions = ref.ready([canvasRef, containerRef], (canvas, container) => ({
       canvasWidth: canvas.width,
       canvasHeight: canvas.height,
       containerWidth: container.clientWidth,
@@ -925,12 +925,12 @@ const MyComponent = blox(() => {
 
 ```tsx
 const MyComponent = blox(() => {
-  const videoRef = blox.ref<HTMLVideoElement>();
-  const audioRef = blox.ref<HTMLAudioElement>();
+  const videoRef = ref<HTMLVideoElement>();
+  const audioRef = ref<HTMLAudioElement>();
 
   blox.onMount(() => {
     // Always get a result, even if refs aren't ready
-    const result = blox.ready(
+    const result = ref.ready(
       [videoRef, audioRef],
       (video, audio) => {
         video.play();

@@ -337,7 +337,7 @@ export type Effect = {
  *
  * @template T - The type of value stored in the ref
  */
-export type Ref<T> = {
+export type Expose<T> = {
   /**
    * Sets the current value of the ref.
    * @param value - The value to set
@@ -428,7 +428,7 @@ export type RxFunction = (exp: () => unknown) => ReactNode;
  * @template TRef - The ref type for imperative access (optional)
  */
 export type BloxFunction = <TProps extends object = {}, TRef = unknown>(
-  render: (props: Readonly<TProps>, ref: Ref<TRef>) => ReactNode
+  render: (props: Readonly<TProps>, ref: Expose<TRef>) => ReactNode
 ) => FC<TProps>;
 
 /**

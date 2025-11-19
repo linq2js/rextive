@@ -35,7 +35,7 @@ rxblox uses the following context types (scopes) internally:
 **Restrictions:**
 
 - ❌ **Cannot use** `blox.onMount()` / `blox.onUnmount()` / `blox.onRender()` - Need `blox` scope
-- ❌ **Cannot create** `blox.ref()` / `blox.slot()` / `blox.hook()` - Need `blox` scope
+- ❌ **Cannot create** `ref()` / `blox.slot()` / `blox.hook()` - Need `blox` scope
 - ❌ **Cannot use** `blox.fill()` - Need active slot inside `blox.slot()`
 - ❌ **Cannot use** `withXXX()` (provider consumers) - Need `blox` scope
 
@@ -69,7 +69,7 @@ rxblox uses the following context types (scopes) internally:
 - ❌ **Cannot create** `blox()` components
 - ❌ **Cannot create** `rx()` expressions
 - ❌ **Cannot use** `blox.onMount()` / `blox.onUnmount()` / `blox.onRender()` - Need `blox` scope
-- ❌ **Cannot create** `blox.ref()` / `blox.slot()` / `blox.hook()` - Need `blox` scope
+- ❌ **Cannot create** `ref()` / `blox.slot()` / `blox.hook()` - Need `blox` scope
 - ❌ **Cannot use** `blox.fill()` - Need active slot
 - ❌ **Cannot use** `withXXX()` - Need `blox` scope
 
@@ -172,8 +172,8 @@ rxblox uses the following context types (scopes) internally:
 | `blox.onMount()`   | `blox`               | None                | All APIs (inherits `blox`) | Callback runs when component mounts                              |
 | `blox.onUnmount()` | `blox`               | None                | All APIs (inherits `blox`) | Callback runs when component unmounts                            |
 | `blox.onRender()`  | `blox`               | None                | React hooks + all APIs     | Callback runs on every render, can use React hooks               |
-| `blox.ref()`       | `blox`               | None                | -                          | Creates a ref object, must be called during builder              |
-| `blox.ready()`     | Any                  | None                | -                          | Checks if refs are ready, typically in `onMount()` or `effect()` |
+| `ref()`            | `blox`               | None                | -                          | Creates a ref object, must be called during builder              |
+| `ref.ready()`      | Any                  | None                | -                          | Checks if refs are ready, typically in `onMount()` or `effect()` |
 | `blox.slot()`      | `blox`               | None (keeps `blox`) | All blox APIs              | Executes function, captures `fill()` calls                       |
 | `blox.fill()`      | Inside `blox.slot()` | None                | -                          | Must be inside active slot                                       |
 | `blox.hook()`      | `blox`               | None                | -                          | Captures React hooks during render phase                         |
@@ -206,7 +206,7 @@ Global (none)
 │  ├─ signal()              ✅ Create local reactive state
 │  ├─ effect()              ✅ Create side effects
 │  ├─ blox.onMount()        ✅ Lifecycle hook
-│  ├─ blox.ref()            ✅ Create refs
+│  ├─ ref()                 ✅ Create refs
 │  ├─ blox.slot()           ✅ Slot/fill pattern (keeps blox context)
 │  │  ├─ blox.fill()        ✅ Fill the slot
 │  │  ├─ signal()           ✅ Context is still blox
@@ -465,7 +465,7 @@ function RegularComponent() {
     console.log("mounted");
   });
 
-  const ref = blox.ref(); // Error! Not in blox context
+  const myRef = ref(); // Error! Not in blox context
 
   return <div>Content</div>;
 }
@@ -480,9 +480,9 @@ const BloxComponent = blox(() => {
     console.log("mounted");
   });
 
-  const ref = blox.ref(); // ✅ Inside blox context
+  const myRef = ref(); // ✅ Inside blox context
 
-  return <div ref={ref}>Content</div>;
+  return <div ref={myRef}>Content</div>;
 });
 ```
 
@@ -531,7 +531,7 @@ const App = () => (
 | `rx()`              | ✅     | ✅   | ✅     | ❌     | ❌      | ❌  |
 | `provider()`        | ✅     | ✅   | ✅     | ❌     | ❌      | ❌  |
 | `action()`          | ✅     | ✅   | ✅     | ❌     | ❌      | ❌  |
-| `blox.ref()`        | ❌     | ✅   | ❌     | ❌     | ❌      | ❌  |
+| `ref()`             | ❌     | ✅   | ❌     | ❌     | ❌      | ❌  |
 | `blox.slot()`       | ❌     | ✅   | ❌     | ❌     | ❌      | ❌  |
 
 ### Table 2: What Can I Use in Each Scope?
@@ -543,7 +543,7 @@ const App = () => (
 | `blox.onMount()`       | ❌     | ✅   | ❌     | ❌     | ❌    | ❌  |
 | `blox.onUnmount()`     | ❌     | ✅   | ❌     | ❌     | ❌    | ❌  |
 | `blox.onRender()`      | ❌     | ✅   | ❌     | ❌     | ❌    | ❌  |
-| `blox.ready()`         | ✅     | ✅   | ✅     | ✅     | ✅    | ✅  |
+| `ref.ready()`          | ✅     | ✅   | ✅     | ✅     | ✅    | ✅  |
 | `blox.fill()`          | ❌     | ✅\* | ❌     | ❌     | ❌    | ❌  |
 | `blox.hook()`          | ❌     | ✅   | ❌     | ❌     | ❌    | ❌  |
 | `withXXX()` (provider) | ❌     | ✅   | ❌     | ❌     | ❌    | ❌  |
@@ -568,7 +568,7 @@ const App = () => (
 2. **No nested `rx()`** - Each reactive boundary should be independent
 3. **`blox.slot()` keeps context** - Inside a slot, you're still in blox context
 4. **Computed signals are pure** - Cannot create signals or effects inside
-5. **blox APIs need blox context** - `blox.onMount()`, `blox.ref()`, etc. only work in `blox()`
+5. **blox APIs need blox context** - `blox.onMount()`, `ref()`, etc. only work in `blox()`
 6. **Providers at module level** - Create providers globally, use them in components
 
 ### Mental Model

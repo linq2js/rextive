@@ -1,5 +1,6 @@
 import { onEvent } from "./eventDispatcher";
 import { getContextType } from "./dispatcher";
+import { BloxRef, ref } from "./ref";
 
 /**
  * Creates a ref to capture values from React hooks during the render phase.
@@ -39,7 +40,7 @@ import { getContextType } from "./dispatcher";
  * @param callback - Function that runs on every render and returns a value to capture
  * @returns A ref with a `.current` property containing the captured value
  */
-export function hook<T>(callback: () => T): Hook<T> {
+export function hook<T>(callback: () => T): BloxRef<T> {
   // Check if we're inside a blox component
   const contextType = getContextType();
   if (contextType !== "blox") {
@@ -49,19 +50,15 @@ export function hook<T>(callback: () => T): Hook<T> {
     );
   }
 
-  let current: T | undefined;
+  const result = ref<T>();
 
   onEvent({
     render: () => {
-      current = callback();
+      result.current = callback();
     },
   });
 
-  return {
-    get current() {
-      return current;
-    },
-  };
+  return result;
 }
 
 export type Hook<T> = {
