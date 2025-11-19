@@ -1,6 +1,7 @@
 import { loadable, Loadable, isLoadable } from "./loadable";
-import { Signal } from "./types";
+import { AwaitedOrSignalValue, Signal } from "./types";
 import { isPromiseLike } from "./isPromiseLike";
+import { delay as delayUtil } from "./delay";
 
 /**
  * Represents a value that can be awaited in signal.async().
@@ -9,7 +10,8 @@ import { isPromiseLike } from "./isPromiseLike";
 export type Awaitable<T> =
   | PromiseLike<T>
   | Signal<PromiseLike<T>>
-  | Signal<Loadable<T>>;
+  | Signal<Loadable<T>>
+  | Loadable<T>;
 
 /**
  * Cache for tracking promise states across wait() calls.
@@ -74,7 +76,7 @@ function isSignal(value: unknown): value is Signal<unknown> {
  * @param awaitable - The awaitable value to resolve
  * @returns Loadable representing the current state
  */
-function resolveAwaitable<T>(awaitable: Awaitable<T>): Loadable<T> {
+function resolveAwaitable(awaitable: Awaitable<unknown>): Loadable<any> {
   let value: unknown = awaitable;
 
   // If it's a signal, call it to get the value
@@ -83,17 +85,17 @@ function resolveAwaitable<T>(awaitable: Awaitable<T>): Loadable<T> {
   }
 
   // If value is a loadable, return it
-  if (isLoadable<T>(value)) {
+  if (isLoadable(value)) {
     return value;
   }
 
   // If value is a promise, get/create loadable from cache
-  if (isPromiseLike<T>(value)) {
+  if (isPromiseLike(value)) {
     return getLoadable(value);
   }
 
   // Otherwise, wrap in success loadable
-  return loadable("success", value as T);
+  return loadable("success", value);
 }
 
 /**
@@ -111,13 +113,11 @@ function resolveAwaitable<T>(awaitable: Awaitable<T>): Loadable<T> {
  * const [user, posts] = wait([userSignal, postsSignal]);
  * ```
  */
-function waitAll<T>(awaitable: Awaitable<T>): T;
+function waitAll(awaitable: Awaitable<unknown>): any;
 function waitAll<const TAwaitables extends readonly Awaitable<unknown>[]>(
   awaitables: TAwaitables
 ): {
-  [K in keyof TAwaitables]: TAwaitables[K] extends Awaitable<infer T>
-    ? T
-    : never;
+  [K in keyof TAwaitables]: AwaitedOrSignalValue<TAwaitables[K]>;
 };
 function waitAll(awaitableOrArray: any): any {
   // Handle single awaitable
@@ -173,10 +173,7 @@ function waitAll(awaitableOrArray: any): any {
 function waitAny<const TAwaitables extends Record<string, Awaitable<unknown>>>(
   awaitables: TAwaitables
 ): {
-  [K in keyof TAwaitables]: [
-    TAwaitables[K] extends Awaitable<infer T> ? T : never,
-    K
-  ];
+  [K in keyof TAwaitables]: [AwaitedOrSignalValue<TAwaitables[K]>, K];
 }[keyof TAwaitables];
 function waitAny(awaitables: Record<string, Awaitable<unknown>>): any {
   const entries = Object.entries(awaitables);
@@ -247,10 +244,7 @@ function waitAny(awaitables: Record<string, Awaitable<unknown>>): any {
 function waitRace<const TAwaitables extends Record<string, Awaitable<unknown>>>(
   awaitables: TAwaitables
 ): {
-  [K in keyof TAwaitables]: [
-    TAwaitables[K] extends Awaitable<infer T> ? T : never,
-    K
-  ];
+  [K in keyof TAwaitables]: [AwaitedOrSignalValue<TAwaitables[K]>, K];
 }[keyof TAwaitables];
 function waitRace(awaitables: Record<string, Awaitable<unknown>>): any {
   const entries = Object.entries(awaitables);
@@ -298,13 +292,13 @@ function waitRace(awaitables: Record<string, Awaitable<unknown>>): any {
  * const successes = results.filter(r => r.status === 'fulfilled');
  * ```
  */
-function waitSettled<T>(awaitable: Awaitable<T>): PromiseSettledResult<T>;
+function waitSettled(awaitable: Awaitable<unknown>): PromiseSettledResult<any>;
 function waitSettled<const TAwaitables extends readonly Awaitable<unknown>[]>(
   awaitables: TAwaitables
 ): {
-  [K in keyof TAwaitables]: TAwaitables[K] extends Awaitable<infer T>
-    ? PromiseSettledResult<T>
-    : never;
+  [K in keyof TAwaitables]: PromiseSettledResult<
+    AwaitedOrSignalValue<TAwaitables[K]>
+  >;
 };
 function waitSettled(awaitableOrArray: any): any {
   // Handle single awaitable
@@ -357,12 +351,423 @@ function waitSettled(awaitableOrArray: any): any {
 }
 
 /**
+ * Waits indefinitely (never resolves).
+ * @example
+ * ```typescript
+ * const data = signal.async(({ wait }) => {
+ *   wait.never();
+ * });
+ * ```
+ */
+export function waitNever(): never {
+  throw new Promise(() => {});
+}
+
+/**
+ * TimeoutError is thrown when a timeout occurs.
+ */
+export class TimeoutError extends Error {
+  constructor(message: string = "Operation timed out") {
+    super(message);
+    this.name = "TimeoutError";
+  }
+}
+
+/**
+ * Adds timeout to a single awaitable.
+ * Throws TimeoutError if the awaitable doesn't resolve within the specified time.
+ *
+ * @param awaitable - The awaitable to add timeout to
+ * @param ms - Timeout duration in milliseconds
+ * @param error - Optional error message or error factory function
+ * @returns The unwrapped value if resolved within timeout
+ *
+ * @example
+ * ```typescript
+ * const user = wait.timeout(userSignal, 5000, 'User fetch timed out');
+ * ```
+ */
+function waitTimeoutAwaitable<T>(
+  awaitable: Awaitable<unknown>,
+  ms: number,
+  error?: string | (() => unknown)
+): T;
+
+/**
+ * Adds timeout to an array of awaitables.
+ * Throws TimeoutError if any awaitable doesn't resolve within the specified time.
+ *
+ * @param awaitables - Array of awaitables
+ * @param ms - Timeout duration in milliseconds
+ * @param error - Optional error message or error factory function
+ * @returns Array of unwrapped values if all resolve within timeout
+ *
+ * @example
+ * ```typescript
+ * const [user, posts] = wait.timeout([userSignal, postsSignal], 5000);
+ * ```
+ */
+function waitTimeoutAwaitable<
+  const TAwaitables extends readonly Awaitable<unknown>[]
+>(
+  awaitables: TAwaitables,
+  ms: number,
+  error?: string | (() => unknown)
+): {
+  [K in keyof TAwaitables]: AwaitedOrSignalValue<TAwaitables[K]>;
+};
+
+/**
+ * Adds timeout to a record of awaitables.
+ * Throws TimeoutError if any awaitable doesn't resolve within the specified time.
+ *
+ * @param awaitables - Record of awaitables
+ * @param ms - Timeout duration in milliseconds
+ * @param error - Optional error message or error factory function
+ * @returns Record with same keys and unwrapped values if all resolve within timeout
+ *
+ * @example
+ * ```typescript
+ * const data = wait.timeout({ user: userSignal, posts: postsSignal }, 5000);
+ * ```
+ */
+function waitTimeoutAwaitable<
+  const TAwaitables extends Record<string, Awaitable<unknown>>
+>(
+  awaitables: TAwaitables,
+  ms: number,
+  error?: string | (() => unknown)
+): {
+  [K in keyof TAwaitables]: AwaitedOrSignalValue<TAwaitables[K]>;
+};
+
+function waitTimeoutAwaitable(
+  awaitableOrCollection: any,
+  ms: number,
+  error?: string | (() => unknown)
+): any {
+  // Handle array
+  if (Array.isArray(awaitableOrCollection)) {
+    const loadables = awaitableOrCollection.map(resolveAwaitable);
+    const anyLoading = loadables.some((l) => l.status === "loading");
+
+    if (!anyLoading) {
+      return waitAll(awaitableOrCollection);
+    }
+
+    const promises = loadables.map((l) =>
+      l.status === "loading"
+        ? l.promise
+        : l.status === "success"
+        ? Promise.resolve(l.value)
+        : Promise.reject(l.error)
+    );
+
+    const timeoutPromise = delayUtil(ms).then(() => {
+      const err =
+        typeof error === "function"
+          ? error()
+          : error
+          ? new TimeoutError(error)
+          : new TimeoutError();
+      throw err;
+    });
+
+    throw Promise.race([Promise.all(promises), timeoutPromise]);
+  }
+
+  // Check if it's a plain object (record) vs a single awaitable
+  // Single awaitables can be: function (signal), promise, or loadable
+  const isSingleAwaitable =
+    typeof awaitableOrCollection === "function" ||
+    isPromiseLike(awaitableOrCollection) ||
+    isLoadable(awaitableOrCollection);
+
+  if (isSingleAwaitable) {
+    // Handle single awaitable
+    const loadableVal = resolveAwaitable(awaitableOrCollection);
+    if (loadableVal.status !== "loading") {
+      return waitAll(awaitableOrCollection);
+    }
+
+    // Create timeout promise
+    const timeoutPromise = delayUtil(ms).then(() => {
+      const err =
+        typeof error === "function"
+          ? error()
+          : error
+          ? new TimeoutError(error)
+          : new TimeoutError();
+      throw err;
+    });
+
+    // Race between the awaitable and timeout
+    throw Promise.race([loadableVal.promise, timeoutPromise]);
+  }
+
+  // Handle object/record
+  const entries = Object.entries(awaitableOrCollection);
+  const loadables = entries.map(([key, awaitable]) => ({
+    key,
+    loadable: resolveAwaitable(awaitable as Awaitable<unknown>),
+  }));
+
+  const anyLoading = loadables.some(
+    ({ loadable: l }) => l.status === "loading"
+  );
+
+  if (!anyLoading) {
+    const result: any = {};
+    for (const { key, loadable } of loadables) {
+      if (loadable.status === "error") {
+        throw loadable.error;
+      }
+      result[key] = loadable.value;
+    }
+    return result;
+  }
+
+  const promises = loadables.map(({ loadable: l }) =>
+    l.status === "loading"
+      ? l.promise
+      : l.status === "success"
+      ? Promise.resolve(l.value)
+      : Promise.reject(l.error)
+  );
+
+  const timeoutPromise = delayUtil(ms).then(() => {
+    const err =
+      typeof error === "function"
+        ? error()
+        : error
+        ? new TimeoutError(error)
+        : new TimeoutError();
+    throw err;
+  });
+
+  throw Promise.race([
+    Promise.all(promises).then(() => {
+      const result: any = {};
+      for (const { key } of loadables) {
+        result[key] = waitAll(awaitableOrCollection[key]);
+      }
+      return result;
+    }),
+    timeoutPromise,
+  ]);
+}
+
+/**
+ * Executes a function and returns a tuple of [result, error].
+ * If the function throws or returns a rejected promise, returns the fallback value.
+ *
+ * @param fn - The function to execute
+ * @param fallback - The fallback value or factory function
+ * @returns Tuple of [result, error] where error is undefined on success
+ *
+ * @example
+ * ```typescript
+ * const [data, error] = await wait.fallback(
+ *   () => fetchUser(id),
+ *   { name: 'Guest' }
+ * );
+ *
+ * if (error) {
+ *   console.error('Failed to fetch user:', error);
+ * }
+ * ```
+ */
+async function waitFallback<T, F>(
+  fn: () => T | PromiseLike<T>,
+  fallback: F | (() => F)
+): Promise<[Awaited<T> | Awaited<F>, unknown]> {
+  try {
+    const result = fn();
+    if (isPromiseLike(result)) {
+      try {
+        const awaited = await result;
+        return [awaited, undefined];
+      } catch (error) {
+        const fallbackValue =
+          typeof fallback === "function" ? (fallback as () => F)() : fallback;
+        return [
+          (isPromiseLike(fallbackValue)
+            ? await fallbackValue
+            : fallbackValue) as Awaited<F>,
+          error,
+        ];
+      }
+    }
+    return [result as Awaited<T>, undefined];
+  } catch (error) {
+    const fallbackValue =
+      typeof fallback === "function" ? (fallback as () => F)() : fallback;
+    return [
+      (isPromiseLike(fallbackValue)
+        ? await fallbackValue
+        : fallbackValue) as Awaited<F>,
+      error,
+    ];
+  }
+}
+
+/**
+ * Waits for a single awaitable until predicate returns true.
+ * Re-throws the promise if predicate returns false.
+ *
+ * @param awaitable - The awaitable to wait for
+ * @param predicate - Function that receives the unwrapped value and returns boolean
+ * @returns The unwrapped value when predicate returns true
+ *
+ * @example
+ * ```typescript
+ * const count = signal(0);
+ * const value = wait.until(count, (c) => c > 10);
+ * ```
+ */
+function waitUntil<T>(
+  awaitable: Awaitable<T>,
+  predicate: (value: T) => boolean
+): T;
+
+/**
+ * Waits for an array of awaitables until predicate returns true.
+ * Re-throws if predicate returns false.
+ *
+ * @param awaitables - Array of awaitables
+ * @param predicate - Function that receives unwrapped values as arguments
+ * @returns Array of unwrapped values when predicate returns true
+ *
+ * @example
+ * ```typescript
+ * const [user, posts] = wait.until(
+ *   [userSignal, postsSignal],
+ *   (user, posts) => user.id > 0 && posts.length > 0
+ * );
+ * ```
+ */
+function waitUntil<const TAwaitables extends readonly Awaitable<unknown>[]>(
+  awaitables: TAwaitables,
+  predicate: (
+    ...values: {
+      [K in keyof TAwaitables]: AwaitedOrSignalValue<TAwaitables[K]>;
+    }
+  ) => boolean
+): {
+  [K in keyof TAwaitables]: AwaitedOrSignalValue<TAwaitables[K]>;
+};
+
+/**
+ * Waits for a record of awaitables until predicate returns true.
+ * Re-throws if predicate returns false.
+ *
+ * @param awaitables - Record of awaitables
+ * @param predicate - Function that receives unwrapped values as record
+ * @returns Record of unwrapped values when predicate returns true
+ *
+ * @example
+ * ```typescript
+ * const data = wait.until(
+ *   { user: userSignal, posts: postsSignal },
+ *   ({ user, posts }) => user.id > 0 && posts.length > 0
+ * );
+ * ```
+ */
+function waitUntil<
+  const TAwaitables extends Record<string, Awaitable<unknown>>
+>(
+  awaitables: TAwaitables,
+  predicate: (values: {
+    [K in keyof TAwaitables]: AwaitedOrSignalValue<TAwaitables[K]>;
+  }) => boolean
+): {
+  [K in keyof TAwaitables]: AwaitedOrSignalValue<TAwaitables[K]>;
+};
+
+function waitUntil(awaitableOrCollection: any, predicate: any): any {
+  // Handle single awaitable
+  if (
+    !Array.isArray(awaitableOrCollection) &&
+    (typeof awaitableOrCollection === "function" ||
+      isPromiseLike(awaitableOrCollection) ||
+      isLoadable(awaitableOrCollection))
+  ) {
+    const value = waitAll(awaitableOrCollection);
+    if (!predicate(value)) {
+      waitNever();
+    }
+    return value;
+  }
+
+  // Handle array
+  if (Array.isArray(awaitableOrCollection)) {
+    const values = waitAll(awaitableOrCollection);
+    if (!predicate(...values)) {
+      waitNever();
+    }
+    return values;
+  }
+
+  // Handle object/record
+  const entries = Object.entries(awaitableOrCollection);
+  const result: any = {};
+  for (const [key, awaitable] of entries) {
+    result[key] = waitAll(awaitable as any);
+  }
+
+  if (!predicate(result)) {
+    waitNever();
+  }
+  return result;
+}
+
+/**
+ * Timeout function for awaitables.
+ */
+function waitTimeout<T>(
+  awaitable: Awaitable<T>,
+  ms: number,
+  error?: string | (() => unknown)
+): T;
+function waitTimeout<const TAwaitables extends readonly Awaitable<unknown>[]>(
+  awaitables: TAwaitables,
+  ms: number,
+  error?: string | (() => unknown)
+): {
+  [K in keyof TAwaitables]: TAwaitables[K] extends Awaitable<infer T>
+    ? T
+    : never;
+};
+function waitTimeout<
+  const TAwaitables extends Record<string, Awaitable<unknown>>
+>(
+  awaitables: TAwaitables,
+  ms: number,
+  error?: string | (() => unknown)
+): {
+  [K in keyof TAwaitables]: TAwaitables[K] extends Awaitable<infer T>
+    ? T
+    : never;
+};
+function waitTimeout(
+  awaitableOrCollection: any,
+  ms: number,
+  error?: string | (() => unknown)
+): any {
+  return waitTimeoutAwaitable(awaitableOrCollection, ms, error);
+}
+
+/**
  * Main wait function with variants for different async coordination patterns.
  *
  * - `wait()` or `wait.all()` - Wait for all (default)
  * - `wait.any()` - Wait for first success
  * - `wait.race()` - Wait for first completion
  * - `wait.settled()` - Wait for all to settle (never throws)
+ * - `wait.never()` - Wait indefinitely (never resolves)
+ * - `wait.timeout()` - Add timeout to awaitable
+ * - `wait.fallback()` - Provide fallback on error
+ * - `wait.until()` - Wait until predicate is true
  *
  * @example
  * ```typescript
@@ -378,6 +783,18 @@ function waitSettled(awaitableOrArray: any): any {
  *
  *   // All settled
  *   const results = wait.settled([sig1, sig2, sig3]);
+ *
+ *   // Never resolve (suspend indefinitely)
+ *   wait.never();
+ *
+ *   // With timeout
+ *   const user = wait.timeout(userSignal, 5000);
+ *
+ *   // With fallback
+ *   const [user, error] = await wait.fallback(() => fetchUser(), defaultUser);
+ *
+ *   // Wait until condition
+ *   const count = wait.until(counterSignal, c => c > 10);
  * });
  * ```
  */
@@ -386,4 +803,8 @@ export const wait = Object.assign(waitAll, {
   any: waitAny,
   race: waitRace,
   settled: waitSettled,
+  never: waitNever,
+  timeout: waitTimeout,
+  fallback: waitFallback,
+  until: waitUntil,
 });

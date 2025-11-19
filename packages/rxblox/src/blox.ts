@@ -79,12 +79,20 @@ import { createProxy } from "./utils/proxy/createProxy";
 export function blox<TProps extends object>(
   builder: (props: PropsWithoutRef<TProps>) => ReactNode
 ): FC<PropsWithoutRef<TProps>>;
-export function blox<TProps extends object, TRef>(
-  builder: (props: PropsWithoutRef<TProps>, expose: Expose<TRef>) => ReactNode
-): FC<PropsWithoutRef<TProps> & { ref?: ForwardedRef<TRef | undefined> }>;
-export function blox<TProps extends object, TRef>(
-  builder: (props: PropsWithoutRef<TProps>, expose: Expose<TRef>) => ReactNode
-): FC<PropsWithoutRef<TProps> & { ref?: ForwardedRef<TRef | undefined> }> {
+export function blox<TProps extends object, TInterface>(
+  builder: (
+    props: PropsWithoutRef<TProps>,
+    expose: Expose<TInterface>
+  ) => ReactNode
+): FC<PropsWithoutRef<TProps> & { ref?: ForwardedRef<TInterface | undefined> }>;
+export function blox<TProps extends object, TInterface>(
+  builder: (
+    props: PropsWithoutRef<TProps>,
+    expose: Expose<TInterface>
+  ) => ReactNode
+): FC<
+  PropsWithoutRef<TProps> & { ref?: ForwardedRef<TInterface | undefined> }
+> {
   /**
    * Internal component that manages reactive props and effects.
    *
@@ -97,7 +105,7 @@ export function blox<TProps extends object, TRef>(
    */
   const Block = (
     props: PropsWithoutRef<TProps> & {
-      forwardedRef: ForwardedRef<TRef>;
+      forwardedRef: ForwardedRef<TInterface>;
     }
   ) => {
     // Destructure to separate forwardedRef from user props
@@ -137,13 +145,13 @@ export function blox<TProps extends object, TRef>(
      * Created once per component instance and reused across renders.
      */
     const [expose] = useState(() => {
-      let value: TRef;
+      let value: TInterface;
 
       return {
         get() {
           return value;
         },
-        set(v: TRef) {
+        set(v: TInterface) {
           if (value !== v) {
             value = v;
             if (!rerender.rendering()) {
@@ -388,7 +396,7 @@ export function blox<TProps extends object, TRef>(
    */
   const HMR = (
     props: PropsWithoutRef<TProps>,
-    forwardedRef: ForwardedRef<TRef>
+    forwardedRef: ForwardedRef<TInterface>
   ) => {
     // Track how many times builder has changed (HMR counter)
     const version = useRef(0);

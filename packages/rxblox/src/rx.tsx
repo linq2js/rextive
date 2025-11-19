@@ -12,7 +12,11 @@ import {
 import { trackingDispatcher, trackingToken } from "./trackingDispatcher";
 import { emitter } from "./emitter";
 import { useRerender } from "./useRerender";
-import { Signal } from "./types";
+import {
+  Signal,
+  type AwaitableOrSignal,
+  type AwaitedOrSignalValue,
+} from "./types";
 import { isSignal } from "./signal";
 import { syncOnly } from "./utils/syncOnly";
 import { getContextType, withDispatchers } from "./dispatcher";
@@ -195,16 +199,6 @@ export const Reactive = memo((props: { exp: () => unknown }) => {
 
 Reactive.displayName = "rx";
 
-export type AwaitableOrSignal = Signal<any> | PromiseLike<any> | Loadable<any>;
-
-export type AwaitedSignalValue<T> = T extends Signal<infer TValue>
-  ? TValue extends Loadable<any>
-    ? Awaited<TValue["promise"]>
-    : Awaited<TValue>
-  : T extends Loadable<any>
-  ? Awaited<T["promise"]>
-  : Awaited<T>;
-
 /**
  * Creates a reactive component with auto-reactive props.
  *
@@ -292,7 +286,7 @@ export function rx<const TShape extends Record<string, AwaitableOrSignal>>(
   shape: TShape,
   fn: (values: {
     [K in keyof TShape]: TShape[K] extends AwaitableOrSignal
-      ? AwaitedSignalValue<TShape[K]>
+      ? AwaitedOrSignalValue<TShape[K]>
       : never;
   }) => ReactNode
 ): ReactElement;
@@ -395,7 +389,7 @@ export function rx<const TAwaitables extends readonly AwaitableOrSignal[]>(
   fn: (
     ...values: {
       [K in keyof TAwaitables]: TAwaitables[K] extends AwaitableOrSignal
-        ? AwaitedSignalValue<TAwaitables[K]>
+        ? AwaitedOrSignalValue<TAwaitables[K]>
         : never;
     }
   ) => ReactNode

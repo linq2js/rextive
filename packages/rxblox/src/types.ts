@@ -489,3 +489,156 @@ export type TrackingDispatcher = {
    */
   track: TrackFunction;
 };
+
+/**
+ * Internal symbol used to identify loadable objects at runtime.
+ * This allows for reliable type checking without relying on duck typing.
+ */
+export const LOADABLE_TYPE = Symbol("LOADABLE_TYPE");
+
+/**
+ * Represents the status of an async operation.
+ */
+export type LoadableStatus = "loading" | "success" | "error";
+
+/**
+ * Represents an in-progress async operation.
+ *
+ * @property status - Always "loading"
+ * @property promise - The underlying promise being awaited
+ * @property data - Always undefined (no data yet)
+ * @property error - Always undefined (no error yet)
+ * @property loading - Always true
+ *
+ * @example
+ * ```typescript
+ * const loadingState: LoadingLoadable = {
+ *   [LOADABLE_TYPE]: true,
+ *   status: "loading",
+ *   promise: fetchUser(1),
+ *   value: undefined,
+ *   error: undefined,
+ *   loading: true,
+ * };
+ * ```
+ */
+export type LoadingLoadable<TValue> = {
+  [LOADABLE_TYPE]: true;
+  status: "loading";
+  promise: PromiseLike<TValue>;
+  value: undefined;
+  error: undefined;
+  loading: true;
+};
+
+/**
+ * Represents a successfully completed async operation.
+ *
+ * @template TValue - The type of the successful result
+ * @property status - Always "success"
+ * @property promise - The resolved promise
+ * @property value - The successful result data
+ * @property error - Always undefined (no error)
+ * @property loading - Always false
+ *
+ * @example
+ * ```typescript
+ * const successState: SuccessLoadable<User> = {
+ *   [LOADABLE_TYPE]: true,
+ *   status: "success",
+ *   promise: Promise.resolve(user),
+ *   value: { id: 1, name: "Alice" },
+ *   error: undefined,
+ *   loading: false,
+ * };
+ * ```
+ */
+export type SuccessLoadable<TValue> = {
+  [LOADABLE_TYPE]: true;
+  status: "success";
+  promise: PromiseLike<TValue>;
+  value: TValue;
+  error: undefined;
+  loading: false;
+};
+
+/**
+ * Represents a failed async operation.
+ *
+ * @property status - Always "error"
+ * @property promise - The rejected promise
+ * @property value - Always undefined (no data)
+ * @property error - The error that occurred
+ * @property loading - Always false
+ *
+ * @example
+ * ```typescript
+ * const errorState: ErrorLoadable = {
+ *   [LOADABLE_TYPE]: true,
+ *   status: "error",
+ *   promise: Promise.reject(new Error("Failed")),
+ *   value: undefined,
+ *   error: new Error("Failed"),
+ *   loading: false,
+ * };
+ * ```
+ */
+export type ErrorLoadable<TValue> = {
+  [LOADABLE_TYPE]: true;
+  status: "error";
+  promise: PromiseLike<TValue>;
+  value: undefined;
+  error: unknown;
+  loading: false;
+};
+
+/**
+ * A discriminated union representing all possible states of an async operation.
+ *
+ * A Loadable encapsulates the three states of async data:
+ * - `LoadingLoadable`: Operation in progress
+ * - `SuccessLoadable<T>`: Operation completed successfully with data
+ * - `ErrorLoadable`: Operation failed with error
+ *
+ * Each loadable maintains a reference to the underlying promise, allowing
+ * integration with React Suspense and other promise-based systems.
+ *
+ * @template T - The type of data when operation succeeds
+ *
+ * @example
+ * ```typescript
+ * // Type-safe pattern matching
+ * function renderLoadable<T>(loadable: Loadable<T>) {
+ *   switch (loadable.status) {
+ *     case "loading":
+ *       return <Spinner />;
+ *     case "success":
+ *       return <div>{loadable.value}</div>; // TypeScript knows data exists
+ *     case "error":
+ *       return <Error error={loadable.error} />; // TypeScript knows error exists
+ *   }
+ * }
+ * ```
+ */
+export type Loadable<T> =
+  | LoadingLoadable<T>
+  | SuccessLoadable<T>
+  | ErrorLoadable<T>;
+
+/**
+ * Represents a value that can be awaited or is signal-wrapped.
+ * Used for async coordination patterns in rxblox.
+ */
+export type AwaitableOrSignal = Signal<any> | PromiseLike<any> | Loadable<any>;
+
+/**
+ * Extracts the awaited value from an AwaitableOrSignal type.
+ * Handles unwrapping of signals, loadables, and promises.
+ */
+export type AwaitedOrSignalValue<T> = T extends Signal<infer TValue>
+  ? TValue extends Loadable<any>
+    ? Awaited<TValue["promise"]>
+    : Awaited<TValue>
+  : T extends Loadable<any>
+  ? Awaited<T["promise"]>
+  : Awaited<T>;

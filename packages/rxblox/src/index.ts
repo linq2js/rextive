@@ -52,7 +52,7 @@ export { useSignals } from "./useSignals";
 export type { UseSignalsResult, UseSignalsOptions } from "./useSignals";
 export { useAction } from "./useAction";
 export * from "./loadable";
-export { wait, type Awaitable } from "./wait";
+export { wait, TimeoutError, type Awaitable } from "./wait";
 export { diff } from "./diff";
 export type { Persistor, PersistStatus, PersistInfo } from "./types";
 export { type Emitter, emitter } from "./emitter";
