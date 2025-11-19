@@ -265,7 +265,7 @@ export function createProxy<T>(options: ProxyOptions<T>): T {
 
       let customKeys: (string | symbol)[];
       if (traps.ownKeys) {
-        customKeys = traps.ownKeys(current);
+        customKeys = traps.ownKeys(current) as (string | symbol)[];
       } else {
         customKeys = Reflect.ownKeys(current as any);
       }
