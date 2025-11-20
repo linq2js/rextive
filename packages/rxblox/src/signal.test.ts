@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { signal, SignalOptions } from "./signal";
+import { signal, SignalOptions, FallbackError } from "./signal";
 import { batch } from "./batch";
 
 describe("signal", () => {
@@ -1438,6 +1438,289 @@ describe("signal", () => {
       expect(cError).toBe(null);
       expect(c.hasError()).toBe(true);
       expect(c.getError()).toBe(null);
+    });
+  });
+
+  describe("fallback option", () => {
+    it("should return fallback value when computation fails", () => {
+      const risky = signal<number>(
+        () => {
+          throw new Error("Failed");
+        },
+        { fallback: () => 42 }
+      );
+
+      expect(risky()).toBe(42);
+      expect(risky.hasError()).toBe(false); // No error exposed since it's handled
+    });
+
+    it("should return computed value when no error", () => {
+      const success = signal(() => 100, { fallback: () => 0 });
+
+      expect(success()).toBe(100);
+      expect(success.hasError()).toBe(false);
+    });
+
+    it("should pass error to fallback function", () => {
+      let capturedError: any;
+      const risky = signal<number>(
+        () => {
+          throw new Error("Test error");
+        },
+        {
+          fallback: (error) => {
+            capturedError = error;
+            return -1;
+          },
+        }
+      );
+
+      expect(risky()).toBe(-1);
+      expect(capturedError).toBeInstanceOf(Error);
+      expect(capturedError.message).toBe("Test error");
+    });
+
+    it("should recover when error is fixed", () => {
+      const trigger = signal(0);
+      let shouldFail = true;
+
+      const risky = signal(
+        () => {
+          trigger();
+          if (shouldFail) throw new Error("Failed");
+          return 100;
+        },
+        { fallback: () => 42 }
+      );
+
+      // Initially fails, returns fallback
+      expect(risky()).toBe(42);
+
+      // Source recovers
+      shouldFail = false;
+      trigger.set(1);
+
+      // Should now return source value
+      expect(risky()).toBe(100);
+    });
+
+    it("should handle transition from success to error to success", async () => {
+      const trigger = signal(0);
+      let shouldFail = false;
+
+      const risky = signal(
+        () => {
+          trigger();
+          if (shouldFail) throw new Error("Failed");
+          return trigger() * 10;
+        },
+        { fallback: () => -1 }
+      );
+
+      // Initially succeeds
+      expect(risky()).toBe(0);
+
+      // Transition to error
+      shouldFail = true;
+      trigger.set(1);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(risky()).toBe(-1);
+
+      // Transition back to success
+      shouldFail = false;
+      trigger.set(2);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(risky()).toBe(20);
+    });
+
+    it("should notify listeners when switching between success and fallback", async () => {
+      const trigger = signal(0);
+      let shouldFail = false;
+
+      const risky = signal(
+        () => {
+          trigger();
+          if (shouldFail) throw new Error("Failed");
+          return 100;
+        },
+        { fallback: () => 42 }
+      );
+
+      const listener = vi.fn();
+      risky.on(listener);
+
+      // Initial state
+      expect(risky()).toBe(100);
+
+      // Transition to error - should notify
+      shouldFail = true;
+      trigger.set(1);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(risky()).toBe(42);
+      expect(listener).toHaveBeenCalledTimes(1);
+
+      // Transition back to success - should notify
+      shouldFail = false;
+      trigger.set(2);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(risky()).toBe(100);
+      expect(listener).toHaveBeenCalledTimes(2);
+    });
+
+    it("should work with static values", () => {
+      const withFallback = signal<string>(
+        () => {
+          throw new Error("Always fails");
+        },
+        { fallback: () => "default" }
+      );
+
+      expect(withFallback()).toBe("default");
+    });
+
+    it("should allow fallback to compute based on error", () => {
+      const risky = signal<string>(
+        () => {
+          throw { code: 404, message: "Not found" };
+        },
+        {
+          fallback: (error: any) => {
+            if (error.code === 404) return "Resource not found";
+            return "Unknown error";
+          },
+        }
+      );
+
+      expect(risky()).toBe("Resource not found");
+    });
+
+    it("should handle fallback that also throws with FallbackError", () => {
+      const risky = signal<number>(
+        () => {
+          throw new Error("Primary error");
+        },
+        {
+          fallback: () => {
+            throw new Error("Fallback also failed");
+          },
+        }
+      );
+
+      // If fallback throws, should throw FallbackError with both errors
+      expect(() => risky()).toThrow();
+      expect(risky.hasError()).toBe(true);
+
+      const error = risky.getError();
+      expect(error).toBeInstanceOf(FallbackError);
+
+      const fallbackError = error as FallbackError;
+      expect(fallbackError.originalError).toBeInstanceOf(Error);
+      expect((fallbackError.originalError as Error).message).toBe(
+        "Primary error"
+      );
+      expect(fallbackError.fallbackError).toBeInstanceOf(Error);
+      expect((fallbackError.fallbackError as Error).message).toBe(
+        "Fallback also failed"
+      );
+      expect(fallbackError.message).toContain("Primary error");
+      expect(fallbackError.message).toContain("Fallback also failed");
+    });
+
+    it("should include signal name in FallbackError context", () => {
+      const risky = signal<number>(
+        () => {
+          throw new Error("Computation failed");
+        },
+        {
+          name: "riskySignal",
+          fallback: () => {
+            throw new Error("Fallback failed");
+          },
+        }
+      );
+
+      expect(() => risky()).toThrow();
+
+      const error = risky.getError() as FallbackError;
+      expect(error.signalName).toBe("riskySignal");
+      expect(error.message).toContain("riskySignal");
+    });
+
+    it("should format FallbackError message with both errors", () => {
+      const risky = signal<number>(
+        () => {
+          throw new Error("Network timeout");
+        },
+        {
+          name: "userLoader",
+          fallback: () => {
+            throw new Error("Default user not found");
+          },
+        }
+      );
+
+      try {
+        risky();
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect(error).toBeInstanceOf(FallbackError);
+        const fbError = error as FallbackError;
+
+        // Message should be informative
+        expect(fbError.message).toMatch(/userLoader/);
+        expect(fbError.message).toMatch(/Network timeout/);
+        expect(fbError.message).toMatch(/Default user not found/);
+        expect(fbError.message).toMatch(/fallback.*failed/i);
+      }
+    });
+
+    it("should work with non-Error throws in FallbackError", () => {
+      const risky = signal<number>(
+        () => {
+          throw "string error";
+        },
+        {
+          fallback: () => {
+            throw { code: 500, msg: "object error" };
+          },
+        }
+      );
+
+      expect(() => risky()).toThrow(FallbackError);
+
+      const error = risky.getError() as FallbackError;
+      expect(error.originalError).toBe("string error");
+      expect(error.fallbackError).toEqual({ code: 500, msg: "object error" });
+    });
+
+    it("should work with computed signals", async () => {
+      const trigger = signal(0);
+      let shouldFail = false;
+
+      const a = signal(
+        () => {
+          trigger();
+          if (shouldFail) throw new Error("A failed");
+          return 10;
+        },
+        { fallback: () => 0 }
+      );
+
+      const b = signal(() => a() * 2);
+
+      expect(b()).toBe(20);
+
+      shouldFail = true;
+      trigger.set(1);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(a()).toBe(0); // Fallback
+      expect(b()).toBe(0); // 0 * 2
+
+      shouldFail = false;
+      trigger.set(2);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(a()).toBe(10);
+      expect(b()).toBe(20);
     });
   });
 });

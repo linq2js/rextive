@@ -41,6 +41,7 @@ export type { Action, ActionOptions, ActionEvents } from "./action";
 export type { CancellableAction } from "./cancellableAction";
 export type { HistoryEntry, HistoryOptions, HistoryQuery } from "./history";
 export { disposable } from "./disposableDispatcher";
+export { FallbackError } from "./signal";
 export * from "./types";
 export { effect } from "./effect";
 export { rx } from "./rx";

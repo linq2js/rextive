@@ -17,6 +17,64 @@ import { batchToken } from "./batchDispatcher";
 import { createProxy } from "./utils/proxy/createProxy";
 
 /**
+ * Error thrown when both a signal computation and its fallback fail.
+ * Contains both the original error and the fallback error for debugging.
+ */
+export class FallbackError extends Error {
+  /**
+   * The original error that occurred during signal computation.
+   */
+  readonly originalError: unknown;
+
+  /**
+   * The error that occurred when the fallback function was executed.
+   */
+  readonly fallbackError: unknown;
+
+  /**
+   * The name of the signal (if provided via options.name).
+   */
+  readonly signalName?: string;
+
+  constructor(
+    originalError: unknown,
+    fallbackError: unknown,
+    signalName?: string
+  ) {
+    const formatError = (error: unknown): string => {
+      if (error instanceof Error) {
+        return error.message;
+      }
+      if (typeof error === "string") {
+        return error;
+      }
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return String(error);
+      }
+    };
+
+    const originalMsg = formatError(originalError);
+    const fallbackMsg = formatError(fallbackError);
+    const signalContext = signalName ? ` in signal '${signalName}'` : "";
+
+    super(
+      `Signal computation${signalContext} failed with: ${originalMsg}\n` +
+        `Fallback also failed with: ${fallbackMsg}`
+    );
+
+    this.name = "FallbackError";
+    this.originalError = originalError;
+    this.fallbackError = fallbackError;
+    this.signalName = signalName;
+
+    // Maintain proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, FallbackError.prototype);
+  }
+}
+
+/**
  * Global queue for coordinating post-batch recomputations.
  * This ensures that cascading updates (e.g., computed signals that depend on other computed signals)
  * only trigger once even when multiple dependencies change.
@@ -165,6 +223,31 @@ export type SignalOptions<T = any> = {
    * ```
    */
   persist?: Persistor<T>;
+
+  /**
+   * Fallback function to handle errors gracefully.
+   * When the signal computation throws an error, this function is called with the error
+   * and its return value is used instead. The signal will not expose an error state.
+   *
+   * If the fallback function itself throws, that error will be exposed.
+   *
+   * @param error - The error that was thrown during computation
+   * @returns The fallback value to use instead
+   *
+   * @example
+   * ```ts
+   * const risky = signal(
+   *   () => riskyOperation(),
+   *   {
+   *     fallback: (error) => {
+   *       console.error('Operation failed:', error);
+   *       return defaultValue;
+   *     }
+   *   }
+   * );
+   * ```
+   */
+  fallback?: (error: unknown) => T;
 };
 
 export type SignalComputeFn<T> = (context: ComputedSignalContext) => T;
@@ -295,7 +378,7 @@ export function signal<T>(
   // Cache for the current computed value (for computed signals)
   let current: { value: T; error?: unknown } | undefined;
   const onCleanup = emitter<void>();
-  const { equals = Object.is, persist, tags } = options;
+  const { equals = Object.is, persist, tags, fallback, name } = options;
   let hydrate = () => {};
 
   // Persistence state
@@ -378,7 +461,19 @@ export function signal<T>(
 
       current = { value: computedValue };
     } catch (error) {
-      current = { error, value: current?.value as T };
+      // If fallback is provided, try to use it
+      if (fallback) {
+        try {
+          const fallbackValue = fallback(error);
+          current = { value: fallbackValue };
+        } catch (fallbackError) {
+          // Fallback also failed - create FallbackError with both errors
+          const combinedError = new FallbackError(error, fallbackError, name);
+          current = { error: combinedError, value: current?.value as T };
+        }
+      } else {
+        current = { error, value: current?.value as T };
+      }
     }
     return current;
   };
