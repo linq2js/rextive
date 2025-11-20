@@ -117,11 +117,111 @@ export type TrackFunction = {
   };
 };
 
+export type SelectFn<T> = {
+  /**
+   * Creates a lightweight selector that derives a value from this signal.
+   *
+   * Selectors are efficient subscrib able views into parts of a signal's value.
+   * They only notify when the selected part changes (via shallow comparison by default).
+   *
+   * **Key features:**
+   * - Lightweight (no full signal overhead)
+   * - Fine-grained reactivity (only notify when selected value changes)
+   * - Auto-cleanup (disposed with parent signal)
+   * - No tracking in selector function (run without dependencies)
+   *
+   * @param selector - Function to select/transform the value, or property key
+   * @param equals - Custom equality function (defaults to shallowEquals)
+   * @returns A selector instance that can be tracked like a signal
+   *
+   * @example Property key selector
+   * ```typescript
+   * const todo = signal({ title: 'Hello', completed: false });
+   *
+   * const title = todo.select('title');
+   * console.log(title()); // 'Hello'
+   *
+   * const completed = todo.select('completed');
+   * effect(() => {
+   *   console.log('Completed:', completed()); // Only runs when completed changes
+   * });
+   * ```
+   *
+   * @example Function selector
+   * ```typescript
+   * const user = signal({ firstName: 'John', lastName: 'Doe', age: 30 });
+   *
+   * const fullName = user.select(u => `${u.firstName} ${u.lastName}`);
+   * console.log(fullName()); // 'John Doe'
+   *
+   * const age = user.select(u => u.age);
+   * effect(() => {
+   *   console.log('Age:', age()); // Only runs when age changes
+   * });
+   * ```
+   *
+   * @example Custom equality
+   * ```typescript
+   * import { deepEquals } from 'rxblox';
+   *
+   * const state = signal({ data: { nested: { value: 1 } } });
+   *
+   * const nested = state.select(
+   *   s => s.data.nested,
+   *   deepEquals // Use deep equality instead of shallow
+   * );
+   * ```
+   */
+  <R>(selector: (value: T) => R, equals?: (a: R, b: R) => boolean): Selector<R>;
+
+  /**
+   * Creates a fine-grained reactive selector for a specific property of this signal's value.
+   *
+   * This overload provides type-safe property access using string keys.
+   * Perfect for selecting a single property from an object signal without transforming it.
+   *
+   * @param selector - Property key to select from the signal's value
+   * @param equals - Optional equality function to determine if the property changed (defaults to shallowEquals)
+   * @returns A lightweight selector that tracks only the selected property
+   *
+   * @example
+   * ```ts
+   * const user = signal({ name: 'Alice', age: 30, email: 'alice@example.com' });
+   *
+   * // Select a single property
+   * const name = user.select('name');
+   * const age = user.select('age');
+   *
+   * // With custom equality for nested objects
+   * const profile = signal({ settings: { theme: 'dark' }, data: {...} });
+   * const settings = profile.select('settings', deepEquals);
+   * ```
+   */
+  <P extends keyof T>(
+    selector: P,
+    equals?: (a: T[P], b: T[P]) => boolean
+  ): Selector<T[P]>;
+};
+
 /**
  * Type definitions for rxblox - a reactive state management library for React.
  *
  * This module contains all the core type definitions used throughout the library.
  */
+
+/**
+ * Lightweight subscribable that derives a value from a parent signal.
+ * Created via `signal.select()`.
+ *
+ * Selectors are automatically disposed when their parent signal is disposed.
+ */
+export type Selector<T> = {
+  (): T;
+  peek(): T;
+  on(listener: VoidFunction): VoidFunction;
+
+  select: SelectFn<T>;
+};
 
 /**
  * A signal represents a reactive value that can be read and optionally written to.
@@ -281,6 +381,8 @@ export type Signal<T> = {
    * ```
    */
   clearError(): void;
+
+  select: SelectFn<T>;
 
   persistInfo: PersistInfo;
 };
@@ -495,8 +597,12 @@ export type SignalFactory = <T>(value: T | (() => T)) => MutableSignal<T>;
  */
 export type EffectFactory = (fn: () => void | VoidFunction) => Effect;
 
-export type Subscribable<T = void> = {
-  on(listener: (value: T) => void): VoidFunction;
+export type Subscribable = {
+  on(listener: VoidFunction): VoidFunction;
+};
+
+export type Observable<T> = Subscribable & {
+  (): T;
 };
 
 /**

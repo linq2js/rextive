@@ -6,6 +6,7 @@ import type {
   PersistStatus,
   Signal,
   TrackFunction,
+  Selector,
 } from "./types";
 import type { Tag } from "./tag";
 import { trackingDispatcher, trackingToken } from "./trackingDispatcher";
@@ -14,7 +15,8 @@ import { getDispatcher, getContextType, withDispatchers } from "./dispatcher";
 import { disposableToken } from "./disposableDispatcher";
 import { isPromiseLike } from "./isPromiseLike";
 import { batchToken } from "./batchDispatcher";
-import { createProxy } from "./utils/proxy/createProxy";
+import { AnyFunc, createProxy } from "./utils/proxy/createProxy";
+import { selector } from "./selector";
 
 /**
  * Error thrown when both a signal computation and its fallback fail.
@@ -378,6 +380,7 @@ export function signal<T>(
   // Cache for the current computed value (for computed signals)
   let current: { value: T; error?: unknown } | undefined;
   const onCleanup = emitter<void>();
+  const onDispose = emitter<void>();
   const { equals = Object.is, persist, tags, fallback, name } = options;
   let hydrate = () => {};
 
@@ -744,10 +747,28 @@ export function signal<T>(
         recompute();
       }
     },
+
+    /**
+     * Creates a lightweight selector that derives a value from this signal.
+     *
+     * @param selectorFn - Function to select/transform the value, or property key
+     * @param equals - Custom equality function (defaults to shallowEquals)
+     * @returns A selector instance
+     */
+    select(selectorFn: AnyFunc, equals?: AnyFunc): Selector<any> {
+      return selector(
+        s.peek, // getParentValue
+        s, // onParentChange (signal is Subscribable)
+        onDispose, // onParentDispose
+        selectorFn as any, // selectorFn
+        equals // equalsFn
+      );
+    },
   });
 
   getDispatcher(disposableToken)?.on(() => {
     onCleanup.emitAndClear();
+    onDispose.emitAndClear();
   });
 
   // Initialize persistence (hydration)
