@@ -11,6 +11,7 @@ import { MutableSignal, Signal } from "./types";
 import { isSignal, signal } from "./signal";
 import { dispatcherToken, getDispatcher, getContextType } from "./dispatcher";
 import { trackingToken } from "./trackingDispatcher";
+import { shallowEquals } from "./utils/shallowEquals";
 
 /**
  * Dispatcher token for provider resolution.
@@ -69,6 +70,7 @@ function ProviderContainer<T>(
   const parentResolver = useContext(providerResolverContext);
   const providerDefRef = useRef(props.providerDef);
   providerDefRef.current = props.providerDef;
+
   const [providerInstance] = useState(() => {
     let currentSignal: MutableSignal<T> | undefined;
     let currentValue = isSignal<T>(props.value)
@@ -127,15 +129,33 @@ function ProviderContainer<T>(
     [providerInstance]
   );
 
+  // Track props.value with shallow comparison for non-signal values
+  const prevValueRef = useRef(props.value);
+  const hasValueChanged =
+    isSignal<T>(props.value) ||
+    isSignal<T>(prevValueRef.current) ||
+    !shallowEquals(props.value, prevValueRef.current);
+
   useLayoutEffect(() => {
+    prevValueRef.current = props.value;
+
     if (isSignal<T>(props.value)) {
       const valueSignal = props.value;
       // No need to set initial value - it was already captured with .peek()
       // Just set up the subscription for future changes
       return valueSignal.on(() => providerInstance.setValue(valueSignal()));
     }
+
+    // Update provider value for non-signal props
     providerInstance.setValue(props.value);
-  }, [providerInstance, props.value]);
+  });
+
+  // Force re-subscription when value changes (only for non-signals)
+  useLayoutEffect(() => {
+    if (!isSignal<T>(props.value)) {
+      providerInstance.setValue(props.value);
+    }
+  }, [providerInstance, hasValueChanged]);
 
   return (
     <providerResolverContext.Provider

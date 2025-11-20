@@ -8,7 +8,6 @@ import {
   ReactNode,
   useImperativeHandle,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -25,6 +24,7 @@ import { trackingToken } from "./trackingDispatcher";
 import { disposableToken } from "./disposableDispatcher";
 import { syncOnly } from "./utils/syncOnly";
 import { createProxy } from "./utils/proxy/createProxy";
+import { shallowEquals } from "./utils/shallowEquals";
 
 /**
  * Creates a reactive component that tracks props as signals and manages effects.
@@ -169,68 +169,64 @@ export function blox<TProps extends object, TInterface>(
     const propsRef = useRef<PropsWithoutRef<TProps>>();
 
     /**
-     * Signal registry that creates and caches signals for each prop key.
+     * Single signal for the entire props object with shallow comparison.
      *
-     * This allows each prop to be tracked independently as a signal.
-     * Signals are created lazily when first accessed and reused for subsequent accesses.
+     * Created lazily on first access and cleaned up on unmount.
+     * Uses shallow comparison to avoid unnecessary updates when props object reference
+     * changes but the actual prop values remain the same.
      *
-     * Created once per component instance and reused across renders.
+     * Lazy creation ensures the signal is only allocated if props are actually accessed
+     * through the proxy in reactive contexts.
      */
-    const signalRegistry = useMemo(() => {
-      const signals = new Map<
-        keyof PropsWithoutRef<TProps>,
-        MutableSignal<unknown>
-      >();
+    const propsSignalRef = useRef<MutableSignal<PropsWithoutRef<TProps>>>();
 
-      return {
-        tryGet: (key: keyof PropsWithoutRef<TProps>) => {
-          return signals.get(key);
-        },
-        get: (key: keyof PropsWithoutRef<TProps>, initialValue: unknown) => {
-          if (!signals.has(key)) {
-            // Temporarily clear context to allow signal creation
-            // Prop signals are created once per component instance, not on every render
-            // Clear context type to prevent rx() validation errors
-            signals.set(
-              key,
-              trackingToken.without(() => signal(initialValue), {
-                contextType: undefined,
-              })
-            );
+    const getPropsSignal = () => {
+      if (!propsSignalRef.current) {
+        // Temporarily clear context to allow signal creation
+        // Props signal is created once per component instance, not on every render
+        // Clear context type to prevent rx() validation errors
+        propsSignalRef.current = trackingToken.without(
+          () =>
+            signal(propsRef.current as PropsWithoutRef<TProps>, {
+              equals: shallowEquals,
+            }),
+          {
+            contextType: undefined,
           }
-          return signals.get(key)!;
-        },
-      };
-    }, []);
+        );
+
+        // Clean up signal on unmount
+        eventDispatcher.emitters.unmount.on(() => {
+          propsSignalRef.current = undefined;
+        });
+      }
+      return propsSignalRef.current;
+    };
 
     /**
-     * Update propsRef immediately during render.
-     * Signal updates happen in useLayoutEffect to avoid "Cannot update during render" warnings.
+     * Update refs immediately during render.
+     * Signal update happens in useLayoutEffect to avoid "Cannot update during render" warnings.
      */
     propsRef.current = userProps as PropsWithoutRef<TProps>;
 
     useLayoutEffect(() => {
-      Object.entries(userProps).forEach(([key, value]) => {
-        const signal = signalRegistry.tryGet(
-          key as keyof PropsWithoutRef<TProps>
-        );
-
-        if (signal && signal.peek() !== value) {
-          signal.set(value);
-        }
-      });
+      // Update props signal if it exists (created lazily)
+      // Shallow comparison in the signal prevents unnecessary notifications
+      if (propsSignalRef.current) {
+        propsSignalRef.current.set(propsRef.current as PropsWithoutRef<TProps>);
+      }
     });
 
     /**
      * Proxy object that wraps props to track signal dependencies.
      *
      * When props are accessed (e.g., `props.count`), the proxy:
-     * 1. Gets or creates a signal for that prop key
+     * 1. Gets or creates the single props signal (lazy creation)
      * 2. Adds the signal to the current signal dispatcher (for tracking)
      * 3. Returns the current prop value from propsRef
      *
      * This allows effects and reactive expressions (like `rx`) to automatically
-     * track which props they depend on, and re-run when those props change.
+     * track props access, and re-run when any accessed prop changes (via shallow comparison).
      *
      * The proxy target is an empty object to avoid React's strict equality checks
      * that would fail when props change but the proxy target remains the same.
@@ -243,19 +239,16 @@ export function blox<TProps extends object, TInterface>(
         traps: {
           /**
            * Intercepts property access on the props object.
-           * When a prop is accessed, it tracks the corresponding signal
+           * When a prop is accessed, it tracks the single props signal
            * and returns the current prop value.
            */
           get(_target, prop) {
-            // Get or create a signal for this prop key
-            const propSignal = signalRegistry.get(
-              prop as keyof PropsWithoutRef<TProps>,
-              propsRef.current?.[prop as keyof PropsWithoutRef<TProps>]
-            );
+            // Get or create the props signal (lazy)
+            const propsSignal = getPropsSignal();
 
             // Add the signal to the current dispatcher for tracking
-            // This allows effects and rx() expressions to track this prop
-            getDispatcher(trackingToken)?.add(propSignal);
+            // This allows effects and rx() expressions to track props changes
+            getDispatcher(trackingToken)?.add(propsSignal);
 
             // Return the current prop value
             return propsRef.current?.[prop as keyof PropsWithoutRef<TProps>];
