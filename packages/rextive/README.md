@@ -560,6 +560,92 @@ rx({ user, posts, comments }, (awaited) => {
 });
 ```
 
+### Persistence with localStorage
+
+```tsx
+import { signal } from "rextive";
+
+// Simple persistence with debouncing
+const { signals } = signal.persist(
+  { count: signal(0), name: signal("") },
+  {
+    load: () => {
+      const stored = localStorage.getItem("app-state");
+      return stored ? JSON.parse(stored) : {};
+    },
+    save: (values) => {
+      localStorage.setItem("app-state", JSON.stringify(values));
+    },
+  }
+);
+
+// Signals are automatically loaded and saved
+signals.count.set(42); // Automatically persisted
+```
+
+### Persistence with control
+
+```tsx
+import { signal } from "rextive";
+import { debounce } from "lodash-es";
+
+const { signals, pause, resume, status } = signal.persist(
+  { todos: signal([]), filter: signal("all") },
+  {
+    load: () => JSON.parse(localStorage.getItem("todos") || "{}"),
+    save: debounce((values) => {
+      localStorage.setItem("todos", JSON.stringify(values));
+    }, 300),
+    onError: (error, type) => {
+      console.error(`${type} failed:`, error);
+    },
+  }
+);
+
+// Pause during bulk operations
+pause();
+signals.todos.set([...newTodos]);
+signals.filter.set("active");
+resume(); // Saves latest state immediately
+
+// Check status
+console.log(status()); // 'idle' | 'loading' | 'watching' | 'paused'
+```
+
+### Conditional persistence
+
+```tsx
+import { signal } from "rextive";
+
+const { signals, start, cancel } = signal.persist(
+  { userSettings: signal({}), theme: signal("light") },
+  {
+    autoStart: false, // Don't start automatically
+    load: async () => {
+      const res = await fetch("/api/user-settings");
+      return res.json();
+    },
+    save: (values) => {
+      fetch("/api/user-settings", {
+        method: "POST",
+        body: JSON.stringify(values),
+      });
+    },
+  }
+);
+
+// Start persistence only when user is logged in
+if (isLoggedIn) {
+  start();
+}
+
+// Stop persistence on logout
+function logout() {
+  cancel();
+  // ... logout logic
+}
+```
+
 ---
 
 ## API
@@ -594,6 +680,30 @@ const unsubscribe = count.on(() => {
 
 // Cleanup
 count.dispose();
+```
+
+### signal.persist
+
+```tsx
+// Persist multiple signals with centralized load/save
+const { signals, pause, resume, status, start, cancel } = signal.persist(
+  { count: signal(0), name: signal("") },
+  {
+    load: () => JSON.parse(localStorage.getItem("state") || "{}"),
+    save: (values) => localStorage.setItem("state", JSON.stringify(values)),
+    onError: (error, type) => console.error(`${type} failed:`, error),
+    autoStart: true, // default: true - start immediately
+  }
+);
+
+// Check status: 'idle' | 'loading' | 'watching' | 'paused'
+console.log(status());
+
+// Control persistence
+pause(); // Pause saving
+resume(); // Resume and save latest state
+cancel(); // Stop all persistence
+start(); // Restart persistence
 ```
 
 ### rx

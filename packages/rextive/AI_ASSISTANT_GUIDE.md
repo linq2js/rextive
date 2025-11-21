@@ -54,6 +54,17 @@ Creates component-scoped signals/disposables with automatic cleanup.
   - `dispose() { ... }` - custom dispose method
 - Can return non-disposable helpers without them being disposed
 
+### 4. signal.persist - Batch Persistence
+
+Persist multiple signals with centralized load/save operations.
+
+**Key Points:**
+- Single state machine: `idle → loading → watching → paused → idle`
+- Batch operations for multiple signals
+- Control functions: `start()`, `cancel()`, `pause()`, `resume()`
+- Waits for load before subscribing (prevents saving initial values)
+- Calling site handles debouncing (e.g., with lodash)
+
 ## Common Patterns
 
 ### Pattern 1: Component-Scoped Signals
@@ -170,7 +181,53 @@ const effectResult = signal({ refreshTrigger }, async ({ deps }) => {
 refreshTrigger.set(refreshTrigger() + 1);
 ```
 
-### Pattern 6: Conditional Rendering with Suspense
+### Pattern 6: Batch Persistence with localStorage
+
+```tsx
+import { debounce } from 'lodash-es';
+
+const { signals, pause, resume } = signal.persist(
+  { count: signal(0), name: signal("") },
+  {
+    load: () => {
+      const stored = localStorage.getItem("app-state");
+      return stored ? JSON.parse(stored) : {};
+    },
+    save: debounce((values) => {
+      localStorage.setItem("app-state", JSON.stringify(values));
+    }, 300),
+    onError: (error, type) => {
+      console.error(`Failed to ${type}:`, error);
+    }
+  }
+);
+
+// Pause during bulk operations
+pause();
+signals.count.set(100);
+signals.name.set("John");
+resume(); // Saves latest state immediately
+```
+
+### Pattern 7: Conditional Persistence
+
+```tsx
+const { signals, start } = signal.persist(
+  { user: signal(null), settings: signal({}) },
+  {
+    autoStart: false, // Don't start automatically
+    load: () => JSON.parse(localStorage.getItem("user-state") || "{}"),
+    save: (values) => localStorage.setItem("user-state", JSON.stringify(values))
+  }
+);
+
+// Start persistence only when user is logged in
+if (isLoggedIn) {
+  start();
+}
+```
+
+### Pattern 8: Conditional Rendering with Suspense
 
 ```tsx
 function Component() {
@@ -275,6 +332,33 @@ const loadable = useLoadable({ data });
 // loadable.data.status: "loading" | "success" | "error"
 // loadable.data.value: T (if success)
 // loadable.data.error: unknown (if error)
+```
+
+### signal.persist
+
+```tsx
+import { debounce } from 'lodash-es';
+
+const { signals, pause, resume, status } = signal.persist(
+  { count: signal(0), name: signal("") },
+  {
+    load: () => JSON.parse(localStorage.getItem("state") || "{}"),
+    save: debounce((values) => {
+      localStorage.setItem("state", JSON.stringify(values));
+    }, 300),
+    onError: (error, type) => console.error(error),
+    autoStart: true, // default - start immediately
+  }
+);
+
+// Status: 'idle' | 'loading' | 'watching' | 'paused'
+console.log(status()); // 'watching'
+
+// Control
+pause(); // Pause saving
+resume(); // Resume and save latest state
+cancel(); // Stop all persistence
+start(); // Restart persistence
 ```
 
 ## Best Practices
@@ -482,6 +566,7 @@ const scope = useScope(() => ({
 ## When to Use What
 
 - **`signal`**: For reactive values (sync or async)
+- **`signal.persist`**: For batch persistence of multiple signals
 - **`rx`**: For reactive rendering in components
 - **`useScope`**: For component-scoped signals with cleanup
 - **`useAwaited`**: For Suspense integration (usually use `rx` instead)

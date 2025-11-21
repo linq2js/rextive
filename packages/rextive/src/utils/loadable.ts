@@ -6,7 +6,7 @@ import {
   type SuccessLoadable,
   type ErrorLoadable,
   type Loadable,
-} from "./types";
+} from "../types";
 
 // Re-export types for backward compatibility
 export { LOADABLE_TYPE };

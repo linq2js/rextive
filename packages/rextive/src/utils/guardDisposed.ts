@@ -1,4 +1,4 @@
-import { AnyFunc } from "./types";
+import { AnyFunc } from "../types";
 
 export function guardDisposed<T extends AnyFunc>(
   isDisposed: () => boolean,

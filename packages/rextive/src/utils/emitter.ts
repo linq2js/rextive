@@ -1,4 +1,4 @@
-import { Listener } from "./index";
+import { Listener } from "../types";
 
 /**
  * Creates an event emitter for managing and notifying listeners.

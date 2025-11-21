@@ -2,8 +2,8 @@ import { useLayoutEffect, useMemo, useState } from "react";
 import { ResolveValue, ResolveValueType, Signal, SignalMap } from "../types";
 import { useRerender } from "../useRerender";
 import { createSignalAccessProxy } from "./createSignalAccessProxy";
-import { getLoadable } from "../loadable";
-import { emitter } from "../emitter";
+import { getLoadable } from "./loadable";
+import { emitter } from "./emitter";
 
 /**
  * useSignals - Creates lazy-tracking proxies for signal access

@@ -1,5 +1,5 @@
-import { emitter } from "./emitter";
-import { guardDisposed } from "./guardDisposed";
+import { emitter } from "./utils/emitter";
+import { guardDisposed } from "./utils/guardDisposed";
 import {
   Signal,
   SignalContext,
@@ -9,6 +9,11 @@ import {
 } from "./types";
 import { createSignalAccessProxy } from "./utils/createSignalAccessProxy";
 import { produce } from "immer";
+import {
+  persistSignals as persistSignalsImpl,
+  PersistSignalsOptions,
+  PersistSignalsResult,
+} from "./persistSignals";
 
 export const SIGNAL_TYPE = Symbol("SIGNAL_TYPE");
 export const DISPOSED_MESSAGE = "Signal is disposed";
@@ -37,22 +42,35 @@ export type SignalExports = {
     compute: (context: SignalContext<NoInfer<TDependencies>>) => TValue,
     options?: SignalOptions<TValue>
   ): Signal<TValue>;
+
+  /**
+   * Persist multiple signals with centralized load/save operations
+   */
+  persist: <TSignals extends SignalMap>(
+    signals: TSignals,
+    options?: PersistSignalsOptions<TSignals>
+  ) => PersistSignalsResult<TSignals>;
 };
 
-export const signal: SignalExports = (...args: any[]) => {
-  // overload: signal(deps, fn, options?)
-  if (typeof args[1] === "function") {
-    return createSignal(args[0], args[1], args[2], undefined);
+export const signal: SignalExports = Object.assign(
+  (...args: any[]) => {
+    // overload: signal(deps, fn, options?)
+    if (typeof args[1] === "function") {
+      return createSignal(args[0], args[1], args[2], undefined);
+    }
+    // overload: signal(value, options?)
+    const isLazy = typeof args[0] === "function";
+    return createSignal(
+      {},
+      isLazy ? args[0] : () => args[0],
+      args[1],
+      isLazy ? undefined : { value: args[0] }
+    );
+  },
+  {
+    persist: persistSignalsImpl,
   }
-  // overload: signal(value, options?)
-  const isLazy = typeof args[0] === "function";
-  return createSignal(
-    {},
-    isLazy ? args[0] : () => args[0],
-    args[1],
-    isLazy ? undefined : { value: args[0] }
-  );
-};
+) as SignalExports;
 
 export class FallbackError extends Error {
   readonly originalError: unknown;
