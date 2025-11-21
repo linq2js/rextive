@@ -189,9 +189,11 @@ function createSignal(
         trackedDeps,
         // Proxy for dependency access with auto-tracking
         deps: createSignalAccessProxy<
+          "value",
           SignalMap,
           ResolveValue<SignalMap, "value">
         >({
+          type: "value",
           getSignals: () => deps,
           onSignalAccess: (depSignal) => {
             // Auto-subscribe to dependency if not already tracked
@@ -201,7 +203,6 @@ function createSignal(
               onCleanup.on(depSignal.on(onDepChange));
             }
           },
-          getValue: (signal) => signal(), // Return current value of dependency
         }),
         abortSignal: abortController.signal,
       };

@@ -2,7 +2,6 @@ import { useLayoutEffect, useMemo, useState } from "react";
 import { ResolveValue, ResolveValueType, Signal, SignalMap } from "../types";
 import { useRerender } from "../useRerender";
 import { createSignalAccessProxy } from "./createSignalAccessProxy";
-import { getLoadable } from "./loadable";
 import { emitter } from "./emitter";
 
 /**
@@ -104,52 +103,18 @@ export function useSignals<TSignals extends SignalMap>(
       if (!proxy) {
         // Create new proxy for this access type using shared utility
         proxy = createSignalAccessProxy<
+          TType,
           TSignals,
           ResolveValue<TSignals, TType>
         >({
+          type,
           getSignals: () => ref.signals,
           onSignalAccess: (signal) => {
             // Track signal for subscription setup
             ref.trackedSignals.add(signal);
           },
-          getValue: (signal) => {
-            // Get current signal value
-            const value = signal();
-
-            // Handle different access patterns
-            if (type === "value") {
-              // Direct value access - return as-is (sync or async)
-              return value;
-            }
-
-            // Convert to loadable for awaited/loadable patterns
-            const loadable = getLoadable(value);
-
-            if (type === "awaited") {
-              // Suspense pattern: throw promises/errors for React boundaries
-              if (loadable.status === "loading") {
-                throw loadable.promise; // Suspense catches this
-              }
-              if (loadable.status === "error") {
-                throw loadable.error; // ErrorBoundary catches this
-              }
-              // Return resolved value
-              return loadable.value;
-            }
-
-            if (loadable.status === "loading") {
-              loadable.promise.then(
-                () => {
-                  rerender();
-                },
-                () => {
-                  rerender();
-                }
-              );
-            }
-
-            // loadable pattern: return Loadable object for manual handling
-            return loadable;
+          onFinally: () => {
+            rerender();
           },
           // Lazy tracking: only track signals accessed during render phase
           // rerender.rendering() === true means we're currently rendering

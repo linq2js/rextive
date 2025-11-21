@@ -1,8 +1,14 @@
 import { createProxy } from "./createProxy";
 import { isSignal } from "../signal";
-import { Signal, SignalMap } from "../types";
+import { ResolveValueType, Signal, SignalMap } from "../types";
+import { isPromiseLike } from "./isPromiseLike";
+import { getLoadable, loadable } from "./loadable";
 
-export type SignalAccessProxyOptions<TSignals extends SignalMap> = {
+export type SignalAccessProxyOptions<
+  TSignals extends SignalMap,
+  TType extends ResolveValueType
+> = {
+  type?: TType;
   /**
    * Function that returns the current signals object.
    * Called on every property access to get the latest signals.
@@ -27,6 +33,8 @@ export type SignalAccessProxyOptions<TSignals extends SignalMap> = {
    * If omitted, onSignalAccess is always called
    */
   shouldTrack?: () => boolean;
+
+  onFinally?: VoidFunction;
 };
 
 /**
@@ -89,10 +97,12 @@ type ResolveValue<
  * ```
  */
 export function createSignalAccessProxy<
+  TType extends ResolveValueType,
   TSignals extends SignalMap,
-  TResolved extends Record<string, any> = ResolveValue<TSignals, "value">
->(options: SignalAccessProxyOptions<TSignals>): TResolved {
-  const { getSignals, onSignalAccess, getValue, shouldTrack } = options;
+  TResolved extends Record<string, any> = ResolveValue<TSignals, TType>
+>(options: SignalAccessProxyOptions<TSignals, TType>): TResolved {
+  const { getSignals, onSignalAccess, getValue, shouldTrack, type, onFinally } =
+    options;
 
   return createProxy({
     get: getSignals,
@@ -114,8 +124,39 @@ export function createSignalAccessProxy<
           return getValue(signal);
         }
 
+        const value = signal();
+
+        if (type === "awaited") {
+          if (isPromiseLike(value)) {
+            const l = getLoadable(value);
+            if (l.status === "loading") {
+              throw l.promise;
+            }
+            if (l.status === "error") {
+              throw l.error;
+            }
+            return l.value;
+          }
+          return loadable("success", value);
+        }
+
+        if (type === "loadable") {
+          if (isPromiseLike(value)) {
+            const l = getLoadable(value);
+            if (l.status === "loading") {
+              if (onFinally) {
+                l.promise.then(onFinally, onFinally);
+              }
+            }
+
+            return l;
+          }
+
+          return loadable("success", value);
+        }
+
         // Default: return signal value directly
-        return signal();
+        return value;
       },
     },
   }) as unknown as TResolved;
