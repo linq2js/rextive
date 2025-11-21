@@ -37,10 +37,22 @@ import { Listener } from "../types";
  */
 export function emitter<T = void>() {
   /**
-   * Array of registered listeners that will be notified when events are emitted.
-   * Using an array allows multiple listeners and maintains order.
+   * Set of registered listeners that will be notified when events are emitted.
+   * Using a Set provides O(1) removal and prevents duplicate listeners.
    */
-  const listeners: Listener<T>[] = [];
+  const listeners = new Set<Listener<T>>();
+  const emit = (payload: T, clear: boolean) => {
+    // Create snapshot - necessary because Set.forEach includes items added during iteration
+    const copy = Array.from(listeners);
+    if (clear) {
+      listeners.clear();
+    }
+    // Use traditional for loop for maximum performance in this hot path
+    const len = copy.length;
+    for (let i = 0; i < len; i++) {
+      copy[i](payload);
+    }
+  };
 
   return {
     /**
@@ -50,54 +62,48 @@ export function emitter<T = void>() {
      * Returns an unsubscribe function that removes the listener.
      *
      * **Important**: The unsubscribe function is idempotent - calling it multiple
-     * times is safe and won't cause errors.
+     * times is safe and won't cause errors. If the same listener is added multiple
+     * times, it will only be called once per emit (Set deduplication).
      *
      * @param listener - Function to call when events are emitted
      * @returns An unsubscribe function that removes the listener
      */
     on(listener: Listener<T>): VoidFunction {
-      /**
-       * Flag to track if this listener is still active.
-       * Prevents double-unsubscription if unsubscribe is called multiple times.
-       */
-      let active = true;
-      listeners.push(listener);
+      listeners.add(listener);
 
       /**
        * Unsubscribe function that removes the listener from the emitter.
-       * Safe to call multiple times - uses the `active` flag to prevent errors.
+       * Safe to call multiple times - Set.delete() is idempotent.
        */
       return () => {
-        if (!active) {
-          return;
-        }
-        active = false;
-        // Find and remove the listener from the array
-        listeners.splice(listeners.indexOf(listener), 1);
+        listeners.delete(listener);
       };
     },
     /**
      * Emits an event to all registered listeners.
      *
-     * **Important**: Uses `slice()` to create a copy of the listeners array
-     * before iterating. This ensures that if a listener modifies the listeners
-     * array (e.g., by unsubscribing) during emission, it won't affect the
-     * current emission cycle.
+     * **Important**: Creates a snapshot of listeners before iterating to ensure
+     * that modifications during emission (adding/removing listeners) don't affect
+     * the current emission cycle. This prevents:
+     * - New listeners added during emission from being called immediately
+     * - Issues with listeners that unsubscribe during emission
+     *
+     * Performance: For typical use cases (< 20 listeners), Array.from() overhead
+     * is negligible compared to calling the listener functions themselves.
      *
      * @param payload - The value to pass to all listeners
      */
     emit(payload: T): void {
-      // Create a copy of listeners array to avoid issues if listeners modify the array during emission
-      listeners.slice().forEach((listener) => listener(payload));
+      emit(payload, false);
     },
     /**
      * Removes all registered listeners.
      *
      * After calling `clear()`, no listeners will be notified until new ones
-     * are added via `add()`.
+     * are added via `on()`.
      */
     clear(): void {
-      listeners.length = 0;
+      listeners.clear();
     },
 
     /**
@@ -106,8 +112,7 @@ export function emitter<T = void>() {
      * @param payload - The value to pass to all listeners
      */
     emitAndClear(payload: T): void {
-      this.emit(payload);
-      this.clear();
+      emit(payload, true);
     },
   };
 }

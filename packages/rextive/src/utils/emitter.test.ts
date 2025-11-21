@@ -51,6 +51,21 @@ describe("emitter", () => {
 
       expect(callOrder).toEqual(["first", "second", "third"]);
     });
+
+    it("should prevent duplicate listeners (same function added twice)", () => {
+      const eventEmitter = emitter<string>();
+      const listener = vi.fn();
+
+      // Add the same listener twice
+      eventEmitter.on(listener);
+      eventEmitter.on(listener);
+
+      eventEmitter.emit("test");
+
+      // Should only be called once due to Set deduplication
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith("test");
+    });
   });
 
   describe("unsubscribe functionality", () => {
