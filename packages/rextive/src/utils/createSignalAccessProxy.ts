@@ -1,11 +1,8 @@
 import { createProxy } from "./createProxy";
-import { isSignal, Signal } from "../signal";
-import { SignalMap } from "../types";
+import { isSignal } from "../signal";
+import { Signal, SignalMap } from "../types";
 
-export type SignalAccessProxyOptions<
-  TSignals extends SignalMap,
-  TResolved extends Record<string, any> = ResolveValue<TSignals, "value">
-> = {
+export type SignalAccessProxyOptions<TSignals extends SignalMap> = {
   /**
    * Function that returns the current signals object.
    * Called on every property access to get the latest signals.
@@ -52,15 +49,15 @@ type ResolveValue<
 
 /**
  * Creates a proxy for accessing signals with configurable tracking and value transformation.
- * 
+ *
  * This utility extracts the common pattern of:
  * 1. Creating a proxy over a signals object
  * 2. Tracking signal access (lazy or immediate)
  * 3. Transforming signal values before returning
- * 
+ *
  * The return type is inferred from the `getValue` transformation function, allowing
  * proper type resolution for "value", "awaited", and "loadable" access patterns.
- * 
+ *
  * @example Usage in signal.ts (deps proxy)
  * ```ts
  * deps: createSignalAccessProxy({
@@ -74,7 +71,7 @@ type ResolveValue<
  *   getValue: (signal) => signal(), // simple value access
  * })
  * ```
- * 
+ *
  * @example Usage in useSignals.ts (signals proxy with lazy tracking)
  * ```ts
  * proxy = createSignalAccessProxy<TSignals, ResolveValue<TSignals, "awaited">>({
@@ -94,9 +91,7 @@ type ResolveValue<
 export function createSignalAccessProxy<
   TSignals extends SignalMap,
   TResolved extends Record<string, any> = ResolveValue<TSignals, "value">
->(
-  options: SignalAccessProxyOptions<TSignals, TResolved>
-): TResolved {
+>(options: SignalAccessProxyOptions<TSignals>): TResolved {
   const { getSignals, onSignalAccess, getValue, shouldTrack } = options;
 
   return createProxy({
@@ -123,5 +118,5 @@ export function createSignalAccessProxy<
         return signal();
       },
     },
-  }) as TResolved;
+  }) as unknown as TResolved;
 }
