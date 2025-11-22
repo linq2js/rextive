@@ -1,4 +1,4 @@
-import { emitter } from "./utils/emitter";
+import { Emitter, emitter } from "./utils/emitter";
 import { guardDisposed } from "./utils/guardDisposed";
 import {
   Signal,
@@ -84,6 +84,75 @@ export class FallbackError extends Error {
   }
 }
 
+function createContext(
+  deps: SignalMap,
+  onCleanup: Emitter,
+  onDepChange: VoidFunction
+): SignalContext<SignalMap> & {
+  trackedDeps: Set<Signal<any>>;
+  abortController: AbortController;
+  cleanup: VoidFunction;
+} {
+  let abortController: AbortController | undefined;
+  let trackedDeps: Set<Signal<any>> | undefined;
+  let depsProxy: any;
+
+  const getTrackedDeps = () => {
+    if (!trackedDeps) {
+      trackedDeps = new Set();
+    }
+    return trackedDeps;
+  };
+
+  const getAbortController = () => {
+    if (!abortController) {
+      abortController = new AbortController();
+    }
+    return abortController;
+  };
+
+  return {
+    get abortController() {
+      return getAbortController();
+    },
+    get trackedDeps() {
+      return getTrackedDeps();
+    },
+    // Proxy for dependency access with auto-tracking
+    get deps() {
+      if (!depsProxy) {
+        depsProxy = createSignalAccessProxy<
+          "value",
+          SignalMap,
+          ResolveValue<SignalMap, "value">
+        >({
+          type: "value",
+          getSignals: () => deps,
+          onSignalAccess: (depSignal) => {
+            // Auto-subscribe to dependency if not already tracked
+            if (!getTrackedDeps().has(depSignal)) {
+              getTrackedDeps().add(depSignal); // Mark as tracked
+              // Subscribe to dep changes and store unsubscribe function in onCleanup
+              onCleanup.on(depSignal.on(onDepChange));
+            }
+          },
+        });
+      }
+      return depsProxy;
+    },
+    get abortSignal() {
+      return getAbortController().signal;
+    },
+    cleanup() {
+      abortController?.abort();
+      abortController = undefined;
+      trackedDeps?.clear();
+      trackedDeps = undefined;
+      depsProxy = undefined;
+    },
+  };
+}
+
 /**
  * Internal function to create a signal instance.
  *
@@ -139,12 +208,7 @@ function createSignal(
 
   // Computation context - recreated on each recompute
   // Contains: deps proxy, trackedDeps set, abortController, abortSignal
-  let context:
-    | (SignalContext<SignalMap> & {
-        trackedDeps: Set<Signal<any>>; // Set of dep signals to avoid duplicate subscriptions
-        abortController: AbortController;
-      })
-    | undefined;
+  let context: ReturnType<typeof createContext> | undefined;
 
   // Reference to the signal instance for tag bookkeeping
   let instanceRef: Signal<any> | undefined;
@@ -157,6 +221,7 @@ function createSignal(
    */
   const dispose = () => {
     if (disposed) return;
+    context?.cleanup();
 
     // Mark as disposed but keep current state for reading
     disposed = true;
@@ -192,44 +257,11 @@ function createSignal(
     // - Aborts previous AbortController
     // - Clears trackedDeps set
     onCleanup.emitAndClear();
+    context?.cleanup();
 
     try {
-      // Create fresh abort controller for this computation
-      const abortController = new AbortController();
-
-      // Track which dependency signals we've subscribed to
-      // Used to avoid duplicate subscriptions when same dep accessed multiple times
-      const trackedDeps = new Set<any>();
-
-      // Register cleanup for next recompute or disposal
-      onCleanup.on(() => {
-        trackedDeps.clear();
-        abortController.abort();
-      });
-
       // Create computation context
-      context = {
-        abortController,
-        trackedDeps,
-        // Proxy for dependency access with auto-tracking
-        deps: createSignalAccessProxy<
-          "value",
-          SignalMap,
-          ResolveValue<SignalMap, "value">
-        >({
-          type: "value",
-          getSignals: () => deps,
-          onSignalAccess: (depSignal) => {
-            // Auto-subscribe to dependency if not already tracked
-            if (!trackedDeps.has(depSignal)) {
-              trackedDeps.add(depSignal); // Mark as tracked
-              // Subscribe to dep changes and store unsubscribe function in onCleanup
-              onCleanup.on(depSignal.on(onDepChange));
-            }
-          },
-        }),
-        abortSignal: abortController.signal,
-      };
+      context = createContext(deps, onCleanup, onDepChange);
 
       // Execute computation function
       const value = fn(context);
