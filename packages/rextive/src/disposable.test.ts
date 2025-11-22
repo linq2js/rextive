@@ -463,4 +463,186 @@ describe("disposable", () => {
       }
     });
   });
+
+  describe("object shape", () => {
+    it("should preserve property names with object shape", () => {
+      const auth = {
+        login: vi.fn(),
+        logout: vi.fn(),
+        dispose: vi.fn(),
+      };
+
+      const api = {
+        get: vi.fn(),
+        post: vi.fn(),
+        dispose: vi.fn(),
+      };
+
+      const services = disposable({ auth, api });
+
+      // Should preserve property names
+      expect(services.auth).toBe(auth);
+      expect(services.api).toBe(api);
+
+      // Should have dispose method
+      expect(typeof services.dispose).toBe("function");
+
+      // Should be able to access nested methods
+      services.auth.login();
+      expect(auth.login).toHaveBeenCalledOnce();
+
+      services.api.get();
+      expect(api.get).toHaveBeenCalledOnce();
+    });
+
+    it("should dispose all services in reverse order with object shape", () => {
+      const order: string[] = [];
+
+      const auth = {
+        dispose: () => order.push("auth"),
+      };
+
+      const api = {
+        dispose: () => order.push("api"),
+      };
+
+      const storage = {
+        dispose: () => order.push("storage"),
+      };
+
+      const services = disposable({ auth, api, storage });
+      services.dispose();
+
+      // Should dispose in reverse order of keys
+      expect(order).toEqual(["storage", "api", "auth"]);
+    });
+
+    it("should handle mixed services (with and without dispose) in object shape", () => {
+      const withDispose = {
+        method: vi.fn(),
+        dispose: vi.fn(),
+      };
+
+      const withoutDispose = {
+        method: vi.fn(),
+      };
+
+      const services = disposable({ withDispose, withoutDispose });
+      services.dispose();
+
+      expect(withDispose.dispose).toHaveBeenCalledOnce();
+      expect(services.withDispose).toBe(withDispose);
+      expect(services.withoutDispose).toBe(withoutDispose);
+    });
+
+    it("should not overwrite dispose property from input object", () => {
+      const customDispose = vi.fn();
+
+      const services = disposable({
+        auth: { dispose: vi.fn() },
+        dispose: customDispose, // This should be ignored
+      });
+
+      // dispose should be our unified dispose, not the custom one
+      services.dispose();
+
+      expect(customDispose).not.toHaveBeenCalled();
+      expect(services.auth.dispose).toHaveBeenCalledOnce();
+    });
+
+    it("should call lifecycle callbacks with object shape", () => {
+      const onBefore = vi.fn();
+      const onAfter = vi.fn();
+
+      const services = disposable(
+        {
+          auth: { dispose: vi.fn() },
+          api: { dispose: vi.fn() },
+        },
+        { onBefore, onAfter }
+      );
+
+      services.dispose();
+
+      expect(onBefore).toHaveBeenCalledOnce();
+      expect(onAfter).toHaveBeenCalledOnce();
+    });
+
+    it("should collect disposal errors with object shape", () => {
+      expect.hasAssertions();
+
+      const services = disposable({
+        auth: {
+          dispose: () => {
+            throw new Error("Auth disposal failed");
+          },
+        },
+        api: {
+          dispose: () => {
+            throw new Error("API disposal failed");
+          },
+        },
+      });
+
+      try {
+        services.dispose();
+        throw new Error("Should have thrown");
+      } catch (error) {
+        expect(error).toBeInstanceOf(DisposalAggregateError);
+        expect((error as DisposalAggregateError).errors).toHaveLength(2);
+        expect((error as DisposalAggregateError).errors[0].message).toContain(
+          "Failed to dispose service at key 'api'"
+        );
+        expect((error as DisposalAggregateError).errors[1].message).toContain(
+          "Failed to dispose service at key 'auth'"
+        );
+      }
+    });
+
+    it("should only dispose once with object shape", () => {
+      const auth = { dispose: vi.fn() };
+      const services = disposable({ auth });
+
+      services.dispose();
+      services.dispose();
+
+      expect(auth.dispose).toHaveBeenCalledOnce();
+    });
+
+    it("should work with empty object", () => {
+      const services = disposable({});
+
+      expect(typeof services.dispose).toBe("function");
+      expect(() => services.dispose()).not.toThrow();
+    });
+
+    it("should support TypeScript type inference with object shape", () => {
+      interface AuthService {
+        login: () => void;
+        dispose: () => void;
+      }
+
+      interface ApiService {
+        get: () => void;
+        dispose: () => void;
+      }
+
+      const auth: AuthService = {
+        login: vi.fn(),
+        dispose: vi.fn(),
+      };
+
+      const api: ApiService = {
+        get: vi.fn(),
+        dispose: vi.fn(),
+      };
+
+      const services = disposable({ auth, api });
+
+      // Type assertions to verify inference
+      expect(services.auth).toBe(auth);
+      expect(services.api).toBe(api);
+      expect(typeof services.dispose).toBe("function");
+    });
+  });
 });

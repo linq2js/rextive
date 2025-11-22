@@ -50,11 +50,11 @@ export type CombineDisposablesOptions = {
  * - Supports lifecycle callbacks (onBefore, onAfter)
  * - Two merge strategies: "overwrite" (default) or "error"
  *
- * @param disposables - Array of disposable services to combine
+ * @param disposables - Array or object of disposable services to combine
  * @param options - Combination options
  * @returns Combined service with unified dispose() method
  *
- * @example Basic usage
+ * @example Array shape (merges properties)
  * ```ts
  * const logger = { log: () => {}, dispose: () => {} }
  * const db = { query: () => {}, dispose: () => {} }
@@ -63,6 +63,18 @@ export type CombineDisposablesOptions = {
  * services.log()    // ✅ Works
  * services.query()  // ✅ Works
  * services.dispose() // Calls db.dispose(), then logger.dispose()
+ * ```
+ *
+ * @example Object shape (preserves property names)
+ * ```ts
+ * const services = disposable({
+ *   auth: new AuthService(),
+ *   api: new ApiService(),
+ * })
+ *
+ * services.auth.login()  // ✅ Access by name
+ * services.api.get('/data')  // ✅ Access by name
+ * services.dispose() // Calls api.dispose(), then auth.dispose()
  * ```
  *
  * @example With merge strategy "error"
@@ -82,36 +94,63 @@ export type CombineDisposablesOptions = {
  * })
  * ```
  */
+
+// Overload 1: Array shape - merges all properties
 export function disposable<T extends Record<string, any>[]>(
   disposables: T,
   options?: CombineDisposablesOptions
-): Disposable & UnionToIntersection<T[number]> {
+): Disposable & UnionToIntersection<T[number]>;
+
+// Overload 2: Object shape - preserves property names
+export function disposable<T extends Record<string, any>>(
+  disposables: T,
+  options?: CombineDisposablesOptions
+): Disposable & T;
+
+// Implementation
+export function disposable<
+  T extends Record<string, any>[] | Record<string, any>
+>(disposables: T, options?: CombineDisposablesOptions): any {
   const { merge = "overwrite", onBefore, onAfter } = options || {};
 
   // Track disposal state
   let disposed = false;
 
+  // Detect if input is array or object
+  const isArray = Array.isArray(disposables);
+  const serviceEntries: Array<[string | number, any]> = isArray
+    ? disposables.map((service, index) => [index, service])
+    : Object.entries(disposables);
+
   // Create combined service
   const combined: any = {};
   const seenProperties = new Set<string>();
 
-  // Merge all properties (except dispose)
-  for (const service of disposables) {
-    if (!service || typeof service !== "object") continue;
+  if (isArray) {
+    // Array shape: Merge all properties from all services
+    for (const [, service] of serviceEntries) {
+      if (!service || typeof service !== "object") continue;
 
-    for (const [key, value] of Object.entries(service)) {
-      if (key === "dispose") continue; // Skip dispose, we'll create our own
+      for (const [key, value] of Object.entries(service)) {
+        if (key === "dispose") continue; // Skip dispose, we'll create our own
 
-      // Check for conflicts if merge strategy is "error"
-      if (merge === "error" && seenProperties.has(key)) {
-        throw new Error(
-          `Property conflict: '${key}' exists in multiple services. ` +
-            `Use merge strategy "overwrite" or ensure unique property names.`
-        );
+        // Check for conflicts if merge strategy is "error"
+        if (merge === "error" && seenProperties.has(key)) {
+          throw new Error(
+            `Property conflict: '${key}' exists in multiple services. ` +
+              `Use merge strategy "overwrite" or ensure unique property names.`
+          );
+        }
+
+        seenProperties.add(key);
+        combined[key] = value;
       }
-
-      seenProperties.add(key);
-      combined[key] = value;
+    }
+  } else {
+    // Object shape: Preserve property names
+    for (const [key, service] of serviceEntries) {
+      if (key === "dispose") continue; // Skip dispose, we'll create our own
+      combined[key] = service;
     }
   }
 
@@ -130,8 +169,8 @@ export function disposable<T extends Record<string, any>[]>(
     const errors: Error[] = [];
 
     // Dispose in REVERSE order (LIFO - like cleanup stacks)
-    for (let i = disposables.length - 1; i >= 0; i--) {
-      const service = disposables[i];
+    for (let i = serviceEntries.length - 1; i >= 0; i--) {
+      const [key, service] = serviceEntries[i];
 
       if (!service || typeof service !== "object") continue;
 
@@ -142,8 +181,9 @@ export function disposable<T extends Record<string, any>[]>(
         } catch (error) {
           const message =
             error instanceof Error ? error.message : String(error);
+          const identifier = isArray ? `index ${key}` : `key '${String(key)}'`;
           const wrappedError = new Error(
-            `Failed to dispose service at index ${i}: ${message}`
+            `Failed to dispose service at ${identifier}: ${message}`
           );
           // Attach original error for debugging
           (wrappedError as any).cause = error;
