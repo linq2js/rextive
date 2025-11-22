@@ -1067,17 +1067,26 @@ await wait.delay(1000); // simple sleep
 ### rx
 
 ```tsx
-// Static rendering
-rx(() => <div>Static</div>);
+// Component with reactive props - mix signals and static values
+const count = signal(42);
+const className = signal("primary");
+rx("div", { 
+  children: count,        // signal prop - reactive
+  className: className,   // signal prop - reactive
+  id: "counter"          // static prop
+});
 
-// With watch dependencies
-rx(() => <div>{value}</div>, { watch: [value] });
+// Custom component with reactive props
+const user = signal({ name: "Alice", age: 25 });
+rx(UserCard, { 
+  user: user,          // signal prop - reactive
+  theme: "dark"        // static prop
+});
 
 // Single signal - convenient shorthand
-const count = signal(42);
 rx(count); // Renders: 42
 
-// With signals (always reactive)
+// With signals and custom render (always reactive)
 rx({ user, posts }, (value, loadable) => (
   <div>
     <div>{value.user.name}</div>

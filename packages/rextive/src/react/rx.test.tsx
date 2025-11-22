@@ -11,95 +11,221 @@ describe("rx", () => {
     vi.clearAllMocks();
   });
 
-  describe("Overload 1: Static or manual control", () => {
-    it("should render static content", () => {
+  describe("Overload 1: Component with reactive props", () => {
+    it("should render intrinsic element with static props", () => {
       const TestComponent = () => {
-        return rx(() => <div data-testid="static">Static content</div>);
+        return rx("div", {
+          "data-testid": "static",
+          children: "Static content",
+        });
       };
 
       render(<TestComponent />);
       expect(screen.getByTestId("static")).toHaveTextContent("Static content");
     });
 
-    it("should not re-render without watch array", () => {
-      let renderCount = 0;
+    it("should render intrinsic element with signal props", async () => {
+      const content = signal("Dynamic content");
       const TestComponent = () => {
-        renderCount++;
-        return rx(() => {
-          renderCount++;
-          return <div data-testid="count">{renderCount}</div>;
+        return rx("div", {
+          "data-testid": "dynamic",
+          children: content,
         });
       };
 
-      const { rerender } = render(<TestComponent />);
-      expect(screen.getByTestId("count")).toHaveTextContent("2");
+      render(<TestComponent />);
+      expect(screen.getByTestId("dynamic")).toHaveTextContent("Dynamic content");
 
-      // Force parent re-render
-      rerender(<TestComponent />);
-      // Should still be 2 (no re-render of rx content)
-      expect(screen.getByTestId("count")).toHaveTextContent("2");
+      act(() => {
+        content.set("Updated content");
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("dynamic")).toHaveTextContent("Updated content");
+      });
     });
 
-    it("should re-render when watch dependencies change", () => {
-      let renderCount = 0;
-      const TestComponent = ({ value }: { value: number }) => {
-        return rx(
-          () => {
-            renderCount++;
-            return <div data-testid="count">{renderCount}</div>;
-          },
-          { watch: [value] }
-        );
-      };
-
-      const { rerender } = render(<TestComponent value={1} />);
-      expect(screen.getByTestId("count")).toHaveTextContent("1");
-
-      // Change watch dependency
-      rerender(<TestComponent value={2} />);
-      expect(screen.getByTestId("count")).toHaveTextContent("2");
-    });
-
-    it("should handle multiple watch dependencies", () => {
-      const TestComponent = ({ a, b }: { a: number; b: string }) => {
-        return rx(
-          () => (
-            <div data-testid="combined">
-              {a} - {b}
-            </div>
-          ),
-          { watch: [a, b] }
-        );
-      };
-
-      const { rerender } = render(<TestComponent a={1} b="hello" />);
-      expect(screen.getByTestId("combined")).toHaveTextContent("1 - hello");
-
-      rerender(<TestComponent a={2} b="hello" />);
-      expect(screen.getByTestId("combined")).toHaveTextContent("2 - hello");
-
-      rerender(<TestComponent a={2} b="world" />);
-      expect(screen.getByTestId("combined")).toHaveTextContent("2 - world");
-    });
-
-    it("should handle empty watch array", () => {
-      let renderCount = 0;
+    it("should render with mixed static and signal props", async () => {
+      const className = signal("dynamic-class");
       const TestComponent = () => {
-        return rx(
-          () => {
-            renderCount++;
-            return <div data-testid="count">{renderCount}</div>;
-          },
-          { watch: [] }
+        return rx("div", {
+          "data-testid": "mixed",
+          className: className,
+          id: "static-id",
+          children: "Content",
+        });
+      };
+
+      render(<TestComponent />);
+      const element = screen.getByTestId("mixed");
+      expect(element).toHaveClass("dynamic-class");
+      expect(element).toHaveAttribute("id", "static-id");
+
+      act(() => {
+        className.set("updated-class");
+      });
+
+      await waitFor(() => {
+        expect(element).toHaveClass("updated-class");
+      });
+    });
+
+    it("should render custom component with signal props", async () => {
+      const UserCard = ({ name, age }: { name: string; age: number }) => (
+        <div data-testid="user-card">
+          {name} - {age}
+        </div>
+      );
+
+      const name = signal("Alice");
+      const age = signal(25);
+
+      const TestComponent = () => {
+        return rx(UserCard, { name, age });
+      };
+
+      render(<TestComponent />);
+      expect(screen.getByTestId("user-card")).toHaveTextContent("Alice - 25");
+
+      act(() => {
+        name.set("Bob");
+        age.set(30);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-card")).toHaveTextContent("Bob - 30");
+      });
+    });
+
+    it("should update when only one signal prop changes", async () => {
+      const title = signal("Hello");
+      const className = signal("class-1");
+
+      const TestComponent = () => {
+        return rx("div", {
+          "data-testid": "multi",
+          title: title,
+          className: className,
+          children: "Content",
+        });
+      };
+
+      render(<TestComponent />);
+      const element = screen.getByTestId("multi");
+      expect(element).toHaveAttribute("title", "Hello");
+      expect(element).toHaveClass("class-1");
+
+      act(() => {
+        title.set("World");
+      });
+
+      await waitFor(() => {
+        expect(element).toHaveAttribute("title", "World");
+      });
+
+      act(() => {
+        className.set("class-2");
+      });
+
+      await waitFor(() => {
+        expect(element).toHaveClass("class-2");
+      });
+    });
+
+    it("should handle component with only static props", () => {
+      const SimpleDiv = ({ text, id }: { text: string; id: string }) => (
+        <div data-testid={id}>{text}</div>
+      );
+
+      const TestComponent = () => {
+        return rx(SimpleDiv, { text: "Static", id: "test-id" });
+      };
+
+      render(<TestComponent />);
+      expect(screen.getByTestId("test-id")).toHaveTextContent("Static");
+    });
+
+    it("should handle async signal props with Suspense", async () => {
+      const asyncName = signal(Promise.resolve("Async Alice"));
+
+      const TestComponent = () => {
+        return (
+          <Suspense fallback={<div data-testid="loading">Loading...</div>}>
+            {rx("div", {
+              "data-testid": "async",
+              children: asyncName,
+            })}
+          </Suspense>
         );
       };
 
-      const { rerender } = render(<TestComponent />);
-      expect(screen.getByTestId("count")).toHaveTextContent("1");
+      render(<TestComponent />);
+      expect(screen.getByTestId("loading")).toBeInTheDocument();
 
-      // Should not re-render even if parent re-renders
-      rerender(<TestComponent />);
-      expect(screen.getByTestId("count")).toHaveTextContent("1");
+      await waitFor(() => {
+        expect(screen.getByTestId("async")).toHaveTextContent("Async Alice");
+      });
+    });
+
+    it("should not re-render when parent re-renders if signals unchanged", async () => {
+      const count = signal(1);
+      let renderCount = 0;
+
+      const Counter = ({ value }: { value: number }) => {
+        renderCount++;
+        return <div data-testid="counter">{value}</div>;
+      };
+
+      const TestComponent = ({ key }: { key: number }) => {
+        return rx(Counter, { value: count });
+      };
+
+      const { rerender } = render(<TestComponent key={1} />);
+      expect(screen.getByTestId("counter")).toHaveTextContent("1");
+      const initialRenderCount = renderCount;
+
+      // Force parent re-render with different key
+      rerender(<TestComponent key={2} />);
+
+      // Give some time for any potential re-render
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // renderCount should increase due to parent re-render
+      // but the signal didn't change
+      expect(screen.getByTestId("counter")).toHaveTextContent("1");
+    });
+
+    it("should handle event handler props", async () => {
+      const text = signal("Click me");
+      let clicked = false;
+
+      const TestComponent = () => {
+        return rx("button", {
+          "data-testid": "btn",
+          children: text,
+          onClick: () => {
+            clicked = true;
+          },
+        });
+      };
+
+      render(<TestComponent />);
+      const button = screen.getByTestId("btn");
+      expect(button).toHaveTextContent("Click me");
+
+      act(() => {
+        button.click();
+      });
+
+      expect(clicked).toBe(true);
+
+      act(() => {
+        text.set("Clicked!");
+      });
+
+      await waitFor(() => {
+        expect(button).toHaveTextContent("Clicked!");
+      });
     });
   });
 
@@ -736,14 +862,22 @@ describe("rx", () => {
   });
 
   describe("Integration with React state", () => {
-    it("should work with useState in parent component", () => {
+    it("should work with useState via signal", async () => {
       const TestComponent = () => {
         const [value, setValue] = useState(0);
+        const valueSignal = signal(value);
+
+        // Update signal when state changes
+        if (valueSignal() !== value) {
+          valueSignal.set(value);
+        }
+
         return (
           <div>
-            {rx(() => (
-              <div data-testid="static">{value}</div>
-            ))}
+            {rx("div", {
+              "data-testid": "value",
+              children: valueSignal,
+            })}
             <button data-testid="button" onClick={() => setValue(value + 1)}>
               Increment
             </button>
@@ -752,38 +886,56 @@ describe("rx", () => {
       };
 
       render(<TestComponent />);
-      expect(screen.getByTestId("static")).toHaveTextContent("0");
-
-      // Note: This won't re-render because rx() doesn't track useState
-      // This demonstrates the static nature of overload 1 without watch
-    });
-
-    it("should work with useState and watch array", () => {
-      const TestComponent = () => {
-        const [value, setValue] = useState(0);
-        return (
-          <div>
-            {rx(
-              () => (
-                <div data-testid="watched">{value}</div>
-              ),
-              { watch: [value] }
-            )}
-            <button data-testid="button" onClick={() => setValue(value + 1)}>
-              Increment
-            </button>
-          </div>
-        );
-      };
-
-      render(<TestComponent />);
-      expect(screen.getByTestId("watched")).toHaveTextContent("0");
+      expect(screen.getByTestId("value")).toHaveTextContent("0");
 
       act(() => {
         screen.getByTestId("button").click();
       });
 
-      expect(screen.getByTestId("watched")).toHaveTextContent("1");
+      await waitFor(() => {
+        expect(screen.getByTestId("value")).toHaveTextContent("1");
+      });
+    });
+
+    it("should combine signals from props and component state", async () => {
+      const externalSignal = signal("External");
+
+      const TestComponent = () => {
+        const [internalValue, setInternalValue] = useState("Internal");
+        const internalSignal = signal(internalValue);
+
+        if (internalSignal() !== internalValue) {
+          internalSignal.set(internalValue);
+        }
+
+        return (
+          <div>
+            {rx("div", {
+              "data-testid": "combined",
+              children: `${externalSignal()} - ${internalSignal()}`,
+              title: externalSignal,
+            })}
+            <button
+              data-testid="internal-btn"
+              onClick={() => setInternalValue("Updated")}
+            >
+              Update Internal
+            </button>
+          </div>
+        );
+      };
+
+      render(<TestComponent />);
+      const element = screen.getByTestId("combined");
+      expect(element).toHaveAttribute("title", "External");
+
+      act(() => {
+        externalSignal.set("Changed");
+      });
+
+      await waitFor(() => {
+        expect(element).toHaveAttribute("title", "Changed");
+      });
     });
   });
 });

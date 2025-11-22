@@ -1,4 +1,13 @@
-import { memo, ReactNode, useCallback, useMemo, useRef } from "react";
+import {
+  ComponentProps,
+  ComponentType,
+  createElement,
+  JSXElementConstructor,
+  memo,
+  ReactNode,
+  useCallback,
+  useRef,
+} from "react";
 import { SignalMap, ResolveValue, AnyFunc, Signal } from "../types";
 import { RxOptions } from "./types";
 import { shallowEquals } from "../utils/shallowEquals";
@@ -22,12 +31,13 @@ const SINGLE_SIGNAL_RENDER = (value: any) => value.value;
  * rx - Reactive rendering for signals
  *
  * Three overloads:
- * 1. **Static or manual control**: `rx(() => ReactNode, { watch?: [...] })`
- *    - No signal tracking by default
- *    - Re-renders only when watch array changes
- *    - Use for static content or manual dependency management
+ * 1. **Component with reactive props**: `rx(Component, { ...props })`
+ *    - Props can be signals or static values
+ *    - Automatically tracks signal props and re-renders when they change
+ *    - Static props are passed through unchanged
+ *    - Convenient for using existing components with signals
  *
- * 2. **Single signal**: `rx(signal, { watch?: [...] })`
+ * 2. **Single signal**: `rx(signal)`
  *    - Automatically renders the value of the signal
  *    - Equivalent to: `rx({ value: signal }, (value) => value.value)`
  *    - Convenient shorthand for displaying a single value
@@ -38,14 +48,20 @@ const SINGLE_SIGNAL_RENDER = (value: any) => value.value;
  *    - Provides both Suspense (value) and manual (loadable) access patterns
  *    - Watch array controls when render function reference changes
  *
- * @example Overload 1 - Static render
+ * @example Overload 1 - Component with mixed props
  * ```tsx
- * rx(() => <div>Static content</div>)
+ * const count = signal(42);
+ * const name = signal("Alice");
+ * rx("div", {
+ *   children: count,  // signal prop - will track changes
+ *   className: "counter"  // static prop
+ * })
  * ```
  *
- * @example Overload 1 - Manual watch
+ * @example Overload 1 - Custom component
  * ```tsx
- * rx(() => <div>User: {userId}</div>, { watch: [userId] })
+ * const user = signal({ name: "Bob", age: 30 });
+ * rx(UserCard, { user, theme: "dark" })
  * ```
  *
  * @example Overload 2 - Single signal
@@ -70,8 +86,17 @@ const SINGLE_SIGNAL_RENDER = (value: any) => value.value;
  * ```
  */
 
-// Overload 1: Static or manual control
-export function rx(render: () => ReactNode, options?: RxOptions): ReactNode;
+// Overload 1: Component with reactive props
+export function rx<
+  TComponent extends
+    | keyof JSX.IntrinsicElements
+    | JSXElementConstructor<any>
+    | ComponentType<any>,
+  TProps extends ComponentProps<TComponent>
+>(
+  component: TComponent,
+  props: { [key in keyof TProps]: Signal<TProps[key]> | TProps[key] }
+): ReactNode;
 
 // Overload 2: Single signal - automatically renders value
 export function rx<T>(signal: Signal<T>, options?: RxOptions): ReactNode;
@@ -95,18 +120,41 @@ export function rx(...args: any[]): ReactNode {
   // Parse arguments to determine which overload was called
   // Check isSignal FIRST because signals are also functions
   if (isSignal(args[0])) {
-    // Overload 2: rx(signal, options?)
+    // Overload 2: rx(signal)
     // Transform single signal into { value: signal } format
     signals = { value: args[0] };
     render = SINGLE_SIGNAL_RENDER;
-    options = args[1];
-  } else if (typeof args[0] === "function") {
-    // Overload 1: rx(render, options?)
-    [render, options] = args;
-    // signals remains undefined
-  } else {
+    options = undefined;
+  } else if (typeof args[1] === "function") {
     // Overload 3: rx(signals, render, options?)
     [signals, render, options] = args;
+  } else {
+    // Overload 1: rx(component, props)
+    const [component, props] = args;
+
+    // Separate signal props from static props
+    signals = {};
+    const staticProps: any = {};
+
+    for (const key in props) {
+      if (isSignal(props[key])) {
+        signals[key] = props[key];
+      } else {
+        staticProps[key] = props[key];
+      }
+    }
+
+    // Create render function that merges static and signal values
+    render = (value: any) => {
+      const finalProps = { ...staticProps };
+      // Assign signal values to finalProps
+      for (const key in value) {
+        finalProps[key] = value[key];
+      }
+      return createElement(component, finalProps);
+    };
+
+    options = undefined;
   }
 
   // Delegate to Rx component where hooks can be safely called
@@ -114,16 +162,14 @@ export function rx(...args: any[]): ReactNode {
 }
 
 /**
- * Internal component that handles hook calls for both overloads.
+ * Internal component that handles hook calls for all overloads.
  *
  * This component is necessary because:
  * 1. Hooks cannot be called conditionally in rx() function
- * 2. Both overloads need memoization but in different ways
+ * 2. All overloads need memoization with watch array support
  * 3. Moving logic to a component ensures hooks are always called in same order
  *
- * Control flow:
- * - If signals provided (overload 2): renders <RxWithSignals> with lazy tracking
- * - If no signals (overload 1): returns memoized result directly
+ * All overloads now use signals, so we always render <RxWithSignals> for lazy tracking.
  */
 const Rx = (props: {
   render: AnyFunc;
@@ -132,17 +178,12 @@ const Rx = (props: {
 }) => {
   const { render, signals, options } = props;
 
-  // Track which overload is being used (signals provided or not)
-  // Using ref to avoid re-renders when checking this flag
-  const hasSignalsRef = useRef(false);
-  hasSignalsRef.current = signals !== undefined;
-
   // Store render function in ref to keep it stable across re-renders
   // while allowing the latest version to be called
   const renderRef = useRef(render);
   renderRef.current = render;
 
-  // Memoize render function for overload 2 (with signals)
+  // Memoize render function with watch array support
   // Dependencies: watch array controls when render function ref changes
   // Used by: <RxWithSignals> component
   const memoizedRender = useCallback<RxRender<any, any>>(
@@ -150,31 +191,14 @@ const Rx = (props: {
     options?.watch || []
   );
 
-  // Memoize result for overload 1 (no signals)
-  // Dependencies: watch array controls when to re-render
-  // Returns: null if signals present (unused), otherwise render result
-  const memoizedResult = useMemo(
-    () => (hasSignalsRef.current ? null : renderRef.current?.() ?? null),
-    options?.watch || []
+  // All overloads use RxWithSignals for lazy signal tracking
+  return (
+    <RxWithSignals render={memoizedRender} signals={signals ?? EMPTY_SIGNALS} />
   );
-
-  // Branch based on overload (determined by presence of signals)
-  if (hasSignalsRef.current) {
-    // Overload 2: Use RxWithSignals for lazy signal tracking
-    return (
-      <RxWithSignals
-        render={memoizedRender}
-        signals={signals ?? EMPTY_SIGNALS}
-      />
-    );
-  }
-
-  // Overload 1: Return memoized result directly (no signal tracking)
-  return memoizedResult;
 };
 
 /**
- * Memoized component for overload 2 (reactive signal tracking).
+ * Memoized component for reactive signal tracking (all overloads).
  *
  * Responsibilities:
  * 1. Creates lazy tracking proxies via useSignals hook
