@@ -21,26 +21,37 @@ import { toLoadable } from "./utils/loadable";
 import { isPromiseLike } from "./utils/isPromiseLike";
 
 /**
+ * Helper type to match any Signal that returns something awaitable.
+ * This uses 'any' in the constraint to be more permissive at the type level,
+ * while the runtime code properly handles the actual values.
+ */
+type SignalAwaitable = Signal<any>;
+
+/**
  * Represents a value that can be awaited by wait().
  *
  * - A Loadable<T>
  * - A PromiseLike<T>
- * - A Signal holding either PromiseLike<T> or Loadable<T>
+ * - A Signal holding either PromiseLike<T> or Loadable<T> (or a union of both)
  */
-export type Awaitable<T> =
-  | Loadable<T>
-  | PromiseLike<T>
-  | Signal<PromiseLike<T> | Loadable<T>>;
+export type Awaitable<T> = Loadable<T> | PromiseLike<T> | SignalAwaitable;
 
 /**
  * Extract the resolved value type from a single Awaitable.
+ *
+ * For Loadables, we use Awaited<L["promise"]> to extract the T from Loadable<T>.
+ * For Signals, we recursively extract the type from what the signal returns.
  */
-export type AwaitedFromAwaitable<A> = A extends Loadable<infer T>
-  ? T
+export type AwaitedFromAwaitable<A> = A extends Loadable<any>
+  ? Awaited<A["promise"]>
   : A extends PromiseLike<infer T>
   ? T
-  : A extends Signal<PromiseLike<infer T> | Loadable<infer T>>
-  ? T
+  : A extends Signal<infer V>
+  ? V extends Loadable<any>
+    ? Awaited<V["promise"]>
+    : V extends PromiseLike<infer T>
+    ? T
+    : V // Fallback to the signal's return type
   : never;
 
 /**

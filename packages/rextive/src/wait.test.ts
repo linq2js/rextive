@@ -8,9 +8,9 @@ describe("wait", () => {
     describe("Single awaitable", () => {
       it("should return value from resolved promise", () => {
         const promise = Promise.resolve(42);
-        
+
         expect(() => wait(promise)).toThrow(Promise);
-        
+
         // After promise resolves
         return promise.then(() => {
           expect(wait(promise)).toBe(42);
@@ -26,14 +26,14 @@ describe("wait", () => {
       it("should throw promise from loading loadable", () => {
         const promise = new Promise(() => {}); // Never resolves
         const l = loadable("loading", promise);
-        
+
         expect(() => wait(l)).toThrow(Promise);
       });
 
       it.skip("should throw error from error loadable", () => {
         const error = new Error("Failed");
         const l = loadable("error", error);
-        
+
         try {
           wait(l);
           expect.fail("Should have thrown");
@@ -51,7 +51,7 @@ describe("wait", () => {
       it("should handle signal with loadable", () => {
         const l = loadable("success", 42);
         const sig = signal(l);
-        
+
         expect(wait(sig)).toBe(42);
       });
 
@@ -59,7 +59,7 @@ describe("wait", () => {
         const promise = new Promise(() => {});
         const l = loadable("loading", promise);
         const sig = signal(l);
-        
+
         expect(() => wait(sig)).toThrow(Promise);
       });
     });
@@ -69,7 +69,7 @@ describe("wait", () => {
         const l1 = loadable("success", 1);
         const l2 = loadable("success", 2);
         const l3 = loadable("success", 3);
-        
+
         const result = wait([l1, l2, l3]);
         expect(result).toEqual([1, 2, 3]);
       });
@@ -78,7 +78,7 @@ describe("wait", () => {
         const p1 = Promise.resolve(1);
         const p2 = new Promise(() => {}); // Never resolves
         const p3 = Promise.resolve(3);
-        
+
         expect(() => wait([p1, p2, p3])).toThrow(Promise);
       });
 
@@ -86,7 +86,7 @@ describe("wait", () => {
         const l1 = loadable("success", 1);
         const l2 = loadable("error", new Error("Error 2"));
         const l3 = loadable("error", new Error("Error 3"));
-        
+
         expect(() => wait([l1, l2, l3])).toThrow("Error 2");
       });
 
@@ -94,14 +94,14 @@ describe("wait", () => {
         const l1 = loadable("success", 1);
         const l2 = loadable("success", 2);
         const l3 = loadable("success", 3);
-        
+
         expect(wait([l1, l2, l3])).toEqual([1, 2, 3]);
       });
 
       it("should handle signals in array", () => {
         const sig1 = signal(1);
         const sig2 = signal(2);
-        
+
         expect(wait([sig1, sig2])).toEqual([1, 2]);
       });
     });
@@ -110,7 +110,7 @@ describe("wait", () => {
       it("should return record of values when all resolved", () => {
         const l1 = loadable("success", 1);
         const l2 = loadable("success", "two");
-        
+
         const result = wait({ a: l1, b: l2 });
         expect(result).toEqual({ a: 1, b: "two" });
       });
@@ -118,21 +118,21 @@ describe("wait", () => {
       it("should throw combined promise when any loading", () => {
         const p1 = Promise.resolve(1);
         const p2 = new Promise(() => {});
-        
+
         expect(() => wait({ a: p1, b: p2 })).toThrow(Promise);
       });
 
       it("should throw first error when any failed", () => {
         const l1 = loadable("success", 1);
         const l2 = loadable("error", new Error("Error"));
-        
+
         expect(() => wait({ a: l1, b: l2 })).toThrow("Error");
       });
 
       it("should handle signals in record", () => {
         const sig1 = signal(1);
         const sig2 = signal("two");
-        
+
         expect(wait({ a: sig1, b: sig2 })).toEqual({ a: 1, b: "two" });
       });
     });
@@ -142,7 +142,7 @@ describe("wait", () => {
     describe("With onResolve callback", () => {
       it("should transform single value", async () => {
         const promise = Promise.resolve(42);
-        
+
         const result = await wait(promise, (value) => value * 2);
         expect(result).toBe(84);
       });
@@ -164,13 +164,10 @@ describe("wait", () => {
       });
 
       it("should handle async onResolve", async () => {
-        const result = await wait(
-          Promise.resolve(10),
-          async (value) => {
-            await new Promise(r => setTimeout(r, 10));
-            return value * 2;
-          }
-        );
+        const result = await wait(Promise.resolve(10), async (value) => {
+          await new Promise((r) => setTimeout(r, 10));
+          return value * 2;
+        });
         expect(result).toBe(20);
       });
     });
@@ -178,13 +175,13 @@ describe("wait", () => {
     describe("With onResolve and onError callbacks", () => {
       it("should call onError on failure", async () => {
         const promise = Promise.reject(new Error("Failed"));
-        
+
         const result = await wait(
           promise,
           (value) => value,
-          (error) => "recovered"
+          () => "recovered"
         );
-        
+
         expect(result).toBe("recovered");
       });
 
@@ -194,22 +191,22 @@ describe("wait", () => {
           (value) => value * 2,
           () => 0
         );
-        
+
         expect(result).toBe(84);
       });
 
       it("should handle async onError", async () => {
         const promise = Promise.reject(new Error("Failed"));
-        
+
         const result = await wait(
           promise,
           (value) => value,
-          async (error) => {
-            await new Promise(r => setTimeout(r, 10));
+          async () => {
+            await new Promise((r) => setTimeout(r, 10));
             return "async recovered";
           }
         );
-        
+
         expect(result).toBe("async recovered");
       });
     });
@@ -220,7 +217,7 @@ describe("wait", () => {
       it("should return first succeeded value with key", () => {
         const l1 = loadable("success", 1);
         const l2 = loadable("loading", new Promise(() => {}));
-        
+
         const result = wait.any({ a: l1, b: l2 });
         expect(result).toEqual([1, "a"]);
       });
@@ -228,7 +225,7 @@ describe("wait", () => {
       it("should throw if all loading", () => {
         const p1 = new Promise(() => {});
         const p2 = new Promise(() => {});
-        
+
         expect(() => wait.any({ a: p1, b: p2 })).toThrow(Promise);
       });
 
@@ -236,14 +233,16 @@ describe("wait", () => {
         // Use loadables to avoid unhandled rejections
         const l1 = loadable("error", new Error("E1"));
         const l2 = loadable("error", new Error("E2"));
-        
-        expect(() => wait.any({ a: l1, b: l2 })).toThrow("All awaitables failed");
+
+        expect(() => wait.any({ a: l1, b: l2 })).toThrow(
+          "All awaitables failed"
+        );
       });
 
       it("should handle immediate success loadable", () => {
         const l1 = loadable("loading", new Promise(() => {}));
         const l2 = loadable("success", 42);
-        
+
         const result = wait.any({ a: l1, b: l2 });
         expect(result).toEqual([42, "b"]);
       });
@@ -255,7 +254,7 @@ describe("wait", () => {
           { a: Promise.resolve(1), b: Promise.resolve(2) },
           ([value, key]) => `${key}:${value}`
         );
-        
+
         expect(result).toMatch(/^(a:1|b:2)$/);
       });
 
@@ -265,7 +264,7 @@ describe("wait", () => {
           ([v, k]) => `${k}:${v}`,
           () => "all failed"
         );
-        
+
         expect(result).toBe("all failed");
       });
     });
@@ -276,7 +275,7 @@ describe("wait", () => {
       it("should return first completed value (success or error)", () => {
         const l1 = loadable("success", 1);
         const l2 = loadable("loading", new Promise(() => {}));
-        
+
         const result = wait.race({ a: l1, b: l2 });
         expect(result).toEqual([1, "a"]);
       });
@@ -284,14 +283,14 @@ describe("wait", () => {
       it("should throw first error if that completes first", () => {
         const l1 = loadable("error", new Error("Fast error"));
         const l2 = loadable("loading", new Promise(() => {}));
-        
+
         expect(() => wait.race({ a: l1, b: l2 })).toThrow("Fast error");
       });
 
       it("should throw combined promise if all loading", () => {
         const p1 = new Promise(() => {});
         const p2 = new Promise(() => {});
-        
+
         expect(() => wait.race({ a: p1, b: p2 })).toThrow(Promise);
       });
     });
@@ -302,20 +301,20 @@ describe("wait", () => {
           { a: Promise.resolve(1), b: Promise.resolve(2) },
           ([value, key]) => `${key}:${value}`
         );
-        
+
         expect(result).toMatch(/^(a:1|b:2)$/);
       });
 
       it("should call onError on race error", async () => {
         const l1 = loadable("error", new Error("Error"));
         const l2 = loadable("loading", new Promise(() => {}));
-        
+
         const promise = wait.race(
           { a: l1, b: l2 },
           ([v, k]) => `${k}:${v}`,
           () => "error handled"
         );
-        
+
         // Should return error handled since l1 is already in error state
         const result = await promise;
         expect(result).toBe("error handled");
@@ -327,7 +326,7 @@ describe("wait", () => {
     describe("Synchronous mode", () => {
       it.skip("should return settled results for single awaitable", () => {
         const l = loadable("success", 42);
-        
+
         const result = wait.settled(l);
         expect(result).toEqual({ status: "fulfilled", value: 42 });
       });
@@ -335,40 +334,40 @@ describe("wait", () => {
       it("should return settled results for array", () => {
         const l1 = loadable("success", 1);
         const l2 = loadable("error", new Error("E2"));
-        
+
         const result = wait.settled([l1, l2]);
         expect(result).toEqual([
           { status: "fulfilled", value: 1 },
-          { status: "rejected", reason: expect.any(Error) }
+          { status: "rejected", reason: expect.any(Error) },
         ]);
       });
 
       it("should return settled results for record", () => {
         const l1 = loadable("success", 1);
         const l2 = loadable("error", new Error("E2"));
-        
+
         const result = wait.settled({ a: l1, b: l2 });
         expect(result).toEqual({
           a: { status: "fulfilled", value: 1 },
-          b: { status: "rejected", reason: expect.any(Error) }
+          b: { status: "rejected", reason: expect.any(Error) },
         });
       });
 
       it("should throw promise if any still loading", () => {
         const p1 = Promise.resolve(1);
         const p2 = new Promise(() => {});
-        
+
         expect(() => wait.settled([p1, p2])).toThrow(Promise);
       });
 
       it("should handle loadables", () => {
         const l1 = loadable("success", 1);
         const l2 = loadable("error", new Error("E2"));
-        
+
         const result = wait.settled([l1, l2]);
         expect(result).toEqual([
           { status: "fulfilled", value: 1 },
-          { status: "rejected", reason: expect.any(Error) }
+          { status: "rejected", reason: expect.any(Error) },
         ]);
       });
     });
@@ -377,76 +376,70 @@ describe("wait", () => {
       it("should transform settled results", async () => {
         const p1 = Promise.resolve(1);
         const p2 = Promise.reject("E2");
-        
+
         const result = await wait.settled(
           [p1, p2],
-          (results) => results.filter(r => r.status === "fulfilled").length
+          (results) => results.filter((r) => r.status === "fulfilled").length
         );
-        
+
         expect(result).toBe(1);
       });
 
       it("should never call onError (settled never throws)", async () => {
         const onError = vi.fn();
-        
+
         await wait.settled(
           [Promise.resolve(1), Promise.reject("E")],
           () => "done",
           onError
         );
-        
+
         expect(onError).not.toHaveBeenCalled();
       });
 
       it("should handle array with all success loadables in async mode", async () => {
         const l1 = loadable("success", 1);
         const l2 = loadable("success", "static");
-        
+
         const result = await wait.settled([l1, l2], (results) =>
           results.map((r: any) => r.value)
         );
-        
+
         expect(result).toEqual([1, "static"]);
       });
 
       it("should handle array with all error loadables in async mode", async () => {
         const l1 = loadable("error", new Error("E1"));
         const l2 = loadable("error", new Error("E2"));
-        
+
         const result = await wait.settled([l1, l2], (results: any) =>
           results.map((r: any) => r.status)
         );
-        
+
         expect(result).toEqual(["rejected", "rejected"]);
       });
 
       it("should handle record with all success loadables in async mode", async () => {
         const l1 = loadable("success", 1);
         const l2 = loadable("success", "static");
-        
-        const result = await wait.settled(
-          { a: l1, b: l2 },
-          (results: any) => ({
-            a: results.a.value,
-            b: results.b.value,
-          })
-        );
-        
+
+        const result = await wait.settled({ a: l1, b: l2 }, (results: any) => ({
+          a: results.a.value,
+          b: results.b.value,
+        }));
+
         expect(result).toEqual({ a: 1, b: "static" });
       });
 
       it("should handle record with all error loadables in async mode", async () => {
         const l1 = loadable("error", new Error("E1"));
         const l2 = loadable("error", new Error("E2"));
-        
-        const result = await wait.settled(
-          { a: l1, b: l2 },
-          (results: any) => ({
-            a: results.a.status,
-            b: results.b.status,
-          })
-        );
-        
+
+        const result = await wait.settled({ a: l1, b: l2 }, (results: any) => ({
+          a: results.a.status,
+          b: results.b.status,
+        }));
+
         expect(result).toEqual({ a: "rejected", b: "rejected" });
       });
 
@@ -488,50 +481,48 @@ describe("wait", () => {
   describe("wait.timeout", () => {
     it("should resolve before timeout", async () => {
       const promise = Promise.resolve(42);
-      
+
       const result = await wait.timeout(promise, 1000);
       expect(result).toBe(42);
     });
 
     it("should reject with TimeoutError on timeout", async () => {
       const promise = new Promise(() => {}); // Never resolves
-      
+
       await expect(wait.timeout(promise, 50)).rejects.toThrow(TimeoutError);
     });
 
     it("should use custom error message", async () => {
       const promise = new Promise(() => {});
-      
-      await expect(
-        wait.timeout(promise, 50, "Custom timeout")
-      ).rejects.toThrow("Custom timeout");
+
+      await expect(wait.timeout(promise, 50, "Custom timeout")).rejects.toThrow(
+        "Custom timeout"
+      );
     });
 
     it("should use custom error function", async () => {
       const promise = new Promise(() => {});
       const customError = () => new Error("Custom error");
-      
-      await expect(
-        wait.timeout(promise, 50, customError)
-      ).rejects.toThrow("Custom error");
+
+      await expect(wait.timeout(promise, 50, customError)).rejects.toThrow(
+        "Custom error"
+      );
     });
 
     it("should timeout array of awaitables", async () => {
       const p1 = Promise.resolve(1);
       const p2 = new Promise(() => {});
-      
-      await expect(
-        wait.timeout([p1, p2], 50)
-      ).rejects.toThrow(TimeoutError);
+
+      await expect(wait.timeout([p1, p2], 50)).rejects.toThrow(TimeoutError);
     });
 
     it("should timeout record of awaitables", async () => {
       const p1 = Promise.resolve(1);
       const p2 = new Promise(() => {});
-      
-      await expect(
-        wait.timeout({ a: p1, b: p2 }, 50)
-      ).rejects.toThrow(TimeoutError);
+
+      await expect(wait.timeout({ a: p1, b: p2 }, 50)).rejects.toThrow(
+        TimeoutError
+      );
     });
 
     it("should resolve array before timeout", async () => {
@@ -539,7 +530,7 @@ describe("wait", () => {
         [Promise.resolve(1), Promise.resolve(2)],
         1000
       );
-      
+
       expect(result).toEqual([1, 2]);
     });
   });
@@ -549,7 +540,7 @@ describe("wait", () => {
       const start = Date.now();
       await wait.delay(50);
       const elapsed = Date.now() - start;
-      
+
       expect(elapsed).toBeGreaterThanOrEqual(45); // Allow some margin
     });
 
@@ -586,33 +577,27 @@ describe("wait", () => {
       const sig = signal(loadable("success", 1));
       const l2 = loadable("success", 2);
       const l3 = loadable("success", 3);
-      
+
       const result = wait([sig, l2, l3]);
       expect(result).toEqual([1, 2, 3]);
     });
 
     it("should handle nested wait operations", async () => {
-      const inner = await wait(
-        Promise.resolve(10),
-        (v) => v * 2
-      );
-      
-      const outer = await wait(
-        Promise.resolve(inner),
-        (v) => v + 5
-      );
-      
+      const inner = await wait(Promise.resolve(10), (v) => v * 2);
+
+      const outer = await wait(Promise.resolve(inner), (v) => v + 5);
+
       expect(outer).toBe(25);
     });
 
     it("should work with signal that updates", () => {
       const sig = signal(loadable("success", 42));
-      
+
       expect(wait(sig)).toBe(42);
-      
+
       // Update the signal
       sig.set(loadable("success", 84));
-      
+
       // Should return updated value
       expect(wait(sig)).toBe(84);
     });
@@ -635,7 +620,7 @@ describe("wait", () => {
         (v) => v,
         (e) => `error:${e}`
       );
-      
+
       expect(result).toBe("error:null");
     });
 
@@ -644,9 +629,8 @@ describe("wait", () => {
         { a: Promise.resolve(1), b: Promise.resolve("two") },
         ({ a, b }) => ({ num: a, str: b })
       );
-      
+
       expect(result).toEqual({ num: 1, str: "two" });
     });
   });
 });
-

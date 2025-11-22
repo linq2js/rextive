@@ -21,6 +21,15 @@
     "rootDir": "./src"
   },
   "include": ["src"],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/*.type.check.ts",
+    "**/*.type.check.tsx",
+    "src/test/**"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
 

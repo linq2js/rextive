@@ -273,8 +273,8 @@ describe("tag", () => {
         const tag2 = tag<number>();
 
         const shared = signal(1, { tags: [tag1, tag2] });
-        const a = signal(2, { tags: [tag1] });
-        const b = signal(3, { tags: [tag2] });
+        const _a = signal(2, { tags: [tag1] });
+        const _b = signal(3, { tags: [tag2] });
 
         const visited: any[] = [];
         tag.forEach([tag1, tag2], (sig) => visited.push(sig));
@@ -322,7 +322,7 @@ describe("tag", () => {
         const tag2 = tag<number>();
 
         const shared = signal(1, { tags: [tag1, tag2] });
-        const a = signal(2, { tags: [tag1] });
+        const _a = signal(2, { tags: [tag1] });
 
         const result = tag.signals([tag1, tag2]);
 
@@ -375,9 +375,9 @@ describe("tag", () => {
     it("should support resource cleanup via tag", () => {
       const resourceTag = tag<any>();
 
-      const resource1 = signal({ id: 1 }, { tags: [resourceTag] });
-      const resource2 = signal({ id: 2 }, { tags: [resourceTag] });
-      const resource3 = signal({ id: 3 }, { tags: [resourceTag] });
+      signal({ id: 1 }, { tags: [resourceTag] });
+      signal({ id: 2 }, { tags: [resourceTag] });
+      signal({ id: 3 }, { tags: [resourceTag] });
 
       expect(resourceTag.size).toBe(3);
 
@@ -391,8 +391,8 @@ describe("tag", () => {
     it("should support debugging and logging", () => {
       const debugTag = tag<number>();
 
-      const counter1 = signal(0, { tags: [debugTag], name: "counter1" });
-      const counter2 = signal(0, { tags: [debugTag], name: "counter2" });
+      signal(0, { tags: [debugTag], name: "counter1" });
+      signal(0, { tags: [debugTag], name: "counter2" });
 
       const names: string[] = [];
       const values: number[] = [];
