@@ -880,4 +880,217 @@ describe("signal", () => {
       expect(compute).not.toHaveBeenCalled();
     });
   });
+
+  describe("lazy option", () => {
+    it("should be lazy by default - not compute until accessed", () => {
+      const compute = vi.fn(() => 42);
+      const s = signal(compute);
+      expect(compute).not.toHaveBeenCalled();
+      s();
+      expect(compute).toHaveBeenCalledOnce();
+    });
+
+    it("should compute immediately with lazy: false", () => {
+      const compute = vi.fn(() => 42);
+      const s = signal(compute, { lazy: false });
+      expect(compute).toHaveBeenCalledOnce();
+      // Second access uses cached value
+      s();
+      expect(compute).toHaveBeenCalledOnce();
+    });
+
+    it("should execute derived signal immediately with lazy: false", () => {
+      const a = signal(10);
+      const compute = vi.fn(({ deps }: any) => deps.a * 2);
+      const doubled = signal({ a }, compute, { lazy: false });
+      expect(compute).toHaveBeenCalledOnce();
+      expect(doubled()).toBe(20);
+    });
+
+    it("should re-execute immediately when dependency changes with lazy: false", () => {
+      const a = signal(10);
+      const compute = vi.fn(({ deps }: any) => deps.a * 2);
+      const doubled = signal({ a }, compute, { lazy: false });
+      expect(compute).toHaveBeenCalledOnce();
+
+      a.set(20);
+      expect(compute).toHaveBeenCalledTimes(2);
+      expect(doubled()).toBe(40);
+    });
+
+    it("should work for side effects with lazy: false", () => {
+      const count = signal(0);
+      const sideEffectLog: number[] = [];
+
+      signal(
+        { count },
+        ({ deps }) => {
+          sideEffectLog.push(deps.count);
+          return deps.count;
+        },
+        { lazy: false }
+      );
+
+      expect(sideEffectLog).toEqual([0]);
+
+      count.set(1);
+      expect(sideEffectLog).toEqual([0, 1]);
+
+      count.set(2);
+      expect(sideEffectLog).toEqual([0, 1, 2]);
+    });
+
+    it("should execute async signal immediately with lazy: false", () => {
+      const compute = vi.fn(async () => "result");
+      const s = signal(compute, { lazy: false });
+      expect(compute).toHaveBeenCalledOnce();
+      // Returns promise on access
+      expect(s()).toBeInstanceOf(Promise);
+    });
+
+    it("should respect lazy: true explicitly", () => {
+      const compute = vi.fn(() => 42);
+      const s = signal(compute, { lazy: true });
+      expect(compute).not.toHaveBeenCalled();
+      s();
+      expect(compute).toHaveBeenCalledOnce();
+    });
+
+    it("should work with DOM side effects (README example)", () => {
+      // Simulate DOM
+      const mockElement = { textContent: "" };
+
+      const count = signal(0);
+
+      // Effect signal with lazy: false
+      signal(
+        { count },
+        ({ deps }) => {
+          mockElement.textContent = `Count: ${deps.count}`;
+        },
+        { lazy: false }
+      );
+
+      expect(mockElement.textContent).toBe("Count: 0");
+
+      count.set(5);
+      expect(mockElement.textContent).toBe("Count: 5");
+
+      count.set(10);
+      expect(mockElement.textContent).toBe("Count: 10");
+    });
+
+    it("should work with multiple dependencies and lazy: false", () => {
+      const a = signal(1);
+      const b = signal(2);
+      const c = signal(3);
+      const compute = vi.fn(({ deps }: any) => deps.a + deps.b + deps.c);
+      const sum = signal({ a, b, c }, compute, { lazy: false });
+
+      expect(compute).toHaveBeenCalledOnce();
+      expect(sum()).toBe(6);
+
+      a.set(10);
+      expect(compute).toHaveBeenCalledTimes(2);
+      expect(sum()).toBe(15);
+    });
+
+    it("should not execute after disposal even with lazy: false", () => {
+      const count = signal(0);
+      const compute = vi.fn(({ deps }: any) => deps.count * 2);
+      const doubled = signal({ count }, compute, { lazy: false });
+
+      expect(compute).toHaveBeenCalledOnce();
+
+      doubled.dispose();
+
+      count.set(10);
+      // Should not recompute after disposal
+      expect(compute).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("toJSON", () => {
+    it("should serialize signal value with JSON.stringify", () => {
+      const count = signal(42);
+      expect(JSON.stringify(count)).toBe("42");
+    });
+
+    it("should serialize object signal", () => {
+      const user = signal({ name: "Alice", age: 30 });
+      expect(JSON.stringify(user)).toBe('{"name":"Alice","age":30}');
+    });
+
+    it("should serialize signal in object", () => {
+      const count = signal(42);
+      const name = signal("Bob");
+      const obj = { count, name, other: "value" };
+      expect(JSON.stringify(obj)).toBe(
+        '{"count":42,"name":"Bob","other":"value"}'
+      );
+    });
+
+    it("should serialize array of signals", () => {
+      const a = signal(1);
+      const b = signal(2);
+      const c = signal(3);
+      expect(JSON.stringify([a, b, c])).toBe("[1,2,3]");
+    });
+
+    it("should serialize derived signal", () => {
+      const a = signal(10);
+      const b = signal(20);
+      const sum = signal({ a, b }, ({ deps }) => deps.a + deps.b);
+      expect(JSON.stringify(sum)).toBe("30");
+    });
+
+    it("should serialize async signal", async () => {
+      const data = signal(async () => "resolved");
+      // Async signals return a Promise until resolved
+      const promise = data();
+      expect(promise).toBeInstanceOf(Promise);
+      // Promise serializes to empty object
+      expect(JSON.stringify(data)).toBe("{}");
+      
+      // After awaiting, signal still returns Promise
+      await promise;
+      expect(JSON.stringify(data)).toBe("{}");
+    });
+
+    it("should serialize undefined signal", () => {
+      const empty = signal();
+      expect(JSON.stringify(empty)).toBe(undefined);
+      expect(JSON.stringify({ value: empty })).toBe("{}");
+    });
+
+    it("should serialize null signal", () => {
+      const nullable = signal<string | null>(null);
+      expect(JSON.stringify(nullable)).toBe("null");
+    });
+
+    it("should serialize updated signal value", () => {
+      const count = signal(1);
+      expect(JSON.stringify(count)).toBe("1");
+      count.set(2);
+      expect(JSON.stringify(count)).toBe("2");
+      count.set(3);
+      expect(JSON.stringify(count)).toBe("3");
+    });
+
+    it("should call toJSON explicitly", () => {
+      const count = signal(42);
+      expect(count.toJSON()).toBe(42);
+    });
+
+    it("should serialize nested signals", () => {
+      const inner = signal(100);
+      const outer = signal({ value: inner, text: "test" });
+      // Nested signals are also serialized via their toJSON method
+      const result = JSON.parse(JSON.stringify(outer));
+      expect(result).toEqual({
+        value: 100, // inner signal's toJSON is called automatically
+        text: "test",
+      });
+    });
+  });
 });

@@ -13,19 +13,19 @@ import { emitter } from "../utils/emitter";
  * - Sets up subscriptions in useLayoutEffect (after render completes)
  * - Automatically cleans up subscriptions on unmount
  *
- * Returns a tuple of [awaited, loadable] proxies:
- * - awaited: Suspense-compatible (throws promises/errors)
+ * Returns a tuple of [value, loadable] proxies:
+ * - value: Direct value access - throws promises/errors (for Suspense)
  * - loadable: Manual state handling (returns Loadable objects)
  *
  * @param signals - Object mapping names to signal instances
- * @returns Tuple of [awaited, loadable] proxies
+ * @returns Tuple of [value, loadable] proxies
  *
  * @example
  * ```tsx
- * const [awaited, loadable] = useSignals({ user, posts });
+ * const [value, loadable] = useSignals({ user, posts });
  *
  * // Suspense pattern
- * return <div>{awaited.user.name}</div>;
+ * return <div>{value.user.name}</div>;
  *
  * // Manual loading state pattern
  * if (loadable.user.status === "loading") return <Spinner />;
@@ -34,10 +34,10 @@ import { emitter } from "../utils/emitter";
  *
  * @example Lazy tracking behavior
  * ```tsx
- * const [awaited] = useSignals({ a, b, c });
+ * const [value] = useSignals({ a, b, c });
  *
  * // Only subscribes to signals actually accessed:
- * awaited.a;  // ✅ Tracks a
+ * value.a;  // ✅ Tracks a
  * // b, c not accessed → no subscription
  * ```
  */
@@ -118,12 +118,12 @@ export function useSignals<TSignals extends SignalMap>(
     };
 
     // Create and return both proxies as a tuple
-    const awaited = createProxy("awaited") as ResolveValue<TSignals, "awaited">;
+    const value = createProxy("awaited") as ResolveValue<TSignals, "awaited">;
     const loadable = createProxy("loadable") as ResolveValue<
       TSignals,
       "loadable"
     >;
 
-    return [awaited, loadable];
+    return [value, loadable];
   }, [rerender]);
 }

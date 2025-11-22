@@ -1,24 +1,50 @@
 # Rextive
 
-Small, fast and scalable state management for React. Simple API, powerful features.
+Small, fast and scalable reactive state management. Framework-agnostic core with React integration.
 
 ```bash
 npm install rextive
 ```
 
-## First create a signal
+## Works with Vanilla JavaScript
+
+```html
+<h1 id="counterText">Count: 0</h1>
+<button id="increment">+1</button>
+<button id="decrement">-1</button>
+```
+
+```js
+import { signal } from "rextive";
+
+const h1 = document.getElementById("counterText");
+const increment = document.getElementById("increment");
+const decrement = document.getElementById("decrement");
+
+// Create reactive state
+const count = signal(0);
+
+// Create reactive effect (runs immediately with lazy: false)
+signal(
+  { count }, // dependencies
+  ({ deps }) => {
+    h1.textContent = `Count: ${deps.count}`;
+  },
+  { lazy: false } // options
+);
+
+// Wire up events
+increment.onclick = () => count.set((x) => x + 1);
+decrement.onclick = () => count.set((x) => x - 1);
+```
+
+## Works with React
 
 ```tsx
-import { signal } from "rextive";
+import { signal, rx } from "rextive/react";
 
 const count = signal(0);
 const doubled = signal({ count }, ({ deps }) => deps.count * 2);
-```
-
-## Then bind your components
-
-```tsx
-import { rx } from "rextive";
 
 function Counter() {
   return (
@@ -33,19 +59,133 @@ function Counter() {
 
 ## That's it!
 
-- ✅ Simple API - just `signal` and `rx`
-- ✅ Powerful - handles sync, async, effects, queries
+- ✅ Framework-agnostic - works with vanilla JS, React, or any framework
+- ✅ Simple API - just `signal` for state management
+- ✅ Powerful - handles state, effects, queries
 - ✅ TypeScript - full type safety
-- ✅ Zero dependencies - lightweight
+- ✅ Lightweight - minimal dependencies
 
 ---
 
 ## Examples
 
-### Basic usage
+### Vanilla JavaScript
+
+#### Counter with DOM
+
+```html
+<!DOCTYPE html>
+<html>
+  <body>
+    <h1 id="count">0</h1>
+    <button id="increment">Increment</button>
+    <button id="decrement">Decrement</button>
+    <button id="reset">Reset</button>
+    <script type="module">
+      import { signal } from "rextive";
+
+      const countElement = document.getElementById("count");
+      const incrementBtn = document.getElementById("increment");
+      const decrementBtn = document.getElementById("decrement");
+      const resetBtn = document.getElementById("reset");
+
+      // Reactive state
+      const count = signal(0);
+
+      // Reactive effect - updates DOM when count changes
+      signal(
+        { count },
+        ({ deps }) => {
+          countElement.textContent = deps.count;
+        },
+        { lazy: false }
+      );
+
+      // Event handlers
+      incrementBtn.onclick = () => count.set((x) => x + 1);
+      decrementBtn.onclick = () => count.set((x) => x - 1);
+      resetBtn.onclick = () => count.reset();
+    </script>
+  </body>
+</html>
+```
+
+#### Derived state
+
+```js
+import { signal } from "rextive";
+
+const firstName = signal("John");
+const lastName = signal("Doe");
+
+// Derived signal
+const fullName = signal(
+  { firstName, lastName },
+  ({ deps }) => `${deps.firstName} ${deps.lastName}`
+);
+
+// Effect to update DOM
+signal(
+  { fullName },
+  ({ deps }) => {
+    document.getElementById("name").textContent = deps.fullName;
+  },
+  { lazy: false }
+);
+
+// Subscribe to changes
+const unsubscribe = fullName.on(() => {
+  console.log("Name changed:", fullName());
+});
+```
+
+#### Async data fetching
+
+```js
+import { signal } from "rextive";
+
+const userId = signal(1);
+
+// Async signal
+const user = signal({ userId }, async ({ deps, abortSignal }) => {
+  const res = await fetch(`/api/users/${deps.userId}`, {
+    signal: abortSignal,
+  });
+  return res.json();
+});
+
+// Handle loading states
+signal(
+  { user },
+  ({ deps }) => {
+    const userValue = deps.user;
+    const statusEl = document.getElementById("status");
+
+    if (userValue && typeof userValue === "object" && "loading" in userValue) {
+      statusEl.textContent = userValue.loading ? "Loading..." : "Loaded";
+    }
+  },
+  { lazy: false }
+);
+
+// Subscribe to user data
+user.on(() => {
+  const userData = user();
+  if (userData && !userData.loading) {
+    document.getElementById("userName").textContent = userData.name;
+  }
+});
+
+// Trigger fetch
+userId.set(2); // Automatically cancels previous fetch
+```
+
+### React Examples
+
+#### Basic usage
 
 ```tsx
-import { signal, rx } from "rextive";
+import { signal, rx } from "rextive/react";
 
 const name = signal("Alice");
 const greeting = signal({ name }, ({ deps }) => `Hello, ${deps.name}!`);
@@ -54,8 +194,8 @@ function App() {
   return (
     <div>
       <h1>{rx(greeting)}</h1>
-      {rx({ name }, (x) => (
-        <input value={x.name} onChange={(e) => name.set(e.target.value)} />
+      {rx({ name }, (value) => (
+        <input value={value.name} onChange={(e) => name.set(e.target.value)} />
       ))}
     </div>
   );
@@ -96,8 +236,8 @@ const user = signal({ userId }, async ({ deps }) => {
 function Profile() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      {rx({ user }, (awaited) => (
-        <div>{awaited.user.name}</div>
+      {rx({ user }, (value) => (
+        <div>{value.user.name}</div>
       ))}
     </Suspense>
   );
@@ -117,14 +257,14 @@ const localValue = signal("default");
 function ConditionalComponent() {
   return (
     <Suspense fallback={<div>Loading cloud value...</div>}>
-      {rx({ cloudValue, localValue }, (awaited) => {
+      {rx({ cloudValue, localValue }, (value) => {
         // If cloudValue is a promise, this will throw and wait
         // Once resolved, the check happens
-        if (!awaited.cloudValue) {
+        if (!value.cloudValue) {
           return <Comp1 />;
         }
 
-        return <Other value={awaited.localValue} />;
+        return <Other value={value.localValue} />;
       })}
     </Suspense>
   );
@@ -132,18 +272,18 @@ function ConditionalComponent() {
 
 // Using useSignals
 function ConditionalComponentWithHook() {
-  const [awaited] = useSignals({ cloudValue, localValue });
+  const [value] = useSignals({ cloudValue, localValue });
 
   return (
     <Suspense fallback={<div>Loading cloud value...</div>}>
       {(() => {
         // If cloudValue is a promise, this will throw and wait
         // Once resolved, the check happens
-        if (!awaited.cloudValue) {
+        if (!value.cloudValue) {
           return <Comp1 />;
         }
 
-        return <Other value={awaited.cloudValue} />;
+        return <Other value={value.cloudValue} />;
       })()}
     </Suspense>
   );
@@ -288,9 +428,9 @@ function TodoList() {
   // Trigger query
   payload.set({ userId: 1 });
 
-  return rx({ result }, (awaited) => (
+  return rx({ result }, (value) => (
     <div>
-      {awaited.result?.map((todo) => (
+      {value.result?.map((todo) => (
         <div key={todo.id}>{todo.title}</div>
       ))}
     </div>
@@ -396,9 +536,9 @@ function SearchBox() {
         value={searchTerm()}
         onChange={(e) => searchTerm.set(e.target.value)}
       />
-      {rx({ results }, (awaited) => (
+      {rx({ results }, (value) => (
         <div>
-          {awaited.results?.map((item) => (
+          {value.results?.map((item) => (
             <div key={item.id}>{item.name}</div>
           ))}
         </div>
@@ -443,8 +583,8 @@ function LiveData() {
     <div>
       <button onClick={startPolling}>Start</button>
       <button onClick={stopPolling}>Stop</button>
-      {rx({ data }, (awaited) => (
-        <div>{JSON.stringify(awaited.data)}</div>
+      {rx({ data }, (value) => (
+        <div>{JSON.stringify(value.data)}</div>
       ))}
     </div>
   );
@@ -479,27 +619,27 @@ function ContactForm() {
     return { form, errors, isValid };
   });
 
-  return rx({ form, errors, isValid }, (awaited) => (
+  return rx({ form, errors, isValid }, (value) => (
     <form>
       <input
-        value={awaited.form.name}
+        value={value.form.name}
         onChange={(e) => form.set({ ...form(), name: e.target.value })}
       />
-      {awaited.errors.name && <span>{awaited.errors.name}</span>}
+      {value.errors.name && <span>{value.errors.name}</span>}
 
       <input
-        value={awaited.form.email}
+        value={value.form.email}
         onChange={(e) => form.set({ ...form(), email: e.target.value })}
       />
-      {awaited.errors.email && <span>{awaited.errors.email}</span>}
+      {value.errors.email && <span>{value.errors.email}</span>}
 
       <textarea
-        value={awaited.form.message}
+        value={value.form.message}
         onChange={(e) => form.set({ ...form(), message: e.target.value })}
       />
-      {awaited.errors.message && <span>{awaited.errors.message}</span>}
+      {value.errors.message && <span>{value.errors.message}</span>}
 
-      <button disabled={!awaited.isValid}>Submit</button>
+      <button disabled={!value.isValid}>Submit</button>
     </form>
   ));
 }
@@ -518,7 +658,7 @@ function UserProfile({ userId }: { userId: number }) {
     { watch: [userId] } // Recreate when userId changes
   );
 
-  return rx({ user }, (awaited) => <div>{awaited.user.name}</div>);
+  return rx({ user }, (value) => <div>{value.user.name}</div>);
 }
 ```
 
@@ -542,7 +682,7 @@ function Timer({ initialValue }: { initialValue: number }) {
     }
   );
 
-  return rx({ timer }, (awaited) => <div>{awaited.timer}</div>);
+  return rx({ timer }, (value) => <div>{value.timer}</div>);
 }
 ```
 
@@ -556,15 +696,15 @@ const posts = signal(async () => fetchPosts());
 const comments = signal(async () => fetchComments());
 
 function Profile({ showPosts }: { showPosts: boolean }) {
-  return rx({ user, posts, comments }, (awaited) => {
+  return rx({ user, posts, comments }, (value) => {
     // Only user is accessed - only user is subscribed
-    <div>{awaited.user.name}</div>;
+    <div>{value.user.name}</div>;
 
     // Conditionally access posts - only subscribed if accessed
     {
       showPosts && (
         <div>
-          {awaited.posts.map((post) => (
+          {value.posts.map((post) => (
             <div key={post.id}>{post.title}</div>
           ))}
         </div>
@@ -935,9 +1075,9 @@ const count = signal(42);
 rx(count); // Renders: 42
 
 // With signals (always reactive)
-rx({ user, posts }, (awaited, loadable) => (
+rx({ user, posts }, (value, loadable) => (
   <div>
-    <div>{awaited.user.name}</div>
+    <div>{value.user.name}</div>
     {loadable.posts.status === "loading" && <Spinner />}
   </div>
 ));
@@ -974,14 +1114,14 @@ import { Suspense } from "react";
 const user = signal(async () => fetchUser());
 const posts = signal(async () => fetchPosts());
 
-// Using awaited (Suspense pattern)
+// Using value (Suspense pattern)
 function Component() {
-  const [awaited] = useSignals({ user, posts });
+  const [value] = useSignals({ user, posts });
 
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <div>{awaited.user.name}</div>
-      <div>{awaited.posts.length} posts</div>
+      <div>{value.user.name}</div>
+      <div>{value.posts.length} posts</div>
     </Suspense>
   );
 }
@@ -998,14 +1138,14 @@ function ComponentWithLoadable() {
 
 // Using both
 function ComponentWithBoth() {
-  const [awaited, loadable] = useSignals({ user, posts });
+  const [value, loadable] = useSignals({ user, posts });
 
   return (
     <div>
       {loadable.user.status === "loading" ? (
         <Spinner />
       ) : (
-        <div>{awaited.user.name}</div>
+        <div>{value.user.name}</div>
       )}
     </div>
   );

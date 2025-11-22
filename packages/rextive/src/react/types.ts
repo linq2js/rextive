@@ -30,7 +30,7 @@ export type RxOptions = {
    * ```tsx
    * // Re-renders when user/posts change
    * // Render function memoized by watch
-   * rx({ user, posts }, (awaited) => <div>{awaited.user.name}</div>, {
+   * rx({ user, posts }, (value) => <div>{value.user.name}</div>, {
    *   watch: [formatFn] // Re-create render only when formatFn changes
    * })
    * ```

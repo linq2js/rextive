@@ -175,10 +175,10 @@ function createSignal(
     equals = Object.is,
     name,
     fallback,
-    onInit: onInitCallbacks,
     onChange: onChangeCallbacks,
     onError: onErrorCallbacks,
     tags,
+    lazy = true,
   } = options;
 
   // Emitter for notifying listeners when signal value changes
@@ -461,6 +461,7 @@ function createSignal(
     set, // Direct value setter
     setIfUnchanged, // Optimistic setter factory
     reset, // Reset the signal to its initial value
+    toJSON: get, // JSON serialization - returns current value
   });
 
   // Store instance reference for tag bookkeeping
@@ -471,13 +472,9 @@ function createSignal(
     tags.forEach((tag) => (tag as any)._add(instanceRef!));
   }
 
-  // Call onInit callbacks after signal is created
-  if (onInitCallbacks) {
-    if (Array.isArray(onInitCallbacks)) {
-      onInitCallbacks.forEach((cb) => cb(instance as unknown as Signal<any>));
-    } else {
-      onInitCallbacks(instance as unknown as Signal<any>);
-    }
+  // If not lazy, compute immediately
+  if (!lazy) {
+    instance.get();
   }
 
   return instance as unknown as Signal<any>;

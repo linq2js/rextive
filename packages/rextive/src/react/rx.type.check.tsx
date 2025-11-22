@@ -106,38 +106,38 @@ const singleWithWatch = rx(count, {
 expectType<ReactNode>(singleWithWatch);
 
 // ---------------------------------------------------------------------------
-// Overload 3: rx(signals, render) - Multiple signals with awaited access
+// Overload 3: rx(signals, render) - Multiple signals with value access
 // ---------------------------------------------------------------------------
 
-// Simple awaited access
-const multi1 = rx({ count, name }, (awaited) => {
-  expectType<{ count: number; name: string }>(awaited);
+// Simple value access
+const multi1 = rx({ count, name }, (value) => {
+  expectType<{ count: number; name: string }>(value);
   return (
     <div>
-      {awaited.count}: {awaited.name}
+      {value.count}: {value.name}
     </div>
   );
 });
 expectType<ReactNode>(multi1);
 
-// Awaited with object signal
-const multi2 = rx({ user }, (awaited) => {
-  expectType<{ user: { id: number; name: string; email: string } }>(awaited);
+// Value with object signal
+const multi2 = rx({ user }, (value) => {
+  expectType<{ user: { id: number; name: string; email: string } }>(value);
   return (
     <div>
-      <h1>{awaited.user.name}</h1>
-      <p>{awaited.user.email}</p>
+      <h1>{value.user.name}</h1>
+      <p>{value.user.email}</p>
     </div>
   );
 });
 expectType<ReactNode>(multi2);
 
-// Awaited with array signal
-const multi3 = rx({ posts }, (awaited) => {
-  expectType<{ posts: Array<{ id: number; title: string }> }>(awaited);
+// Value with array signal
+const multi3 = rx({ posts }, (value) => {
+  expectType<{ posts: Array<{ id: number; title: string }> }>(value);
   return (
     <ul>
-      {awaited.posts.map((post) => (
+      {value.posts.map((post) => (
         <li key={post.id}>{post.title}</li>
       ))}
     </ul>
@@ -179,9 +179,9 @@ const withLoadable2 = rx({ loading }, (_, loadable) => {
 });
 expectType<ReactNode>(withLoadable2);
 
-// Using both awaited and loadable
-const withBoth = rx({ count, name }, (awaited, loadable) => {
-  expectType<{ count: number; name: string }>(awaited);
+// Using both value and loadable
+const withBoth = rx({ count, name }, (value, loadable) => {
+  expectType<{ count: number; name: string }>(value);
   expectType<{
     count: Loadable<number>;
     name: Loadable<string>;
@@ -192,10 +192,10 @@ const withBoth = rx({ count, name }, (awaited, loadable) => {
     return <div>Loading name...</div>;
   }
 
-  // Use awaited for direct value access (will suspend if needed)
+  // Use value for direct access (will suspend if needed)
   return (
     <div>
-      Count: {awaited.count}, Name: {awaited.name}
+      Count: {value.count}, Name: {value.name}
     </div>
   );
 });
@@ -208,9 +208,9 @@ expectType<ReactNode>(withBoth);
 // With watch option
 const withWatch1 = rx(
   { count, name },
-  (awaited) => (
+  (value) => (
     <div>
-      {awaited.count}: {awaited.name}
+      {value.count}: {value.name}
     </div>
   ),
   {
@@ -220,7 +220,7 @@ const withWatch1 = rx(
 expectType<ReactNode>(withWatch1);
 
 // With multiple watch deps
-const withWatch2 = rx({ count }, (awaited) => <div>{awaited.count}</div>, {
+const withWatch2 = rx({ count }, (value) => <div>{value.count}</div>, {
   watch: ["some", "deps"],
 });
 expectType<ReactNode>(withWatch2);
@@ -237,21 +237,21 @@ const complex1 = rx(
     user,
     posts,
   },
-  (awaited) => {
+  (value) => {
     expectType<{
       count: number;
       name: string;
       user: { id: number; name: string; email: string };
       posts: Array<{ id: number; title: string }>;
-    }>(awaited);
+    }>(value);
 
     return (
       <div>
-        <h1>{awaited.user.name}</h1>
-        <p>Count: {awaited.count}</p>
-        <p>Name: {awaited.name}</p>
+        <h1>{value.user.name}</h1>
+        <p>Count: {value.count}</p>
+        <p>Name: {value.name}</p>
         <ul>
-          {awaited.posts.map((post) => (
+          {value.posts.map((post) => (
             <li key={post.id}>{post.title}</li>
           ))}
         </ul>
@@ -262,14 +262,14 @@ const complex1 = rx(
 expectType<ReactNode>(complex1);
 
 // Nested JSX
-const complex2 = rx({ user, posts }, (awaited) => {
+const complex2 = rx({ user, posts }, (value) => {
   const renderPosts = () =>
-    awaited.posts.map((post) => <li key={post.id}>{post.title}</li>);
+    value.posts.map((post) => <li key={post.id}>{post.title}</li>);
 
   return (
     <div>
       <header>
-        <h1>{awaited.user.name}</h1>
+        <h1>{value.user.name}</h1>
       </header>
       <main>
         <ul>{renderPosts()}</ul>
@@ -279,17 +279,17 @@ const complex2 = rx({ user, posts }, (awaited) => {
 });
 expectType<ReactNode>(complex2);
 
-// Conditional rendering with awaited
-const conditional1 = rx({ count, name }, (awaited) => {
-  if (awaited.count > 10) {
-    return <div>High: {awaited.name}</div>;
+// Conditional rendering with value
+const conditional1 = rx({ count, name }, (value) => {
+  if (value.count > 10) {
+    return <div>High: {value.name}</div>;
   }
-  return <div>Low: {awaited.name}</div>;
+  return <div>Low: {value.name}</div>;
 });
 expectType<ReactNode>(conditional1);
 
 // Conditional rendering with loadable
-const conditional2 = rx({ user }, (awaited, loadable) => {
+const conditional2 = rx({ user }, (value, loadable) => {
   if (loadable.user.status === "loading") {
     return <div>Loading user...</div>;
   }
@@ -298,17 +298,17 @@ const conditional2 = rx({ user }, (awaited, loadable) => {
     return <div>Error loading user</div>;
   }
 
-  // Safe to use awaited here since we checked loadable
-  return <div>Welcome, {awaited.user.name}!</div>;
+  // Safe to use value here since we checked loadable
+  return <div>Welcome, {value.user.name}!</div>;
 });
 expectType<ReactNode>(conditional2);
 
 // Early return patterns
-const earlyReturn = rx({ count }, (awaited, loadable) => {
+const earlyReturn = rx({ count }, (value, loadable) => {
   if (loadable.count.loading) return <div>Loading...</div>;
   if (loadable.count.status === "error") return <div>Error</div>;
 
-  return <div>{awaited.count}</div>;
+  return <div>{value.count}</div>;
 });
 expectType<ReactNode>(earlyReturn);
 
@@ -317,16 +317,16 @@ expectType<ReactNode>(earlyReturn);
 // ---------------------------------------------------------------------------
 
 // Empty signals object
-const emptySignals = rx({}, (awaited) => {
-  expectType<{}>(awaited);
+const emptySignals = rx({}, (value) => {
+  expectType<{}>(value);
   return <div>No signals</div>;
 });
 expectType<ReactNode>(emptySignals);
 
 // Single signal in signals object
-const singleInObject = rx({ count }, (awaited) => {
-  expectType<{ count: number }>(awaited);
-  return <div>{awaited.count}</div>;
+const singleInObject = rx({ count }, (value) => {
+  expectType<{ count: number }>(value);
+  return <div>{value.count}</div>;
 });
 expectType<ReactNode>(singleInObject);
 

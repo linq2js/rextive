@@ -90,9 +90,6 @@ const signalWithFallback = signal(0, {
 expectType<Signal<number>>(signalWithFallback);
 
 const signalWithCallbacks = signal(0, {
-  onInit: (sig) => {
-    expectType<Signal<number>>(sig);
-  },
   onChange: (value) => {
     expectType<number>(value);
   },
@@ -145,9 +142,6 @@ const computedWithOptions = signal({ count }, (ctx) => ctx.deps.count * 2, {
   fallback: (error) => {
     expectType<unknown>(error);
     return 0;
-  },
-  onInit: (sig) => {
-    expectType<Signal<number>>(sig);
   },
   onChange: (value) => {
     expectType<number>(value);
@@ -249,3 +243,51 @@ expectType<Signal<number>>(a);
 expectType<Signal<number>>(b);
 expectType<Signal<number>>(c);
 expectType<number>(c());
+
+// ---------------------------------------------------------------------------
+// lazy option
+// ---------------------------------------------------------------------------
+
+// Lazy by default (no option)
+const lazyDefault = signal(() => 42);
+expectType<Signal<number>>(lazyDefault);
+
+// Explicit lazy: true
+const lazyTrue = signal(() => 42, { lazy: true });
+expectType<Signal<number>>(lazyTrue);
+
+// Eager evaluation with lazy: false
+const eager = signal(() => 42, { lazy: false });
+expectType<Signal<number>>(eager);
+
+// Lazy option with dependencies
+const eagerDerived = signal({ count }, (ctx) => ctx.deps.count * 2, {
+  lazy: false,
+});
+expectType<Signal<number>>(eagerDerived);
+
+// Lazy option with other options
+const eagerWithOptions = signal(() => 42, {
+  lazy: false,
+  name: "mySignal",
+  equals: (a, b) => a === b,
+});
+expectType<Signal<number>>(eagerWithOptions);
+
+// ---------------------------------------------------------------------------
+// toJSON method
+// ---------------------------------------------------------------------------
+
+// toJSON returns the signal value type
+expectType<number>(count.toJSON());
+expectType<string>(name.toJSON());
+expectType<User>(user.toJSON());
+expectType<number[]>(numbers.toJSON());
+
+// toJSON with optional signals
+const optional = signal<string>();
+expectType<string | undefined>(optional.toJSON());
+
+// toJSON works with JSON.stringify
+const countJson: string = JSON.stringify(count);
+expectType<string>(countJson);

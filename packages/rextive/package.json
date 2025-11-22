@@ -75,10 +75,11 @@
     "vite": "^5.0.8",
     "vite-plugin-dts": "^3.6.4",
     "vitest": "^1.1.0",
-    "react-error-boundary": "6.0.0"
+    "react-error-boundary": "6.0.0",
+    "@types/lodash": "^4.17.20"
   },
   "dependencies": {
-    "@types/lodash": "^4.17.20",
-    "lodash": "^4.17.21"
+    "lodash": "^4.17.21",
+    "immer": "^10.2.0"
   }
 }

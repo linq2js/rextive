@@ -66,6 +66,12 @@ export type Signal<TValue, TInit = TValue> = Subscribable &
      * Reset the signal to its initial value
      */
     reset(): void;
+
+    /**
+     * Custom JSON serialization - returns the current signal value
+     * Useful for JSON.stringify() and debugging
+     */
+    toJSON(): TValue | TInit;
   };
 
 /**
@@ -98,12 +104,35 @@ export type SignalOptions<T> = {
    * to multiple tags at once.
    */
   tags?: readonly Tag<T>[];
-  /** Called once after signal is created and initialized */
-  onInit?: SingleOrMultipleListeners<Signal<T>>;
   /** Called whenever signal value changes (receives new value) */
   onChange?: SingleOrMultipleListeners<T>;
   /** Called whenever signal computation throws an error (receives error) */
   onError?: SingleOrMultipleListeners<unknown>;
+  /**
+   * Whether the signal computation is lazy (default: true).
+   *
+   * - `lazy: true` (default): Computation runs only when the signal is accessed
+   * - `lazy: false`: Computation runs immediately when the signal is created or dependencies change
+   *
+   * Use `lazy: false` for:
+   * - Side effects that need to run immediately
+   * - Pre-fetching data eagerly
+   * - Effects that update DOM or external state
+   *
+   * @example Lazy (default) - runs only when accessed
+   * ```ts
+   * const user = signal(async () => fetchUser()); // Not fetched yet
+   * user(); // Fetches now
+   * ```
+   *
+   * @example Eager - runs immediately
+   * ```ts
+   * signal({ count }, ({ deps }) => {
+   *   document.title = `Count: ${deps.count}`;
+   * }, { lazy: false }); // Updates title immediately
+   * ```
+   */
+  lazy?: boolean;
 };
 
 export type ResolveValueType = "awaited" | "loadable" | "value";
