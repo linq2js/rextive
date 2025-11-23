@@ -255,6 +255,13 @@ export type SignalContext = {
   cleanup: (fn: VoidFunction) => void;
 };
 
+export type WithUse<T> = T & {
+  use<TArgs extends any[], TReturn>(
+    logic: (context: WithUse<T>, ...args: TArgs) => TReturn,
+    ...args: TArgs
+  ): TReturn;
+};
+
 /**
  * Context for computed signal computation functions (with dependencies)
  */

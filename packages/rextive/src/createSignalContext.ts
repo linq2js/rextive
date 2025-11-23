@@ -9,14 +9,14 @@ import { createSignalAccessProxy } from "./utils/createSignalAccessProxy";
 
 /**
  * Creates a context object for signal computation.
- * 
+ *
  * This context provides:
  * - `deps`: Proxy for accessing signal dependencies with auto-tracking
  * - `abortSignal`: AbortSignal for cancelling async operations
  * - `cleanup`: Register cleanup functions
  * - `trackedDeps`: Set of tracked signal dependencies
  * - `dispose`: Cleanup function for internal resources
- * 
+ *
  * @param deps - Map of signal dependencies
  * @param onCleanup - Emitter for cleanup callbacks
  * @param onDepChange - Callback when any dependency changes
@@ -49,10 +49,6 @@ export function createSignalContext(
     return abortController;
   };
 
-  const contextCleanup = (fn: VoidFunction) => {
-    onCleanup.on(fn);
-  };
-
   const internalCleanup = () => {
     abortController?.abort();
     abortController = undefined;
@@ -71,7 +67,7 @@ export function createSignalContext(
     get abortSignal() {
       return getAbortController().signal;
     },
-    cleanup: contextCleanup,
+    cleanup: onCleanup.on,
     // Proxy for dependency access with auto-tracking
     get deps() {
       if (!depsProxy) {
@@ -97,4 +93,3 @@ export function createSignalContext(
     dispose: internalCleanup,
   };
 }
-
