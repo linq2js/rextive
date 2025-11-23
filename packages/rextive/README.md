@@ -984,6 +984,92 @@ const unsubscribe = count.on(() => {
 count.dispose();
 ```
 
+### signal.map
+
+Transform signal values with a pure function (stateless).
+
+```tsx
+const count = signal(5);
+
+// Transform to different type
+const doubled = count.map(x => x * 2);
+console.log(doubled()); // 10
+
+const formatted = count.map(x => `Count: ${x}`);
+console.log(formatted()); // "Count: 5"
+
+// Chainable
+const result = count
+  .map(x => x * 2)
+  .map(x => x + 1)
+  .map(x => `Result: ${x}`);
+
+// With custom equals function
+const user = signal({ name: 'John', age: 30 });
+const name = user.map(
+  u => u.name,
+  (a, b) => a === b // Custom equality check
+);
+```
+
+Or use the standalone function:
+
+```tsx
+import { mapSignal } from 'rextive';
+
+const doubled = mapSignal(count, x => x * 2);
+```
+
+### signal.scan
+
+Accumulate values with state (like Array.reduce).
+
+```tsx
+const count = signal(1);
+
+// Running total
+const total = count.scan((sum, curr) => sum + curr, 0);
+count.set(2); // total = 3
+count.set(3); // total = 6
+
+// Keep last N values
+const last3 = count.scan(
+  (acc, curr) => [...acc, curr].slice(-3),
+  [] as number[]
+);
+
+// Build statistics
+const stats = count.scan(
+  (acc, curr) => ({
+    sum: acc.sum + curr,
+    count: acc.count + 1,
+    avg: (acc.sum + curr) / (acc.count + 1),
+    min: Math.min(acc.min, curr),
+    max: Math.max(acc.max, curr),
+  }),
+  { sum: 0, count: 0, avg: 0, min: Infinity, max: -Infinity }
+);
+
+// Track delta from previous value
+const deltaState = count.scan(
+  (acc, curr) => ({ prev: curr, delta: curr - acc.prev }),
+  { prev: 0, delta: 0 }
+);
+const delta = deltaState.map(s => s.delta);
+```
+
+Or use the standalone function:
+
+```tsx
+import { scanSignal } from 'rextive';
+
+const total = scanSignal(count, (sum, curr) => sum + curr, 0);
+```
+
+**Key difference from `.map()`:**
+- `.map()` is **stateless** - pure transformation
+- `.scan()` is **stateful** - maintains accumulator across updates
+
 ### signal.batch
 
 ```tsx

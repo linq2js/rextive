@@ -75,6 +75,80 @@ export type Signal<TValue, TInit = TValue> = Subscribable &
      * @returns "success" if value was hydrated, "skipped" if already modified/computed
      */
     hydrate(value: TValue): HydrateStatus;
+
+    /**
+     * Transform signal value (stateless, pure function)
+     *
+     * Creates a new computed signal that applies the transform function
+     * to each value from the source signal.
+     *
+     * @param fn - Pure transformation function (value: T) => U
+     * @param equals - Optional custom equality function for output values (default: Object.is)
+     * @returns New computed signal with transformed values
+     *
+     * @example
+     * ```ts
+     * const count = signal(0);
+     * const doubled = count.map(x => x * 2);
+     * const formatted = count.map(x => `Count: ${x}`);
+     *
+     * // With custom equals for object comparison
+     * const user = signal({ name: 'John', age: 30 });
+     * const name = user.map(
+     *   u => u.name,
+     *   (a, b) => a === b
+     * );
+     * ```
+     */
+    map<U>(
+      fn: (value: TValue | TInit) => U,
+      equals?: (a: U, b: U) => boolean
+    ): ComputedSignal<U>;
+
+    /**
+     * Accumulate values with state (stateful operation)
+     *
+     * Creates a new computed signal that maintains an accumulator value,
+     * similar to Array.reduce(). The accumulator is updated on each
+     * source signal change.
+     *
+     * @param fn - Accumulator function (accumulator: U, current: T) => U
+     * @param initialValue - Initial accumulator value (determines output type)
+     * @param equals - Optional custom equality function for accumulator (default: Object.is)
+     * @returns New computed signal with accumulated values
+     *
+     * @example
+     * ```ts
+     * const count = signal(0);
+     *
+     * // Running total
+     * const total = count.scan((sum, curr) => sum + curr, 0);
+     *
+     * // Delta from previous
+     * const delta = count.scan((prev, curr) => curr - prev, 0);
+     *
+     * // Keep last N values
+     * const last5 = count.scan(
+     *   (acc, curr) => [...acc, curr].slice(-5),
+     *   [] as number[]
+     * );
+     *
+     * // Build statistics object
+     * const stats = count.scan(
+     *   (acc, curr) => ({
+     *     sum: acc.sum + curr,
+     *     count: acc.count + 1,
+     *     avg: (acc.sum + curr) / (acc.count + 1)
+     *   }),
+     *   { sum: 0, count: 0, avg: 0 }
+     * );
+     * ```
+     */
+    scan<U>(
+      fn: (accumulator: U, current: TValue | TInit) => U,
+      initialValue: U,
+      equals?: (a: U, b: U) => boolean
+    ): ComputedSignal<U>;
   };
 
 /**

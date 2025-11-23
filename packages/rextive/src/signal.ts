@@ -13,6 +13,8 @@ import {
 } from "./types";
 import { createSignalAccessProxy } from "./utils/createSignalAccessProxy";
 import { scheduleNotification } from "./batch";
+import { mapSignal } from "./utils/mapSignal";
+import { scanSignal } from "./utils/scanSignal";
 
 export const SIGNAL_TYPE = Symbol("SIGNAL_TYPE");
 export const DISPOSED_MESSAGE = "Signal is disposed";
@@ -37,17 +39,6 @@ export type SignalExports = {
   ): MutableSignal<TValue>;
 
   /**
-   * Create computed signal from dependencies
-   * @param dependencies - Map of signals to depend on
-   * @param compute - Compute function that receives dependency values
-   * @returns ComputedSignal<T>
-   */
-  <TValue, TDependencies extends SignalMap>(
-    dependencies: TDependencies,
-    compute: (context: ComputedSignalContext<NoInfer<TDependencies>>) => TValue
-  ): ComputedSignal<TValue>;
-
-  /**
    * Create computed signal from dependencies with options
    * @param dependencies - Map of signals to depend on
    * @param compute - Compute function that receives dependency values
@@ -57,7 +48,7 @@ export type SignalExports = {
   <TValue, TDependencies extends SignalMap>(
     dependencies: TDependencies,
     compute: (context: ComputedSignalContext<NoInfer<TDependencies>>) => TValue,
-    options: SignalOptions<TValue>
+    options?: SignalOptions<TValue>
   ): ComputedSignal<TValue>;
 
   /**
@@ -361,6 +352,23 @@ function createMutableSignal(
     return "success";
   };
 
+  const map = function <U>(
+    this: MutableSignal<any>,
+    fn: (value: any) => U,
+    equals?: (a: U, b: U) => boolean
+  ): ComputedSignal<U> {
+    return mapSignal(this, fn, equals);
+  };
+
+  const scan = function <U>(
+    this: MutableSignal<any>,
+    fn: (accumulator: U, current: any) => U,
+    initialValue: U,
+    equals?: (a: U, b: U) => boolean
+  ): ComputedSignal<U> {
+    return scanSignal(this, fn, initialValue, equals);
+  };
+
   const instance = Object.assign(get, {
     [SIGNAL_TYPE]: true,
     displayName: name,
@@ -371,6 +379,8 @@ function createMutableSignal(
     reset,
     toJSON: get,
     hydrate,
+    map,
+    scan,
   });
 
   instanceRef = instance as unknown as MutableSignal<any>;
@@ -573,6 +583,23 @@ function createComputedSignal(
     return "success" as const;
   };
 
+  const map = function <U>(
+    this: ComputedSignal<any>,
+    fn: (value: any) => U,
+    equalsOutput?: (a: U, b: U) => boolean
+  ): ComputedSignal<U> {
+    return mapSignal(this, fn, equalsOutput);
+  };
+
+  const scan = function <U>(
+    this: ComputedSignal<any>,
+    fn: (accumulator: U, current: any) => U,
+    initialValue: U,
+    equalsOutput?: (a: U, b: U) => boolean
+  ): ComputedSignal<U> {
+    return scanSignal(this, fn, initialValue, equalsOutput);
+  };
+
   const instance = Object.assign(get, {
     [SIGNAL_TYPE]: true,
     displayName: name,
@@ -585,6 +612,8 @@ function createComputedSignal(
     resume,
     paused,
     hydrate,
+    map,
+    scan,
   });
 
   instanceRef = instance as unknown as ComputedSignal<any>;

@@ -90,6 +90,8 @@ export type { ProxyOptions } from "./utils/createProxy";
 export { shallowEquals } from "./utils/shallowEquals";
 export { devLog, devWarn, devError, devOnly, devAssert } from "./utils/dev";
 export { wait, type Awaitable } from "./wait";
+export { mapSignal } from "./utils/mapSignal";
+export { scanSignal } from "./utils/scanSignal";
 
 // Disposable utilities
 export { disposable, DisposalAggregateError } from "./disposable";
