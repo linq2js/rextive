@@ -1,7 +1,9 @@
+import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import { useScope } from "./useScope";
 import { signal } from "../signal";
+import "@testing-library/jest-dom/vitest";
 
 describe("useScope", () => {
   beforeEach(() => {
@@ -94,15 +96,16 @@ describe("useScope", () => {
     });
 
     it("should dispose signals on unmount", () => {
-      const count = signal(0);
-      const disposeSpy = vi.spyOn(count, "dispose");
+      const disposeSpy = vi.fn();
+      const count = { dispose: disposeSpy, value: 0 } as any;
 
       const TestComponent = () => {
         const scope = useScope(() => ({
           count,
+          dispose: [count], // Must explicitly include in dispose array
         }));
 
-        return <div>{scope.count()}</div>;
+        return <div>{JSON.stringify(scope.count)}</div>;
       };
 
       const { unmount } = render(<TestComponent />);
@@ -112,17 +115,19 @@ describe("useScope", () => {
       expect(disposeSpy).toHaveBeenCalledOnce();
     });
 
-    it("should handle disposables without dispose method", () => {
+    it("should handle non-disposable objects in scope", () => {
       const TestComponent = () => {
+        const b = signal(0);
         const scope = useScope(() => ({
-          a: { noDispose: true } as any,
-          b: signal(0),
+          a: { noDispose: true } as any, // Non-disposable, not in dispose array
+          b,
+          dispose: [b], // Only dispose signal b
         }));
 
         return <div>{scope.b()}</div>;
       };
 
-      // Should not throw
+      // Should not throw - non-disposable objects are fine if not in dispose array
       const { unmount } = render(<TestComponent />);
       unmount();
     });
@@ -405,13 +410,18 @@ describe("useScope", () => {
 
       const TestComponent = () => {
         useScope(
-          () => ({
-            disposable: {
+          () => {
+            const disposable = {
               dispose: () => {
                 disposeOrder.push("autoDispose");
               },
-            } as any,
-          }),
+            } as any;
+
+            return {
+              disposable,
+              dispose: disposable, // Must set dispose property for auto-disposal
+            };
+          },
           { onDispose }
         );
 
@@ -828,49 +838,25 @@ describe("useScope", () => {
       expect(onDispose).toHaveBeenCalledOnce(); // Old scope disposed
     });
 
-    it("should handle nested disposables", () => {
-      const outerDispose = vi.fn();
-      const innerDispose = vi.fn();
-
-      const TestComponent = () => {
-        useScope(() => ({
-          outer: {
-            dispose: outerDispose,
-            inner: {
-              dispose: innerDispose,
-            },
-          } as any,
-        }));
-
-        return <div>Test</div>;
-      };
-
-      const { unmount } = render(<TestComponent />);
-      unmount();
-
-      // Only outer dispose should be called (inner is not a direct disposable)
-      expect(outerDispose).toHaveBeenCalledOnce();
-      expect(innerDispose).not.toHaveBeenCalled();
-    });
-
     it("should handle scope with mixed disposable types", () => {
       const signalDispose = vi.fn();
       const customDispose = vi.fn();
 
       const TestComponent = () => {
         const scope = useScope(() => {
-          const sig = signal(0);
-          vi.spyOn(sig, "dispose").mockImplementation(signalDispose);
+          const sig = { dispose: signalDispose, value: 0 } as any;
+          const custom = {
+            dispose: customDispose,
+          } as any;
 
           return {
             signal: sig,
-            custom: {
-              dispose: customDispose,
-            } as any,
+            custom,
+            dispose: [sig, custom], // Explicitly list disposables for performance
           };
         });
 
-        return <div>{scope.signal()}</div>;
+        return <div>{JSON.stringify(scope.signal)}</div>;
       };
 
       const { unmount } = render(<TestComponent />);
@@ -1155,42 +1141,45 @@ describe("useScope", () => {
       expect(disposeFn).toHaveBeenCalledOnce();
     });
 
-    it("should dispose signals in the scope properties", () => {
+    it("should dispose signals listed in dispose property", () => {
+      const disposeSpy1 = vi.fn();
+      const disposeSpy2 = vi.fn();
+
       const TestComponent = () => {
         const scope = useScope(() => {
-          const sig1 = signal(1);
-          const sig2 = signal(2);
-          const disposeSpy1 = vi.spyOn(sig1, "dispose");
-          const disposeSpy2 = vi.spyOn(sig2, "dispose");
-          
+          const sig1 = { dispose: disposeSpy1 } as any;
+          const sig2 = { dispose: disposeSpy2 } as any;
+
           return {
             mySignal1: sig1,
             mySignal2: sig2,
-            spy1: disposeSpy1,
-            spy2: disposeSpy2,
+            dispose: [sig1, sig2], // Explicitly list what to dispose
           };
         });
 
-        return (
-          <div data-testid="spy1">{scope.spy1.getMockName()}</div>
-        );
+        return <div data-testid="sig1">{JSON.stringify(scope.mySignal1)}</div>;
       };
 
       const { unmount } = render(<TestComponent />);
+      expect(disposeSpy1).not.toHaveBeenCalled();
+      expect(disposeSpy2).not.toHaveBeenCalled();
+
       unmount();
-      // Spies should have been called after unmount
-      // We can't directly access them after unmount, but the test ensures
-      // signals created in scope are properly disposed
+      expect(disposeSpy1).toHaveBeenCalledOnce();
+      expect(disposeSpy2).toHaveBeenCalledOnce();
     });
 
-    it("should dispose only signals, not other scope properties", () => {
+    it("should only dispose items in dispose property", () => {
+      const signalDispose = vi.fn();
       const regularFn = vi.fn();
-      
+
       const TestComponent = () => {
+        const mySignal = { dispose: signalDispose } as any;
         useScope(() => ({
-          mySignal: signal(0),
+          mySignal,
           notASignal: { some: "data" },
           myFunction: regularFn,
+          dispose: [mySignal], // Only dispose mySignal, not other properties
         }));
 
         return <div>Test</div>;
@@ -1198,6 +1187,8 @@ describe("useScope", () => {
 
       const { unmount } = render(<TestComponent />);
       unmount();
+      // Only signal's dispose should be called
+      expect(signalDispose).toHaveBeenCalledOnce();
       // Regular function should not be called during dispose
       expect(regularFn).not.toHaveBeenCalled();
     });

@@ -217,10 +217,16 @@ import { signal } from "rextive";
 import { rx, useScope } from "rextive/react";
 
 function TodoList() {
-  const { todos, filter } = useScope(() => ({
-    todos: signal([]),
-    filter: signal("all"),
-  })); // ✅ Auto-disposed when component unmounts!
+  const { todos, filter } = useScope(() => {
+    const todos = signal([]);
+    const filter = signal("all");
+
+    return {
+      todos,
+      filter,
+      dispose: [todos, filter], // ✅ Auto-disposed when component unmounts!
+    };
+  });
 
   return (
     <div>
@@ -256,7 +262,11 @@ function createQuery(endpoint) {
     return res.json();
   });
 
-  return { params, data };
+  return {
+    params,
+    data,
+    dispose: [params, data], // Dispose signals when scope unmounts
+  };
 }
 
 // Use it
@@ -296,7 +306,12 @@ function ContactForm() {
       ({ deps }) => Object.keys(deps.errors).length === 0
     );
 
-    return { form, errors, isValid };
+    return {
+      form,
+      errors,
+      isValid,
+      dispose: [form, errors, isValid], // Dispose all signals
+    };
   });
 
   return rx({ form, errors, isValid }, (value) => (
@@ -335,7 +350,11 @@ function SearchBox() {
       return res.json();
     });
 
-    return { searchTerm, results };
+    return {
+      searchTerm,
+      results,
+      dispose: [searchTerm, results], // Dispose signals on unmount
+    };
   });
 
   return (
@@ -614,10 +633,16 @@ Create component-scoped signals with automatic cleanup.
 
 ```tsx
 const { count, doubled } = useScope(
-  () => ({
-    count: signal(0),
-    doubled: signal({ count }, ({ deps }) => deps.count * 2),
-  }),
+  () => {
+    const count = signal(0);
+    const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+
+    return {
+      count,
+      doubled,
+      dispose: [count, doubled], // Automatically disposed on unmount
+    };
+  },
   {
     watch: [userId], // Recreate when userId changes
     onUpdate: [

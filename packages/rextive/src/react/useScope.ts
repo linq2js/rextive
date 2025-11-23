@@ -1,73 +1,85 @@
 import { useMemo, useState, useLayoutEffect } from "react";
-import { Disposable } from "../types";
+import { ExDisposable } from "../types";
 import { UseScopeOptions } from "./types";
 import { shallowEquals } from "../utils/shallowEquals";
-import { is } from "../is";
+import { tryDispose } from "../disposable";
 
 /**
- * useScope - Create component-scoped disposables
+ * useScope - Create component-scoped services with automatic cleanup
  *
- * Creates signals and other disposables that are automatically cleaned up
+ * Creates signals, services, and other disposables that are automatically cleaned up
  * when the component unmounts. Optionally recreate when dependencies change.
  *
  * **Lifecycle:**
  * 1. Creates scope on mount (or when watch deps change)
  * 2. Calls onUpdate callback when scope or update deps change
- * 3. Calls onDispose callback + disposes all disposables on unmount
+ * 3. Calls onDispose callback + disposes scope.dispose on unmount
  *
- * **Disposal:**
- * - Only items in the `dispose` property are automatically disposed
- * - You can return non-disposable values (functions, plain objects) without them being disposed
- * - This allows you to expose helper functions or keep signals private
+ * **Disposal (Performance Optimized):**
+ * - **Only `scope.dispose` is automatically disposed** - other properties are NOT automatically disposed
+ * - This design optimizes performance by avoiding iteration over all scope properties
+ * - You must explicitly list what to dispose in the `dispose` property
  * - `dispose` can be:
  *   - A single `VoidFunction` - invoked directly
  *   - A single `Disposable` - calls `dispose()` method
- *   - An array `(VoidFunction | Disposable)[]` - handles each item
+ *   - An array `(VoidFunction | Disposable)[]` - disposes each item in reverse order (LIFO)
+ * - Non-disposable properties (helpers, data) can safely coexist in the scope
  *
  * **Watch dependencies:**
  * - `watch`: Controls when scope is recreated (like useEffect deps)
  * - `onUpdate` tuple form: Second element controls when onUpdate runs
  *
- * @param create - Factory function that creates scope (can include `dispose` property)
+ * @param create - Factory function that creates scope (should include `dispose` property for cleanup)
  * @param options - Optional configuration
  * @returns The created scope
  *
- * @example Basic usage with array
+ * @example Basic usage - explicit dispose list
  * ```tsx
- * const { count, doubled } = useScope(() => ({
- *   count: signal(0),
- *   doubled: signal({ count }, ({ deps }) => deps.count * 2),
- *   dispose: [count, doubled], // Array of disposables
- * }));
- * ```
+ * const { count, doubled } = useScope(() => {
+ *   const count = signal(0);
+ *   const doubled = signal({ count }, ({ deps }) => deps.count * 2);
  *
- * @example Single disposable
- * ```tsx
- * const { connection } = useScope(() => ({
- *   connection: createWebSocket(),
- *   dispose: createWebSocket(), // Single Disposable
- * }));
- * ```
- *
- * @example Single function
- * ```tsx
- * const { timer } = useScope(() => {
- *   const intervalId = setInterval(() => {}, 1000);
  *   return {
- *     timer: signal(0),
- *     dispose: () => clearInterval(intervalId), // Single cleanup function
+ *     count,
+ *     doubled,
+ *     dispose: [count, doubled], // ✅ Must explicitly list disposables
  *   };
  * });
  * ```
  *
- * @example With helper functions (not disposed)
+ * @example Single disposable
+ * ```tsx
+ * const { connection } = useScope(() => {
+ *   const connection = createWebSocket();
+ *
+ *   return {
+ *     connection,
+ *     dispose: connection, // ✅ Single Disposable
+ *   };
+ * });
+ * ```
+ *
+ * @example Single cleanup function
+ * ```tsx
+ * const { timer } = useScope(() => {
+ *   const intervalId = setInterval(() => {}, 1000);
+ *
+ *   return {
+ *     timer: signal(0),
+ *     dispose: () => clearInterval(intervalId), // ✅ Single function
+ *   };
+ * });
+ * ```
+ *
+ * @example With helper functions (not in dispose list)
  * ```tsx
  * const { count, increment, reset } = useScope(() => {
  *   const count = signal(0);
+ *
  *   return {
  *     count,
- *     increment: () => count.set(count() + 1), // Helper - not disposed
- *     reset: () => count.set(0), // Helper - not disposed
+ *     increment: () => count.set(count() + 1), // ✅ Helper - not disposed
+ *     reset: () => count.set(0),                // ✅ Helper - not disposed
  *     dispose: [count], // Only dispose count signal
  *   };
  * });
@@ -75,37 +87,44 @@ import { is } from "../is";
  *
  * @example Service composition pattern
  * ```tsx
- * const createService3 = () => {
+ * const createService = () => {
  *   const service1 = createService1();
  *   const service2 = createService2();
  *
  *   return {
- *     // Option 1: Array of disposables
- *     dispose: [service1, service2],
+ *     // Expose services
+ *     service1,
+ *     service2,
  *
- *     // Option 2: Custom dispose method
- *     // dispose() {
- *     //   service1.dispose();
- *     //   service2.dispose();
- *     // },
- *
- *     customMethod() {
- *       // Use service1 and service2
+ *     // Custom methods
+ *     doSomething() {
+ *       service1.method();
+ *       service2.method();
  *     },
+ *
+ *     // Explicit disposal list
+ *     dispose: [service1, service2], // ✅ Or use custom dispose function
  *   };
  * };
  *
- * // Global usage - no automatic disposal
- * const service3 = createService3();
+ * // Global usage - manual disposal
+ * const service = createService();
+ * // Later: service.dispose.forEach(d => d.dispose());
  *
  * // Component usage - automatic disposal on unmount
- * const service3 = useScope(createService3);
+ * const service = useScope(createService);
  * ```
  *
  * @example With watch (recreate on prop change)
  * ```tsx
  * const { userData } = useScope(
- *   () => ({ userData: signal(fetchUser(userId)) }),
+ *   () => {
+ *     const userData = signal(fetchUser(userId));
+ *     return {
+ *       userData,
+ *       dispose: [userData],
+ *     };
+ *   },
  *   { watch: [userId] } // Recreate when userId changes
  * );
  * ```
@@ -113,7 +132,10 @@ import { is } from "../is";
  * @example With onUpdate (sync with props)
  * ```tsx
  * const { timer } = useScope(
- *   () => ({ timer: signal(0) }),
+ *   () => {
+ *     const timer = signal(0);
+ *     return { timer, dispose: [timer] };
+ *   },
  *   {
  *     onUpdate: [(scope) => {
  *       scope.timer.set(propValue); // Sync with latest prop
@@ -126,7 +148,13 @@ import { is } from "../is";
  * @example With onDispose (custom cleanup)
  * ```tsx
  * const { connection } = useScope(
- *   () => ({ connection: createWebSocket() }),
+ *   () => {
+ *     const connection = createWebSocket();
+ *     return {
+ *       connection,
+ *       dispose: [connection],
+ *     };
+ *   },
  *   {
  *     onDispose: (scope) => {
  *       console.log('Closing connection');
@@ -137,9 +165,7 @@ import { is } from "../is";
  * ```
  */
 export function useScope<TScope>(
-  create: () => {
-    dispose?: VoidFunction | Disposable | (VoidFunction | Disposable)[];
-  } & TScope,
+  create: () => ExDisposable & TScope,
   options?: UseScopeOptions<TScope>
 ): TScope {
   const { watch, onUpdate, onDispose } = options || {};
@@ -188,68 +214,7 @@ export function useScope<TScope>(
       // This allows user to do custom cleanup before automatic disposal
       ref.onDispose?.(scope);
 
-      // Helper function to dispose a single item
-      const disposeItem = (item: any) => {
-        if (!item) return;
-
-        // Check if it's a Signal (has SIGNAL_TYPE symbol and dispose method)
-        if (is(item)) {
-          item.dispose();
-          return;
-        }
-
-        // Check if it's a Disposable object (has dispose method)
-        if (
-          typeof item === "object" &&
-          "dispose" in item &&
-          typeof item.dispose === "function"
-        ) {
-          item.dispose();
-          return;
-        }
-
-        // Otherwise, if it's a function, invoke it directly
-        if (typeof item === "function") {
-          item();
-        }
-      };
-
-      // First, handle explicit dispose property if it exists
-      const dispose = scope.dispose;
-      if (dispose) {
-        // Handle array case
-        if (Array.isArray(dispose)) {
-          for (const item of dispose) {
-            disposeItem(item);
-          }
-          return;
-        }
-
-        // Handle single Disposable object or VoidFunction
-        disposeItem(dispose);
-      }
-
-      // Then, iterate over all properties of the scope and dispose any disposables
-      // This handles cases where properties are signals or have dispose methods
-      // Note: Only disposes direct properties, not nested objects
-      for (const key in scope as any) {
-        if (key === "dispose") continue; // Already handled above
-
-        const value = (scope as any)[key];
-        if (is(value)) {
-          // Signal has dispose method
-          value.dispose();
-        } else if (
-          value &&
-          typeof value === "object" &&
-          "dispose" in value &&
-          typeof value.dispose === "function"
-        ) {
-          // Object with dispose method
-          value.dispose();
-        }
-        // Functions and other values are not automatically disposed
-      }
+      tryDispose(scope);
     };
   }, [scope]); // Re-run cleanup when scope reference changes
 

@@ -1,4 +1,4 @@
-import { Disposable } from "./types";
+import { Disposable, UnionToIntersection } from "./types";
 
 /**
  * Error thrown when one or more services fail to dispose.
@@ -96,13 +96,13 @@ export type CombineDisposablesOptions = {
  */
 
 // Overload 1: Array shape - merges all properties
-export function disposable<T extends Record<string, any>[]>(
+export function disposable<const T extends object[]>(
   disposables: T,
   options?: CombineDisposablesOptions
 ): Disposable & UnionToIntersection<T[number]>;
 
 // Overload 2: Object shape - preserves property names
-export function disposable<T extends Record<string, any>>(
+export function disposable<const T extends object>(
   disposables: T,
   options?: CombineDisposablesOptions
 ): Disposable & T;
@@ -174,11 +174,12 @@ export function disposable<
 
       if (!service || typeof service !== "object") continue;
 
-      // Check if service has dispose method
-      if (typeof service.dispose === "function") {
-        try {
-          service.dispose();
-        } catch (error) {
+      try {
+        tryDispose(service);
+      } catch (error) {
+        if (error instanceof DisposalAggregateError) {
+          errors.push(...error.errors);
+        } else {
           const message =
             error instanceof Error ? error.message : String(error);
           const identifier = isArray ? `index ${key}` : `key '${String(key)}'`;
@@ -207,12 +208,16 @@ export function disposable<
   return combined;
 }
 
-/**
- * Type helper to convert union to intersection
- * @internal
- */
-type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
-  k: infer I
-) => void
-  ? I
-  : never;
+export function tryDispose(disposable: unknown) {
+  if (typeof disposable === "object" && disposable && "dispose" in disposable) {
+    if (typeof disposable.dispose === "function") {
+      disposable.dispose();
+    } else if (Array.isArray(disposable.dispose)) {
+      for (const item of disposable.dispose) {
+        tryDispose(item);
+      }
+    } else {
+      tryDispose(disposable.dispose);
+    }
+  }
+}

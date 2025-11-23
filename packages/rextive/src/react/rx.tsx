@@ -8,7 +8,7 @@ import {
   useCallback,
   useRef,
 } from "react";
-import { SignalMap, ResolveValue, AnyFunc, Signal } from "../types";
+import { SignalMap, ResolveValue, AnyFunc, Signal, Loadable } from "../types";
 import { RxOptions } from "./types";
 import { shallowEquals } from "../utils/shallowEquals";
 import { useSignals } from "./useSignals";
@@ -95,7 +95,11 @@ export function rx<
   TProps extends ComponentProps<TComponent>
 >(
   component: TComponent,
-  props: { [key in keyof TProps]: Signal<TProps[key]> | TProps[key] }
+  props: {
+    [key in keyof TProps]:
+      | Signal<TProps[key] | PromiseLike<TProps[key]> | Loadable<TProps[key]>>
+      | TProps[key];
+  }
 ): ReactNode;
 
 // Overload 2: Single signal - automatically renders value

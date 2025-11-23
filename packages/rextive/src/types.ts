@@ -36,6 +36,20 @@ export type Disposable = {
   dispose(): void;
 };
 
+export type ExDisposable = {
+  dispose?: VoidFunction | Disposable | (VoidFunction | Disposable)[];
+};
+
+/**
+ * Type helper to convert union to intersection
+ * @internal
+ */
+export type UnionToIntersection<U> = (
+  U extends any ? (k: U) => void : never
+) extends (k: infer I) => void
+  ? I
+  : never;
+
 /**
  * Status returned by hydrate() method
  */
