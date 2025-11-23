@@ -645,10 +645,11 @@ const resetForm = () => {
 ### Fine-Grained Lifecycle Control
 
 ```tsx
-import { useLifecycle } from "rextive/react";
+import { useScope } from "rextive/react";
 
 function Component() {
-  useLifecycle({
+  // Component lifecycle mode
+  useScope({
     init: () => console.log("Before first render"),
     mount: () => console.log("After first paint"),
     render: () => console.log("Every render"),
@@ -918,11 +919,11 @@ rx({ user, posts }, (value, loadable) => (
 ));
 ```
 
-### `useScope(factory, options?)` or `useScope(callbacks)`
+### `useScope()` - Three Modes
 
-Create component-scoped signals with automatic cleanup, OR manage pure lifecycle.
+Unified hook for lifecycle management and scoped services.
 
-**Overload 1: Factory mode** - Create scoped signals/services
+**Mode 1: Factory mode** - Create scoped signals/services
 
 ```tsx
 const { count, doubled } = useScope(
@@ -937,44 +938,43 @@ const { count, doubled } = useScope(
     };
   },
   {
-    watch: [userId], // Recreate scope when userId changes
-    init: (scope) => {
-      // Called once after scope is created
-      console.log("scope initialized", scope);
-    },
-    mount: (scope) => {
-      // Called after component paints
-      startService(scope.count);
-    },
-    render: (scope) => {
-      // Called on every render
-      console.log("rendering with scope", scope);
-    },
-    cleanup: (scope) => {
-      // Called on React cleanup (may run 2-3x in StrictMode)
-      pauseService();
-    },
-    dispose: (scope) => {
-      // Called ONLY on true unmount (StrictMode-aware, runs exactly once)
-      console.log("final dispose", scope);
-    },
+    watch: [userId], // Optional: Recreate scope when userId changes
   }
 );
 ```
 
-**Overload 2: Pure lifecycle mode** - No factory, just lifecycle hooks
+**Mode 2: Component lifecycle** - Track component lifecycle phases
 
 ```tsx
 const getPhase = useScope({
-  init: () => console.log("init"),
-  mount: () => console.log("mounted"),
-  render: () => console.log("rendering"),
-  cleanup: () => console.log("cleanup"),
-  dispose: () => console.log("disposed"),
+  init: () => console.log("Before first render"),
+  mount: () => console.log("After first paint"),
+  render: () => console.log("Every render"),
+  cleanup: () => console.log("React cleanup (may run 2-3x in StrictMode)"),
+  dispose: () => console.log("True unmount (runs exactly once)"),
 });
 
-// Check current phase
+// Check current phase dynamically
 console.log(getPhase()); // "render" | "mount" | "cleanup" | "disposed"
+```
+
+**Mode 3: Object lifecycle** - Track object reference changes
+
+```tsx
+const user = { id: 1, name: "John" };
+
+const getPhase = useScope({
+  for: user, // Track this object
+  init: (user) => console.log("User activated:", user),
+  mount: (user) => startTracking(user),
+  render: (user) => console.log("Rendering with", user),
+  cleanup: (user) => pauseTracking(user),
+  dispose: (user) => analytics.track("user-session-end", user),
+});
+
+// When user reference changes:
+// 1. cleanup(oldUser) + dispose(oldUser)
+// 2. init(newUser) + mount(newUser)
 ```
 
 ### `useSignals(signals)`
@@ -1204,9 +1204,8 @@ rextive/react     # React integration
 **React features:**
 
 - `rx` - Reactive rendering
-- `useScope` - Component-scoped signals
+- `useScope` - Component-scoped signals & lifecycle control (3 modes)
 - `useSignals` - Subscribe with lazy tracking
-- `useLifecycle` - Fine-grained lifecycle control
 
 ---
 

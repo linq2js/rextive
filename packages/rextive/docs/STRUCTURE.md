@@ -28,10 +28,10 @@ packages/rextive/
 │       ├── index.ts                # React exports
 │       ├── types.ts                # React types
 │       ├── rx.tsx                  # Reactive rendering
-│       ├── useScope.ts             # Scoped signals hook
+│       ├── useScope.ts             # Scoped signals & lifecycle (3 modes)
 │       ├── useSignals.ts           # Signal tracking hook
 │       ├── useRerender.ts          # Rerender control
-│       └── useLifecycle.ts         # Lifecycle management
+│       └── useLifecycle.ts         # Lifecycle management (internal)
 ├── dist/
 │   ├── rextive.js                  # Core bundle
 │   ├── rextive.umd.js              # Core UMD bundle
@@ -53,17 +53,18 @@ Framework-agnostic reactive primitives:
 
 ```ts
 import {
-  signal,        // Create reactive signals
-  batch,         // Batch multiple updates
-  wait,          // Coordinate async operations
-  emitter,       // Event emitter utility
-  loadable,      // Async state representation
-  isSignal,      // Type guard
+  signal, // Create reactive signals
+  batch, // Batch multiple updates
+  wait, // Coordinate async operations
+  emitter, // Event emitter utility
+  loadable, // Async state representation
+  isSignal, // Type guard
   // ... more utilities
-} from 'rextive';
+} from "rextive";
 ```
 
 **Use Cases:**
+
 - Node.js applications
 - Vue/Svelte/Angular integration
 - Vanilla JavaScript projects
@@ -79,15 +80,15 @@ React hooks and components:
 
 ```tsx
 import {
-  rx,            // Reactive JSX rendering
-  useScope,      // Component-scoped signals
-  useSignals,    // Signal tracking hook
-  useRerender,   // Manual rerender control
-  useLifecycle,  // Lifecycle management
-} from 'rextive/react';
+  rx, // Reactive JSX rendering (3 overloads)
+  useScope, // Scoped signals & lifecycle (3 modes)
+  useSignals, // Signal tracking hook
+  useRerender, // Manual rerender control
+} from "rextive/react";
 ```
 
 **Features:**
+
 - Automatic component re-rendering
 - Signal lifecycle management
 - Suspense integration
@@ -153,6 +154,7 @@ TypeScript automatically resolves types for both entry points:
 ### Core Tests
 
 Located in `src/`:
+
 - `signal.test.ts`
 - `batch.test.ts`
 - `wait.test.ts`
@@ -162,6 +164,7 @@ Located in `src/`:
 ### React Tests
 
 Located in `src/react/`:
+
 - `rx.test.tsx`
 - `useScope.test.tsx`
 - `useSignals.test.tsx`
@@ -171,6 +174,7 @@ Located in `src/react/`:
 ### Type Check Files
 
 Compile-time type validation:
+
 - Core: `signal.type.check.ts`, `wait.type.check.ts`, `utils/loadable.type.check.ts`
 - React: `react/rx.type.check.tsx`
 
@@ -181,14 +185,16 @@ See [MIGRATION_CORE_REACT.md](./MIGRATION_CORE_REACT.md) for detailed migration 
 ### Quick Migration
 
 **Before:**
+
 ```tsx
-import { signal, rx, useScope } from 'rextive';
+import { signal, rx, useScope } from "rextive";
 ```
 
 **After:**
+
 ```tsx
-import { signal } from 'rextive';
-import { rx, useScope } from 'rextive/react';
+import { signal } from "rextive";
+import { rx, useScope } from "rextive/react";
 ```
 
 ## Benefits of This Structure
@@ -199,4 +205,3 @@ import { rx, useScope } from 'rextive/react';
 4. **Clear Separation**: Obvious distinction between core and React APIs
 5. **Easier Testing**: Test core logic without React dependencies
 6. **Future-Proof**: Easy to add integrations for other frameworks (Vue, Svelte, etc.)
-

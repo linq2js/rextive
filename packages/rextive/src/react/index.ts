@@ -27,6 +27,13 @@ export type {
   RerenderFunction,
 } from "./types";
 
+// Re-export lifecycle types for useScope
+export type { 
+  LifecyclePhase,
+  ComponentLifecycleCallbacks,
+  ObjectLifecycleCallbacks,
+} from "./useLifecycle";
+
 // Export React components and hooks
 export { rx } from "./rx";
 export { useScope } from "./useScope";

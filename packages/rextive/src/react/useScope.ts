@@ -3,37 +3,51 @@ import { ExDisposable } from "../types";
 import { UseScopeOptions } from "./types";
 import { shallowEquals } from "../utils/shallowEquals";
 import { tryDispose } from "../disposable";
+import { 
+  useLifecycle, 
+  ComponentLifecycleCallbacks, 
+  ObjectLifecycleCallbacks,
+  LifecyclePhase 
+} from "./useLifecycle";
 
 /**
- * useScope - Create component-scoped services with automatic cleanup
+ * useScope - Unified hook for lifecycle management and scoped services
  *
- * Creates signals, services, and other disposables that are automatically cleaned up
- * when the component unmounts. Optionally recreate when dependencies change.
+ * **Three modes:**
  *
- * **Lifecycle:**
- * 1. Creates scope on mount (or when watch deps change)
- * 2. Calls onUpdate callback when scope or update deps change
- * 3. Calls onDispose callback + disposes scope.dispose on unmount
+ * 1. **Component lifecycle**: Manage component lifecycle phases
+ * 2. **Object lifecycle**: Track an object's lifecycle (recreate when object changes)
+ * 3. **Factory mode**: Create scoped services with automatic cleanup
  *
- * **Disposal (Performance Optimized):**
- * - **Only `scope.dispose` is automatically disposed** - other properties are NOT automatically disposed
- * - This design optimizes performance by avoiding iteration over all scope properties
- * - You must explicitly list what to dispose in the `dispose` property
- * - `dispose` can be:
- *   - A single `VoidFunction` - invoked directly
- *   - A single `Disposable` - calls `dispose()` method
- *   - An array `(VoidFunction | Disposable)[]` - disposes each item in reverse order (LIFO)
- * - Non-disposable properties (helpers, data) can safely coexist in the scope
+ * @example Mode 1: Component lifecycle
+ * ```tsx
+ * const getPhase = useScope({
+ *   init: () => console.log('Component initializing'),
+ *   mount: () => console.log('Component mounted'),
+ *   render: () => console.log('Component rendering'),
+ *   cleanup: () => console.log('Component cleaning up'),
+ *   dispose: () => console.log('Component disposed'),
+ * });
+ * 
+ * console.log(getPhase()); // "render" | "mount" | "cleanup" | "disposed"
+ * ```
  *
- * **Watch dependencies:**
- * - `watch`: Controls when scope is recreated (like useEffect deps)
- * - `onUpdate` tuple form: Second element controls when onUpdate runs
+ * @example Mode 2: Object lifecycle
+ * ```tsx
+ * const user = { id: 1, name: 'John' };
+ * 
+ * const getPhase = useScope({
+ *   for: user, // Track this object
+ *   init: (user) => console.log('User activated:', user),
+ *   mount: (user) => startTracking(user),
+ *   cleanup: (user) => pauseTracking(user),
+ *   dispose: (user) => analytics.track('user-session-end', user),
+ * });
+ * 
+ * // When user reference changes, old user is disposed and new user is initialized
+ * ```
  *
- * @param create - Factory function that creates scope (should include `dispose` property for cleanup)
- * @param options - Optional configuration
- * @returns The created scope
- *
- * @example Basic usage - explicit dispose list
+ * @example Mode 3: Factory mode - Create scoped services
  * ```tsx
  * const { count, doubled } = useScope(() => {
  *   const count = signal(0);
@@ -42,132 +56,55 @@ import { tryDispose } from "../disposable";
  *   return {
  *     count,
  *     doubled,
- *     dispose: [count, doubled], // ✅ Must explicitly list disposables
+ *     dispose: [count, doubled], // Explicit dispose list
  *   };
  * });
  * ```
  *
- * @example Single disposable
- * ```tsx
- * const { connection } = useScope(() => {
- *   const connection = createWebSocket();
- *
- *   return {
- *     connection,
- *     dispose: connection, // ✅ Single Disposable
- *   };
- * });
- * ```
- *
- * @example Single cleanup function
- * ```tsx
- * const { timer } = useScope(() => {
- *   const intervalId = setInterval(() => {}, 1000);
- *
- *   return {
- *     timer: signal(0),
- *     dispose: () => clearInterval(intervalId), // ✅ Single function
- *   };
- * });
- * ```
- *
- * @example With helper functions (not in dispose list)
- * ```tsx
- * const { count, increment, reset } = useScope(() => {
- *   const count = signal(0);
- *
- *   return {
- *     count,
- *     increment: () => count.set(count() + 1), // ✅ Helper - not disposed
- *     reset: () => count.set(0),                // ✅ Helper - not disposed
- *     dispose: [count], // Only dispose count signal
- *   };
- * });
- * ```
- *
- * @example Service composition pattern
- * ```tsx
- * const createService = () => {
- *   const service1 = createService1();
- *   const service2 = createService2();
- *
- *   return {
- *     // Expose services
- *     service1,
- *     service2,
- *
- *     // Custom methods
- *     doSomething() {
- *       service1.method();
- *       service2.method();
- *     },
- *
- *     // Explicit disposal list
- *     dispose: [service1, service2], // ✅ Or use custom dispose function
- *   };
- * };
- *
- * // Global usage - manual disposal
- * const service = createService();
- * // Later: service.dispose.forEach(d => d.dispose());
- *
- * // Component usage - automatic disposal on unmount
- * const service = useScope(createService);
- * ```
- *
- * @example With watch (recreate on prop change)
+ * @example Factory mode with watch (recreate on prop change)
  * ```tsx
  * const { userData } = useScope(
  *   () => {
  *     const userData = signal(fetchUser(userId));
- *     return {
- *       userData,
- *       dispose: [userData],
- *     };
+ *     return { userData, dispose: [userData] };
  *   },
  *   { watch: [userId] } // Recreate when userId changes
  * );
  * ```
- *
- * @example With onUpdate (sync with props)
- * ```tsx
- * const { timer } = useScope(
- *   () => {
- *     const timer = signal(0);
- *     return { timer, dispose: [timer] };
- *   },
- *   {
- *     onUpdate: [(scope) => {
- *       scope.timer.set(propValue); // Sync with latest prop
- *     }, propValue], // Re-run when propValue changes
- *     watch: [] // Don't recreate scope
- *   }
- * );
- * ```
- *
- * @example With onDispose (custom cleanup)
- * ```tsx
- * const { connection } = useScope(
- *   () => {
- *     const connection = createWebSocket();
- *     return {
- *       connection,
- *       dispose: [connection],
- *     };
- *   },
- *   {
- *     onDispose: (scope) => {
- *       console.log('Closing connection');
- *       scope.connection.close();
- *     }
- *   }
- * );
- * ```
  */
+
+// Overload 1: Component lifecycle (no target object)
+export function useScope(
+  callbacks: ComponentLifecycleCallbacks
+): () => LifecyclePhase;
+
+// Overload 2: Object lifecycle (with target object)
+export function useScope<TTarget>(
+  callbacks: ObjectLifecycleCallbacks<TTarget>
+): () => LifecyclePhase;
+
+// Overload 3: Factory mode (create scoped services)
 export function useScope<TScope>(
   create: () => ExDisposable & TScope,
   options?: UseScopeOptions<TScope>
-): Omit<TScope, "dispose"> {
+): Omit<TScope, "dispose">;
+
+// Implementation
+export function useScope<TScope>(
+  createOrCallbacks: (() => ExDisposable & TScope) | ComponentLifecycleCallbacks | ObjectLifecycleCallbacks<any>,
+  options?: UseScopeOptions<TScope>
+): Omit<TScope, "dispose"> | (() => LifecyclePhase) {
+  // Detect which mode based on first argument
+  const isLifecycleMode = typeof createOrCallbacks !== "function";
+  
+  if (isLifecycleMode) {
+    // Mode 1 or 2: Lifecycle mode (component or object)
+    // Delegate to useLifecycle
+    return useLifecycle(createOrCallbacks as ComponentLifecycleCallbacks | ObjectLifecycleCallbacks<any>);
+  }
+  
+  // Mode 3: Factory mode - create scoped services
+  const create = createOrCallbacks as () => ExDisposable & TScope;
   const { watch, onUpdate, onDispose } = options || {};
 
   // Persistent ref object that survives re-renders

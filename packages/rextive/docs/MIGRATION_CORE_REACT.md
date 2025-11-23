@@ -29,10 +29,9 @@ Contains React hooks and components:
 ```tsx
 import {
   rx,            // Reactive JSX rendering
-  useScope,      // Component-scoped signals
+  useScope,      // Component-scoped signals & lifecycle (3 modes)
   useSignals,    // Signal tracking hook
   useRerender,   // Manual rerender control
-  useLifecycle,  // Lifecycle management
 } from 'rextive/react';
 ```
 

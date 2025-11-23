@@ -27,10 +27,10 @@
 declare const __DEV__: boolean | undefined;
 
 /**
- * Runtime check for development mode.
+ * Internal check for development mode.
  * Used as a fallback when __DEV__ is not defined by the consumer.
  */
-export function isDev(): boolean {
+function checkIsDev(): boolean {
   // If __DEV__ is defined by the consumer's bundler, use it
   if (typeof __DEV__ !== "undefined") {
     return __DEV__;
@@ -47,105 +47,175 @@ export function isDev(): boolean {
 }
 
 /**
- * Log a message only in development.
- * If __DEV__ is defined by the consumer's bundler and is false, this is removed.
+ * Development utilities namespace.
  *
- * @param message - Message to log
- * @param args - Additional arguments
- *
- * @example
+ * **Usage:**
  * ```ts
- * devLog("Signal created:", signal);
- * // Production (with __DEV__ defined): removed entirely
- * // Development: console.log("Signal created:", signal)
- * ```
- */
-export function devLog(message: string, ...args: any[]): void {
-  if (isDev()) {
-    console.log(`[rextive] ${message}`, ...args);
-  }
-}
-
-/**
- * Log a warning only in development.
- * If __DEV__ is defined by the consumer's bundler and is false, this is removed.
+ * // Check if in dev mode
+ * if (dev()) {
+ *   // dev code
+ * }
  *
- * @param message - Warning message
- * @param args - Additional arguments
- *
- * @example
- * ```ts
- * devWarn("Deprecated API used");
- * // Production (with __DEV__ defined): removed entirely
- * // Development: console.warn("[rextive] Deprecated API used")
- * ```
- */
-export function devWarn(message: string, ...args: any[]): void {
-  if (isDev()) {
-    console.warn(`[rextive] ${message}`, ...args);
-  }
-}
-
-/**
- * Log an error only in development.
- * If __DEV__ is defined by the consumer's bundler and is false, this is removed.
- *
- * @param message - Error message
- * @param args - Additional arguments
- *
- * @example
- * ```ts
- * devError("Invalid configuration:", config);
- * // Production (with __DEV__ defined): removed entirely
- * // Development: console.error("[rextive] Invalid configuration:", config)
- * ```
- */
-export function devError(message: string, ...args: any[]): void {
-  if (isDev()) {
-    console.error(`[rextive] ${message}`, ...args);
-  }
-}
-
-/**
- * Execute code only in development.
- * If __DEV__ is defined by the consumer's bundler and is false, this is removed.
- *
- * @param fn - Function to execute
- *
- * @example
- * ```ts
- * devOnly(() => {
+ * // Run function only in dev
+ * dev(() => {
  *   validateSignalGraph();
+ * });
+ *
+ * // Logging
+ * dev.log("Signal created:", signal);
+ * dev.warn("Deprecated API used");
+ * dev.error("Invalid config:", config);
+ *
+ * // Assertions
+ * dev.assert(value !== undefined, "Value cannot be undefined");
+ * ```
+ *
+ * @example
+ * ```ts
+ * // Check dev mode
+ * if (dev()) {
+ *   console.log("Running in development");
+ * }
+ *
+ * // Execute in dev only
+ * dev(() => {
  *   checkMemoryLeaks();
  * });
- * // Production (with __DEV__ defined): removed entirely
- * // Development: executes the function
+ *
+ * // Development logging
+ * dev.log("Signal created");
+ * dev.warn("Performance issue detected");
+ * dev.error("Configuration invalid");
+ * dev.assert(count > 0, "Count must be positive");
  * ```
  */
-export function devOnly(fn: () => void): void {
-  if (isDev()) {
-    fn();
+export function dev(fn?: () => void): boolean {
+  const isDev = checkIsDev();
+
+  if (fn) {
+    if (isDev) {
+      fn();
+    }
+    return isDev;
   }
+
+  return isDev;
 }
 
 /**
- * Assert a condition only in development.
- * If __DEV__ is defined by the consumer's bundler and is false, this is removed.
- *
- * @param condition - Condition to assert
- * @param message - Error message if assertion fails
- *
- * @example
- * ```ts
- * devAssert(signal !== undefined, "Signal cannot be undefined");
- * // Production (with __DEV__ defined): removed entirely
- * // Development: throws if condition is false
- * ```
+ * Log a message only in development
  */
-export function devAssert(condition: boolean, message: string): void {
-  if (isDev()) {
-    if (!condition) {
-      throw new Error(`[rextive] Assertion failed: ${message}`);
+export namespace dev {
+  /**
+   * Log a message only in development.
+   * If __DEV__ is defined and is false, this is removed via dead code elimination.
+   *
+   * @param message - Message to log
+   * @param args - Additional arguments
+   *
+   * @example
+   * ```ts
+   * dev.log("Signal created:", signal);
+   * // Production (with __DEV__ defined): removed entirely
+   * // Development: console.log("[rextive] Signal created:", signal)
+   * ```
+   */
+  export function log(message: string, ...args: any[]): void {
+    if (checkIsDev()) {
+      console.log(`[rextive] ${message}`, ...args);
     }
   }
+
+  /**
+   * Log a warning only in development.
+   * If __DEV__ is defined and is false, this is removed via dead code elimination.
+   *
+   * @param message - Warning message
+   * @param args - Additional arguments
+   *
+   * @example
+   * ```ts
+   * dev.warn("Deprecated API used");
+   * // Production (with __DEV__ defined): removed entirely
+   * // Development: console.warn("[rextive] Deprecated API used")
+   * ```
+   */
+  export function warn(message: string, ...args: any[]): void {
+    if (checkIsDev()) {
+      console.warn(`[rextive] ${message}`, ...args);
+    }
+  }
+
+  /**
+   * Log an error only in development.
+   * If __DEV__ is defined and is false, this is removed via dead code elimination.
+   *
+   * @param message - Error message
+   * @param args - Additional arguments
+   *
+   * @example
+   * ```ts
+   * dev.error("Invalid configuration:", config);
+   * // Production (with __DEV__ defined): removed entirely
+   * // Development: console.error("[rextive] Invalid configuration:", config)
+   * ```
+   */
+  export function error(message: string, ...args: any[]): void {
+    if (checkIsDev()) {
+      console.error(`[rextive] ${message}`, ...args);
+    }
+  }
+
+  /**
+   * Assert a condition only in development.
+   * If __DEV__ is defined and is false, this is removed via dead code elimination.
+   *
+   * @param condition - Condition to assert
+   * @param message - Error message if assertion fails
+   *
+   * @example
+   * ```ts
+   * dev.assert(signal !== undefined, "Signal cannot be undefined");
+   * // Production (with __DEV__ defined): removed entirely
+   * // Development: throws if condition is false
+   * ```
+   */
+  export function assert(condition: boolean, message: string): void {
+    if (checkIsDev()) {
+      if (!condition) {
+        throw new Error(`[rextive] Assertion failed: ${message}`);
+      }
+    }
+  }
+}
+
+// Legacy exports for backward compatibility (deprecated)
+/** @deprecated Use `dev()` instead */
+export function isDev(): boolean {
+  return checkIsDev();
+}
+
+/** @deprecated Use `dev.log()` instead */
+export function devLog(message: string, ...args: any[]): void {
+  dev.log(message, ...args);
+}
+
+/** @deprecated Use `dev.warn()` instead */
+export function devWarn(message: string, ...args: any[]): void {
+  dev.warn(message, ...args);
+}
+
+/** @deprecated Use `dev.error()` instead */
+export function devError(message: string, ...args: any[]): void {
+  dev.error(message, ...args);
+}
+
+/** @deprecated Use `dev()` with a function argument instead */
+export function devOnly(fn: () => void): void {
+  dev(fn);
+}
+
+/** @deprecated Use `dev.assert()` instead */
+export function devAssert(condition: boolean, message: string): void {
+  dev.assert(condition, message);
 }

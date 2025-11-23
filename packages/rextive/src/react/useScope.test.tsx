@@ -1238,4 +1238,93 @@ describe("useScope", () => {
       expect(onUpdate).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe("lifecycle mode - component callbacks", () => {
+    it("should support component lifecycle mode", () => {
+      const init = vi.fn();
+      const mount = vi.fn();
+      const renderCallback = vi.fn();
+
+      const TestComponent = () => {
+        const getPhase = useScope({
+          init,
+          mount,
+          render: renderCallback,
+        });
+        
+        return <div>{getPhase()}</div>;
+      };
+
+      render(<TestComponent />);
+
+      expect(init).toHaveBeenCalledTimes(1);
+      expect(renderCallback).toHaveBeenCalledTimes(1);
+    });
+
+    it("should return getPhase function", () => {
+      const TestComponent = () => {
+        const getPhase = useScope({
+          init: () => {},
+        });
+        
+        return <div>{getPhase()}</div>;
+      };
+
+      const { container } = render(<TestComponent />);
+      expect(container.textContent).toMatch(/render|mount/);
+    });
+  });
+
+  describe("lifecycle mode - object tracking", () => {
+    it("should support object lifecycle mode", () => {
+      const user = { id: 1, name: "John" };
+      const init = vi.fn();
+      const mount = vi.fn();
+
+      const TestComponent = () => {
+        const getPhase = useScope({
+          for: user,
+          init,
+          mount,
+        });
+        
+        return <div>{user.name} - {getPhase()}</div>;
+      };
+
+      render(<TestComponent />);
+
+      expect(init).toHaveBeenCalledWith(user);
+    });
+
+    it("should reinitialize when object reference changes", async () => {
+      const user1 = { id: 1, name: "John" };
+      const user2 = { id: 2, name: "Jane" };
+      const init = vi.fn();
+      const dispose = vi.fn();
+
+      const TestComponent = ({ user }: { user: typeof user1 }) => {
+        useScope({
+          for: user,
+          init,
+          dispose,
+        });
+        
+        return <div>{user.name}</div>;
+      };
+
+      const { rerender } = render(<TestComponent user={user1} />);
+
+      expect(init).toHaveBeenCalledWith(user1);
+      expect(init).toHaveBeenCalledTimes(1);
+
+      rerender(<TestComponent user={user2} />);
+
+      // Should dispose old and init new
+      await vi.waitFor(() => {
+        expect(dispose).toHaveBeenCalledWith(user1);
+        expect(init).toHaveBeenCalledWith(user2);
+        expect(init).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
 });
