@@ -13,6 +13,11 @@ export type Listener<T> = (value: T) => void;
 export type SingleOrMultipleListeners<T> = Listener<T> | Listener<T>[];
 
 /**
+ * Equality function type for comparing values
+ */
+export type EqualsFn<T = any> = (a: T, b: T) => boolean;
+
+/**
  * Observable interface for reactive values
  */
 export type Observable = {
@@ -119,7 +124,7 @@ export type Signal<TValue, TInit = TValue> = Observable &
      */
     map<U>(
       fn: (value: TValue | TInit) => U,
-      equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
+      equalsOrOptions?: "is" | "shallow" | "deep" | EqualsFn<U> | SignalOptions<U>
     ): ComputedSignal<U>;
 
     /**
@@ -175,7 +180,7 @@ export type Signal<TValue, TInit = TValue> = Observable &
     scan<U>(
       fn: (accumulator: U, current: TValue | TInit) => U,
       initialValue: U,
-      equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
+      equalsOrOptions?: "is" | "shallow" | "deep" | EqualsFn<U> | SignalOptions<U>
     ): ComputedSignal<U>;
   };
 
@@ -308,7 +313,7 @@ export type SignalOptions<T> = {
    * signal(obj, (a, b) => a.id === b.id) // Custom function
    * ```
    */
-  equals?: "is" | "shallow" | "deep" | ((a: any, b: any) => boolean);
+  equals?: "is" | "shallow" | "deep" | EqualsFn<T>;
   /** Debug name for the signal */
   name?: string;
   /** Fallback function to recover from errors */

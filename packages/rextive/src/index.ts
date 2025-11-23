@@ -36,11 +36,7 @@ export { createProxy } from "./utils/createProxy";
 export type { ProxyOptions } from "./utils/createProxy";
 export { shallowEquals } from "./utils/shallowEquals";
 export { resolveEquals } from "./utils/resolveEquals";
-export type {
-  EqualsFn,
-  EqualsStrategy,
-  EqualsOption,
-} from "./utils/resolveEquals";
+export type { EqualsStrategy, EqualsOption } from "./utils/resolveEquals";
 export { dev } from "./utils/dev";
 export { wait, type Awaitable } from "./wait";
 

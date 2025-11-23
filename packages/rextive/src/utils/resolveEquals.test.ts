@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { resolveEquals } from "./resolveEquals";
 import { shallowEquals } from "./shallowEquals";
-import { isEqual } from "lodash";
+import isEqual from "lodash/isEqual";
 
 describe("resolveEquals", () => {
   it("should return undefined for 'is' strategy", () => {
@@ -45,11 +45,11 @@ describe("resolveEquals", () => {
   });
 
   it("should work with custom equals in practice", () => {
-    const customEquals = (a: { id: number }, b: { id: number }) => a.id === b.id;
+    const customEquals = (a: { id: number }, b: { id: number }) =>
+      a.id === b.id;
     const equals = resolveEquals(customEquals);
     expect(equals).toBe(customEquals);
     expect(equals!({ id: 1 }, { id: 1 })).toBe(true);
     expect(equals!({ id: 1 }, { id: 2 })).toBe(false);
   });
 });
-

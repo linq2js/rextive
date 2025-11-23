@@ -1,10 +1,6 @@
-import { isEqual } from "lodash";
+import deepEquals from "lodash/isEqual";
 import { shallowEquals } from "./shallowEquals";
-
-/**
- * Equality function type
- */
-export type EqualsFn<T = any> = (a: T, b: T) => boolean;
+import type { EqualsFn } from "../types";
 
 /**
  * Built-in equality strategies
@@ -56,10 +52,9 @@ export function resolveEquals<T = any>(
   }
 
   if (equals === "deep") {
-    return isEqual as EqualsFn<T>;
+    return deepEquals as EqualsFn<T>;
   }
 
   // Custom function
   return equals;
 }
-
