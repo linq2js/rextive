@@ -13,16 +13,16 @@ export type Listener<T> = (value: T) => void;
 export type SingleOrMultipleListeners<T> = Listener<T> | Listener<T>[];
 
 /**
- * Subscribable interface for reactive values
+ * Observable interface for reactive values
  */
-export type Subscribable = {
+export type Observable = {
   on(listener: VoidFunction): VoidFunction;
 };
 
 /**
- * Accessor interface combining Subscribable with a getter
+ * Accessor interface combining Observable with a getter
  */
-export type Accessor<T> = Subscribable & {
+export type Accessor<T> = Observable & {
   (): T;
 };
 
@@ -58,7 +58,7 @@ export type HydrateStatus = "success" | "skipped";
 /**
  * Base signal interface - common functionality for all signal types
  */
-export type Signal<TValue, TInit = TValue> = Subscribable &
+export type Signal<TValue, TInit = TValue> = Observable &
   Disposable &
   Accessor<TValue | TInit> & {
     readonly displayName?: string;
@@ -352,11 +352,6 @@ export const LOADABLE_TYPE = Symbol("LOADABLE_TYPE");
  * Represents the status of an async operation.
  */
 export type LoadableStatus = "loading" | "success" | "error";
-
-/**
- * @deprecated Use LoadableStatus instead
- */
-export type LoadableType = LoadableStatus;
 
 /**
  * Represents an in-progress async operation.

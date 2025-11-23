@@ -3,20 +3,20 @@ import {
   MutableSignal,
   ComputedSignal,
   Accessor,
-  Subscribable,
+  Observable,
 } from "./types";
 
 export const SIGNAL_TYPE = Symbol("SIGNAL_TYPE");
 
 /**
- * Type guard that checks whether a value is a Signal, Accessor, or Subscribable.
+ * Type guard that checks whether a value is a Signal, Accessor, or Observable.
  *
  * @param value - The value to check
  * @param type - Optional type specifier:
  *   - `undefined`: checks if value is any Signal
  *   - `"mutable"`: checks if value is a MutableSignal (has `set` method)
  *   - `"computed"`: checks if value is a ComputedSignal (has `pause` method, no `set`)
- *   - `"subscribable"`: checks if value is a Subscribable (object with `on` method)
+ *   - `"observable"`: checks if value is an Observable (object with `on` method)
  *   - `"accessor"`: checks if value is an Accessor (function with `on` method)
  * @returns true if `value` matches the specified type
  *
@@ -40,9 +40,9 @@ export const SIGNAL_TYPE = Symbol("SIGNAL_TYPE");
  *   doubled.pause(); // Safe to call pause
  * }
  *
- * // Check if subscribable (has on method)
+ * // Check if observable (has on method)
  * const emitter = { on: (fn: () => void) => fn };
- * if (is(emitter, "subscribable")) {
+ * if (is(emitter, "observable")) {
  *   emitter.on(() => console.log("event"));
  * }
  *
@@ -55,8 +55,8 @@ export const SIGNAL_TYPE = Symbol("SIGNAL_TYPE");
 export function is<T = any>(value: unknown): value is Signal<T>;
 export function is<T = any>(
   value: unknown,
-  type: "subscribable"
-): value is Subscribable;
+  type: "observable"
+): value is Observable;
 export function is<T = any>(
   value: unknown,
   type: "accessor"
@@ -71,9 +71,9 @@ export function is<T = any>(
 ): value is ComputedSignal<T>;
 export function is<T = any>(
   value: unknown,
-  type?: "mutable" | "computed" | "subscribable" | "accessor"
+  type?: "mutable" | "computed" | "observable" | "accessor"
 ): value is Signal<T> | MutableSignal<T> | ComputedSignal<T> {
-  if (type === "subscribable") {
+  if (type === "observable") {
     return typeof value === "object" && value !== null && "on" in value;
   }
   if (type === "accessor") {

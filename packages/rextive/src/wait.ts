@@ -11,7 +11,7 @@
  *
  * - **Promise mode (async)**: when you pass callbacks (`onResolve`/`onError` for most APIs,
  *   `onSettled` for `wait.settled`), the helpers return a Promise and run your callbacks.
- *   These Promises are also registered with the loadable cache (via `toLoadable`) so their
+ *   These Promises are also registered with the loadable cache (via `loadable()`) so their
  *   status can be observed through the normal `Loadable` API without awaiting them.
  *
  * `wait.timeout` and `wait.delay` are Promise-only utilities with no callback overloads.
@@ -21,7 +21,7 @@
  * - Async mode: Always resolves (never rejects), even when awaitables fail
  */
 import type { AnyFunc, Loadable, Signal } from "./types";
-import { toLoadable } from "./utils/loadable";
+import { loadable } from "./utils/loadable";
 import { isPromiseLike } from "./utils/isPromiseLike";
 import { is } from "./is";
 
@@ -97,7 +97,7 @@ function isSingleAwaitable(value: unknown): boolean {
  * Resolves an awaitable to a Loadable representation.
  *
  * - Signal -> call to get underlying value
- * - Value -> normalized via toLoadable()
+ * - Value -> normalized via loadable()
  */
 function resolveAwaitable(awaitable: Awaitable<any>): Loadable<any> {
   let value: unknown = awaitable;
@@ -107,7 +107,7 @@ function resolveAwaitable(awaitable: Awaitable<any>): Loadable<any> {
     value = (value as Signal<unknown>)();
   }
 
-  return toLoadable(value);
+  return loadable(value);
 }
 
 /**
@@ -416,7 +416,7 @@ export function waitAll(
       onResolve,
       hasOnError ? onError : undefined
     );
-    toLoadable(promise);
+    loadable(promise);
     return promise;
   }
 
@@ -426,7 +426,7 @@ export function waitAll(
       onResolve,
       hasOnError ? onError : undefined
     );
-    toLoadable(promise);
+    loadable(promise);
     return promise;
   }
 
@@ -435,7 +435,7 @@ export function waitAll(
     onResolve,
     hasOnError ? onError : undefined
   );
-  toLoadable(promise);
+  loadable(promise);
   return promise;
 }
 
@@ -600,7 +600,7 @@ export function waitAny(
     hasOnError ? onError : undefined
   );
   // Track this Promise in the loadable cache so its state is observable
-  toLoadable(promise);
+  loadable(promise);
   return promise;
 }
 
@@ -725,7 +725,7 @@ export function waitRace(
     onResolve,
     hasOnError ? onError : undefined
   );
-  toLoadable(promise);
+  loadable(promise);
   return promise;
 }
 
@@ -1073,7 +1073,7 @@ export function waitSettled(awaitableOrCollection: any, onSettled?: any): any {
   // Async mode with callback
   // Always resolves (never rejects) with transformed result
   const promise = waitSettledAsync(awaitableOrCollection, onSettled);
-  toLoadable(promise);
+  loadable(promise);
   return promise;
 }
 
@@ -1151,7 +1151,7 @@ export function waitTimeout(
   }
 
   const promise = Promise.race([mainPromise, timeoutPromise]);
-  toLoadable(promise);
+  loadable(promise);
   return promise;
 }
 

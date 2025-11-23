@@ -167,7 +167,7 @@ import { tryDispose } from "../disposable";
 export function useScope<TScope>(
   create: () => ExDisposable & TScope,
   options?: UseScopeOptions<TScope>
-): TScope {
+): Omit<TScope, "dispose"> {
   const { watch, onUpdate, onDispose } = options || {};
 
   // Persistent ref object that survives re-renders

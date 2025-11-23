@@ -102,8 +102,8 @@ export const Reactive = memo((props: { exp: () => unknown }) => {
         try {
           // Subscribe to all signals that were accessed during the most recent evaluation
           // Each signal will call recompute() when it changes
-          for (const subscribable of dispatcher.subscribables) {
-            onCleanup.on(subscribable.on(recompute));
+          for (const observable of dispatcher.observables) {
+            onCleanup.on(observable.on(recompute));
           }
         } catch (ex) {
           // If subscription fails, clean up and trigger immediate error re-render
@@ -123,7 +123,7 @@ export const Reactive = memo((props: { exp: () => unknown }) => {
       },
       getValue() {
         // Take snapshot of current dependencies before clearing
-        const prevSubscribables = new Set(dispatcher.subscribables);
+        const prevObservables = new Set(dispatcher.observables);
 
         // Clear dispatcher to track new dependencies during evaluation
         dispatcher.clear();
@@ -155,8 +155,8 @@ export const Reactive = memo((props: { exp: () => unknown }) => {
 
         // Compare old and new dependencies to detect changes
         let dependencyChanged = false;
-        const nextSubscribables = new Set(dispatcher.subscribables);
-        if (isDiff(prevSubscribables, nextSubscribables)) {
+        const nextObservables = new Set(dispatcher.observables);
+        if (isDiff(prevObservables, nextObservables)) {
           dependencyChanged = true;
           // Update token to trigger useLayoutEffect re-subscription
           subscribeToken.current = {};

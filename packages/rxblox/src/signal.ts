@@ -758,7 +758,7 @@ export function signal<T>(
     select(selectorFn: AnyFunc, equals?: AnyFunc): Selector<any> {
       return selector(
         s.peek, // getParentValue
-        s, // onParentChange (signal is Subscribable)
+        s, // onParentChange (signal is Observable)
         onDispose, // onParentDispose
         selectorFn as any, // selectorFn
         equals // equalsFn
@@ -777,7 +777,7 @@ export function signal<T>(
      * Emitter for persistInfo changes.
      *
      * This emitter notifies reactive contexts (effects, computed signals, rx expressions)
-     * when the persistence status changes. It acts as a subscribable that integrates
+     * when the persistence status changes. It acts as an observable that integrates
      * with the tracking dispatcher.
      */
     const onPersistInfoChange = emitter<void>();
@@ -939,7 +939,7 @@ export function signal<T>(
      * **How it works:**
      * 1. When accessed in a reactive context (rx, effect, computed signal),
      *    the tracking dispatcher is automatically captured via getDispatcher()
-     * 2. The getter registers onPersistInfoChange as a subscribable dependency
+     * 2. The getter registers onPersistInfoChange as an observable dependency
      * 3. When persistInfo changes (via setPersistInfo), onPersistInfoChange emits
      * 4. All reactive contexts that accessed persistInfo automatically re-run
      *

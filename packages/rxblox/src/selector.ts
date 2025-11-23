@@ -3,16 +3,16 @@ import { disposableToken } from "./disposableDispatcher";
 import { emitter } from "./emitter";
 import { isPromiseLike } from "./isPromiseLike";
 import { trackingToken } from "./trackingDispatcher";
-import { Selector, Subscribable } from "./types";
+import { Selector, Observable } from "./types";
 import { devAssert } from "./utils/dev";
 import { shallowEquals } from "./utils/shallowEquals";
 
 /**
- * Creates a selector that derives a value from a subscribable source.
+ * Creates a selector that derives a value from an observable source.
  *
  * @param getParentValue - Function to get the parent value (non-reactive)
- * @param onParentChange - Subscribable to listen for parent changes
- * @param onParentDispose - Subscribable to listen for parent disposal
+ * @param onParentChange - Observable to listen for parent changes
+ * @param onParentDispose - Observable to listen for parent disposal
  * @param selectorFn - Function or property key to select a part of the value
  * @param equalsFn - Custom equality function (defaults to shallowEquals)
  *
@@ -30,8 +30,8 @@ import { shallowEquals } from "./utils/shallowEquals";
  */
 export function selector<TSource, TResult>(
   getParentValue: () => TSource,
-  onParentChange: Subscribable,
-  onParentDispose: Subscribable,
+  onParentChange: Observable,
+  onParentDispose: Observable,
   selectorFn: ((value: TSource) => TResult) | keyof TSource,
   equalsFn: (a: TResult, b: TResult) => boolean = shallowEquals
 ): Selector<TResult> {

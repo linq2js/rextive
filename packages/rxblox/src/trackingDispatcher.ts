@@ -1,6 +1,6 @@
 import {
   TrackingDispatcher,
-  Subscribable,
+  Observable,
   TrackFunction,
   MutableSignal,
 } from "./types";
@@ -23,19 +23,19 @@ export const trackingToken =
 /**
  * Creates a new tracking dispatcher for tracking dependencies.
  *
- * A tracking dispatcher is used to collect all subscribables (signals, computed values, etc.)
+ * A tracking dispatcher is used to collect all observables (signals, computed values, etc.)
  * that are accessed during the execution of a function (e.g., in computed signals or effects).
  * This enables automatic dependency tracking and reactive updates.
  *
- * The dispatcher uses a minimal `Subscribable` interface (only requires `on()` method),
+ * The dispatcher uses a minimal `Observable` interface (only requires `on()` method),
  * making it decoupled from the full Signal API and flexible for various reactive primitives.
  *
  * The dispatcher:
- * - Maintains a Set of subscribables that were accessed
+ * - Maintains a Set of observables that were accessed
  * - Provides methods to add, get, and clear tracked dependencies
  * - Is used in conjunction with `withDispatchers()` to track dependencies
  *
- * @param onUpdate - Optional callback invoked when tracked subscribables change
+ * @param onUpdate - Optional callback invoked when tracked observables change
  * @param onCleanup - Optional emitter for cleanup functions
  * @returns A new tracking dispatcher instance
  *
@@ -49,15 +49,15 @@ export const trackingToken =
  * const onCleanup = emitter();
  * const dispatcher = trackingDispatcher(onUpdate, onCleanup);
  *
- * // Track subscribables accessed during function execution
+ * // Track observables accessed during function execution
  * const result = withDispatchers([trackingToken(dispatcher)], () => {
  *   const value1 = signal1(); // signal1 is added to dispatcher
  *   const value2 = signal2(); // signal2 is added to dispatcher
  *   return value1 + value2;
  * });
  *
- * // Get all subscribables that were accessed
- * const dependencies = dispatcher.subscribables; // [signal1, signal2]
+ * // Get all observables that were accessed
+ * const dependencies = dispatcher.observables; // [signal1, signal2]
  * ```
  */
 export function trackingDispatcher(
@@ -66,19 +66,19 @@ export function trackingDispatcher(
 ): TrackingDispatcher {
   const onCleanupDynamicTracking = emitter<void>();
   /**
-   * Adds a subscribable to the dispatcher's tracking set.
+   * Adds an observable to the dispatcher's tracking set.
    *
-   * @param subscribable - The subscribable to track
+   * @param observable - The observable to track
    * @returns True if added, false if already tracked
    */
-  const add = (subscribable: Subscribable) => {
-    if (subscribables.has(subscribable)) {
+  const add = (observable: Observable) => {
+    if (observables.has(observable)) {
       return false;
     }
-    subscribables.add(subscribable);
+    observables.add(observable);
 
     if (onUpdate) {
-      onCleanup?.on(subscribable.on(onUpdate));
+      onCleanup?.on(observable.on(onUpdate));
     }
 
     return true;
@@ -312,32 +312,32 @@ export function trackingDispatcher(
     }) as any;
   };
   /**
-   * Set of subscribables that have been accessed during tracking.
-   * Using a Set ensures each subscribable is only tracked once, even if accessed multiple times.
+   * Set of observables that have been accessed during tracking.
+   * Using a Set ensures each observable is only tracked once, even if accessed multiple times.
    */
-  const subscribables = new Set<Subscribable>();
+  const observables = new Set<Observable>();
 
   const dispatcher: TrackingDispatcher = {
     track,
     add,
     /**
-     * Gets all subscribables that have been tracked.
+     * Gets all observables that have been tracked.
      *
-     * Returns a readonly array copy of the subscribables set.
+     * Returns a readonly array copy of the observables set.
      * This prevents external modification while allowing iteration.
      *
-     * @returns A readonly array of all tracked subscribables
+     * @returns A readonly array of all tracked observables
      */
-    get subscribables(): readonly Subscribable[] {
-      return Array.from(subscribables);
+    get observables(): readonly Observable[] {
+      return Array.from(observables);
     },
     /**
-     * Clears all tracked subscribables from the dispatcher.
+     * Clears all tracked observables from the dispatcher.
      *
      * Used to reset the dispatcher before tracking a new set of dependencies.
      */
     clear() {
-      subscribables.clear();
+      observables.clear();
       onCleanupDynamicTracking.emitAndClear();
     },
   };

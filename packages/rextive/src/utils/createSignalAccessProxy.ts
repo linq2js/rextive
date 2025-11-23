@@ -2,7 +2,7 @@ import { createProxy } from "./createProxy";
 import { is } from "../is";
 import { ResolveValueType, Signal, SignalMap } from "../types";
 import { isPromiseLike } from "./isPromiseLike";
-import { getLoadable, toLoadable } from "./loadable";
+import { loadable } from "./loadable";
 
 export type SignalAccessProxyOptions<
   TSignals extends SignalMap,
@@ -130,7 +130,7 @@ export function createSignalAccessProxy<
 
     if (type === "awaited") {
       if (isPromiseLike(value)) {
-        const l = getLoadable(value);
+        const l = loadable.get(value);
         if (l.status === "loading") {
           throw l.promise;
         }
@@ -143,7 +143,7 @@ export function createSignalAccessProxy<
     }
 
     if (type === "loadable") {
-      const l = toLoadable(value);
+      const l = loadable(value);
       if (l.status === "loading" && onFinally) {
         l.promise.then(onFinally, onFinally);
       }

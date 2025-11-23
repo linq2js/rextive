@@ -8,7 +8,7 @@ import {
   type Loadable,
 } from "../types";
 
-// Re-export types for backward compatibility
+// Re-export types
 export { LOADABLE_TYPE };
 export type {
   LoadableStatus,
@@ -19,83 +19,56 @@ export type {
 };
 
 /**
- * Creates a loading loadable from a promise.
+ * Normalizes an arbitrary value into a Loadable.
  *
- * @param promise - The promise representing the ongoing operation
- * @returns A LoadingLoadable wrapping the promise
+ * - If the value is already a Loadable, returns it as-is.
+ * - If the value is a PromiseLike, wraps or reuses a cached Loadable.
+ * - Otherwise, wraps the value in a "success" Loadable.
  *
- * @example
- * ```typescript
- * const userPromise = fetchUser(1);
- * const loading = loadable("loading", userPromise);
- * // { status: "loading", promise: userPromise, data: undefined, error: undefined, loading: true }
- * ```
- */
-export function loadable<TValue>(
-  status: "loading",
-  promise: PromiseLike<TValue>
-): LoadingLoadable<TValue>;
-
-/**
- * Creates a success loadable with data and the resolved promise.
- *
- * @template TValue - The type of the successful result
- * @param status - Must be "success"
- * @param value - The successful result data
- * @param promise - The resolved promise (optional, will create one if not provided)
- * @returns A SuccessLoadable containing the data
+ * @template TValue - The type of the value
+ * @param value - The value to convert to a Loadable
+ * @returns A Loadable wrapping the value
  *
  * @example
  * ```typescript
- * const user = { id: 1, name: "Alice" };
- * const success = loadable("success", user);
- * // { status: "success", promise: Promise.resolve(user), data: user, error: undefined, loading: false }
+ * // Convert promise to loadable
+ * const userLoadable = loadable(fetchUser(1));
+ *
+ * // Convert plain value to loadable
+ * const dataLoadable = loadable({ id: 1, name: "Alice" });
+ *
+ * // Already a loadable? Returns as-is
+ * const l = loadable.success(42);
+ * const same = loadable(l); // same === l
  * ```
  */
 export function loadable<TValue>(
-  status: "success",
-  value: TValue,
-  promise?: PromiseLike<TValue>
-): SuccessLoadable<TValue>;
+  value: TValue
+): TValue extends Loadable<any>
+  ? TValue
+  : TValue extends PromiseLike<infer T>
+  ? Loadable<T>
+  : Loadable<TValue> {
+  return toLoadableImpl(value) as any;
+}
 
-/**
- * Creates an error loadable with error information.
- *
- * @param status - Must be "error"
- * @param error - The error that occurred
- * @param promise - The rejected promise (optional, will create one if not provided)
- * @returns An ErrorLoadable containing the error
- *
- * @example
- * ```typescript
- * const err = new Error("User not found");
- * const error = loadable("error", err);
- * // { status: "error", promise: Promise.reject(err), data: undefined, error: err, loading: false }
- * ```
- */
-export function loadable<TValue>(
-  status: "error",
-  error: unknown,
-  promise?: PromiseLike<TValue>
-): ErrorLoadable<TValue>;
-
-/**
- * Internal implementation of the loadable factory function.
- * Use the typed overloads above for type-safe loadable creation.
- */
-export function loadable(
-  status: LoadableStatus,
-  dataOrError?: unknown,
-  promise?: PromiseLike<unknown>
-): Loadable<any> {
-  if (status === "loading") {
-    if (!promise && isPromiseLike(dataOrError)) {
-      promise = dataOrError as PromiseLike<unknown>;
-    }
-
-    if (!promise) {
-      throw new Error("Loading loadable requires a promise");
-    }
+// Namespace with factory and helper methods
+export namespace loadable {
+  /**
+   * Creates a loading loadable from a promise.
+   *
+   * @param promise - The promise representing the ongoing operation
+   * @returns A LoadingLoadable wrapping the promise
+   *
+   * @example
+   * ```typescript
+   * const userPromise = fetchUser(1);
+   * const loading = loadable.loading(userPromise);
+   * ```
+   */
+  export function loading<TValue>(
+    promise: PromiseLike<TValue>
+  ): LoadingLoadable<TValue> {
     return {
       [LOADABLE_TYPE]: true,
       status: "loading",
@@ -106,21 +79,51 @@ export function loadable(
     };
   }
 
-  if (status === "success") {
-    const data = dataOrError;
-    const resolvedPromise = promise || Promise.resolve(data);
+  /**
+   * Creates a success loadable with data.
+   *
+   * @param value - The successful result data
+   * @param promise - The resolved promise (optional)
+   * @returns A SuccessLoadable containing the data
+   *
+   * @example
+   * ```typescript
+   * const user = { id: 1, name: "Alice" };
+   * const success = loadable.success(user);
+   * ```
+   */
+  export function success<TValue>(
+    value: TValue,
+    promise?: PromiseLike<TValue>
+  ): SuccessLoadable<TValue> {
+    const resolvedPromise = promise || Promise.resolve(value);
     return {
       [LOADABLE_TYPE]: true,
       status: "success",
       promise: resolvedPromise,
-      value: data,
+      value,
       error: undefined,
       loading: false,
     };
   }
 
-  if (status === "error") {
-    const error = dataOrError;
+  /**
+   * Creates an error loadable.
+   *
+   * @param error - The error that occurred
+   * @param promise - The rejected promise (optional)
+   * @returns An ErrorLoadable containing the error
+   *
+   * @example
+   * ```typescript
+   * const err = new Error("User not found");
+   * const error = loadable.error(err);
+   * ```
+   */
+  export function error<TValue = any>(
+    error: unknown,
+    promise?: PromiseLike<TValue>
+  ): ErrorLoadable<TValue> {
     const rejectedPromise = promise || Promise.reject(error);
     if (rejectedPromise instanceof Promise) {
       // Prevent unhandled rejection warnings
@@ -136,58 +139,77 @@ export function loadable(
     };
   }
 
-  throw new Error(`Invalid loadable status: ${status}`);
-}
-
-export namespace loadable {
-  export function from<TValue>(
-    value: TValue
-  ): TValue extends Loadable<any>
-    ? TValue
-    : TValue extends PromiseLike<infer T>
-    ? Loadable<T>
-    : Loadable<TValue> {
-    return toLoadable(value) as any;
+  /**
+   * Type guard to check if a value is a Loadable.
+   *
+   * @param value - The value to check
+   * @returns True if value is a Loadable
+   *
+   * @example
+   * ```typescript
+   * if (loadable.is(value)) {
+   *   console.log(value.status);
+   * }
+   * ```
+   */
+  export function is<T = unknown>(value: unknown): value is Loadable<T> {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      LOADABLE_TYPE in value &&
+      (value as any)[LOADABLE_TYPE] === true
+    );
   }
-}
 
-/**
- * Type guard to check if a value is a Loadable.
- *
- * This function performs runtime type checking using the LOADABLE_TYPE symbol,
- * which is more reliable than duck typing on the shape of the object.
- *
- * @template T - The expected data type of the loadable
- * @param value - The value to check
- * @returns True if value is a Loadable, false otherwise
- *
- * @example
- * ```typescript
- * const value: unknown = getAsyncData();
- *
- * if (isLoadable(value)) {
- *   // TypeScript knows value is Loadable<unknown>
- *   switch (value.status) {
- *     case "loading":
- *       console.log("Loading...");
- *       break;
- *     case "success":
- *       console.log("Data:", value.value);
- *       break;
- *     case "error":
- *       console.error("Error:", value.error);
- *       break;
- *   }
- * }
- * ```
- */
-export function isLoadable<T = unknown>(value: unknown): value is Loadable<T> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    LOADABLE_TYPE in value &&
-    (value as any)[LOADABLE_TYPE] === true
-  );
+  /**
+   * Associates a loadable with a promise in the cache.
+   *
+   * @param promise - The promise to cache
+   * @param l - The loadable to associate with the promise
+   * @returns The loadable that was cached
+   *
+   * @example
+   * ```typescript
+   * const promise = fetchUser(1);
+   * const l = loadable.loading(promise);
+   * loadable.set(promise, l);
+   * ```
+   */
+  export function set<T, L extends Loadable<T>>(
+    promise: PromiseLike<T>,
+    l: L
+  ): L {
+    promiseCache.set(promise, l);
+    return l;
+  }
+
+  /**
+   * Gets or creates a loadable for a promise.
+   *
+   * @param promise - The promise to get/create loadable for
+   * @returns Loadable representing the promise state
+   *
+   * @example
+   * ```typescript
+   * const promise = fetchUser(1);
+   * const l = loadable.get(promise);
+   * ```
+   */
+  export function get<T>(promise: PromiseLike<T>): Loadable<T> {
+    let l = promiseCache.get(promise) as Loadable<T> | undefined;
+    if (l) return l;
+
+    promise.then(
+      (data) => {
+        loadable.set(promise, loadable.success(data, promise as Promise<T>));
+      },
+      (error) => {
+        loadable.set(promise, loadable.error(error, promise as Promise<T>));
+      }
+    );
+
+    return loadable.set(promise, loadable.loading(promise as Promise<T>));
+  }
 }
 
 /**
@@ -203,84 +225,15 @@ const promiseCache = new WeakMap<PromiseLike<unknown>, Loadable<unknown>>();
 const staticLoadableCache = new WeakMap<object, Loadable<unknown>>();
 
 /**
- * Associates a loadable with a promise in the cache.
- * Used internally to track promise states.
- *
- * @param promise - The promise to cache
- * @param l - The loadable to associate with the promise
- * @returns The loadable that was cached
- *
- * @example
- * ```typescript
- * const promise = fetchUser(1);
- * const l = loadable("loading", promise);
- * setLoadable(promise, l);
- * ```
+ * Internal implementation for normalizing a value to a Loadable.
  */
-export function setLoadable<T, L extends Loadable<T>>(
-  promise: PromiseLike<T>,
-  l: L
-) {
-  promiseCache.set(promise, l);
-  return l;
-}
-
-/**
- * Gets or creates a loadable for a promise.
- *
- * If the promise is already cached, returns the cached loadable.
- * Otherwise, creates a new loading loadable and sets up handlers
- * to update the cache when the promise settles.
- *
- * @param promise - The promise to get/create loadable for
- * @returns Loadable representing the promise state
- *
- * @example
- * ```typescript
- * const promise = fetchUser(1);
- * const l = getLoadable(promise);
- *
- * // First call creates loading loadable
- * console.log(l.status); // "loading"
- *
- * // Promise resolves, cache is updated
- * await promise;
- *
- * // Second call returns cached success loadable
- * const l2 = getLoadable(promise);
- * console.log(l2.status); // "success"
- * ```
- */
-export function getLoadable<T>(promise: PromiseLike<T>): Loadable<T> {
-  let l = promiseCache.get(promise) as Loadable<T> | undefined;
-  if (l) return l;
-
-  promise.then(
-    (data) => {
-      setLoadable(promise, loadable("success", data, promise as Promise<T>));
-    },
-    (error) => {
-      setLoadable(promise, loadable("error", error, promise as Promise<T>));
-    }
-  );
-
-  return setLoadable(promise, loadable("loading", promise as Promise<T>));
-}
-
-/**
- * Normalizes an arbitrary value into a Loadable.
- *
- * - If the value is already a Loadable, returns it as-is.
- * - If the value is a PromiseLike, wraps or reuses a cached Loadable.
- * - Otherwise, wraps the value in a "success" Loadable.
- */
-export function toLoadable<T>(value: unknown): Loadable<T> {
-  if (isLoadable<T>(value)) {
+function toLoadableImpl<T>(value: unknown): Loadable<T> {
+  if (loadable.is<T>(value)) {
     return value;
   }
 
   if (isPromiseLike<T>(value)) {
-    return getLoadable(value);
+    return loadable.get(value);
   }
 
   // Cache object/function values to reuse their success loadables
@@ -292,11 +245,11 @@ export function toLoadable<T>(value: unknown): Loadable<T> {
     if (existing) {
       return existing as Loadable<T>;
     }
-    const l = loadable("success", value as T);
+    const l = loadable.success(value as T) as Loadable<T>;
     staticLoadableCache.set(value as object, l);
     return l;
   }
 
   // Primitives are cheap to wrap, no caching needed
-  return loadable("success", value as T);
+  return loadable.success(value as T) as Loadable<T>;
 }

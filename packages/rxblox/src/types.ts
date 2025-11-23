@@ -210,7 +210,7 @@ export type SelectFn<T> = {
  */
 
 /**
- * Lightweight subscribable that derives a value from a parent signal.
+ * Lightweight observable that derives a value from a parent signal.
  * Created via `signal.select()`.
  *
  * Selectors are automatically disposed when their parent signal is disposed.
@@ -597,44 +597,44 @@ export type SignalFactory = <T>(value: T | (() => T)) => MutableSignal<T>;
  */
 export type EffectFactory = (fn: () => void | VoidFunction) => Effect;
 
-export type Subscribable = {
+export type Observable = {
   on(listener: VoidFunction): VoidFunction;
 };
 
-export type Observable<T> = Subscribable & {
+export type ObservableGetter<T> = Observable & {
   (): T;
 };
 
 /**
  * Dispatcher for tracking dependencies during expression evaluation.
  *
- * Tracking dispatchers are used internally to track which subscribables (signals, etc.)
+ * Tracking dispatchers are used internally to track which observables (signals, etc.)
  * are accessed during the execution of computed signals, effects, or reactive expressions.
  * This enables automatic dependency tracking and reactive updates.
  *
- * The dispatcher uses a minimal `Subscribable` interface, requiring only an `on()` method
+ * The dispatcher uses a minimal `Observable` interface, requiring only an `on()` method
  * for subscription, making it flexible and decoupled from the full Signal API.
  */
 export type TrackingDispatcher = {
   /**
-   * Adds a subscribable to the dispatcher's tracking set.
-   * Called automatically when a subscribable is accessed within a tracking context.
+   * Adds an observable to the dispatcher's tracking set.
+   * Called automatically when an observable is accessed within a tracking context.
    *
-   * @param subscribable - The subscribable to track (signals, computed values, etc.)
+   * @param observable - The observable to track (signals, computed values, etc.)
    * @returns True if added, false if already tracked
    */
-  add(subscribable: Subscribable): boolean;
+  add(observable: Observable): boolean;
 
   /**
-   * Gets all subscribables that have been tracked.
+   * Gets all observables that have been tracked.
    * Returns a readonly array to prevent external modification.
    *
-   * @returns A readonly array of all tracked subscribables
+   * @returns A readonly array of all tracked observables
    */
-  get subscribables(): readonly Subscribable[];
+  get observables(): readonly Observable[];
 
   /**
-   * Clears all tracked subscribables from the dispatcher.
+   * Clears all tracked observables from the dispatcher.
    * Used to reset the dispatcher before tracking a new set of dependencies.
    */
   clear(): void;

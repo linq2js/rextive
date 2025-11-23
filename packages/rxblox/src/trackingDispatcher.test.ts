@@ -14,7 +14,7 @@ describe("trackingDispatcher", () => {
       expect(typeof dispatcher.add).toBe("function");
       expect(typeof dispatcher.track).toBe("function");
       expect(typeof dispatcher.clear).toBe("function");
-      expect(dispatcher.subscribables).toEqual([]);
+      expect(dispatcher.observables).toEqual([]);
     });
 
     it("should track signals when added", () => {
@@ -27,9 +27,9 @@ describe("trackingDispatcher", () => {
       dispatcher.add(s1);
       dispatcher.add(s2);
 
-      expect(dispatcher.subscribables).toContain(s1);
-      expect(dispatcher.subscribables).toContain(s2);
-      expect(dispatcher.subscribables.length).toBe(2);
+      expect(dispatcher.observables).toContain(s1);
+      expect(dispatcher.observables).toContain(s2);
+      expect(dispatcher.observables.length).toBe(2);
     });
 
     it("should not duplicate signals when added multiple times", () => {
@@ -45,8 +45,8 @@ describe("trackingDispatcher", () => {
       expect(result1).toBe(true); // First add returns true
       expect(result2).toBe(false); // Duplicate returns false
       expect(result3).toBe(false); // Duplicate returns false
-      expect(dispatcher.subscribables.length).toBe(1);
-      expect(dispatcher.subscribables).toContain(s1);
+      expect(dispatcher.observables.length).toBe(1);
+      expect(dispatcher.observables).toContain(s1);
     });
 
     it("should clear all signals", () => {
@@ -58,10 +58,10 @@ describe("trackingDispatcher", () => {
 
       dispatcher.add(s1);
       dispatcher.add(s2);
-      expect(dispatcher.subscribables.length).toBe(2);
+      expect(dispatcher.observables.length).toBe(2);
 
       dispatcher.clear();
-      expect(dispatcher.subscribables.length).toBe(0);
+      expect(dispatcher.observables.length).toBe(0);
     });
 
     it("should call onUpdate when tracked signal changes", () => {
@@ -91,17 +91,17 @@ describe("trackingDispatcher", () => {
 
       const tracked = dispatcher.track({ s1, s2 });
 
-      expect(dispatcher.subscribables.length).toBe(0);
+      expect(dispatcher.observables.length).toBe(0);
 
       const value1 = tracked.s1;
       expect(value1).toBe(10);
-      expect(dispatcher.subscribables).toContain(s1);
-      expect(dispatcher.subscribables.length).toBe(1);
+      expect(dispatcher.observables).toContain(s1);
+      expect(dispatcher.observables.length).toBe(1);
 
       const value2 = tracked.s2;
       expect(value2).toBe(20);
-      expect(dispatcher.subscribables).toContain(s2);
-      expect(dispatcher.subscribables.length).toBe(2);
+      expect(dispatcher.observables).toContain(s2);
+      expect(dispatcher.observables.length).toBe(2);
     });
 
     it("should only track accessed signals", () => {
@@ -118,10 +118,10 @@ describe("trackingDispatcher", () => {
       const sum = tracked.a + tracked.b;
       expect(sum).toBe(3);
 
-      expect(dispatcher.subscribables).toContain(a);
-      expect(dispatcher.subscribables).toContain(b);
-      expect(dispatcher.subscribables).not.toContain(c);
-      expect(dispatcher.subscribables.length).toBe(2);
+      expect(dispatcher.observables).toContain(a);
+      expect(dispatcher.observables).toContain(b);
+      expect(dispatcher.observables).not.toContain(c);
+      expect(dispatcher.observables.length).toBe(2);
     });
 
     it("should support conditional tracking", () => {
@@ -138,10 +138,10 @@ describe("trackingDispatcher", () => {
       expect(result).toBe(10);
 
       // Should track condition and a, but not b
-      expect(dispatcher.subscribables).toContain(condition);
-      expect(dispatcher.subscribables).toContain(a);
-      expect(dispatcher.subscribables).not.toContain(b);
-      expect(dispatcher.subscribables.length).toBe(2);
+      expect(dispatcher.observables).toContain(condition);
+      expect(dispatcher.observables).toContain(a);
+      expect(dispatcher.observables).not.toContain(b);
+      expect(dispatcher.observables.length).toBe(2);
     });
 
     it("should track computed properties with arrow functions", () => {
@@ -160,17 +160,17 @@ describe("trackingDispatcher", () => {
 
       // Access only 'doubled'
       expect(tracked.doubled).toBe(10);
-      expect(dispatcher.subscribables).toContain(count);
-      expect(dispatcher.subscribables).not.toContain(multiplier);
-      expect(dispatcher.subscribables.length).toBe(1);
+      expect(dispatcher.observables).toContain(count);
+      expect(dispatcher.observables).not.toContain(multiplier);
+      expect(dispatcher.observables.length).toBe(1);
 
       dispatcher.clear();
 
       // Access 'multiplied' which uses both signals
       expect(tracked.multiplied).toBe(10);
-      expect(dispatcher.subscribables).toContain(count);
-      expect(dispatcher.subscribables).toContain(multiplier);
-      expect(dispatcher.subscribables.length).toBe(2);
+      expect(dispatcher.observables).toContain(count);
+      expect(dispatcher.observables).toContain(multiplier);
+      expect(dispatcher.observables.length).toBe(2);
     });
 
     it("should throw error when tracked property is not a function", () => {
@@ -201,16 +201,16 @@ describe("trackingDispatcher", () => {
       // Track before await
       const initialCount = tracked.count;
       expect(initialCount).toBe(1);
-      expect(dispatcher.subscribables).toContain(count);
-      expect(dispatcher.subscribables.length).toBe(1);
+      expect(dispatcher.observables).toContain(count);
+      expect(dispatcher.observables.length).toBe(1);
 
       await delay(10);
 
       // Track after await - still works!
       const nameValue = tracked.name;
       expect(nameValue).toBe("Alice");
-      expect(dispatcher.subscribables).toContain(name);
-      expect(dispatcher.subscribables.length).toBe(2);
+      expect(dispatcher.observables).toContain(name);
+      expect(dispatcher.observables.length).toBe(2);
     });
 
     it("should support tracking props-like objects in async contexts", async () => {
@@ -236,21 +236,21 @@ describe("trackingDispatcher", () => {
       // Before await
       const id1 = tracked.userId;
       expect(id1).toBe(1);
-      expect(dispatcher.subscribables).toContain(userId);
+      expect(dispatcher.observables).toContain(userId);
 
       await delay(10);
 
       // After await - tracking still works
       const name1 = tracked.userName;
       expect(name1).toBe("Alice");
-      expect(dispatcher.subscribables).toContain(userName);
+      expect(dispatcher.observables).toContain(userName);
 
       await delay(10);
 
       // Computed property after multiple awaits
       const fullName = tracked.fullName;
       expect(fullName).toBe("User: Alice");
-      expect(dispatcher.subscribables.length).toBe(2);
+      expect(dispatcher.observables.length).toBe(2);
     });
 
     it("should avoid premature tracking with lazy proxy", () => {
@@ -264,17 +264,17 @@ describe("trackingDispatcher", () => {
       const tracked = dispatcher.track({ a, b, c });
 
       // Just creating the proxy doesn't track anything
-      expect(dispatcher.subscribables.length).toBe(0);
+      expect(dispatcher.observables.length).toBe(0);
 
       // Even passing the proxy around doesn't track
       const passedProxy = tracked;
-      expect(dispatcher.subscribables.length).toBe(0);
+      expect(dispatcher.observables.length).toBe(0);
 
       // Only when we access a property does tracking happen
       const value = passedProxy.a;
       expect(value).toBe(1);
-      expect(dispatcher.subscribables.length).toBe(1);
-      expect(dispatcher.subscribables).toContain(a);
+      expect(dispatcher.observables.length).toBe(1);
+      expect(dispatcher.observables).toContain(a);
     });
 
     it("should support destructuring after conditional check", () => {
@@ -290,13 +290,13 @@ describe("trackingDispatcher", () => {
       // Check condition first
       if (tracked.isLoggedIn) {
         // Only track isLoggedIn at this point
-        expect(dispatcher.subscribables.length).toBe(1);
+        expect(dispatcher.observables.length).toBe(1);
 
         // Now destructure and track the rest
         const { userId: id, userName: name } = tracked;
         expect(id).toBe(123);
         expect(name).toBe("Alice");
-        expect(dispatcher.subscribables.length).toBe(3);
+        expect(dispatcher.observables.length).toBe(3);
       }
     });
 
@@ -317,7 +317,7 @@ describe("trackingDispatcher", () => {
       await delay(5);
       const currentStatus = tracked.status;
       expect(currentStatus).toBe("loading");
-      expect(dispatcher.subscribables.length).toBe(1);
+      expect(dispatcher.observables.length).toBe(1);
 
       // Conditional tracking after await
       if (currentStatus === "loading") {
@@ -325,10 +325,10 @@ describe("trackingDispatcher", () => {
         // Don't access error, only data
         const currentData = tracked.data;
         expect(currentData).toEqual({ id: 1, value: "test" });
-        expect(dispatcher.subscribables.length).toBe(2);
-        expect(dispatcher.subscribables).toContain(status);
-        expect(dispatcher.subscribables).toContain(data);
-        expect(dispatcher.subscribables).not.toContain(error);
+        expect(dispatcher.observables.length).toBe(2);
+        expect(dispatcher.observables).toContain(status);
+        expect(dispatcher.observables).toContain(data);
+        expect(dispatcher.observables).not.toContain(error);
       }
     });
 
@@ -343,16 +343,16 @@ describe("trackingDispatcher", () => {
       const tracked = dispatcher.track({ s1, s2, s3 });
 
       // Initially no signals are tracked
-      expect(dispatcher.subscribables.length).toBe(0);
+      expect(dispatcher.observables.length).toBe(0);
 
       // Spread operator accesses all properties, thus tracking all signals
       const values = { ...tracked };
 
       expect(values).toEqual({ s1: 10, s2: 20, s3: 30 });
-      expect(dispatcher.subscribables.length).toBe(3);
-      expect(dispatcher.subscribables).toContain(s1);
-      expect(dispatcher.subscribables).toContain(s2);
-      expect(dispatcher.subscribables).toContain(s3);
+      expect(dispatcher.observables.length).toBe(3);
+      expect(dispatcher.observables).toContain(s1);
+      expect(dispatcher.observables).toContain(s2);
+      expect(dispatcher.observables).toContain(s3);
     });
 
     it("should track all signals with Object.assign", () => {
@@ -366,16 +366,16 @@ describe("trackingDispatcher", () => {
       const tracked = dispatcher.track({ a, b, c });
 
       // Initially no signals are tracked
-      expect(dispatcher.subscribables.length).toBe(0);
+      expect(dispatcher.observables.length).toBe(0);
 
       // Object.assign accesses all properties
       const values = Object.assign({}, tracked);
 
       expect(values).toEqual({ a: 1, b: 2, c: 3 });
-      expect(dispatcher.subscribables.length).toBe(3);
-      expect(dispatcher.subscribables).toContain(a);
-      expect(dispatcher.subscribables).toContain(b);
-      expect(dispatcher.subscribables).toContain(c);
+      expect(dispatcher.observables.length).toBe(3);
+      expect(dispatcher.observables).toContain(a);
+      expect(dispatcher.observables).toContain(b);
+      expect(dispatcher.observables).toContain(c);
     });
 
     it("should track signals with Object.values", () => {
@@ -392,10 +392,10 @@ describe("trackingDispatcher", () => {
       const values = Object.values(tracked);
 
       expect(values).toEqual([100, 200, 300]);
-      expect(dispatcher.subscribables.length).toBe(3);
-      expect(dispatcher.subscribables).toContain(x);
-      expect(dispatcher.subscribables).toContain(y);
-      expect(dispatcher.subscribables).toContain(z);
+      expect(dispatcher.observables.length).toBe(3);
+      expect(dispatcher.observables).toContain(x);
+      expect(dispatcher.observables).toContain(y);
+      expect(dispatcher.observables).toContain(z);
     });
 
     it("should track signals with Object.entries", () => {
@@ -414,9 +414,9 @@ describe("trackingDispatcher", () => {
         ["name", "Alice"],
         ["age", 25],
       ]);
-      expect(dispatcher.subscribables.length).toBe(2);
-      expect(dispatcher.subscribables).toContain(name);
-      expect(dispatcher.subscribables).toContain(age);
+      expect(dispatcher.observables.length).toBe(2);
+      expect(dispatcher.observables).toContain(name);
+      expect(dispatcher.observables).toContain(age);
     });
   });
 
@@ -460,9 +460,9 @@ describe("trackingDispatcher", () => {
         s2(); // Access signal - should be tracked
       });
 
-      expect(dispatcher.subscribables).toContain(s1);
-      expect(dispatcher.subscribables).toContain(s2);
-      expect(dispatcher.subscribables.length).toBe(2);
+      expect(dispatcher.observables).toContain(s1);
+      expect(dispatcher.observables).toContain(s2);
+      expect(dispatcher.observables.length).toBe(2);
     });
 
     it("should restore previous dispatcher after execution", () => {
@@ -517,10 +517,10 @@ describe("trackingDispatcher", () => {
           s2(); // Should be tracked by innerDispatcher
         });
 
-        expect(outerDispatcher.subscribables).toContain(s1);
-        expect(outerDispatcher.subscribables).not.toContain(s2);
-        expect(innerDispatcher.subscribables).toContain(s2);
-        expect(innerDispatcher.subscribables).not.toContain(s1);
+        expect(outerDispatcher.observables).toContain(s1);
+        expect(outerDispatcher.observables).not.toContain(s2);
+        expect(innerDispatcher.observables).toContain(s2);
+        expect(innerDispatcher.observables).not.toContain(s1);
       });
     });
 
@@ -536,7 +536,7 @@ describe("trackingDispatcher", () => {
         // Do nothing
       });
 
-      expect(dispatcher.subscribables.length).toBe(0);
+      expect(dispatcher.observables.length).toBe(0);
     });
   });
 
@@ -552,7 +552,7 @@ describe("trackingDispatcher", () => {
         expect(value).toBe(0);
       });
 
-      expect(dispatcher.subscribables).toContain(count);
+      expect(dispatcher.observables).toContain(count);
     });
 
     it("should track multiple signals accessed in computed expression", () => {
@@ -568,10 +568,10 @@ describe("trackingDispatcher", () => {
         expect(result).toBe(6);
       });
 
-      expect(dispatcher.subscribables.length).toBe(3);
-      expect(dispatcher.subscribables).toContain(a);
-      expect(dispatcher.subscribables).toContain(b);
-      expect(dispatcher.subscribables).toContain(c);
+      expect(dispatcher.observables.length).toBe(3);
+      expect(dispatcher.observables).toContain(a);
+      expect(dispatcher.observables).toContain(b);
+      expect(dispatcher.observables).toContain(c);
     });
 
     it("should not track signals accessed via peek()", () => {
@@ -584,7 +584,7 @@ describe("trackingDispatcher", () => {
         count.peek(); // peek() should not add to dispatcher
       });
 
-      expect(dispatcher.subscribables.length).toBe(0);
+      expect(dispatcher.observables.length).toBe(0);
     });
   });
 
@@ -720,7 +720,7 @@ describe("trackingDispatcher", () => {
     });
 
     describe("subscription cleanup", () => {
-      it("should clear tracked subscribables when clear() is called", () => {
+      it("should clear tracked observables when clear() is called", () => {
         const onUpdate = vi.fn();
         const onCleanup = emitter();
         const dispatcher = trackingDispatcher(onUpdate, onCleanup);
@@ -732,13 +732,13 @@ describe("trackingDispatcher", () => {
         });
 
         // Verify subscription
-        expect(dispatcher.subscribables.length).toBe(1);
+        expect(dispatcher.observables.length).toBe(1);
         source.set(2);
         expect(onUpdate).toHaveBeenCalledTimes(1);
 
-        // Clear removes from subscribables list (but doesn't unsubscribe)
+        // Clear removes from observables list (but doesn't unsubscribe)
         dispatcher.clear();
-        expect(dispatcher.subscribables.length).toBe(0);
+        expect(dispatcher.observables.length).toBe(0);
 
         // Existing subscriptions still work (clear doesn't unsubscribe)
         onUpdate.mockClear();
@@ -749,7 +749,7 @@ describe("trackingDispatcher", () => {
         withDispatchers([trackingToken(dispatcher)], () => {
           source();
         });
-        expect(dispatcher.subscribables.length).toBe(1);
+        expect(dispatcher.observables.length).toBe(1);
       });
 
       it("should not leak subscriptions when tracking same signal multiple times", () => {
@@ -765,7 +765,7 @@ describe("trackingDispatcher", () => {
         }
 
         // Should only have one subscription due to Set deduplication
-        expect(dispatcher.subscribables.length).toBe(1);
+        expect(dispatcher.observables.length).toBe(1);
 
         // Update should only trigger onUpdate once
         source.set(2);

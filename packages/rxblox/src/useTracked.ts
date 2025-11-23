@@ -225,8 +225,8 @@ export function useTracked<T extends Record<string, () => unknown>>(
     const onCleanup = emitter();
 
     // Subscribe to each signal that was accessed during render
-    ref.dispatcher.subscribables.forEach((subscribable) => {
-      onCleanup.on(subscribable.on(rerender));
+    ref.dispatcher.observables.forEach((observable) => {
+      onCleanup.on(observable.on(rerender));
     });
 
     // Return cleanup function to unsubscribe on unmount/re-run

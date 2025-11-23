@@ -30,13 +30,7 @@ export const $ = signal;
 // Core utilities (no React)
 export { emitter } from "./utils/emitter";
 export type { Emitter } from "./utils/emitter";
-export {
-  loadable,
-  isLoadable,
-  getLoadable,
-  setLoadable,
-  toLoadable,
-} from "./utils/loadable";
+export { loadable } from "./utils/loadable";
 export { isPromiseLike } from "./utils/isPromiseLike";
 export { createProxy } from "./utils/createProxy";
 export type { ProxyOptions } from "./utils/createProxy";
