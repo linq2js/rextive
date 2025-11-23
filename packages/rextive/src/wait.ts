@@ -6,17 +6,21 @@
  * - **Suspense mode (sync)**: `wait(...)`, `wait.any(...)`, `wait.race(...)`, `wait.settled(...)`
  *   without callbacks are synchronous helpers that:
  *   - Return plain values (or tuples/records/settled-shapes)
- *   - Throw Promises while pending so they work with React Suspense
- *   - Throw errors when underlying awaitables fail
+ *   - Throw Promises while any awaitable is loading (React Suspense compatible)
+ *   - Throw errors when awaitables fail (EXCEPT `wait.settled` which captures errors as "rejected")
  *
- * - **Promise mode (async)**: when you pass `onResolve` and optionally `onError`,
- *   the helpers return a Promise and run your callbacks. These Promises are also
- *   registered with the loadable cache (via `toLoadable`) so their status can be
- *   observed through the normal `Loadable` API without awaiting them.
+ * - **Promise mode (async)**: when you pass callbacks (`onResolve`/`onError` for most APIs,
+ *   `onSettled` for `wait.settled`), the helpers return a Promise and run your callbacks.
+ *   These Promises are also registered with the loadable cache (via `toLoadable`) so their
+ *   status can be observed through the normal `Loadable` API without awaiting them.
  *
  * `wait.timeout` and `wait.delay` are Promise-only utilities with no callback overloads.
+ *
+ * **Important**: `wait.settled()` behavior differs from other wait APIs:
+ * - Sync mode: Throws promises (loading) but NOT errors (captured as "rejected" status)
+ * - Async mode: Always resolves (never rejects), even when awaitables fail
  */
-import type { Loadable, Signal } from "./types";
+import type { AnyFunc, Loadable, Signal } from "./types";
 import { toLoadable } from "./utils/loadable";
 import { isPromiseLike } from "./utils/isPromiseLike";
 import { is } from "./is";
@@ -842,47 +846,74 @@ function waitSettledSync(awaitableOrCollection: any): any {
 
 /**
  * Async helper for waitSettled that always resolves (never throws).
+ * Accepts an optional onSettled callback to transform the result.
  */
+async function waitSettledAsync<R = any>(
+  awaitable: Awaitable<any>,
+  onSettled: (result: PromiseSettledResult<any>) => R | PromiseLike<R>
+): Promise<R | PromiseSettledResult<any>>;
+async function waitSettledAsync<
+  const TAwaitables extends readonly Awaitable<any>[],
+  R = any
+>(
+  awaitables: TAwaitables,
+  onSettled: (result: {
+    [K in keyof TAwaitables]: PromiseSettledResult<
+      AwaitedFromAwaitable<TAwaitables[K]>
+    >;
+  }) => R | PromiseLike<R>
+): Promise<
+  | R
+  | {
+      [K in keyof TAwaitables]: PromiseSettledResult<
+        AwaitedFromAwaitable<TAwaitables[K]>
+      >;
+    }
+>;
+async function waitSettledAsync<
+  const TAwaitables extends Record<string, Awaitable<any>>,
+  R = any
+>(
+  awaitables: TAwaitables,
+  onSettled: (result: {
+    [K in keyof TAwaitables]: PromiseSettledResult<
+      AwaitedFromAwaitable<TAwaitables[K]>
+    >;
+  }) => R | PromiseLike<R>
+): Promise<
+  | R
+  | {
+      [K in keyof TAwaitables]: PromiseSettledResult<
+        AwaitedFromAwaitable<TAwaitables[K]>
+      >;
+    }
+>;
 async function waitSettledAsync(
-  awaitable: Awaitable<any>
-): Promise<PromiseSettledResult<any>>;
-async function waitSettledAsync<
-  const TAwaitables extends readonly Awaitable<any>[]
->(
-  awaitables: TAwaitables
-): Promise<{
-  [K in keyof TAwaitables]: PromiseSettledResult<
-    AwaitedFromAwaitable<TAwaitables[K]>
-  >;
-}>;
-async function waitSettledAsync<
-  const TAwaitables extends Record<string, Awaitable<any>>
->(
-  awaitables: TAwaitables
-): Promise<{
-  [K in keyof TAwaitables]: PromiseSettledResult<
-    AwaitedFromAwaitable<TAwaitables[K]>
-  >;
-}>;
-async function waitSettledAsync(awaitableOrCollection: any): Promise<any> {
+  awaitableOrCollection: any,
+  onSettled: AnyFunc
+): Promise<any> {
   // Single
   if (
     !Array.isArray(awaitableOrCollection) &&
     isSingleAwaitable(awaitableOrCollection)
   ) {
     const l = resolveAwaitable(awaitableOrCollection);
+    let result: PromiseSettledResult<any>;
+
     if (l.status === "loading") {
       try {
         const value = await l.promise;
-        return { status: "fulfilled" as const, value };
+        result = { status: "fulfilled" as const, value };
       } catch (reason) {
-        return { status: "rejected" as const, reason };
+        result = { status: "rejected" as const, reason };
       }
+    } else if (l.status === "error") {
+      result = { status: "rejected" as const, reason: l.error };
+    } else {
+      result = { status: "fulfilled" as const, value: l.value };
     }
-    if (l.status === "error") {
-      return { status: "rejected" as const, reason: l.error };
-    }
-    return { status: "fulfilled" as const, value: l.value };
+
+    return onSettled ? await onSettled(result) : result;
   }
 
   // Array
@@ -904,7 +935,8 @@ async function waitSettledAsync(awaitableOrCollection: any): Promise<any> {
         )
       )
     );
-    return results;
+
+    return onSettled ? await onSettled(results) : results;
   }
 
   // Record
@@ -939,14 +971,47 @@ async function waitSettledAsync(awaitableOrCollection: any): Promise<any> {
     const { key } = loadables[index];
     result[key] = entry;
   });
-  return result;
+
+  return onSettled ? await onSettled(result) : result;
 }
 
 /**
- * Overloads for waitSettled:
+ * Wait for awaitables to settle (complete with success or failure).
  *
- * 1) Synchronous (no handlers): Suspense-style (throws promises/errors, returns settled shapes)
- * 2) Async (with onResolve/onError): Promise-based
+ * Unlike `wait()`, `wait.any()`, and `wait.race()`, `wait.settled()` captures
+ * both successful and failed outcomes as PromiseSettledResult shapes instead of
+ * throwing errors.
+ *
+ * ## Modes
+ *
+ * ### 1. Synchronous (Suspense-style) - No callback
+ * - ✅ **DOES** throw promises while any awaitable is still loading (Suspense-compatible)
+ * - ❌ **NEVER** throws errors - failed awaitables become `{ status: "rejected", reason }`
+ * - Returns PromiseSettledResult shapes when all are complete
+ *
+ * ### 2. Async (Promise-style) - With `onSettled` callback
+ * - Returns a Promise that **always resolves** (never rejects)
+ * - Callback receives PromiseSettledResult shapes
+ * - Callback can transform the results into any shape
+ *
+ * @example
+ * // Synchronous mode
+ * const results = wait.settled([promise1, promise2]);
+ * // [{ status: "fulfilled", value }, { status: "rejected", reason }]
+ *
+ * @example
+ * // Async mode with callback
+ * const successful = await wait.settled([p1, p2, p3], (results) =>
+ *   results.filter(r => r.status === "fulfilled").map(r => r.value)
+ * );
+ *
+ * @example
+ * // Handle partial failures
+ * const data = await wait.settled({ user, posts, settings }, (settled) => ({
+ *   user: settled.user.status === "fulfilled" ? settled.user.value : null,
+ *   posts: settled.posts.status === "fulfilled" ? settled.posts.value : [],
+ *   settings: settled.settings.status === "fulfilled" ? settled.settings.value : {},
+ * }));
  */
 export function waitSettled(
   awaitable: Awaitable<any>
@@ -969,56 +1034,45 @@ export function waitSettled<
     AwaitedFromAwaitable<TAwaitables[K]>
   >;
 };
-export function waitSettled<R, E = never>(
+export function waitSettled<R>(
   awaitable: Awaitable<any>,
-  onResolve: (result: PromiseSettledResult<any>) => R | PromiseLike<R>,
-  onError?: (error: unknown) => E | PromiseLike<E>
-): Promise<Awaited<R | E>>;
+  onSettled: (result: PromiseSettledResult<any>) => R | PromiseLike<R>
+): Promise<Awaited<R>>;
 export function waitSettled<
   const TAwaitables extends readonly Awaitable<any>[],
-  R,
-  E = never
+  R
 >(
   awaitables: TAwaitables,
-  onResolve: (result: {
+  onSettled: (result: {
     [K in keyof TAwaitables]: PromiseSettledResult<
       AwaitedFromAwaitable<TAwaitables[K]>
     >;
-  }) => R | PromiseLike<R>,
-  onError?: (error: unknown) => E | PromiseLike<E>
-): Promise<Awaited<R | E>>;
+  }) => R | PromiseLike<R>
+): Promise<Awaited<R>>;
 export function waitSettled<
   const TAwaitables extends Record<string, Awaitable<any>>,
-  R,
-  E = never
+  R
 >(
   awaitables: TAwaitables,
-  onResolve: (result: {
+  onSettled: (result: {
     [K in keyof TAwaitables]: PromiseSettledResult<
       AwaitedFromAwaitable<TAwaitables[K]>
     >;
-  }) => R | PromiseLike<R>,
-  onError?: (error: unknown) => E | PromiseLike<E>
-): Promise<Awaited<R | E>>;
-export function waitSettled(
-  awaitableOrCollection: any,
-  onResolve?: any,
-  onError?: any
-): any {
-  const hasOnResolve = typeof onResolve === "function";
-  const hasOnError = typeof onError === "function";
+  }) => R | PromiseLike<R>
+): Promise<Awaited<R>>;
+export function waitSettled(awaitableOrCollection: any, onSettled?: any): any {
+  const hasOnSettled = typeof onSettled === "function";
 
-  if (!hasOnResolve && !hasOnError) {
+  if (!hasOnSettled) {
     // Synchronous Suspense-style
+    // Throws promise while loading, but NEVER throws errors
+    // Always returns PromiseSettledResult shapes
     return waitSettledSync(awaitableOrCollection);
   }
 
-  const promise = waitSettledAsync(awaitableOrCollection)
-    .then((result) => (onResolve ? onResolve(result) : result))
-    .catch((error) => {
-      if (!onError) throw error;
-      return onError(error);
-    });
+  // Async mode with callback
+  // Always resolves (never rejects) with transformed result
+  const promise = waitSettledAsync(awaitableOrCollection, onSettled);
   toLoadable(promise);
   return promise;
 }

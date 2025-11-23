@@ -23,6 +23,7 @@ useEffect(() => {
 
 // ✅ Rextive - One concept for everything
 import { signal } from "rextive";
+// Or use $ for concise code: import { $ } from "rextive";
 
 const count = signal(0);
 const doubled = signal({ count }, ({ deps }) => deps.count * 2);
@@ -59,6 +60,19 @@ function Counter() {
 ```
 
 **That's it.** No providers. No hooks. No boilerplate.
+
+### 💡 Shorthand: `$()` instead of `signal()`
+
+For more concise code, use `$` as an alias:
+
+```tsx
+import { $ } from "rextive";
+
+const count = $(0);
+const doubled = $({ count }, ({ deps }) => deps.count * 2);
+```
+
+Both are identical - use whichever you prefer! The rest of the docs use `signal()` for clarity.
 
 ### Vanilla JavaScript in 30 seconds
 
@@ -508,9 +522,9 @@ function Component() {
 
 ## 📚 Complete API Reference
 
-### `signal(value)`
+### `signal(value)` or `$(value)`
 
-Create reactive state.
+Create reactive state. Use `signal` or its shorthand `$` - they're identical.
 
 ```tsx
 // Mutable signal
@@ -559,7 +573,21 @@ signal(value, {
 });
 ```
 
-### `signal.batch(fn)`
+**Style Comparison:**
+
+```tsx
+// Explicit style - great for teams and learning
+import { signal } from "rextive";
+const count = signal(0);
+const name = signal("Alice");
+
+// Concise style - great for experienced developers
+import { $ } from "rextive";
+const count = $(0);
+const name = $("Alice");
+```
+
+### `signal.batch(fn)` or `$.batch(fn)`
 
 Batch multiple updates into a single notification.
 
@@ -571,7 +599,7 @@ signal.batch(() => {
 }); // Single notification after all updates
 ```
 
-### `signal.persist(signals, options)`
+### `signal.persist(signals, options)` or `$.persist(...)`
 
 Persist signals to storage.
 
@@ -587,7 +615,7 @@ const { signals, pause, resume, status, start, cancel } = signal.persist(
 );
 ```
 
-### `signal.tag()`
+### `signal.tag()` or `$.tag()`
 
 Group related signals.
 
@@ -715,7 +743,13 @@ await wait(
 // Helpers
 await wait.any({ user, posts }, ([val, key]) => {}); // First success
 await wait.race({ user, posts }, ([val, key]) => {}); // First settle
-const results = await wait.settled([user, posts]); // All results
+
+// wait.settled - never rejects, returns PromiseSettledResult shapes
+const results = await wait.settled([user, posts], (settled) => {
+  // settled is array of { status: "fulfilled", value } | { status: "rejected", reason }
+  return settled.filter((r) => r.status === "fulfilled").map((r) => r.value);
+});
+
 const result = await wait.timeout(user, 5000, "Timeout");
 await wait.delay(1000); // Sleep
 ```
@@ -879,7 +913,7 @@ const data = signal(async () => fetchData());
 
 ## 📦 What's Included
 
-```
+```bash
 rextive/          # Core - works anywhere
 rextive/react     # React integration
 ```

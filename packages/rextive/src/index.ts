@@ -1,53 +1,4 @@
-/**
- * Rextive - Core reactive state management library
- *
- * This module exports the core primitives for reactive state management
- * without React dependencies. For React hooks and components, use 'rextive/react'.
- *
- * @example Core usage (no React)
- * ```ts
- * import { signal, batch, wait } from 'rextive';
- *
- * const count = signal(0);
- * const doubled = signal({ count }, ({ deps }) => deps.count * 2);
- *
- * count.on(() => console.log('Count changed:', count()));
- * count.set(5);
- * ```
- *
- * @example React usage
- * ```tsx
- * import { signal } from 'rextive';
- * import { rx, useScope } from 'rextive/react';
- *
- * const count = signal(0);
- *
- * function Counter() {
- *   return rx({ count }, (awaited) => <div>{awaited.count}</div>);
- * }
- * ```
- */
-
-// Re-export core types only (no React types)
-export type {
-  Listener,
-  Subscribable,
-  Accessor,
-  Disposable,
-  Signal,
-  SignalMap,
-  SignalContext,
-  SignalOptions,
-  ResolveValue,
-  LoadableStatus,
-  LoadableType,
-  LoadingLoadable,
-  SuccessLoadable,
-  ErrorLoadable,
-  Loadable,
-  AnyFunc,
-  HydrateStatus,
-} from "./types";
+export type * from "./types";
 
 // Re-export persist types
 export type {
@@ -73,6 +24,8 @@ export const signal = Object.assign(signalBase, {
   batch: batchImpl,
   tag: tagImpl,
 });
+
+export const $ = signal;
 
 // Core utilities (no React)
 export { emitter } from "./utils/emitter";

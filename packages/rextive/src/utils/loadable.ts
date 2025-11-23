@@ -139,6 +139,18 @@ export function loadable(
   throw new Error(`Invalid loadable status: ${status}`);
 }
 
+export namespace loadable {
+  export function from<TValue>(
+    value: TValue
+  ): TValue extends Loadable<any>
+    ? TValue
+    : TValue extends PromiseLike<infer T>
+    ? Loadable<T>
+    : Loadable<TValue> {
+    return toLoadable(value) as any;
+  }
+}
+
 /**
  * Type guard to check if a value is a Loadable.
  *

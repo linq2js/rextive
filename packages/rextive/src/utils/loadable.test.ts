@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { type Loadable, LOADABLE_TYPE, loadable, isLoadable, getLoadable, setLoadable, toLoadable } from "./loadable";
+import {
+  type Loadable,
+  LOADABLE_TYPE,
+  loadable,
+  isLoadable,
+  getLoadable,
+  setLoadable,
+  toLoadable,
+} from "./loadable";
 
 describe("loadable", () => {
   describe("loadable factory - loading", () => {
@@ -472,7 +480,7 @@ describe("loadable", () => {
     it("should return cached loadable for same promise", () => {
       const promise1 = Promise.resolve(42);
       const promise2 = Promise.resolve(42); // Different promise instance
-      
+
       const l1 = getLoadable(promise1);
       const l2 = getLoadable(promise1); // Same promise
       const l3 = getLoadable(promise2); // Different promise

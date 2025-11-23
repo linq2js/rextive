@@ -385,16 +385,14 @@ describe("wait", () => {
         expect(result).toBe(1);
       });
 
-      it("should never call onError (settled never throws)", async () => {
-        const onError = vi.fn();
-
-        await wait.settled(
+      it("should never reject (settled never throws)", async () => {
+        // wait.settled always resolves, even with errors - they become "rejected" status
+        const result = await wait.settled(
           [Promise.resolve(1), Promise.reject("E")],
-          () => "done",
-          onError
+          (results) => results.map((r) => r.status)
         );
 
-        expect(onError).not.toHaveBeenCalled();
+        expect(result).toEqual(["fulfilled", "rejected"]);
       });
 
       it("should handle array with all success loadables in async mode", async () => {
@@ -443,13 +441,13 @@ describe("wait", () => {
         expect(result).toEqual({ a: "rejected", b: "rejected" });
       });
 
-      it("should propagate errors from onResolve callback", async () => {
+      it("should propagate errors from onSettled callback", async () => {
         const l1 = loadable("success", 1);
-        const onResolve = vi.fn(() => {
+        const onSettled = vi.fn(() => {
           throw new Error("Transform error");
         });
 
-        await expect(wait.settled(l1, onResolve)).rejects.toThrow(
+        await expect(wait.settled(l1, onSettled)).rejects.toThrow(
           "Transform error"
         );
       });
