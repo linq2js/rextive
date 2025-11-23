@@ -201,5 +201,53 @@ describe("mapSignal", () => {
     count.set(15);
     expect(formatted()).toBe("Result: -1");
   });
+
+  it("should accept full options object (not just equals)", () => {
+    const count = signal(0);
+    
+    // Test with options object including name and equals
+    const doubled = count.map((x) => x * 2, {
+      name: "doubledValue",
+      equals: (a, b) => a === b,
+    });
+
+    expect(doubled()).toBe(0);
+    expect(doubled.displayName).toBe("doubledValue");
+
+    count.set(5);
+    expect(doubled()).toBe(10);
+  });
+
+  it("should work with signal.map(fn, options)", () => {
+    const user = signal({ name: "John", age: 30 });
+    
+    const shallowEquals = (a: any, b: any) => {
+      if (a === b) return true;
+      if (typeof a !== "object" || typeof b !== "object") return false;
+      const keysA = Object.keys(a);
+      const keysB = Object.keys(b);
+      if (keysA.length !== keysB.length) return false;
+      return keysA.every((key) => a[key] === b[key]);
+    };
+
+    const name = user.map(
+      (u) => ({ firstName: u.name }),
+      { equals: shallowEquals, name: "userName" }
+    );
+
+    const listener = vi.fn();
+    name.on(listener);
+
+    expect(name()).toEqual({ firstName: "John" });
+    expect(name.displayName).toBe("userName");
+
+    // Same content, should not notify due to custom equals
+    user.set({ name: "John", age: 31 });
+    expect(listener).not.toHaveBeenCalled();
+
+    // Different content
+    user.set({ name: "Jane", age: 31 });
+    expect(listener).toHaveBeenCalledOnce();
+  });
 });
 

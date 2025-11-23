@@ -9,7 +9,7 @@ import { signal } from "../signal";
  *
  * @param source - Source signal to transform
  * @param fn - Pure transformation function (value: T) => U
- * @param equals - Optional custom equality function for output values
+ * @param equalsOrOptions - Optional custom equality function or full options object
  * @returns New computed signal with transformed values
  *
  * @example
@@ -18,21 +18,24 @@ import { signal } from "../signal";
  * const doubled = mapSignal(count, x => x * 2);
  * const formatted = mapSignal(count, x => `Count: ${x}`);
  *
- * // With custom equals for object comparison
+ * // With custom equals function
  * const user = signal({ name: 'John', age: 30 });
- * const name = mapSignal(
- *   user,
- *   u => u.name,
- *   (a, b) => a === b
- * );
+ * const name = mapSignal(user, u => u.name, (a, b) => a === b);
+ *
+ * // With full options
+ * const name = mapSignal(user, u => u.name, { equals: shallowEquals, name: 'userName' });
  * ```
  */
 export function mapSignal<T, U>(
   source: Signal<T>,
   fn: (value: T) => U,
-  equals?: (a: U, b: U) => boolean
+  equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
 ): ComputedSignal<U> {
-  const options: SignalOptions<U> | undefined = equals ? { equals } : undefined;
+  // If it's a function or string, treat it as equals; otherwise use as-is
+  const options: SignalOptions<U> | undefined =
+    typeof equalsOrOptions === "function" || typeof equalsOrOptions === "string"
+      ? { equals: equalsOrOptions }
+      : equalsOrOptions;
 
   return signal({ source }, (ctx) => fn(ctx.deps.source), options);
 }

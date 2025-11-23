@@ -325,5 +325,61 @@ describe("scanSignal", () => {
     total();
     expect(accumulatorFn).toHaveBeenCalledTimes(1);
   });
+
+  it("should accept full options object (not just equals)", () => {
+    const count = signal(1);
+    
+    // Test with options object including name and equals
+    const total = count.scan(
+      (sum, curr) => sum + curr,
+      0,
+      {
+        name: "runningTotal",
+        equals: (a, b) => a === b,
+      }
+    );
+
+    expect(total()).toBe(1);
+    expect(total.displayName).toBe("runningTotal");
+
+    count.set(2);
+    expect(total()).toBe(3);
+
+    count.set(3);
+    expect(total()).toBe(6);
+  });
+
+  it("should work with signal.scan(fn, initial, options)", () => {
+    const count = signal(1);
+    
+    const shallowEquals = (a: any, b: any) => {
+      if (a === b) return true;
+      if (typeof a !== "object" || typeof b !== "object") return false;
+      const keysA = Object.keys(a);
+      const keysB = Object.keys(b);
+      if (keysA.length !== keysB.length) return false;
+      return keysA.every((key) => a[key] === b[key]);
+    };
+
+    const stats = count.scan(
+      (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
+      { sum: 0, count: 0 },
+      { equals: shallowEquals, name: "stats" }
+    );
+
+    const listener = vi.fn();
+    stats.on(listener);
+
+    expect(stats()).toEqual({ sum: 1, count: 1 });
+    expect(stats.displayName).toBe("stats");
+
+    count.set(2);
+    expect(stats()).toEqual({ sum: 3, count: 2 });
+    expect(listener).toHaveBeenCalledOnce();
+
+    count.set(3);
+    expect(stats()).toEqual({ sum: 6, count: 3 });
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
 });
 

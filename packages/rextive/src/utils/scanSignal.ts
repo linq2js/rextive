@@ -11,7 +11,7 @@ import { signal } from "../signal";
  * @param source - Source signal to accumulate
  * @param fn - Accumulator function (accumulator: U, current: T) => U
  * @param initialValue - Initial accumulator value (determines output type)
- * @param equals - Optional custom equality function for accumulator
+ * @param equalsOrOptions - Optional custom equality function or full options object
  * @returns New computed signal with accumulated values
  * 
  * @example
@@ -31,15 +31,20 @@ import { signal } from "../signal";
  *   [] as number[]
  * );
  * 
- * // Build statistics object
+ * // With custom equals function
  * const stats = scanSignal(
  *   count,
- *   (acc, curr) => ({
- *     sum: acc.sum + curr,
- *     count: acc.count + 1,
- *     avg: (acc.sum + curr) / (acc.count + 1)
- *   }),
- *   { sum: 0, count: 0, avg: 0 }
+ *   (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
+ *   { sum: 0, count: 0 },
+ *   (a, b) => a.sum === b.sum
+ * );
+ *
+ * // With full options
+ * const stats = scanSignal(
+ *   count,
+ *   (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
+ *   { sum: 0, count: 0 },
+ *   { equals: shallowEquals, name: 'stats' }
  * );
  * ```
  */
@@ -47,12 +52,14 @@ export function scanSignal<T, U>(
   source: Signal<T>,
   fn: (accumulator: U, current: T) => U,
   initialValue: U,
-  equals?: (a: U, b: U) => boolean
+  equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
 ): ComputedSignal<U> {
   let acc = initialValue;
-  const options: SignalOptions<U> | undefined = equals
-    ? { equals }
-    : undefined;
+  // If it's a function or string, treat it as equals; otherwise use as-is
+  const options: SignalOptions<U> | undefined =
+    typeof equalsOrOptions === "function" || typeof equalsOrOptions === "string"
+      ? { equals: equalsOrOptions }
+      : equalsOrOptions;
 
   return signal(
     { source },

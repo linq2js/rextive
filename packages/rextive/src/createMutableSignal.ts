@@ -13,6 +13,7 @@ import { mapSignal } from "./utils/mapSignal";
 import { scanSignal } from "./utils/scanSignal";
 import { SIGNAL_TYPE } from "./is";
 import { FallbackError } from "./signal";
+import { resolveEquals } from "./utils/resolveEquals";
 
 /**
  * Create a mutable signal (no dependencies)
@@ -31,7 +32,7 @@ export function createMutableSignal(
   ) => any
 ): MutableSignal<any> {
   const {
-    equals = Object.is,
+    equals: equalsOption,
     name,
     fallback,
     onChange: onChangeCallbacks,
@@ -39,6 +40,9 @@ export function createMutableSignal(
     tags,
     lazy = true,
   } = options;
+
+  // Resolve equals option to actual function (handles string shortcuts)
+  const equals = resolveEquals(equalsOption) || Object.is;
 
   const onChange = emitter<void>();
   const onChangeValue = emitter<any>();
@@ -198,17 +202,17 @@ export function createMutableSignal(
 
   const map = function <U>(
     fn: (value: any) => U,
-    equalsOutput?: (a: U, b: U) => boolean
+    equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
   ): ComputedSignal<U> {
-    return mapSignal(instance, fn, equalsOutput);
+    return mapSignal(instance, fn, equalsOrOptions);
   };
 
   const scan = function <U>(
     fn: (accumulator: U, current: any) => U,
     initialValue: U,
-    equalsOutput?: (a: U, b: U) => boolean
+    equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
   ): ComputedSignal<U> {
-    return scanSignal(instance, fn, initialValue, equalsOutput);
+    return scanSignal(instance, fn, initialValue, equalsOrOptions);
   };
 
   const instance = Object.assign(get, {

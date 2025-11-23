@@ -26,7 +26,7 @@ import { signal } from "rextive";
 // Or use $ for concise code: import { $ } from "rextive";
 
 const count = signal(0);
-const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+const doubled = count.map((x) => x * 2);
 ```
 
 **Rextive replaces:**
@@ -46,17 +46,11 @@ const doubled = signal({ count }, ({ deps }) => deps.count * 2);
 
 ```tsx
 import { signal } from "rextive";
+import { rx } from "rextive/react";
 
-const count = signal(0);
-
-function Counter() {
-  return (
-    <div>
-      <h1>{count()}</h1>
-      <button onClick={() => count.set((x) => x + 1)}>+1</button>
-    </div>
-  );
-}
+const count = signal(0); // create signal
+const increment = () => count.set((x) => x + 1); // mutate signal
+const Counter = <h1 onClick={increment}>{rx(count)}</h1>; // Counter UI
 ```
 
 **That's it.** No providers. No hooks. No boilerplate.
@@ -96,6 +90,146 @@ count.set((x) => x + 1);
 
 ---
 
+## 📖 Core Concepts
+
+### Single Dependency: Use `.map()`
+
+For simple transformations of a single signal, use `.map()`:
+
+```tsx
+const count = signal(0);
+const doubled = count.map((x) => x * 2);
+const formatted = count.map((x) => `Count: ${x}`);
+
+// With custom equality (string shortcuts or functions)
+const user = signal({ name: "John", age: 30 });
+const name = user.map((u) => u.name, "shallow");
+const data = user.map((u) => u.data, "deep");
+```
+
+### Custom Equality: Optimize Re-renders
+
+By default, signals use `Object.is` for equality. For objects/arrays, use custom equality to prevent unnecessary updates:
+
+```tsx
+import { signal, shallowEquals } from "rextive";
+
+// ✅ String shortcuts (most convenient)
+const user = signal({ name: "John", age: 30 }, "shallow");
+const data = signal(complexObj, "deep");
+const ref = signal(obj, "is"); // Same as default Object.is
+
+// ✅ Also works: Pass equals as second argument
+const user = signal({ name: "John", age: 30 }, shallowEquals);
+
+// ✅ Or: Pass in options object
+const user = signal({ name: "John", age: 30 }, { equals: "shallow" });
+
+// Custom equality function
+const customEquals = (a, b) => a.id === b.id;
+const item = signal({ id: 1, name: "Item" }, customEquals);
+
+// Now setting same content doesn't trigger updates
+user.set({ name: "John", age: 30 }); // ✅ No update (content unchanged)
+user.set({ name: "Jane", age: 30 }); // ✅ Updates (name changed)
+```
+
+**Built-in equality strategies:**
+
+- `'is'` (default) - Reference equality using `Object.is`
+- `'shallow'` - Shallow comparison (compares object keys/array elements)
+- `'deep'` - Deep comparison using lodash `isEqual` (recursive)
+
+**When to use custom equality:**
+
+- ✅ Object/array props from parent components
+- ✅ Computed values that return new objects
+- ✅ Preventing unnecessary re-renders
+
+### Multiple Dependencies: Use `signal({ deps }, fn)`
+
+When you need to combine multiple signals, use the dependency pattern:
+
+```tsx
+const firstName = signal("John");
+const lastName = signal("Doe");
+
+// ✅ Combine multiple signals
+const fullName = signal(
+  { firstName, lastName },
+  ({ deps }) => `${deps.firstName} ${deps.lastName}`
+);
+
+const count = signal(0);
+const multiplier = signal(2);
+
+// ✅ Reactive calculations
+const result = signal(
+  { count, multiplier },
+  ({ deps }) => deps.count * deps.multiplier
+);
+```
+
+**How it works:**
+
+1. **Define dependencies** - Pass an object with signals as the first argument
+2. **Access via `deps`** - The compute function receives `{ deps }` containing current values
+3. **Auto-tracking** - Updates whenever any dependency changes
+4. **Type-safe** - Full TypeScript inference for all dependencies
+
+**With custom equality:**
+
+```tsx
+// String shortcut as third argument
+const fullName = signal(
+  { firstName, lastName },
+  ({ deps }) => ({ full: `${deps.firstName} ${deps.lastName}` }),
+  "shallow" // Shallow comparison
+);
+
+// Custom function
+const result = signal(
+  { a, b },
+  ({ deps }) => ({ sum: deps.a + deps.b, extra: Math.random() }),
+  (x, y) => x.sum === y.sum // Only compare sum property
+);
+
+// Full options object
+const data = signal({ userId }, ({ deps }) => fetchUser(deps.userId), {
+  equals: "deep",
+  name: "userData",
+});
+```
+
+### Async with Dependencies
+
+Dependencies work seamlessly with async operations:
+
+```tsx
+const userId = signal(1);
+
+// ✅ Automatically re-fetches when userId changes
+const user = signal({ userId }, async ({ deps, abortSignal }) => {
+  const response = await fetch(`/users/${deps.userId}`, {
+    signal: abortSignal, // Auto-cancels previous request
+  });
+  return response.json();
+});
+
+userId.set(2); // Cancels previous fetch, starts new one
+```
+
+### When to Use Which?
+
+| Pattern                      | Use When                         | Example                                           |
+| ---------------------------- | -------------------------------- | ------------------------------------------------- |
+| `.map()`                     | Single dependency transformation | `count.map(x => x * 2)`                           |
+| `signal(value, equals)`      | Custom equality for objects      | `signal({ name: 'John' }, shallowEquals)`         |
+| `signal({ deps }, fn)`       | Multiple dependencies            | `signal({ a, b }, ({ deps }) => deps.a + deps.b)` |
+| `signal({ deps }, async fn)` | Async with dependencies          | `signal({ id }, async ({ deps }) => fetch(...))`  |
+
+---
+
 ## ✨ What Makes Rextive Different?
 
 ### 🎯 **Lazy Tracking** - Only subscribe to what you actually use
@@ -124,7 +258,7 @@ import { rx } from "rextive/react";
 
 const user = signal(async () => fetchUser()); // Async
 const count = signal(0); // Sync
-const doubled = signal({ count }, (ctx) => ctx.deps.count * 2); // Computed
+const doubled = count.map((x) => x * 2); // Computed (transformation)
 
 // Use them exactly the same way!
 rx({ user, count, doubled }, (value) => (
@@ -187,7 +321,7 @@ import { rx, useScope } from "rextive/react";
 import { signal } from "rextive";
 
 const count = signal(0);
-const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+const doubled = count.map((x) => x * 2);
 
 function Counter() {
   return (
@@ -470,7 +604,7 @@ count.set(3); // total = 6
 // Keep last 3 values
 const last3 = count.scan((acc, curr) => [...acc, curr].slice(-3), []);
 
-// Build statistics
+// Build statistics with shallow equality
 const stats = count.scan(
   (acc, curr) => ({
     sum: acc.sum + curr,
@@ -479,7 +613,15 @@ const stats = count.scan(
     min: Math.min(acc.min, curr),
     max: Math.max(acc.max, curr),
   }),
-  { sum: 0, count: 0, avg: 0, min: Infinity, max: -Infinity }
+  { sum: 0, count: 0, avg: 0, min: Infinity, max: -Infinity },
+  "shallow" // String shortcut for shallow equality
+);
+
+// Or with full options
+const stats = count.scan(
+  (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
+  { sum: 0, count: 0 },
+  { equals: "shallow", name: "runningStats" }
 );
 ```
 
@@ -537,8 +679,8 @@ count.reset();
 const user = signal<User>(); // get() returns User | undefined
 user.set({ name: "Alice" }); // set() requires User (not undefined)
 
-// Computed signal
-const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+// Computed signal (transformation)
+const doubled = count.map((x) => x * 2);
 
 // Async signal
 const data = signal(async () => fetchData());
@@ -565,12 +707,18 @@ const result = signal({ query }, async ({ deps, abortSignal }) => {
 signal(value, {
   name: "mySignal", // For debugging
   lazy: true, // Compute only when accessed
-  equals: (a, b) => a === b, // Custom equality check
+  equals: "shallow", // String shortcut: 'is' | 'shallow' | 'deep' | custom function
   fallback: (error) => value, // Error fallback value
   onChange: (value) => {}, // Change callback
   onError: (error) => {}, // Error callback
   tags: [myTag], // Group with tags
 });
+
+// Equals option accepts:
+// - 'is' (default): Object.is (reference equality)
+// - 'shallow': Shallow comparison (object keys/array elements)
+// - 'deep': Deep comparison (lodash isEqual)
+// - Custom function: (a, b) => boolean
 ```
 
 **Style Comparison:**
@@ -663,7 +811,7 @@ Create component-scoped signals with automatic cleanup.
 const { count, doubled } = useScope(
   () => {
     const count = signal(0);
-    const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+    const doubled = count.map((x) => x * 2);
 
     return {
       count,
@@ -775,7 +923,7 @@ import { signal } from "rextive";
 
 const count = signal(0);
 const name = signal("");
-const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+const doubled = count.map((x) => x * 2);
 
 count.on(() => console.log("count changed"));
 ```

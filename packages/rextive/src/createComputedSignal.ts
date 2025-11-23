@@ -10,6 +10,7 @@ import {
 import { scheduleNotification } from "./batch";
 import { SIGNAL_TYPE } from "./is";
 import { FallbackError } from "./signal";
+import { resolveEquals } from "./utils/resolveEquals";
 
 /**
  * Create a computed signal (with dependencies)
@@ -31,7 +32,7 @@ export function createComputedSignal(
   // and with pause/resume functionality
 
   const {
-    equals = Object.is,
+    equals: equalsOption,
     name,
     fallback,
     onChange: onChangeCallbacks,
@@ -39,6 +40,9 @@ export function createComputedSignal(
     tags,
     lazy = true,
   } = options;
+
+  // Resolve equals option to actual function (handles string shortcuts)
+  const equals = resolveEquals(equalsOption) || Object.is;
 
   const onChange = emitter<void>();
   const onChangeValue = emitter<any>();
@@ -207,37 +211,38 @@ export function createComputedSignal(
   const map = function <U>(
     this: ComputedSignal<any>,
     fn: (value: any) => U,
-    equalsOutput?: (a: U, b: U) => boolean
+    equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
   ): ComputedSignal<U> {
-    if (equalsOutput) {
-      return signal({ source: this }, (ctx: any) => fn(ctx.deps.source), {
-        equals: equalsOutput,
-      });
-    }
-    return signal({ source: this }, (ctx: any) => fn(ctx.deps.source));
+    // Convert equals function/string to options if needed
+    const options: SignalOptions<U> | undefined =
+      typeof equalsOrOptions === "function" || typeof equalsOrOptions === "string"
+        ? { equals: equalsOrOptions }
+        : equalsOrOptions;
+    
+    return signal({ source: this }, (ctx: any) => fn(ctx.deps.source), options);
   };
 
   const scan = function <U>(
     this: ComputedSignal<any>,
     fn: (accumulator: U, current: any) => U,
     initialValue: U,
-    equalsOutput?: (a: U, b: U) => boolean
+    equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
   ): ComputedSignal<U> {
     let acc = initialValue;
-    if (equalsOutput) {
-      return signal(
-        { source: this },
-        (ctx: any) => {
-          acc = fn(acc, ctx.deps.source);
-          return acc;
-        },
-        { equals: equalsOutput }
-      );
-    }
-    return signal({ source: this }, (ctx: any) => {
-      acc = fn(acc, ctx.deps.source);
-      return acc;
-    });
+    // Convert equals function/string to options if needed
+    const options: SignalOptions<U> | undefined =
+      typeof equalsOrOptions === "function" || typeof equalsOrOptions === "string"
+        ? { equals: equalsOrOptions }
+        : equalsOrOptions;
+
+    return signal(
+      { source: this },
+      (ctx: any) => {
+        acc = fn(acc, ctx.deps.source);
+        return acc;
+      },
+      options
+    );
   };
 
   const instance = Object.assign(get, {

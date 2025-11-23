@@ -217,6 +217,51 @@ describe("signal", () => {
       user.set({ name: "Bob" });
       expect(listener).toHaveBeenCalledOnce();
     });
+
+    it("should support signal(value, equals) shorthand", () => {
+      const shallowEquals = (a: any, b: any) => {
+        if (a === b) return true;
+        if (typeof a !== "object" || typeof b !== "object") return false;
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+        if (keysA.length !== keysB.length) return false;
+        return keysA.every((key) => a[key] === b[key]);
+      };
+
+      // New shorthand: pass equals directly as second arg
+      const user = signal({ name: "Alice" }, shallowEquals);
+      const listener = vi.fn();
+      user.on(listener);
+
+      // Set same content but different object
+      user.set({ name: "Alice" });
+      expect(listener).not.toHaveBeenCalled();
+
+      // Set different content
+      user.set({ name: "Bob" });
+      expect(listener).toHaveBeenCalledOnce();
+    });
+
+    it("should not confuse signal(value, equals) with signal(deps, compute)", () => {
+      const customEquals = (a: number, b: number) => a === b;
+      
+      // This should create a mutable signal with equals, not a computed signal
+      const count = signal(42, customEquals);
+      expect(count()).toBe(42);
+      
+      // Should be mutable (has set method)
+      expect(typeof count.set).toBe("function");
+      count.set(100);
+      expect(count()).toBe(100);
+      
+      // Now create an actual computed signal to verify it still works
+      const a = signal(10);
+      const doubled = signal({ a }, ({ deps }) => deps.a * 2);
+      expect(doubled()).toBe(20);
+      
+      // Computed signal should NOT have set method
+      expect((doubled as any).set).toBeUndefined();
+    });
   });
 
   describe("error handling", () => {
@@ -1182,6 +1227,228 @@ describe("signal", () => {
       // Now hydration works again
       expect(count.hydrate(30)).toBe("success");
       expect(count()).toBe(30);
+    });
+  });
+
+  describe("equals string shortcuts", () => {
+    it("should support 'shallow' string shortcut", () => {
+      const obj = signal({ name: "John", age: 30 }, "shallow");
+      const listener = vi.fn();
+      obj.on(listener);
+
+      // Same content, should not trigger due to shallow equals
+      obj.set({ name: "John", age: 30 });
+      expect(listener).not.toHaveBeenCalled();
+
+      // Different content, should trigger
+      obj.set({ name: "Jane", age: 30 });
+      expect(listener).toHaveBeenCalledOnce();
+    });
+
+    it("should support 'deep' string shortcut", () => {
+      const obj = signal({ nested: { value: 1 } }, "deep");
+      const listener = vi.fn();
+      obj.on(listener);
+
+      // Same nested content, should not trigger due to deep equals
+      obj.set({ nested: { value: 1 } });
+      expect(listener).not.toHaveBeenCalled();
+
+      // Different nested content, should trigger
+      obj.set({ nested: { value: 2 } });
+      expect(listener).toHaveBeenCalledOnce();
+    });
+
+    it("should support 'is' string shortcut (same as default)", () => {
+      const obj = signal({ name: "John" }, "is");
+      const listener = vi.fn();
+      obj.on(listener);
+
+      // Different reference, should trigger
+      obj.set({ name: "John" });
+      expect(listener).toHaveBeenCalledOnce();
+    });
+
+    it("should support 'shallow' in options object", () => {
+      const obj = signal({ name: "John", age: 30 }, { equals: "shallow", name: "user" });
+      const listener = vi.fn();
+      obj.on(listener);
+
+      expect(obj.displayName).toBe("user");
+
+      // Same content, should not trigger
+      obj.set({ name: "John", age: 30 });
+      expect(listener).not.toHaveBeenCalled();
+
+      // Different content, should trigger
+      obj.set({ name: "Jane", age: 30 });
+      expect(listener).toHaveBeenCalledOnce();
+    });
+
+    it("should support 'deep' in options object", () => {
+      const obj = signal(
+        { nested: { value: 1 } },
+        { equals: "deep", name: "deepData" }
+      );
+      const listener = vi.fn();
+      obj.on(listener);
+
+      expect(obj.displayName).toBe("deepData");
+
+      // Same nested content, should not trigger
+      obj.set({ nested: { value: 1 } });
+      expect(listener).not.toHaveBeenCalled();
+
+      // Different nested content, should trigger
+      obj.set({ nested: { value: 2 } });
+      expect(listener).toHaveBeenCalledOnce();
+    });
+
+    it("should work with computed signals", () => {
+      const user = signal({ name: "John", age: 30 });
+      const userName = signal(
+        { user },
+        ({ deps }) => ({ firstName: deps.user.name }),
+        { equals: "shallow" }
+      );
+
+      const listener = vi.fn();
+      userName.on(listener);
+
+      expect(userName()).toEqual({ firstName: "John" });
+
+      // Same name, different age - userName should not trigger
+      user.set({ name: "John", age: 31 });
+      expect(listener).not.toHaveBeenCalled();
+
+      // Different name - should trigger
+      user.set({ name: "Jane", age: 31 });
+      expect(listener).toHaveBeenCalledOnce();
+    });
+
+    it("should work with .map() method", () => {
+      const user = signal({ name: "John", age: 30 });
+      const userName = user.map(
+        (u) => ({ firstName: u.name }),
+        "shallow"
+      );
+
+      const listener = vi.fn();
+      userName.on(listener);
+
+      expect(userName()).toEqual({ firstName: "John" });
+
+      // Same name, different age - userName should not trigger
+      user.set({ name: "John", age: 31 });
+      expect(listener).not.toHaveBeenCalled();
+
+      // Different name - should trigger
+      user.set({ name: "Jane", age: 31 });
+      expect(listener).toHaveBeenCalledOnce();
+    });
+
+    it("should work with .scan() method", () => {
+      const count = signal(1);
+      const stats = count.scan(
+        (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
+        { sum: 0, count: 0 },
+        "shallow"
+      );
+
+      const listener = vi.fn();
+      stats.on(listener);
+
+      expect(stats()).toEqual({ sum: 1, count: 1 });
+
+      count.set(2);
+      expect(stats()).toEqual({ sum: 3, count: 2 });
+      expect(listener).toHaveBeenCalledOnce();
+
+      count.set(3);
+      expect(stats()).toEqual({ sum: 6, count: 3 });
+      expect(listener).toHaveBeenCalledTimes(2);
+    });
+
+    it("should work with signal(deps, fn, equals) - shallow string", () => {
+      const count = signal(1);
+      
+      const stats = signal(
+        { count },
+        ({ deps }) => ({ value: deps.count, extra: "constant" }),
+        "shallow"
+      );
+
+      const listener = vi.fn();
+      stats.on(listener);
+
+      expect(stats()).toEqual({ value: 1, extra: "constant" });
+
+      // Different value, should trigger
+      count.set(2);
+      expect(stats()).toEqual({ value: 2, extra: "constant" });
+      expect(listener).toHaveBeenCalledOnce();
+
+      // Same value - should NOT trigger due to shallow equals
+      count.set(2);
+      expect(stats()).toEqual({ value: 2, extra: "constant" });
+      expect(listener).toHaveBeenCalledOnce(); // Should not increase, same shallow content
+    });
+
+    it("should work with signal(deps, fn, equals) - custom function", () => {
+      const a = signal(1);
+      const b = signal(2);
+
+      // Custom equals that only compares the 'id' property
+      const result = signal(
+        { a, b },
+        ({ deps }) => ({ id: deps.a + deps.b, extra: Math.random() }),
+        (x, y) => x?.id === y?.id // Only compare id, ignore extra/random values
+      );
+
+      const listener = vi.fn();
+      result.on(listener);
+
+      const initialResult = result();
+      expect(initialResult.id).toBe(3);
+
+      // Change that affects id - should trigger
+      a.set(2);
+      expect(result().id).toBe(4);
+      expect(listener).toHaveBeenCalledOnce();
+
+      // Batch change where id stays same - should NOT trigger even though extra would be different
+      const beforeBatch = listener.mock.calls.length;
+      signal.batch(() => {
+        a.set(3);
+        b.set(1);
+      });
+      
+      expect(result().id).toBe(4); // id is still 4
+      expect(listener).toHaveBeenCalledTimes(beforeBatch); // No new calls due to custom equals
+    });
+
+    it("should work with signal(deps, fn, 'deep')", () => {
+      const a = signal({ x: 1 });
+      const b = signal({ y: 2 });
+
+      const combined = signal(
+        { a, b },
+        ({ deps }) => ({ data: { x: deps.a.x, y: deps.b.y } }),
+        "deep"
+      );
+
+      const listener = vi.fn();
+      combined.on(listener);
+
+      expect(combined()).toEqual({ data: { x: 1, y: 2 } });
+
+      // Same nested content
+      a.set({ x: 1 });
+      expect(listener).not.toHaveBeenCalled(); // Deep equal, no trigger
+
+      // Different nested content
+      a.set({ x: 2 });
+      expect(listener).toHaveBeenCalledOnce();
     });
   });
 });

@@ -35,6 +35,8 @@ export { isPromiseLike } from "./utils/isPromiseLike";
 export { createProxy } from "./utils/createProxy";
 export type { ProxyOptions } from "./utils/createProxy";
 export { shallowEquals } from "./utils/shallowEquals";
+export { resolveEquals } from "./utils/resolveEquals";
+export type { EqualsFn, EqualsStrategy, EqualsOption } from "./utils/resolveEquals";
 export { devLog, devWarn, devError, devOnly, devAssert } from "./utils/dev";
 export { wait, type Awaitable } from "./wait";
 export { mapSignal } from "./utils/mapSignal";

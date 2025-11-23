@@ -97,7 +97,7 @@ export type Signal<TValue, TInit = TValue> = Observable &
      * to each value from the source signal.
      *
      * @param fn - Pure transformation function (value: T) => U
-     * @param equals - Optional custom equality function for output values (default: Object.is)
+     * @param equalsOrOptions - Optional equality strategy/function or full options object
      * @returns New computed signal with transformed values
      *
      * @example
@@ -106,17 +106,20 @@ export type Signal<TValue, TInit = TValue> = Observable &
      * const doubled = count.map(x => x * 2);
      * const formatted = count.map(x => `Count: ${x}`);
      *
-     * // With custom equals for object comparison
-     * const user = signal({ name: 'John', age: 30 });
-     * const name = user.map(
-     *   u => u.name,
-     *   (a, b) => a === b
-     * );
+     * // With equality string shortcuts
+     * const name = user.map(u => u.name, 'shallow');
+     * const data = user.map(u => u.data, 'deep');
+     *
+     * // With custom equals function
+     * const name = user.map(u => u.name, (a, b) => a === b);
+     *
+     * // With full options
+     * const name = user.map(u => u.name, { equals: 'shallow', name: 'userName' });
      * ```
      */
     map<U>(
       fn: (value: TValue | TInit) => U,
-      equals?: (a: U, b: U) => boolean
+      equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
     ): ComputedSignal<U>;
 
     /**
@@ -128,7 +131,7 @@ export type Signal<TValue, TInit = TValue> = Observable &
      *
      * @param fn - Accumulator function (accumulator: U, current: T) => U
      * @param initialValue - Initial accumulator value (determines output type)
-     * @param equals - Optional custom equality function for accumulator (default: Object.is)
+     * @param equalsOrOptions - Optional equality strategy/function or full options object
      * @returns New computed signal with accumulated values
      *
      * @example
@@ -147,21 +150,32 @@ export type Signal<TValue, TInit = TValue> = Observable &
      *   [] as number[]
      * );
      *
-     * // Build statistics object
+     * // With equality string shortcuts
      * const stats = count.scan(
-     *   (acc, curr) => ({
-     *     sum: acc.sum + curr,
-     *     count: acc.count + 1,
-     *     avg: (acc.sum + curr) / (acc.count + 1)
-     *   }),
-     *   { sum: 0, count: 0, avg: 0 }
+     *   (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
+     *   { sum: 0, count: 0 },
+     *   'shallow'
+     * );
+     *
+     * // With custom equals function
+     * const stats = count.scan(
+     *   (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
+     *   { sum: 0, count: 0 },
+     *   (a, b) => a.sum === b.sum
+     * );
+     *
+     * // With full options
+     * const stats = count.scan(
+     *   (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
+     *   { sum: 0, count: 0 },
+     *   { equals: 'deep', name: 'stats' }
      * );
      * ```
      */
     scan<U>(
       fn: (accumulator: U, current: TValue | TInit) => U,
       initialValue: U,
-      equals?: (a: U, b: U) => boolean
+      equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
     ): ComputedSignal<U>;
   };
 
@@ -278,8 +292,23 @@ export type ComputedSignalContext<TDependencies extends SignalMap = {}> =
  * Options for signal creation
  */
 export type SignalOptions<T> = {
-  /** Custom equality function to determine if value changed (default: Object.is) */
-  equals?: (a: any, b: any) => boolean;
+  /** 
+   * Custom equality function or strategy to determine if value changed.
+   * 
+   * Supports:
+   * - `'is'` or `undefined` - Object.is (default, reference equality)
+   * - `'shallow'` - Shallow equality (compares object keys/array elements)
+   * - `'deep'` - Deep equality (lodash isEqual, recursive comparison)
+   * - Custom function - `(a: T, b: T) => boolean`
+   * 
+   * @example
+   * ```ts
+   * signal(obj, 'shallow')              // String shortcut
+   * signal(obj, { equals: 'deep' })     // In options
+   * signal(obj, (a, b) => a.id === b.id) // Custom function
+   * ```
+   */
+  equals?: "is" | "shallow" | "deep" | ((a: any, b: any) => boolean);
   /** Debug name for the signal */
   name?: string;
   /** Fallback function to recover from errors */
