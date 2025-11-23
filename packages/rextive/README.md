@@ -691,15 +691,25 @@ const result = signal({ query }, async ({ deps, abortSignal }) => {
 });
 ```
 
-**Methods:**
+**Signal Instance API:**
 
-- `signal()` - Read value
-- `signal.set(value)` - Update value
-- `signal.reset()` - Reset to initial value
-- `signal.on(callback)` - Subscribe to changes (returns unsubscribe function)
-- `signal.dispose()` - Cleanup and stop reactivity
-- `signal.map(fn, equals?)` - Transform value (stateless)
-- `signal.scan(fn, initial, equals?)` - Accumulate value (stateful)
+```tsx
+const count = signal(0); // Create signal
+
+// Reading and writing
+count(); // Read current value
+count.set(5); // Update value
+count.set((x) => x + 1); // Update with function
+count.reset(); // Reset to initial value
+
+// Subscriptions
+count.on((value) => console.log(value)); // Subscribe to changes
+count.dispose(); // Cleanup and stop reactivity
+
+// Transformations
+count.map((x) => x * 2, "shallow"); // Transform value (stateless)
+count.scan((sum, x) => sum + x, 0, "deep"); // Accumulate value (stateful)
+```
 
 **Options:**
 
@@ -734,6 +744,111 @@ import { $ } from "rextive";
 const count = $(0);
 const name = $("Alice");
 ```
+
+---
+
+### Signal Instance Methods
+
+#### `.set(value)` or `.set(updater)`
+
+Update signal value. Accepts a value or updater function.
+
+```tsx
+const count = signal(0);
+
+count.set(5); // Direct value
+count.set((x) => x + 1); // Updater function
+```
+
+#### `.reset()`
+
+Reset signal to its initial value.
+
+```tsx
+const count = signal(0);
+count.set(5);
+count.reset(); // Back to 0
+```
+
+#### `.on(callback)` → `unsubscribe`
+
+Subscribe to value changes. Returns unsubscribe function.
+
+```tsx
+const count = signal(0);
+
+const unsubscribe = count.on((value) => {
+  console.log("Count changed:", value);
+});
+
+count.set(1); // Logs: "Count changed: 1"
+unsubscribe(); // Stop listening
+```
+
+#### `.dispose()`
+
+Cleanup and stop all reactivity. **⚠️ Using disposed signals will throw errors.**
+
+```tsx
+const count = signal(0);
+count.dispose();
+
+// ❌ Error: Attempting to use disposed signal
+count(); // Throws error
+count.set(1); // Throws error
+count.on(() => {}); // Throws error
+```
+
+**When to use:**
+
+- Manual cleanup when signal is no longer needed
+- Component unmounting (or use `useScope` for auto-cleanup)
+- Preventing memory leaks in long-lived applications
+
+#### `.map(fn, equals?)` → `ComputedSignal`
+
+Transform signal value (stateless). Returns a new computed signal.
+
+```tsx
+const count = signal(0);
+
+// Basic transformation
+const doubled = count.map((x) => x * 2);
+
+// With equality check
+const user = signal({ name: "John", age: 30 });
+const name = user.map((u) => u.name, "shallow");
+
+// With custom equals
+const data = user.map(
+  (u) => ({ name: u.name }),
+  (a, b) => a.name === b.name
+);
+```
+
+**Equals options:** `'is'` | `'shallow'` | `'deep'` | `(a, b) => boolean`
+
+#### `.scan(fn, initial, equals?)` → `ComputedSignal`
+
+Accumulate values with state (stateful). Returns a new computed signal.
+
+```tsx
+const count = signal(1);
+
+// Running total
+const total = count.scan((sum, curr) => sum + curr, 0);
+
+// With equality check
+const stats = count.scan(
+  (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
+  { sum: 0, count: 0 },
+  "shallow"
+);
+```
+
+**Equals options:** `'is'` | `'shallow'` | `'deep'` | `(a, b) => boolean`
+
+---
 
 ### `signal.batch(fn)` or `$.batch(fn)`
 
@@ -803,9 +918,11 @@ rx({ user, posts }, (value, loadable) => (
 ));
 ```
 
-### `useScope(factory, options?)`
+### `useScope(factory, options?)` or `useScope(callbacks)`
 
-Create component-scoped signals with automatic cleanup.
+Create component-scoped signals with automatic cleanup, OR manage pure lifecycle.
+
+**Overload 1: Factory mode** - Create scoped signals/services
 
 ```tsx
 const { count, doubled } = useScope(
@@ -820,20 +937,44 @@ const { count, doubled } = useScope(
     };
   },
   {
-    watch: [userId], // Recreate when userId changes
-    onUpdate: [
-      (scope) => {
-        // Run when dependencies change
-        scope.count.set(propValue);
-      },
-      propValue,
-    ],
-    onDispose: (scope) => {
-      // Cleanup callback
-      console.log("disposing");
+    watch: [userId], // Recreate scope when userId changes
+    init: (scope) => {
+      // Called once after scope is created
+      console.log("scope initialized", scope);
+    },
+    mount: (scope) => {
+      // Called after component paints
+      startService(scope.count);
+    },
+    render: (scope) => {
+      // Called on every render
+      console.log("rendering with scope", scope);
+    },
+    cleanup: (scope) => {
+      // Called on React cleanup (may run 2-3x in StrictMode)
+      pauseService();
+    },
+    dispose: (scope) => {
+      // Called ONLY on true unmount (StrictMode-aware, runs exactly once)
+      console.log("final dispose", scope);
     },
   }
 );
+```
+
+**Overload 2: Pure lifecycle mode** - No factory, just lifecycle hooks
+
+```tsx
+const getPhase = useScope({
+  init: () => console.log("init"),
+  mount: () => console.log("mounted"),
+  render: () => console.log("rendering"),
+  cleanup: () => console.log("cleanup"),
+  dispose: () => console.log("disposed"),
+});
+
+// Check current phase
+console.log(getPhase()); // "render" | "mount" | "cleanup" | "disposed"
 ```
 
 ### `useSignals(signals)`
@@ -852,20 +993,6 @@ const [value, loadable] = useSignals({ user, posts });
 if (loadable.user.status === "loading") return <Spinner />;
 if (loadable.user.status === "error") return <Error />;
 return <div>{loadable.user.value.name}</div>;
-```
-
-### `useLifecycle(callbacks)`
-
-Fine-grained lifecycle control.
-
-```tsx
-useLifecycle({
-  init: () => {}, // During useState initialization
-  mount: () => {}, // After first paint (useLayoutEffect)
-  render: () => {}, // Every render
-  cleanup: () => {}, // React cleanup (may run 2-3x in StrictMode)
-  dispose: () => {}, // True unmount (runs exactly once, StrictMode-safe)
-});
 ```
 
 ### `wait()` - Handle Promises

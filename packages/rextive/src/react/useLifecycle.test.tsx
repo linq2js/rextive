@@ -449,4 +449,301 @@ describe("useLifecycle", () => {
       consoleError.mockRestore();
     });
   });
+
+  describe("object lifecycle (with 'for' option)", () => {
+    it("should pass target to all callbacks", async () => {
+      const user = { id: 1, name: "John" };
+      const init = vi.fn();
+      const mount = vi.fn();
+      const renderCallback = vi.fn();
+      const cleanup = vi.fn();
+      const dispose = vi.fn();
+
+      const TestComponent = () => {
+        useLifecycle({
+          for: user,
+          init,
+          mount,
+          render: renderCallback,
+          cleanup,
+          dispose,
+        });
+        return <div>test</div>;
+      };
+
+      render(<TestComponent />);
+
+      expect(init).toHaveBeenCalledWith(user);
+      expect(renderCallback).toHaveBeenCalledWith(user);
+
+      await waitFor(() => {
+        expect(mount).toHaveBeenCalledWith(user);
+      });
+    });
+
+    it("should call init and mount for initial target", async () => {
+      const user = { id: 1, name: "John" };
+      const init = vi.fn();
+      const mount = vi.fn();
+
+      const TestComponent = () => {
+        useLifecycle({
+          for: user,
+          init,
+          mount,
+        });
+        return <div>{user.name}</div>;
+      };
+
+      render(<TestComponent />);
+
+      expect(init).toHaveBeenCalledWith(user);
+      expect(init).toHaveBeenCalledTimes(1);
+
+      await waitFor(() => {
+        expect(mount).toHaveBeenCalledWith(user);
+        expect(mount).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it("should dispose old target and init new target when reference changes", async () => {
+      const user1 = { id: 1, name: "John" };
+      const user2 = { id: 2, name: "Jane" };
+      const init = vi.fn();
+      const mount = vi.fn();
+      const cleanup = vi.fn();
+      const dispose = vi.fn();
+
+      const TestComponent = ({ user }: { user: typeof user1 }) => {
+        useLifecycle({
+          for: user,
+          init,
+          mount,
+          cleanup,
+          dispose,
+        });
+        return <div>{user.name}</div>;
+      };
+
+      const { rerender } = render(<TestComponent user={user1} />);
+
+      expect(init).toHaveBeenCalledWith(user1);
+      await waitFor(() => {
+        expect(mount).toHaveBeenCalledWith(user1);
+      });
+
+      // Change target
+      rerender(<TestComponent user={user2} />);
+
+      // Old target should be disposed
+      expect(cleanup).toHaveBeenCalledWith(user1);
+      expect(dispose).toHaveBeenCalledWith(user1);
+
+      // New target should be initialized
+      expect(init).toHaveBeenCalledWith(user2);
+      expect(init).toHaveBeenCalledTimes(2);
+
+      await waitFor(() => {
+        expect(mount).toHaveBeenCalledWith(user2);
+        expect(mount).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it("should call render with current target on every render", () => {
+      const user1 = { id: 1, name: "John" };
+      const user2 = { id: 2, name: "Jane" };
+      const renderCallback = vi.fn();
+
+      const TestComponent = ({ user }: { user: typeof user1 }) => {
+        useLifecycle({
+          for: user,
+          render: renderCallback,
+        });
+        return <div>{user.name}</div>;
+      };
+
+      const { rerender } = render(<TestComponent user={user1} />);
+
+      expect(renderCallback).toHaveBeenCalledWith(user1);
+      expect(renderCallback).toHaveBeenCalledTimes(1);
+
+      rerender(<TestComponent user={user2} />);
+
+      expect(renderCallback).toHaveBeenCalledWith(user2);
+      expect(renderCallback).toHaveBeenCalledTimes(2);
+    });
+
+    it("should execute lifecycle in correct order for target changes", async () => {
+      const user1 = { id: 1, name: "John" };
+      const user2 = { id: 2, name: "Jane" };
+      const callOrder: string[] = [];
+
+      const TestComponent = ({ user }: { user: typeof user1 }) => {
+        useLifecycle({
+          for: user,
+          init: (u) => callOrder.push(`init-${u.id}`),
+          mount: (u) => callOrder.push(`mount-${u.id}`),
+          render: (u) => callOrder.push(`render-${u.id}`),
+          cleanup: (u) => callOrder.push(`cleanup-${u.id}`),
+          dispose: (u) => callOrder.push(`dispose-${u.id}`),
+        });
+        return <div>{user.name}</div>;
+      };
+
+      const { rerender } = render(<TestComponent user={user1} />);
+
+      await waitFor(() => {
+        expect(callOrder).toEqual(["init-1", "render-1", "mount-1"]);
+      });
+
+      callOrder.length = 0; // Clear
+      rerender(<TestComponent user={user2} />);
+
+      await waitFor(() => {
+        // React's actual lifecycle order:
+        // 1. Render phase: render(user2)
+        // 2. Commit phase: cleanup(user1), dispose(user1), init(user2), mount(user2)
+        expect(callOrder).toEqual([
+          "render-2",
+          "cleanup-1",
+          "dispose-1",
+          "init-2",
+          "mount-2",
+        ]);
+      });
+    });
+
+    it("should dispose current target on component unmount", async () => {
+      const user = { id: 1, name: "John" };
+      const cleanup = vi.fn();
+      const dispose = vi.fn();
+
+      const TestComponent = () => {
+        useLifecycle({
+          for: user,
+          cleanup,
+          dispose,
+        });
+        return <div>{user.name}</div>;
+      };
+
+      const { unmount } = render(<TestComponent />);
+
+      unmount();
+
+      await waitFor(() => {
+        expect(cleanup).toHaveBeenCalledWith(user);
+        expect(dispose).toHaveBeenCalledWith(user);
+      });
+    });
+
+    it("should not re-run lifecycle if target reference stays same", async () => {
+      const user = { id: 1, name: "John" };
+      const init = vi.fn();
+      const mount = vi.fn();
+      const cleanup = vi.fn();
+      const dispose = vi.fn();
+
+      const TestComponent = ({ count }: { count: number }) => {
+        useLifecycle({
+          for: user, // Same reference
+          init,
+          mount,
+          cleanup,
+          dispose,
+        });
+        return <div>{count}</div>;
+      };
+
+      const { rerender } = render(<TestComponent count={1} />);
+
+      await waitFor(() => {
+        expect(init).toHaveBeenCalledTimes(1);
+        expect(mount).toHaveBeenCalledTimes(1);
+      });
+
+      // Re-render with different prop but same target
+      rerender(<TestComponent count={2} />);
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Should not re-run lifecycle
+      expect(init).toHaveBeenCalledTimes(1);
+      expect(mount).toHaveBeenCalledTimes(1);
+      expect(cleanup).not.toHaveBeenCalled();
+      expect(dispose).not.toHaveBeenCalled();
+    });
+
+    it("should handle multiple target changes", async () => {
+      const user1 = { id: 1, name: "John" };
+      const user2 = { id: 2, name: "Jane" };
+      const user3 = { id: 3, name: "Bob" };
+      const init = vi.fn();
+      const dispose = vi.fn();
+
+      const TestComponent = ({ user }: { user: typeof user1 }) => {
+        useLifecycle({
+          for: user,
+          init,
+          dispose,
+        });
+        return <div>{user.name}</div>;
+      };
+
+      const { rerender } = render(<TestComponent user={user1} />);
+
+      expect(init).toHaveBeenCalledWith(user1);
+
+      rerender(<TestComponent user={user2} />);
+      await waitFor(() => {
+        expect(dispose).toHaveBeenCalledWith(user1);
+        expect(init).toHaveBeenCalledWith(user2);
+      });
+
+      rerender(<TestComponent user={user3} />);
+      await waitFor(() => {
+        expect(dispose).toHaveBeenCalledWith(user2);
+        expect(init).toHaveBeenCalledWith(user3);
+      });
+
+      expect(init).toHaveBeenCalledTimes(3);
+      expect(dispose).toHaveBeenCalledTimes(2); // user1, user2 (not user3 yet)
+    });
+
+    it("should work with complex objects", async () => {
+      const scope1 = { count: { value: 0 }, name: "scope1" };
+      const scope2 = { count: { value: 10 }, name: "scope2" };
+      const init = vi.fn();
+      const dispose = vi.fn();
+
+      const TestComponent = ({ scope }: { scope: typeof scope1 }) => {
+        useLifecycle({
+          for: scope,
+          init: (s) => {
+            init(s);
+            s.count.value++;
+          },
+          dispose: (s) => {
+            dispose(s);
+            s.count.value--;
+          },
+        });
+        return <div>{scope.name}</div>;
+      };
+
+      const { rerender } = render(<TestComponent scope={scope1} />);
+
+      expect(init).toHaveBeenCalledWith(scope1);
+      expect(scope1.count.value).toBe(1);
+
+      rerender(<TestComponent scope={scope2} />);
+
+      await waitFor(() => {
+        expect(dispose).toHaveBeenCalledWith(scope1);
+        expect(init).toHaveBeenCalledWith(scope2);
+        expect(scope1.count.value).toBe(0); // Decremented on dispose
+        expect(scope2.count.value).toBe(11); // Incremented on init
+      });
+    });
+  });
 });

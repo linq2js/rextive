@@ -2,227 +2,231 @@ import { useLayoutEffect, useState } from "react";
 import { isDev } from "../utils/dev";
 
 /**
- * Lifecycle hook options
- * Provides fine-grained control over component lifecycle phases
+ * Lifecycle phase type
  */
-export type UseLifecycleOptions = {
-  /**
-   * Called during component initialization (before first render)
-   * Runs during useState initialization - only once
-   * Use for: One-time setup that doesn't depend on React lifecycle
-   */
+export type LifecyclePhase = "render" | "mount" | "cleanup" | "disposed";
+
+/**
+ * Lifecycle callbacks for component lifecycle (no target object)
+ */
+export type ComponentLifecycleCallbacks = {
+  /** Called during component initialization (before first render) */
   init?: VoidFunction;
-
-  /**
-   * Called after component renders and paints
-   * Runs once after first paint (useLayoutEffect)
-   * Use for: DOM measurements, subscriptions, etc.
-   */
+  /** Called after component renders and paints */
   mount?: VoidFunction;
-
-  /**
-   * Called on every render (including first render)
-   * Runs during render phase, before paint
-   * Use for: Tracking renders, updating refs, etc.
-   */
+  /** Called on every render (including first render) */
   render?: VoidFunction;
-
-  /**
-   * Called synchronously during React cleanup phase
-   * ⚠️ In StrictMode (development), may run multiple times:
-   * - During mount/unmount/remount cycles
-   * - During final unmount
-   *
-   * Use for: Standard React cleanup (safe to run multiple times)
-   * - Canceling subscriptions
-   * - Clearing timers
-   * - Removing event listeners
-   */
+  /** Called synchronously during React cleanup phase */
   cleanup?: VoidFunction;
-
-  /**
-   * Called ONLY on true unmount (StrictMode-aware)
-   * Deferred to microtask + guarded by phase check
-   *
-   * **Guarantees:**
-   * - In StrictMode: Only runs on FINAL unmount, not remounts
-   * - In production: Always runs on unmount
-   * - Errors: Protected with try-catch, won't crash app
-   *
-   * **Limitation:**
-   * If component throws during render before useLayoutEffect runs,
-   * dispose will NOT be called (React discards the component instance).
-   * Use Error Boundaries to catch errors and ensure proper cleanup.
-   *
-   * **Use for:** Final cleanup that MUST run exactly once
-   * - Persisting state to storage
-   * - Sending analytics events
-   * - Critical cleanup that shouldn't duplicate
-   *
-   * @example
-   * ```tsx
-   * useLifecycle({
-   *   mount: () => {
-   *     subscription.subscribe();
-   *   },
-   *   dispose: () => {
-   *     subscription.unsubscribe();
-   *   }
-   * });
-   * ```
-   */
+  /** Called ONLY on true unmount (StrictMode-aware) */
   dispose?: VoidFunction;
 };
 
-const EMPTY_OPTIONS: UseLifecycleOptions = {};
+/**
+ * Lifecycle callbacks for tracked object lifecycle (with target)
+ */
+export type ObjectLifecycleCallbacks<TTarget> = {
+  /** The target object to track - when reference changes, lifecycle restarts */
+  for: TTarget;
+  /** Called when this object becomes active */
+  init?: (target: TTarget) => void;
+  /** Called after this object is initialized */
+  mount?: (target: TTarget) => void;
+  /** Called on every render with current object */
+  render?: (target: TTarget) => void;
+  /** Called when this object is being replaced or component unmounts */
+  cleanup?: (target: TTarget) => void;
+  /** Called when this object is truly done (StrictMode-safe) */
+  dispose?: (target: TTarget) => void;
+};
+
+/**
+ * Internal type that combines both callback styles
+ */
+type InternalLifecycleOptions = {
+  for?: any;
+  init?: ((target: any) => void) | VoidFunction;
+  mount?: ((target: any) => void) | VoidFunction;
+  render?: ((target: any) => void) | VoidFunction;
+  cleanup?: ((target: any) => void) | VoidFunction;
+  dispose?: ((target: any) => void) | VoidFunction;
+};
+
+// Legacy export for backward compatibility
+export type UseLifecycleOptions = ComponentLifecycleCallbacks;
 
 /**
  * Hook for managing component lifecycle with fine-grained control
  *
- * Provides callbacks for all major lifecycle phases:
- * 1. `init` - Before first render (useState initialization)
- * 2. `mount` - After first paint (useLayoutEffect)
- * 3. `render` - Every render (render phase)
- * 4. `cleanup` - Every cleanup (may run 2-3x in StrictMode)
- * 5. `dispose` - Final unmount only (runs exactly once)
- *
- * **Important:** If component throws during render before mounting,
- * only `init` will have run. Use Error Boundaries for proper error handling.
+ * **Two modes:**
+ * 1. Component lifecycle (no `for`): Callbacks run based on component's lifecycle
+ * 2. Object lifecycle (with `for`): Callbacks run based on tracked object's lifecycle
  *
  * @param options - Lifecycle callbacks
  * @returns `getPhase` function - Returns current lifecycle phase dynamically
  *
- * @example Basic usage
+ * @example Component lifecycle
  * ```tsx
  * const getPhase = useLifecycle({
- *   init: () => console.log('Initializing...'),
- *   mount: () => console.log('Mounted!'),
- *   render: () => console.log('Rendering...'),
- *   cleanup: () => subscription.unsubscribe(),
- *   dispose: () => analytics.track('closed'),
+ *   init: () => console.log('Component initializing'),
+ *   mount: () => console.log('Component mounted'),
+ *   dispose: () => console.log('Component disposed'),
  * });
- *
- * // Check current phase dynamically
- * console.log(getPhase()); // "render" | "mount" | "cleanup" | "disposed"
  * ```
  *
- * @example Service pattern with phase check
+ * @example Object lifecycle
  * ```tsx
+ * const user = { id: 1, name: 'John' };
+ *
  * const getPhase = useLifecycle({
- *   mount: () => {
- *     const sub = service.subscribe(data => setState(data));
- *   },
- *   dispose: () => {
- *     service.cleanup();
- *   }
+ *   for: user, // Track this object
+ *   init: (user) => console.log('User activated:', user),
+ *   mount: (user) => startTracking(user),
+ *   cleanup: (user) => pauseTracking(user),
+ *   dispose: (user) => analytics.track('user-session-end', user),
  * });
  *
- * // Use phase to guard async operations
- * const fetchData = async () => {
- *   const data = await api.fetch();
- *   if (getPhase() !== "disposed" && getPhase() !== "cleanup") {
- *     setState(data); // Safe: component still mounted
- *   }
- * };
- * ```
- *
- * @example Conditional logic based on phase
- * ```tsx
- * const getPhase = useLifecycle({
- *   mount: () => startAnimation(),
- *   dispose: () => stopAnimation(),
- * });
- *
- * const handleClick = () => {
- *   if (getPhase() === "mount") {
- *     // Only process clicks when fully mounted
- *     processClick();
- *   }
- * };
+ * // When user reference changes, old user is disposed and new user is initialized
  * ```
  */
-export function useLifecycle(options: UseLifecycleOptions) {
+
+// Overload 1: Component lifecycle (no target object)
+export function useLifecycle(
+  options: ComponentLifecycleCallbacks
+): () => LifecyclePhase;
+
+// Overload 2: Object lifecycle (with target object)
+export function useLifecycle<TTarget>(
+  options: ObjectLifecycleCallbacks<TTarget>
+): () => LifecyclePhase;
+
+// Implementation
+export function useLifecycle(
+  options: InternalLifecycleOptions
+): () => LifecyclePhase {
+  const hasTarget = "for" in options;
+  const target = options.for;
+
   // Create stable ref object using useState (created once, never recreated)
   // Run init callback during initialization (before first render)
   const [ref] = useState(() => {
     let currentOptions = options;
-    options.init?.();
-    let phase: "render" | "cleanup" | "mount" | "disposed" = "render";
-    let shouldDisposeIfThereIsErrorInRender = false;
+    let isFirstMount = true;
 
-    const dispose = () => {
+    // Call init with target if present
+    if (hasTarget) {
+      (currentOptions.init as any)?.(target);
+    } else {
+      (currentOptions.init as VoidFunction)?.();
+    }
+
+    let phase: LifecyclePhase = "render";
+    let pendingDispose: { target: any; shouldRun: boolean } | null = null;
+
+    const dispose = (targetToDispose: any) => {
       if (phase === "disposed") return;
       phase = "disposed";
-      currentOptions.dispose?.();
-      currentOptions = EMPTY_OPTIONS as UseLifecycleOptions;
+
+      if (hasTarget) {
+        (currentOptions.dispose as any)?.(targetToDispose);
+      } else {
+        (currentOptions.dispose as VoidFunction)?.();
+      }
     };
 
     return {
       /**
        * Returns the current lifecycle phase
        * Allows calling code to dynamically check component state
-       * 
+       *
        * @returns Current phase: "render" | "mount" | "cleanup" | "disposed"
        */
       getPhase() {
         return phase;
       },
-      onRender(nextOptions: UseLifecycleOptions) {
+      onRender(nextOptions: InternalLifecycleOptions, nextTarget: any) {
         currentOptions = nextOptions;
-        shouldDisposeIfThereIsErrorInRender = true;
         phase = "render";
-        Promise.resolve().then(() => {
-          if (shouldDisposeIfThereIsErrorInRender) {
-            dispose();
-          }
-        });
-        currentOptions.render?.();
-      },
-      onMount() {
-        phase = "mount";
-        shouldDisposeIfThereIsErrorInRender = false;
-        currentOptions.mount?.();
 
+        // Call render with target if present
+        if (hasTarget) {
+          (currentOptions.render as any)?.(nextTarget);
+        } else {
+          (currentOptions.render as VoidFunction)?.();
+        }
+      },
+      onMount(targetForMount: any) {
+        // If there's a pending dispose for a DIFFERENT target, run it now (target changed)
+        // If it's the SAME target, cancel it (StrictMode remount)
+        if (pendingDispose) {
+          if (pendingDispose.target === targetForMount) {
+            // StrictMode remount: cancel the dispose
+            pendingDispose.shouldRun = false;
+          } else {
+            // Target changed: run dispose for old target synchronously
+            if (pendingDispose.shouldRun) {
+              try {
+                dispose(pendingDispose.target);
+                pendingDispose.shouldRun = false; // Prevent double-dispose
+              } catch (error) {
+                console.error("Error in dispose callback:", error);
+              }
+            }
+          }
+          pendingDispose = null;
+        }
+
+        // Call init for new target (except first mount, already called in useState)
+        if (!isFirstMount && hasTarget) {
+          (currentOptions.init as any)?.(targetForMount);
+        }
+        isFirstMount = false;
+
+        phase = "mount";
+
+        // Call mount with target if present
+        if (hasTarget) {
+          (currentOptions.mount as any)?.(targetForMount);
+        } else {
+          (currentOptions.mount as VoidFunction)?.();
+        }
+
+        // Return cleanup function that captures THIS target
+        const capturedTarget = targetForMount;
         return () => {
           phase = "cleanup";
-          currentOptions.cleanup?.();
+
+          // Call cleanup with captured target
+          if (hasTarget) {
+            (currentOptions.cleanup as any)?.(capturedTarget);
+          } else {
+            (currentOptions.cleanup as VoidFunction)?.();
+          }
 
           if (currentOptions.dispose) {
             if (isDev()) {
               /**
                * Defer dispose callback to microtask for StrictMode safety
-               *
-               * Why deferred execution?
-               * 1. **StrictMode guard**: Component may remount immediately in development.
-               *    By deferring to microtask, we can check if phase changed back to
-               *    "mount", indicating a remount. This prevents dispose from running during
-               *    remount cycles.
-               *
-               * 2. **Full unmount guarantee**: Ensures component is completely removed from
-               *    React tree before dispose runs. Synchronous execution could run while
-               *    React is still cleaning up sibling components.
-               *
-               * 3. **Timing consistency**: All synchronous cleanup operations (cleanup callback,
-               *    other effects) complete before dispose runs.
-               *
-               * Microtask (Promise.resolve().then):
-               * - Runs after current synchronous execution
-               * - Runs before next render
-               * - Faster than setTimeout (macrotask)
+               * Use a flag to track if dispose should run (can be canceled if remounting same target)
                */
+              const disposeTask = { target: capturedTarget, shouldRun: true };
+              pendingDispose = disposeTask;
+
               Promise.resolve().then(() => {
-                // Verify still unmounted (phase wasn't reset to "mount")
-                if (phase === "cleanup") {
+                if (disposeTask.shouldRun) {
                   try {
-                    dispose();
+                    dispose(capturedTarget);
                   } catch (error) {
                     console.error("Error in dispose callback:", error);
                   }
                 }
+                if (pendingDispose === disposeTask) {
+                  pendingDispose = null;
+                }
               });
             } else {
               // Production: call dispose synchronously
-              dispose();
+              dispose(capturedTarget);
             }
           }
         };
@@ -231,21 +235,25 @@ export function useLifecycle(options: UseLifecycleOptions) {
   });
 
   // Update options on every render and call render callback
-  ref.onRender(options);
+  ref.onRender(options, target);
 
   // Setup mount/cleanup lifecycle
-  useLayoutEffect(() => {
-    return ref.onMount();
-  }, []); // Empty deps: mount once, cleanup on unmount
+  // Re-run when target changes (only in object lifecycle mode)
+  useLayoutEffect(
+    () => {
+      return ref.onMount(target);
+    },
+    hasTarget ? [target] : []
+  ); // Re-mount when target changes, or empty deps for component lifecycle
 
   /**
    * Return getPhase function for dynamic phase inspection
-   * 
+   *
    * This allows calling code to check component state at any time:
    * - Guard async operations (prevent setState after unmount)
    * - Conditional logic based on lifecycle phase
    * - Debugging and logging
-   * 
+   *
    * @returns Function that returns current phase when called
    */
   return ref.getPhase;
