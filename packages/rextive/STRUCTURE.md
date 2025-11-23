@@ -31,7 +31,7 @@ packages/rextive/
 │       ├── useScope.ts             # Scoped signals hook
 │       ├── useSignals.ts           # Signal tracking hook
 │       ├── useRerender.ts          # Rerender control
-│       └── useUnmount.ts           # Unmount lifecycle
+│       └── useLifecycle.ts         # Lifecycle management
 ├── dist/
 │   ├── rextive.js                  # Core bundle
 │   ├── rextive.umd.js              # Core UMD bundle
@@ -83,7 +83,7 @@ import {
   useScope,      // Component-scoped signals
   useSignals,    // Signal tracking hook
   useRerender,   // Manual rerender control
-  useUnmount,    // Unmount lifecycle
+  useLifecycle,  // Lifecycle management
 } from 'rextive/react';
 ```
 
@@ -166,7 +166,7 @@ Located in `src/react/`:
 - `useScope.test.tsx`
 - `useSignals.test.tsx`
 - `useRerender.test.tsx`
-- `useUnmount.test.tsx`
+- `useLifecycle.test.tsx`
 
 ### Type Check Files
 

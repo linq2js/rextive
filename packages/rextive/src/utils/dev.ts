@@ -1,8 +1,8 @@
 /**
  * Development-only utilities.
- * 
+ *
  * These use the __DEV__ flag which should be defined by the consuming application's bundler.
- * 
+ *
  * **For consuming applications:**
  * Add this to your Vite config:
  * ```ts
@@ -12,10 +12,10 @@
  *   },
  * });
  * ```
- * 
+ *
  * In production builds with __DEV__ = false, all code inside `if (__DEV__)` blocks
  * is completely removed via dead code elimination.
- * 
+ *
  * If __DEV__ is not defined, these utilities fall back to checking process.env.NODE_ENV.
  */
 
@@ -30,16 +30,16 @@ declare const __DEV__: boolean | undefined;
  * Runtime check for development mode.
  * Used as a fallback when __DEV__ is not defined by the consumer.
  */
-function isDev(): boolean {
+export function isDev(): boolean {
   // If __DEV__ is defined by the consumer's bundler, use it
-  if (typeof __DEV__ !== 'undefined') {
+  if (typeof __DEV__ !== "undefined") {
     return __DEV__;
   }
-  
+
   // Fallback: check process.env.NODE_ENV at runtime
   // This won't be tree-shaken but ensures dev utilities work
   try {
-    return process.env.NODE_ENV !== 'production';
+    return process.env.NODE_ENV !== "production";
   } catch {
     // If process is not available (browser without polyfill), assume production
     return false;
@@ -49,10 +49,10 @@ function isDev(): boolean {
 /**
  * Log a message only in development.
  * If __DEV__ is defined by the consumer's bundler and is false, this is removed.
- * 
+ *
  * @param message - Message to log
  * @param args - Additional arguments
- * 
+ *
  * @example
  * ```ts
  * devLog("Signal created:", signal);
@@ -69,10 +69,10 @@ export function devLog(message: string, ...args: any[]): void {
 /**
  * Log a warning only in development.
  * If __DEV__ is defined by the consumer's bundler and is false, this is removed.
- * 
+ *
  * @param message - Warning message
  * @param args - Additional arguments
- * 
+ *
  * @example
  * ```ts
  * devWarn("Deprecated API used");
@@ -89,10 +89,10 @@ export function devWarn(message: string, ...args: any[]): void {
 /**
  * Log an error only in development.
  * If __DEV__ is defined by the consumer's bundler and is false, this is removed.
- * 
+ *
  * @param message - Error message
  * @param args - Additional arguments
- * 
+ *
  * @example
  * ```ts
  * devError("Invalid configuration:", config);
@@ -109,9 +109,9 @@ export function devError(message: string, ...args: any[]): void {
 /**
  * Execute code only in development.
  * If __DEV__ is defined by the consumer's bundler and is false, this is removed.
- * 
+ *
  * @param fn - Function to execute
- * 
+ *
  * @example
  * ```ts
  * devOnly(() => {
@@ -131,10 +131,10 @@ export function devOnly(fn: () => void): void {
 /**
  * Assert a condition only in development.
  * If __DEV__ is defined by the consumer's bundler and is false, this is removed.
- * 
+ *
  * @param condition - Condition to assert
  * @param message - Error message if assertion fails
- * 
+ *
  * @example
  * ```ts
  * devAssert(signal !== undefined, "Signal cannot be undefined");
@@ -149,4 +149,3 @@ export function devAssert(condition: boolean, message: string): void {
     }
   }
 }
-

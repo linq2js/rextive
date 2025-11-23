@@ -26,11 +26,12 @@ export type {
   RerenderOptions,
   RerenderFunction,
 } from "./types";
+export type { UseLifecycleOptions } from "./useLifecycle";
 
 // Export React components and hooks
 export { rx } from "./rx";
 export { useScope } from "./useScope";
 export { useSignals } from "./useSignals";
 export { useRerender } from "./useRerender";
-export { useUnmount } from "./useUnmount";
+export { useLifecycle } from "./useLifecycle";
 

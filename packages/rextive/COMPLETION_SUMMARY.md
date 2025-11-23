@@ -61,7 +61,7 @@ rextive/
 │       ├── useScope.ts
 │       ├── useSignals.ts
 │       ├── useRerender.ts
-│       ├── useUnmount.ts
+│       ├── useLifecycle.ts
 │       ├── rx.type.check.tsx
 │       └── *.test.tsx              # React tests
 └── dist/
@@ -96,7 +96,7 @@ import {
   useScope,      // Scoped signals
   useSignals,    // Signal tracking
   useRerender,   // Rerender control
-  useUnmount,    // Unmount lifecycle
+  useLifecycle,  // Lifecycle management
 } from 'rextive/react';
 ```
 
@@ -181,7 +181,7 @@ Test Files  12 passed (12)
 - ✅ `batch.test.ts` (14 tests)
 - ✅ `signal.test.ts` (65 tests)
 - ✅ `persistSignals.test.ts` (31 tests)
-- ✅ `react/useUnmount.test.tsx` (10 tests)
+- ✅ `react/useLifecycle.test.tsx` (comprehensive tests)
 - ✅ `react/useScope.test.tsx` (43 tests)
 - ✅ `react/useRerender.test.tsx` (19 tests)
 - ✅ `react/rx.test.tsx` (31 tests)
@@ -248,7 +248,7 @@ Test Files  12 passed (12)
 - `useScope.ts` → `react/useScope.ts`
 - `useSignals.ts` → `react/useSignals.ts`
 - `useRerender.ts` → `react/useRerender.ts`
-- `useUnmount.ts` → `react/useUnmount.ts`
+- `useLifecycle.ts` → `react/useLifecycle.ts`
 - All React test files → `react/` directory
 
 ---

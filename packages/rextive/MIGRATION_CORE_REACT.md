@@ -32,7 +32,7 @@ import {
   useScope,      // Component-scoped signals
   useSignals,    // Signal tracking hook
   useRerender,   // Manual rerender control
-  useUnmount,    // Unmount lifecycle
+  useLifecycle,  // Lifecycle management
 } from 'rextive/react';
 ```
 

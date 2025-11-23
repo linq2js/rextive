@@ -67,6 +67,52 @@ function Counter() {
 
 ---
 
+## React Hooks
+
+### `useLifecycle` - Fine-grained lifecycle control
+
+```tsx
+import { useLifecycle } from "rextive/react";
+
+function Component() {
+  useLifecycle({
+    init: () => {
+      // Called during useState initialization (before first render)
+      console.log("Initializing...");
+    },
+    mount: () => {
+      // Called after first paint
+      console.log("Mounted!");
+    },
+    render: () => {
+      // Called on every render
+      console.log("Rendering...");
+    },
+    cleanup: () => {
+      // Called during React cleanup (may run 2-3x in StrictMode)
+      subscription.unsubscribe();
+    },
+    dispose: () => {
+      // Called ONLY on true unmount (runs exactly once)
+      analytics.track("component_closed");
+    },
+  });
+
+  return <div>Hello</div>;
+}
+```
+
+**Use cases:**
+
+- Resource management (WebSocket, subscriptions)
+- Analytics tracking (page views, time spent)
+- Global state registration/cleanup
+- Service initialization and disposal
+
+**StrictMode-aware:** The `dispose` callback is guaranteed to run exactly once, even in React StrictMode's double-mount behavior.
+
+---
+
 ## Examples
 
 ### Vanilla JavaScript

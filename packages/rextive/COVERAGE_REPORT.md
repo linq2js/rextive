@@ -27,7 +27,7 @@ Successfully increased test coverage from 50.5% to **95.37%**, exceeding the 90%
 | rx.tsx | 100% | ✅ Perfect |
 | useRerender.ts | 100% | ✅ Perfect |
 | useSignals.ts | 100% | ✅ Perfect |
-| useUnmount.ts | 100% | ✅ Perfect |
+| useLifecycle.ts | 100% | ✅ Perfect |
 | useScope.ts | 98.86% | ⚠️ Minor gaps |
 
 ### Utilities (97.46% average)
