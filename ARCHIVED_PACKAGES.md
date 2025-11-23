@@ -32,8 +32,7 @@ packages/
 
 After:
 packages/
-  ├── rextive/        ← Active
-  └── rxasync/        ← Active
+  └── rextive/        ← Active (only package)
 
 archived/
   ├── rxblox/         ← Preserved but not built/tested
@@ -43,7 +42,7 @@ archived/
 
 ### Workspace Configuration
 
-The `pnpm-workspace.yaml` still includes `packages/*`, which now only contains active packages (`rextive` and `rxasync`). The archived packages are excluded automatically.
+The `pnpm-workspace.yaml` still includes `packages/*`, which now only contains the active `rextive` package. The archived packages are excluded automatically.
 
 ### Scripts Updated
 
@@ -96,8 +95,9 @@ However, they are **not maintained**, **not built**, and **not tested** as part 
 - **Archived Date:** November 23, 2025
 - **Last rxblox Version:** 1.37.0  
 - **Current rextive Version:** 2.2.0
-- **Packages Removed from Workspace:** 3 (rxblox, rxblox-demo, rxblox-todo)
+- **Packages Removed from Workspace:** 4 (rxblox, rxblox-demo, rxblox-todo, rxasync)
 - **Dependencies Cleaned:** ~75 packages removed from workspace
+- **Active Packages:** 1 (rextive)
 
 ## Questions?
 
