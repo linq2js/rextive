@@ -1,4 +1,4 @@
-import { Signal, SignalMap, MutableSignal } from "./types";
+import { Signal, SignalMap } from "./types";
 import { emitter } from "./utils/emitter";
 import { isPromiseLike } from "./utils/isPromiseLike";
 
@@ -125,7 +125,8 @@ export function persistSignals<TSignals extends SignalMap>(
   const applyLoadedValues = (loaded: PersistedValues<TSignals>) => {
     for (const key in loaded) {
       if (key in signals) {
-        const signal = signals[key] as MutableSignal<any>;
+        const signal = signals[key];
+        // All signals have hydrate method, safe to call directly
         signal.hydrate(loaded[key]);
       }
     }

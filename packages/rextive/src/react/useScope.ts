@@ -3,11 +3,11 @@ import { ExDisposable } from "../types";
 import { UseScopeOptions } from "./types";
 import { shallowEquals } from "../utils/shallowEquals";
 import { tryDispose } from "../disposable";
-import { 
-  useLifecycle, 
-  ComponentLifecycleCallbacks, 
+import {
+  useLifecycle,
+  ComponentLifecycleCallbacks,
   ObjectLifecycleCallbacks,
-  LifecyclePhase 
+  LifecyclePhase,
 } from "./useLifecycle";
 
 /**
@@ -28,14 +28,14 @@ import {
  *   cleanup: () => console.log('Component cleaning up'),
  *   dispose: () => console.log('Component disposed'),
  * });
- * 
+ *
  * console.log(getPhase()); // "render" | "mount" | "cleanup" | "disposed"
  * ```
  *
  * @example Mode 2: Object lifecycle
  * ```tsx
  * const user = { id: 1, name: 'John' };
- * 
+ *
  * const getPhase = useScope({
  *   for: user, // Track this object
  *   init: (user) => console.log('User activated:', user),
@@ -43,7 +43,7 @@ import {
  *   cleanup: (user) => pauseTracking(user),
  *   dispose: (user) => analytics.track('user-session-end', user),
  * });
- * 
+ *
  * // When user reference changes, old user is disposed and new user is initialized
  * ```
  *
@@ -91,18 +91,27 @@ export function useScope<TScope>(
 
 // Implementation
 export function useScope<TScope>(
-  createOrCallbacks: (() => ExDisposable & TScope) | ComponentLifecycleCallbacks | ObjectLifecycleCallbacks<any>,
+  createOrCallbacks:
+    | (() => ExDisposable & TScope)
+    | ComponentLifecycleCallbacks
+    | ObjectLifecycleCallbacks<any>,
   options?: UseScopeOptions<TScope>
 ): Omit<TScope, "dispose"> | (() => LifecyclePhase) {
   // Detect which mode based on first argument
   const isLifecycleMode = typeof createOrCallbacks !== "function";
-  
+
   if (isLifecycleMode) {
     // Mode 1 or 2: Lifecycle mode (component or object)
-    // Delegate to useLifecycle
-    return useLifecycle(createOrCallbacks as ComponentLifecycleCallbacks | ObjectLifecycleCallbacks<any>);
+    // Need to check if it's object lifecycle (has 'for' property) or component lifecycle
+    if ("for" in createOrCallbacks) {
+      // Object lifecycle mode
+      return useLifecycle(createOrCallbacks as ObjectLifecycleCallbacks<any>);
+    } else {
+      // Component lifecycle mode
+      return useLifecycle(createOrCallbacks as ComponentLifecycleCallbacks);
+    }
   }
-  
+
   // Mode 3: Factory mode - create scoped services
   const create = createOrCallbacks as () => ExDisposable & TScope;
   const { watch, onUpdate, onDispose } = options || {};
