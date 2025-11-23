@@ -20,9 +20,9 @@ export type Subscribable = {
 };
 
 /**
- * Observable interface combining Subscribable with a getter
+ * Accessor interface combining Subscribable with a getter
  */
-export type Observable<T> = Subscribable & {
+export type Accessor<T> = Subscribable & {
   (): T;
 };
 
@@ -46,7 +46,7 @@ export type HydrateStatus = "success" | "skipped";
  */
 export type Signal<TValue, TInit = TValue> = Subscribable &
   Disposable &
-  Observable<TValue | TInit> & {
+  Accessor<TValue | TInit> & {
     readonly displayName?: string;
 
     get(): TValue | TInit;
@@ -220,10 +220,7 @@ export type ComputedSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
  * Map of signal names to signal instances
  * Accepts both MutableSignal and ComputedSignal
  */
-export type SignalMap = Record<
-  string,
-  Signal<any> | MutableSignal<any> | ComputedSignal<any>
->;
+export type SignalMap = Record<string, Signal<any>>;
 
 /**
  * Base context for signal computation functions

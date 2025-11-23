@@ -1,5 +1,5 @@
 import { createProxy } from "./createProxy";
-import { isSignal } from "../signal";
+import { is } from "../is";
 import { ResolveValueType, Signal, SignalMap } from "../types";
 import { isPromiseLike } from "./isPromiseLike";
 import { getLoadable, toLoadable } from "./loadable";
@@ -112,7 +112,7 @@ export function createSignalAccessProxy<
   const getPropValue = (prop: string) => {
     const signals = getSignals();
     const signal = signals[prop as keyof TSignals];
-    if (!isSignal(signal)) {
+    if (!is(signal)) {
       return undefined;
     }
 

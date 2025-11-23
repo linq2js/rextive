@@ -12,7 +12,7 @@ import { SignalMap, ResolveValue, AnyFunc, Signal } from "../types";
 import { RxOptions } from "./types";
 import { shallowEquals } from "../utils/shallowEquals";
 import { useSignals } from "./useSignals";
-import { isSignal } from "../signal";
+import { is } from "../is";
 
 /**
  * Render function signature for overload 2 (with signals).
@@ -118,8 +118,8 @@ export function rx(...args: any[]): ReactNode {
   let signals: SignalMap | undefined;
 
   // Parse arguments to determine which overload was called
-  // Check isSignal FIRST because signals are also functions
-  if (isSignal(args[0])) {
+  // Check is FIRST because signals are also functions
+  if (is(args[0])) {
     // Overload 2: rx(signal)
     // Transform single signal into { value: signal } format
     signals = { value: args[0] };
@@ -137,7 +137,7 @@ export function rx(...args: any[]): ReactNode {
     const staticProps: any = {};
 
     for (const key in props) {
-      if (isSignal(props[key])) {
+      if (is(props[key])) {
         signals[key] = props[key];
       } else {
         staticProps[key] = props[key];

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { tag } from "./tag";
-import { signal } from "./signal";
+import { signal } from "./index";
 import { Signal } from "./types";
 
 describe("tag", () => {

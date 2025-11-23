@@ -19,6 +19,7 @@
 import type { Loadable, Signal } from "./types";
 import { toLoadable } from "./utils/loadable";
 import { isPromiseLike } from "./utils/isPromiseLike";
+import { is } from "./is";
 
 /**
  * Helper type to match any Signal that returns something awaitable.
@@ -81,17 +82,6 @@ export type AwaitedKeyedResult<
 }[keyof TAwaitables];
 
 /**
- * Local runtime check for signals (functions).
- *
- * We treat any function value as a Signal here – at the call sites in this file
- * we only ever pass known `Signal` instances, so this is safe and avoids importing
- * the heavier `isSignal` helper from the main module.
- */
-function isSignal(value: unknown): value is Signal<unknown> {
-  return typeof value === "function";
-}
-
-/**
  * Checks if a value should be treated as a "single" awaitable
  * (vs an object/record of awaitables).
  */
@@ -109,7 +99,7 @@ function resolveAwaitable(awaitable: Awaitable<any>): Loadable<any> {
   let value: unknown = awaitable;
 
   // If it's a signal, call it to get the underlying value
-  if (isSignal(value)) {
+  if (is(value)) {
     value = (value as Signal<unknown>)();
   }
 

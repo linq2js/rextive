@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { wait, TimeoutError } from "./wait";
-import { signal } from "./signal";
+import { signal } from "./index";
 import { loadable } from "./utils/loadable";
 
 describe("wait", () => {

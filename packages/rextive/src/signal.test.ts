@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { signal, isSignal, FallbackError } from "./signal";
+import { signal } from "./index";
+import { FallbackError } from "./signal";
+import { is } from "./is";
 
 describe("signal", () => {
   describe("basic signal creation", () => {
@@ -636,19 +638,19 @@ describe("signal", () => {
     });
   });
 
-  describe("isSignal type guard", () => {
+  describe("is type guard", () => {
     it("should return true for signals", () => {
       const count = signal(1);
-      expect(isSignal(count)).toBe(true);
+      expect(is(count)).toBe(true);
     });
 
     it("should return false for non-signals", () => {
-      expect(isSignal(42)).toBe(false);
-      expect(isSignal("string")).toBe(false);
-      expect(isSignal({})).toBe(false);
-      expect(isSignal(null)).toBe(false);
-      expect(isSignal(undefined)).toBe(false);
-      expect(isSignal(() => 42)).toBe(false);
+      expect(is(42)).toBe(false);
+      expect(is("string")).toBe(false);
+      expect(is({})).toBe(false);
+      expect(is(null)).toBe(false);
+      expect(is(undefined)).toBe(false);
+      expect(is(() => 42)).toBe(false);
     });
   });
 

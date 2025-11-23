@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { batch, isBatching } from "./batch";
-import { signal } from "./signal";
+import { signal } from "./index";
 
 describe("batch", () => {
   it("should execute function and return result", () => {

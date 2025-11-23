@@ -2,7 +2,7 @@ import { useMemo, useState, useLayoutEffect } from "react";
 import { Disposable } from "../types";
 import { UseScopeOptions } from "./types";
 import { shallowEquals } from "../utils/shallowEquals";
-import { isSignal } from "../signal";
+import { is } from "../is";
 
 /**
  * useScope - Create component-scoped disposables
@@ -193,7 +193,7 @@ export function useScope<TScope>(
         if (!item) return;
 
         // Check if it's a Signal (has SIGNAL_TYPE symbol and dispose method)
-        if (isSignal(item)) {
+        if (is(item)) {
           item.dispose();
           return;
         }
@@ -236,7 +236,7 @@ export function useScope<TScope>(
         if (key === "dispose") continue; // Already handled above
 
         const value = (scope as any)[key];
-        if (isSignal(value)) {
+        if (is(value)) {
           // Signal has dispose method
           value.dispose();
         } else if (

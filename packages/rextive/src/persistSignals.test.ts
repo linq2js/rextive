@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { signal } from "./signal";
+import { signal } from "./index";
 import { persistSignals } from "./persistSignals";
 
 describe("persistSignals", () => {

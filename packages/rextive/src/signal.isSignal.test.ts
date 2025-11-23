@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { signal } from "./signal";
+import { signal } from "./index";
 
-describe("isSignal", () => {
+describe("is", () => {
   it("should identify any signal", () => {
     const mutable = signal(1);
     const computed = signal({ mutable }, ({ deps }) => deps.mutable * 2);
@@ -80,4 +80,3 @@ describe("isSignal", () => {
     }
   });
 });
-

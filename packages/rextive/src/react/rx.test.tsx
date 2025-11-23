@@ -34,14 +34,18 @@ describe("rx", () => {
       };
 
       render(<TestComponent />);
-      expect(screen.getByTestId("dynamic")).toHaveTextContent("Dynamic content");
+      expect(screen.getByTestId("dynamic")).toHaveTextContent(
+        "Dynamic content"
+      );
 
       act(() => {
         content.set("Updated content");
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId("dynamic")).toHaveTextContent("Updated content");
+        expect(screen.getByTestId("dynamic")).toHaveTextContent(
+          "Updated content"
+        );
       });
     });
 

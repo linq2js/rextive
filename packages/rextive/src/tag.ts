@@ -1,5 +1,5 @@
 import type { Signal } from "./types";
-import { isSignal } from "./signal";
+import { is } from "./is";
 
 /**
  * A tag for grouping signals together.
@@ -117,7 +117,7 @@ export function tag<T>(): Tag<T> {
     },
 
     _add(signal: Signal<T>): void {
-      if (!isSignal(signal)) {
+      if (!is(signal)) {
         throw new Error("Only signals created by rextive can be tagged");
       }
       signals.add(signal);
