@@ -202,7 +202,7 @@ export function createMutableSignal(
 
   const map = function <U>(
     fn: (value: any) => U,
-    equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
+    equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
   ): ComputedSignal<U> {
     return mapSignal(instance, fn, equalsOrOptions);
   };
@@ -210,7 +210,7 @@ export function createMutableSignal(
   const scan = function <U>(
     fn: (accumulator: U, current: any) => U,
     initialValue: U,
-    equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
+    equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
   ): ComputedSignal<U> {
     return scanSignal(instance, fn, initialValue, equalsOrOptions);
   };

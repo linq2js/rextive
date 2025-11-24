@@ -20,17 +20,10 @@
  * - Sync mode: Throws promises (loading) but NOT errors (captured as "rejected" status)
  * - Async mode: Always resolves (never rejects), even when awaitables fail
  */
-import type { AnyFunc, Loadable, Signal } from "./types";
+import type { AnyFunc, Loadable, ResolveAwaitable, Signal } from "./types";
 import { loadable } from "./utils/loadable";
 import { isPromiseLike } from "./utils/isPromiseLike";
 import { is } from "./is";
-
-/**
- * Helper type to match any Signal that returns something awaitable.
- * This uses 'any' in the constraint to be more permissive at the type level,
- * while the runtime code properly handles the actual values.
- */
-type SignalAwaitable = Signal<any>;
 
 /**
  * Represents a value that can be awaited by wait().
@@ -39,7 +32,7 @@ type SignalAwaitable = Signal<any>;
  * - A PromiseLike<T>
  * - A Signal holding either PromiseLike<T> or Loadable<T> (or a union of both)
  */
-export type Awaitable<T> = Loadable<T> | PromiseLike<T> | SignalAwaitable;
+export type Awaitable<T> = Loadable<T> | PromiseLike<T> | Signal<T>;
 
 /**
  * Extract the resolved value type from a single Awaitable.
@@ -333,7 +326,7 @@ async function waitAllAsyncRecord<
  */
 
 // 1) Synchronous overloads
-export function waitAll<T>(awaitable: Awaitable<T>): T;
+export function waitAll<T>(awaitable: Awaitable<T>): ResolveAwaitable<T>;
 
 export function waitAll<const TAwaitables extends readonly Awaitable<any>[]>(
   awaitables: TAwaitables

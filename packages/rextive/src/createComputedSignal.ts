@@ -211,7 +211,7 @@ export function createComputedSignal(
   const map = function <U>(
     this: ComputedSignal<any>,
     fn: (value: any) => U,
-    equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
+    equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
   ): ComputedSignal<U> {
     // Convert equals function/string to options if needed
     const options: SignalOptions<U> | undefined =
@@ -226,7 +226,7 @@ export function createComputedSignal(
     this: ComputedSignal<any>,
     fn: (accumulator: U, current: any) => U,
     initialValue: U,
-    equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
+    equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
   ): ComputedSignal<U> {
     let acc = initialValue;
     // Convert equals function/string to options if needed

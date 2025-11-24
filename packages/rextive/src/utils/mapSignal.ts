@@ -29,7 +29,7 @@ import { signal } from "../signal";
 export function mapSignal<T, U>(
   source: Signal<T>,
   fn: (value: T) => U,
-  equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
+  equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
 ): ComputedSignal<U> {
   // If it's a function or string, treat it as equals; otherwise use as-is
   const options: SignalOptions<U> | undefined =

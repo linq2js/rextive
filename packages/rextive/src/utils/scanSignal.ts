@@ -52,7 +52,7 @@ export function scanSignal<T, U>(
   source: Signal<T>,
   fn: (accumulator: U, current: T) => U,
   initialValue: U,
-  equalsOrOptions?: "is" | "shallow" | "deep" | ((a: U, b: U) => boolean) | SignalOptions<U>
+  equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
 ): ComputedSignal<U> {
   let acc = initialValue;
   // If it's a function or string, treat it as equals; otherwise use as-is
