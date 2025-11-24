@@ -15,7 +15,7 @@ import { resolveEquals } from "./utils/resolveEquals";
 /**
  * Create a computed signal (with dependencies)
  * Has: pause(), resume(), paused(), hydrate()
- * No: set(), setIfUnchanged()
+ * No: set()
  */
 export function createComputedSignal(
   deps: SignalMap,
@@ -28,7 +28,7 @@ export function createComputedSignal(
   ) => any,
   signal: any // Pass signal function to avoid circular dependency
 ): ComputedSignal<any> {
-  // Similar to createSignal but without set/setIfUnchanged
+  // Similar to createSignal but without set()
   // and with pause/resume functionality
 
   const {

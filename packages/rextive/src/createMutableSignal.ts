@@ -17,7 +17,7 @@ import { resolveEquals } from "./utils/resolveEquals";
 
 /**
  * Create a mutable signal (no dependencies)
- * Has: set(), setIfUnchanged(), hydrate()
+ * Has: set(), hydrate()
  * No: pause(), resume()
  */
 export function createMutableSignal(

@@ -7,7 +7,7 @@ Created comprehensive type check files for all APIs with multiple overloads:
 ### 1. `signal.type.check.ts`
 - Tests 3 overloads of the `signal()` API
 - Covers no-args, value-based, and computed signal patterns
-- Validates signal methods (get, set, on, dispose, setIfUnchanged, reset)
+- Validates signal methods (get, set, on, dispose, reset)
 - Tests edge cases (union types, optional types, generics)
 
 ### 2. `react/rx.type.check.tsx`

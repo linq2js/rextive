@@ -247,7 +247,6 @@ interface MutableSignal<TValue> extends Signal<TValue> {
   
   // Utilities
   reset(): void;
-  setIfUnchanged(): (value: TValue) => boolean;
   hydrate(value: TValue): void;
 }
 ```

@@ -199,12 +199,6 @@ expectType<() => void>(unsubscribe);
 // dispose() method
 testSignal.dispose();
 
-// setIfUnchanged() method
-const optimisticSet = testSignal.setIfUnchanged();
-expectType<(value: number) => boolean>(optimisticSet);
-const didSet = optimisticSet(50);
-expectType<boolean>(didSet);
-
 // reset() method
 testSignal.reset();
 

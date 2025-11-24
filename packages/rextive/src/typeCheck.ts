@@ -125,7 +125,7 @@ expectType<MutableSignal<{ name: string }>>(signalShallow);
 const signalDeep = signal({ nested: { value: 1 } }, "deep");
 expectType<MutableSignal<{ nested: { value: number } }>>(signalDeep);
 
-const signalIs = signal(42, "is");
+const signalIs = signal(42, "strict");
 expectType<MutableSignal<number>>(signalIs);
 
 // @ts-expect-error - custom equals function not allowed as second arg (use options)
@@ -169,7 +169,7 @@ expectType<MutableSignal<number>>(signalWithCallbacks);
 
 const count = signal(0);
 const doubled = signal({ count }, (ctx) => {
-  expectType<{ count: Signal<number> }>(ctx.deps);
+  expectType<{ count: number }>(ctx.deps);
   expectType<number>(ctx.deps.count);
   expectType<AbortSignal>(ctx.abortSignal);
   ctx.cleanup(() => {});
@@ -219,10 +219,10 @@ expectType<
   ComputedSignal<{ user: { id: number; name: string }; posts: number[] }>
 >(computedDeep);
 
-// @ts-expect-error - custom equals function not allowed as third arg (use options)
-const computedCustomEquals = signal(
+signal(
   { count },
   (ctx) => ctx.deps.count * 2,
+  // @ts-expect-error - custom equals function not allowed as third arg (use options)
   (a, b) => a === b
 );
 
@@ -265,12 +265,6 @@ expectType<() => void>(unsubscribe);
 // dispose() method
 testSignal.dispose();
 
-// setIfUnchanged() method
-const optimisticSet = testSignal.setIfUnchanged();
-expectType<(value: number) => boolean>(optimisticSet);
-const didSet = optimisticSet(50);
-expectType<boolean>(didSet);
-
 // reset() method
 testSignal.reset();
 
@@ -290,8 +284,11 @@ const mappedWithOptions = user.map((u) => u.name, {
 });
 expectType<ComputedSignal<string>>(mappedWithOptions);
 
-// @ts-expect-error - custom equals function not allowed as second arg (use options)
-const mappedCustomEquals = count.map((x) => x * 2, (a, b) => a === b);
+count.map(
+  (x) => x * 2,
+  // @ts-expect-error - custom equals function not allowed as second arg (use options)
+  (a, b) => a === b
+);
 
 // scan() method
 const scanned = count.scan((acc, curr) => acc + curr, 0);
@@ -304,17 +301,16 @@ const scannedShallow = count.scan(
 );
 expectType<ComputedSignal<{ sum: number; count: number }>>(scannedShallow);
 
-const scannedWithOptions = count.scan(
-  (acc, curr) => acc + curr,
-  0,
-  { equals: (a, b) => a === b, name: "total" }
-);
+const scannedWithOptions = count.scan((acc, curr) => acc + curr, 0, {
+  equals: (a, b) => a === b,
+  name: "total",
+});
 expectType<ComputedSignal<number>>(scannedWithOptions);
 
-// @ts-expect-error - custom equals function not allowed as third arg (use options)
-const scannedCustomEquals = count.scan(
+count.scan(
   (acc, curr) => acc + curr,
   0,
+  // @ts-expect-error - custom equals function not allowed as third arg (use options)
   (a, b) => a === b
 );
 
@@ -869,4 +865,3 @@ expectType<Promise<string>>(transformedUser);
 // =============================================================================
 
 export {};
-
