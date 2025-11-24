@@ -1657,6 +1657,145 @@ function awaitedTests() {
 }
 
 // =============================================================================
+// Context.use() Tests
+// =============================================================================
+
+function contextUseTests() {
+  // Clone from global scope
+  const count = signal(0);
+
+  // Basic usage - context passed as first argument
+  const computed1 = signal({ count }, (context) => {
+    return context.use((ctx) => {
+      expectType<number>(ctx.deps.count);
+      return ctx.deps.count * 2;
+    });
+  });
+  expectType<ComputedSignal<number>>(computed1);
+
+  // With additional arguments
+  const computed2 = signal({ count }, (context) => {
+    const multiply = (ctx: typeof context, factor: number) => {
+      return ctx.deps.count * factor;
+    };
+    return context.use(multiply, 5);
+  });
+  expectType<ComputedSignal<number>>(computed2);
+
+  // Multiple arguments
+  const computed3 = signal({ count }, (context) => {
+    const calculate = (ctx: typeof context, a: number, b: number, c: string) => {
+      return `${ctx.deps.count * a * b} ${c}`;
+    };
+    return context.use(calculate, 2, 3, "result");
+  });
+  expectType<ComputedSignal<string>>(computed3);
+
+  // Async logic function
+  const computed4 = signal({ count }, async (context) => {
+    return await context.use(async (ctx) => {
+      return ctx.deps.count * 2;
+    });
+  });
+  expectType<ComputedSignal<Promise<number>>>(computed4);
+
+  // Async with arguments
+  const computed5 = signal({ count }, async (context) => {
+    const multiply = async (ctx: typeof context, factor: number) => {
+      return ctx.deps.count * factor;
+    };
+    return await context.use(multiply, 5);
+  });
+  expectType<ComputedSignal<Promise<number>>>(computed5);
+
+  // Access all context properties
+  const computed6 = signal({ count }, (context) => {
+    return context.use((ctx) => {
+      expectType<number>(ctx.deps.count);
+      expectType<AbortSignal>(ctx.abortSignal);
+      expectType<(fn: VoidFunction) => void>(ctx.cleanup);
+      expectType<
+        {
+          <T>(fn: () => T): T;
+          <T, TArgs extends any[]>(fn: (...args: TArgs) => T, ...args: TArgs): T;
+        }
+      >(ctx.run);
+      return ctx.deps.count;
+    });
+  });
+  expectType<ComputedSignal<number>>(computed6);
+
+  // Nested use calls
+  const computed7 = signal({ count }, (context) => {
+    return context.use((ctx) => {
+      const step1 = ctx.use((innerCtx) => innerCtx.deps.count * 2);
+      const step2 = ctx.use((_innerCtx) => step1 + 10);
+      return step2;
+    });
+  });
+  expectType<ComputedSignal<number>>(computed7);
+
+  // With cleanup
+  const computed8 = signal({ count }, (context) => {
+    return context.use((ctx) => {
+      ctx.cleanup(() => console.log("cleanup"));
+      return ctx.deps.count * 2;
+    });
+  });
+  expectType<ComputedSignal<number>>(computed8);
+
+  // With run inside use
+  const computed9 = signal({ count }, (context) => {
+    return context.use((ctx) => {
+      const step1 = ctx.run(() => ctx.deps.count * 2);
+      return step1;
+    });
+  });
+  expectType<ComputedSignal<number>>(computed9);
+
+  // Multiple dependencies
+  const name = signal("Alice");
+  const computed10 = signal({ count, name }, (context) => {
+    return context.use((ctx) => {
+      expectType<number>(ctx.deps.count);
+      expectType<string>(ctx.deps.name);
+      return `${ctx.deps.name}: ${ctx.deps.count}`;
+    });
+  });
+  expectType<ComputedSignal<string>>(computed10);
+
+  // Complex object return type
+  interface LocalUser {
+    id: number;
+    name: string;
+  }
+
+  const userId = signal(1);
+  const computed11 = signal({ userId }, async (context) => {
+    return await context.use(async (ctx): Promise<LocalUser> => {
+      return { id: ctx.deps.userId, name: "User" };
+    });
+  });
+  expectType<ComputedSignal<Promise<LocalUser>>>(computed11);
+
+  // Array operations
+  const items = signal([1, 2, 3]);
+  const computed12 = signal({ items }, (context) => {
+    return context.use((ctx) => {
+      return ctx.deps.items.map((x) => x * 2);
+    });
+  });
+  expectType<ComputedSignal<number[]>>(computed12);
+
+  // Reusable logic function (using any for simplicity in type checks)
+  const multiply = (ctx: any, factor: number) => ctx.deps.count * factor;
+  const computed13 = signal({ count }, (context) => context.use(multiply, 3));
+  const computed14 = signal({ count }, (context) => context.use(multiply, 5));
+  expectType<ComputedSignal<number>>(computed13);
+  expectType<ComputedSignal<number>>(computed14);
+}
+
+// =============================================================================
 // Export test functions to avoid unused warnings
 // (These are never actually called - this file is for type checking only)
 // =============================================================================
@@ -1670,4 +1809,5 @@ export {
   pipeOperatorTests,
   signalToTests,
   awaitedTests,
+  contextUseTests,
 };

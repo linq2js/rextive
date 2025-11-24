@@ -495,7 +495,7 @@ export type SignalMap = Record<string, Signal<any>>;
 /**
  * Base context for signal computation functions
  */
-export type SignalContext = {
+export interface SignalContext {
   /**
    * AbortSignal that gets triggered when:
    * - Signal is disposed
@@ -509,7 +509,140 @@ export type SignalContext = {
    * - Signal is disposed
    */
   cleanup: (fn: VoidFunction) => void;
-};
+
+  /**
+   * Execute a function only if the computation is still active (not aborted).
+   *
+   * - For sync functions: Throws if aborted, otherwise executes normally
+   * - For async functions: Returns a never-resolving promise if aborted, otherwise executes normally
+   *
+   * This prevents wasted work after a computation has been cancelled.
+   *
+   * @param fn - Function to execute
+   * @param args - Arguments to pass to the function
+   * @returns The result of the function, or a never-resolving promise if aborted
+   *
+   * @example
+   * ```ts
+   * const mySignal = signal({ count }, async ({ deps, run }) => {
+   *   await fetch('/api/data', { signal: abortSignal });
+   *
+   *   // Only runs if not aborted
+   *   const processed = run(() => expensiveOperation(deps.count));
+   *
+   *   // Works with async functions too
+   *   const result = await run(async () => {
+   *     return processData(processed);
+   *   });
+   *
+   *   return result;
+   * });
+   * ```
+   */
+  run<T>(fn: () => T): T;
+  run<T, TArgs extends any[]>(fn: (...args: TArgs) => T, ...args: TArgs): T;
+
+  /**
+   * Execute a logic function with the context itself as the first argument.
+   *
+   * This is a convenience method that combines `run()` with passing the context,
+   * allowing you to write reusable logic functions that receive the full context.
+   *
+   * **Behavior:**
+   * - Wraps the logic function with `run()` for abort safety
+   * - Passes the context as the first argument to the logic function
+   * - Supports additional arguments after the context
+   * - Works with both sync and async logic functions
+   *
+   * @param logic - Function that receives the context as first argument
+   * @param args - Additional arguments to pass to the logic function
+   * @returns The result of the logic function
+   * @throws {AbortedComputationError} If computation was aborted before execution
+   *
+   * @example Basic usage
+   * ```ts
+   * const count = signal(1);
+   *
+   * const computed = signal({ count }, (context) => {
+   *   return context.use((ctx) => {
+   *     return ctx.deps.count * 2;
+   *   });
+   * });
+   * // computed() === 2
+   * ```
+   *
+   * @example With additional arguments
+   * ```ts
+   * const count = signal(1);
+   *
+   * const multiply = (ctx, factor: number) => {
+   *   return ctx.deps.count * factor;
+   * };
+   *
+   * const computed = signal({ count }, (context) => {
+   *   return context.use(multiply, 5);
+   * });
+   * // computed() === 5
+   * ```
+   *
+   * @example Reusable logic functions
+   * ```ts
+   * const count = signal(1);
+   * const multiplier = signal(2);
+   *
+   * // Define once, use everywhere
+   * const multiply = (ctx) => ctx.deps.count * ctx.deps.multiplier;
+   *
+   * const result1 = signal({ count, multiplier }, (ctx) => ctx.use(multiply));
+   * const result2 = signal({ count, multiplier }, (ctx) => ctx.use(multiply) + 10);
+   * ```
+   *
+   * @example Async logic
+   * ```ts
+   * const userId = signal(1);
+   *
+   * const fetchUser = async (ctx) => {
+   *   const response = await fetch(`/api/users/${ctx.deps.userId}`, {
+   *     signal: ctx.abortSignal
+   *   });
+   *   return response.json();
+   * };
+   *
+   * const user = signal({ userId }, async (context) => {
+   *   return await context.use(fetchUser);
+   * });
+   * ```
+   *
+   * @example With cleanup
+   * ```ts
+   * const count = signal(1);
+   *
+   * const computed = signal({ count }, (context) => {
+   *   return context.use((ctx) => {
+   *     ctx.cleanup(() => console.log('Cleanup!'));
+   *     return ctx.deps.count * 2;
+   *   });
+   * });
+   * ```
+   *
+   * @example Composing with other context methods
+   * ```ts
+   * const count = signal(1);
+   *
+   * const computed = signal({ count }, (context) => {
+   *   return context.use((ctx) => {
+   *     const step1 = ctx.run(() => ctx.deps.count * 2);
+   *     const step2 = ctx.run(() => step1 + 10);
+   *     return step2;
+   *   });
+   * });
+   * ```
+   */
+  use<TArgs extends any[], TResult>(
+    logic: (context: this, ...args: TArgs) => TResult,
+    ...args: TArgs
+  ): TResult;
+}
 
 export type WithUse<T> = T & {
   use<TArgs extends any[], TReturn>(
