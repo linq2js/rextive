@@ -324,97 +324,168 @@ export type Signal<TValue, TInit = TValue> = Observable &
      * ```
      */
     // 1 selector
-    to<T1>(s1: (value: TValue) => T1): ComputedSignal<T1>;
+    to<T1>(
+      s1: (value: TValue, context: SignalContext) => T1
+    ): ComputedSignal<T1>;
 
     // 2 selectors
     to<T1, T2>(
-      s1: (value: TValue) => T1,
-      s2: (value: T1) => T2
+      s1: (value: TValue, context: SignalContext) => T1,
+      s2: (value: T1, context: SignalContext) => T2
     ): ComputedSignal<T2>;
 
     // 3 selectors
     to<T1, T2, T3>(
-      s1: (value: TValue) => T1,
-      s2: (value: T1) => T2,
-      s3: (value: T2) => T3
+      s1: (value: TValue, context: SignalContext) => T1,
+      s2: (value: T1, context: SignalContext) => T2,
+      s3: (value: T2, context: SignalContext) => T3
     ): ComputedSignal<T3>;
 
     // 4 selectors
     to<T1, T2, T3, T4>(
-      s1: (value: TValue) => T1,
-      s2: (value: T1) => T2,
-      s3: (value: T2) => T3,
-      s4: (value: T3) => T4
+      s1: (value: TValue, context: SignalContext) => T1,
+      s2: (value: T1, context: SignalContext) => T2,
+      s3: (value: T2, context: SignalContext) => T3,
+      s4: (value: T3, context: SignalContext) => T4
     ): ComputedSignal<T4>;
 
     // 5 selectors
     to<T1, T2, T3, T4, T5>(
-      s1: (value: TValue) => T1,
-      s2: (value: T1) => T2,
-      s3: (value: T2) => T3,
-      s4: (value: T3) => T4,
-      s5: (value: T4) => T5
+      s1: (value: TValue, context: SignalContext) => T1,
+      s2: (value: T1, context: SignalContext) => T2,
+      s3: (value: T2, context: SignalContext) => T3,
+      s4: (value: T3, context: SignalContext) => T4,
+      s5: (value: T4, context: SignalContext) => T5
     ): ComputedSignal<T5>;
 
     // 6 selectors
     to<T1, T2, T3, T4, T5, T6>(
-      s1: (value: TValue) => T1,
-      s2: (value: T1) => T2,
-      s3: (value: T2) => T3,
-      s4: (value: T3) => T4,
-      s5: (value: T4) => T5,
-      s6: (value: T5) => T6
+      s1: (value: TValue, context: SignalContext) => T1,
+      s2: (value: T1, context: SignalContext) => T2,
+      s3: (value: T2, context: SignalContext) => T3,
+      s4: (value: T3, context: SignalContext) => T4,
+      s5: (value: T4, context: SignalContext) => T5,
+      s6: (value: T5, context: SignalContext) => T6
     ): ComputedSignal<T6>;
 
     // 7 selectors
     to<T1, T2, T3, T4, T5, T6, T7>(
-      s1: (value: TValue) => T1,
-      s2: (value: T1) => T2,
-      s3: (value: T2) => T3,
-      s4: (value: T3) => T4,
-      s5: (value: T4) => T5,
-      s6: (value: T5) => T6,
-      s7: (value: T6) => T7
+      s1: (value: TValue, context: SignalContext) => T1,
+      s2: (value: T1, context: SignalContext) => T2,
+      s3: (value: T2, context: SignalContext) => T3,
+      s4: (value: T3, context: SignalContext) => T4,
+      s5: (value: T4, context: SignalContext) => T5,
+      s6: (value: T5, context: SignalContext) => T6,
+      s7: (value: T6, context: SignalContext) => T7
     ): ComputedSignal<T7>;
 
     // 8 selectors
     to<T1, T2, T3, T4, T5, T6, T7, T8>(
-      s1: (value: TValue) => T1,
-      s2: (value: T1) => T2,
-      s3: (value: T2) => T3,
-      s4: (value: T3) => T4,
-      s5: (value: T4) => T5,
-      s6: (value: T5) => T6,
-      s7: (value: T6) => T7,
-      s8: (value: T7) => T8
+      s1: (value: TValue, context: SignalContext) => T1,
+      s2: (value: T1, context: SignalContext) => T2,
+      s3: (value: T2, context: SignalContext) => T3,
+      s4: (value: T3, context: SignalContext) => T4,
+      s5: (value: T4, context: SignalContext) => T5,
+      s6: (value: T5, context: SignalContext) => T6,
+      s7: (value: T6, context: SignalContext) => T7,
+      s8: (value: T7, context: SignalContext) => T8
     ): ComputedSignal<T8>;
 
     // 9 selectors
     to<T1, T2, T3, T4, T5, T6, T7, T8, T9>(
-      s1: (value: TValue) => T1,
-      s2: (value: T1) => T2,
-      s3: (value: T2) => T3,
-      s4: (value: T3) => T4,
-      s5: (value: T4) => T5,
-      s6: (value: T5) => T6,
-      s7: (value: T6) => T7,
-      s8: (value: T7) => T8,
-      s9: (value: T8) => T9
+      s1: (value: TValue, context: SignalContext) => T1,
+      s2: (value: T1, context: SignalContext) => T2,
+      s3: (value: T2, context: SignalContext) => T3,
+      s4: (value: T3, context: SignalContext) => T4,
+      s5: (value: T4, context: SignalContext) => T5,
+      s6: (value: T5, context: SignalContext) => T6,
+      s7: (value: T6, context: SignalContext) => T7,
+      s8: (value: T7, context: SignalContext) => T8,
+      s9: (value: T8, context: SignalContext) => T9
     ): ComputedSignal<T9>;
 
     // 10 selectors
     to<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(
-      s1: (value: TValue) => T1,
-      s2: (value: T1) => T2,
-      s3: (value: T2) => T3,
-      s4: (value: T3) => T4,
-      s5: (value: T4) => T5,
-      s6: (value: T5) => T6,
-      s7: (value: T6) => T7,
-      s8: (value: T7) => T8,
-      s9: (value: T8) => T9,
-      s10: (value: T9) => T10
+      s1: (value: TValue, context: SignalContext) => T1,
+      s2: (value: T1, context: SignalContext) => T2,
+      s3: (value: T2, context: SignalContext) => T3,
+      s4: (value: T3, context: SignalContext) => T4,
+      s5: (value: T4, context: SignalContext) => T5,
+      s6: (value: T5, context: SignalContext) => T6,
+      s7: (value: T6, context: SignalContext) => T7,
+      s8: (value: T7, context: SignalContext) => T8,
+      s9: (value: T8, context: SignalContext) => T9,
+      s10: (value: T9, context: SignalContext) => T10
     ): ComputedSignal<T10>;
+
+    /**
+     * Trigger an immediate recomputation of this signal.
+     *
+     * - For **computed/async signals**: Re-runs the compute function immediately
+     * - For **mutable signals**: No-op (nothing to recompute)
+     * - Cancels any pending async computation (via abortSignal)
+     * - Multiple rapid calls are batched into a single recomputation
+     *
+     * @example Polling pattern
+     * ```ts
+     * const liveData = signal(async (context) => {
+     *   const data = await fetchData();
+     *   // Schedule next refresh after getting data
+     *   setTimeout(() => context.refresh(), 1000);
+     *   return data;
+     * });
+     *
+     * // Manual refresh from UI
+     * <button onClick={() => liveData.refresh()}>Refresh Now</button>
+     * ```
+     *
+     * @example After mutation
+     * ```ts
+     * const posts = signal(async () => fetchPosts());
+     *
+     * async function deletePost(id) {
+     *   await api.delete(id);
+     *   posts.refresh(); // Reload the list
+     * }
+     * ```
+     */
+    refresh(): void;
+
+    /**
+     * Mark this signal's data as stale without triggering recomputation.
+     * The signal will recompute on the next access (lazy recomputation).
+     *
+     * - For **computed/async signals**: Marks as stale, recomputes on next get()
+     * - For **mutable signals**: No-op (nothing to recompute)
+     * - Useful for cache invalidation patterns
+     * - Multiple stale() calls before access = single recomputation
+     *
+     * @example Cache invalidation
+     * ```ts
+     * const userData = signal(async () => fetchUser());
+     *
+     * // Mark stale after mutation (lazy)
+     * async function updateUser(data) {
+     *   await api.updateUser(data);
+     *   userData.stale(); // Won't refetch until accessed
+     * }
+     *
+     * // Later: access triggers recomputation
+     * console.log(userData()); // Refetches now
+     * ```
+     *
+     * @example Batch invalidations
+     * ```ts
+     * userData.stale();
+     * userPosts.stale();
+     * userComments.stale();
+     * // None have recomputed yet
+     *
+     * // First access triggers its recomputation
+     * console.log(userData()); // Fetches user data
+     * ```
+     */
+    stale(): void;
   };
 
 export type TryInjectDispose<T> = T extends object
@@ -496,6 +567,7 @@ export type SignalMap = Record<string, Signal<any>>;
  * Base context for signal computation functions
  */
 export interface SignalContext {
+  aborted(): boolean;
   /**
    * AbortSignal that gets triggered when:
    * - Signal is disposed
@@ -508,7 +580,7 @@ export interface SignalContext {
    * - Signal recomputes (cleanup previous side effects)
    * - Signal is disposed
    */
-  cleanup: (fn: VoidFunction) => void;
+  onCleanup: (fn: VoidFunction) => void;
 
   /**
    * Execute a function only if the computation is still active (not aborted).
@@ -619,7 +691,7 @@ export interface SignalContext {
    *
    * const computed = signal({ count }, (context) => {
    *   return context.use((ctx) => {
-   *     ctx.cleanup(() => console.log('Cleanup!'));
+   *     ctx.onCleanup(() => console.log('Cleanup!'));
    *     return ctx.deps.count * 2;
    *   });
    * });
@@ -642,6 +714,57 @@ export interface SignalContext {
     logic: (context: this, ...args: TArgs) => TResult,
     ...args: TArgs
   ): TResult;
+
+  /**
+   * Trigger an immediate recomputation of the signal from within the compute function.
+   *
+   * - Safe to call even if computation is aborted (no-op)
+   * - Schedules the next computation after current one completes
+   * - Useful for self-scheduling patterns (polling, intervals)
+   *
+   * @example Polling pattern
+   * ```ts
+   * const liveData = signal(async (context) => {
+   *   const data = await fetchData();
+   *   // Schedule next refresh after getting data
+   *   setTimeout(() => context.refresh(), 1000);
+   *   return data;
+   * });
+   * ```
+   *
+   * @example Exponential backoff
+   * ```ts
+   * const resilientData = signal(async (context) => {
+   *   try {
+   *     return await fetchData();
+   *   } catch (error) {
+   *     // Retry after 2 seconds
+   *     setTimeout(() => context.refresh(), 2000);
+   *     throw error;
+   *   }
+   * });
+   * ```
+   */
+  refresh(): void;
+
+  /**
+   * Mark the signal as stale from within the compute function (lazy recomputation).
+   *
+   * - Safe to call even if computation is aborted (no-op)
+   * - Signal will recompute on next access
+   * - Useful for cache invalidation without immediate refresh
+   *
+   * @example Cache with TTL
+   * ```ts
+   * const cachedData = signal(async (context) => {
+   *   const data = await fetchExpensiveData();
+   *   // Mark stale after 5 minutes
+   *   setTimeout(() => context.stale(), 5 * 60 * 1000);
+   *   return data;
+   * });
+   * ```
+   */
+  stale(): void;
 }
 
 export type WithUse<T> = T & {
@@ -650,6 +773,8 @@ export type WithUse<T> = T & {
     ...args: TArgs
   ): TReturn;
 };
+
+export type PredefinedEquals = "strict" | "shallow" | "deep";
 
 /**
  * Context for computed signal computation functions (with dependencies)
@@ -683,7 +808,7 @@ export type SignalOptions<T> = {
    * signal(obj, { equals: (a, b) => a.id === b.id }) // Custom function (use options)
    * ```
    */
-  equals?: "strict" | "shallow" | "deep" | EqualsFn<T>;
+  equals?: PredefinedEquals | EqualsFn<T>;
   /** Debug name for the signal */
   name?: string;
   /** Fallback function to recover from errors */

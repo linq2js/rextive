@@ -3,6 +3,8 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { signal } from "./signal";
+import { loadable } from "./utils/loadable";
+import { wait } from "./wait";
 
 describe("signal.to() - value selector chaining", () => {
   it("should chain single selector", () => {
@@ -36,9 +38,9 @@ describe("signal.to() - value selector chaining", () => {
   it("should handle type transformations", () => {
     const count = signal(42);
     const result = count.to(
-      (x) => x * 2,           // 84
-      (x) => x + 10,          // 94
-      (x) => `Count: ${x}`    // "Count: 94"
+      (x) => x * 2, // 84
+      (x) => x + 10, // 94
+      (x) => `Count: ${x}` // "Count: 94"
     );
 
     expect(result()).toBe("Count: 94");
@@ -91,7 +93,7 @@ describe("signal.to() - value selector chaining", () => {
     doubled.on(spy);
 
     count.set(10);
-    
+
     // The spy should be called once
     expect(spy).toHaveBeenCalledTimes(1);
     // And the doubled value should be updated
@@ -149,7 +151,7 @@ describe("signal.to() - value selector chaining", () => {
   it("should handle union types", () => {
     const value = signal<number | string>(42);
     const result = value.to(
-      (val) => typeof val === "number" ? val * 2 : val.length,
+      (val) => (typeof val === "number" ? val * 2 : val.length),
       (num) => `Value: ${num}`
     );
 
@@ -164,7 +166,7 @@ describe("signal.to() - value selector chaining", () => {
     const result = count.to(
       (x) => x > 50,
       (bool) => !bool,
-      (bool) => bool ? "yes" : "no"
+      (bool) => (bool ? "yes" : "no")
     );
 
     expect(result()).toBe("yes");
@@ -177,16 +179,17 @@ describe("signal.to() - value selector chaining", () => {
     const data = signal({
       users: [
         { name: "Alice", scores: [85, 90, 95] },
-        { name: "Bob", scores: [70, 80, 90] }
-      ]
+        { name: "Bob", scores: [70, 80, 90] },
+      ],
     });
 
     const result = data.to(
       (d) => d.users,
-      (users) => users.map((u) => ({
-        name: u.name,
-        avg: u.scores.reduce((a, b) => a + b, 0) / u.scores.length
-      })),
+      (users) =>
+        users.map((u) => ({
+          name: u.name,
+          avg: u.scores.reduce((a, b) => a + b, 0) / u.scores.length,
+        })),
       (users) => users.find((u) => u.avg > 85),
       (user) => user?.name ?? "None"
     );
@@ -197,12 +200,10 @@ describe("signal.to() - value selector chaining", () => {
   it("should not re-compute unnecessarily", () => {
     let computeCount = 0;
     const count = signal(5);
-    const result = count.to(
-      (x) => {
-        computeCount++;
-        return x * 2;
-      }
-    );
+    const result = count.to((x) => {
+      computeCount++;
+      return x * 2;
+    });
 
     expect(computeCount).toBe(0); // Lazy
 
@@ -219,9 +220,17 @@ describe("signal.to() - value selector chaining", () => {
 
   it("should work with empty selector list", () => {
     const count = signal(42);
+    // @ts-expect-error - empty selector list
     const result = count.to();
 
     expect(result()).toBe(42);
   });
-});
 
+  it("to: loadable", async () => {
+    const loading = signal(Promise.resolve(42)).to(loadable);
+    expect(loading().status).toBe("loading");
+    await wait.delay(10);
+    expect(loading().status).toBe("success");
+    expect(loading().value).toBe(42);
+  });
+});

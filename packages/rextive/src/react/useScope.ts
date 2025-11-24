@@ -1,6 +1,7 @@
 import { useMemo, useLayoutEffect, useRef } from "react";
-import { ExDisposable } from "../types";
+import { ExDisposable, Signal } from "../types";
 import { tryDispose } from "../disposable";
+
 import {
   useLifecycle,
   LifecycleCallbacks,
@@ -102,7 +103,7 @@ export function useScope<TTarget>(
 export function useScope<TScope>(
   create: () => ExDisposable & TScope,
   options?: UseScopeOptions<TScope>
-): Omit<TScope, "dispose">;
+): TScope extends Signal<any> ? TScope : Omit<TScope, "dispose">;
 
 // Implementation
 export function useScope<TScope>(
@@ -163,9 +164,7 @@ export function useScope<TScope>(
     };
   }, [scope]); // Re-run when scope instance changes
 
-  // Return scope without the 'dispose' property
-  const { dispose: _dispose, ...scopeWithoutDispose } = scope as TScope & {
-    dispose?: any;
-  };
-  return scopeWithoutDispose as Omit<TScope, "dispose">;
+  // we return fully scoped object, Typescript will omit the dispose property
+  // why? if users create a scope with some methods and its methods are not binded to the scope, Invoking those methods will throw an error
+  return scope;
 }

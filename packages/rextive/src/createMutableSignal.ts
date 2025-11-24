@@ -28,7 +28,9 @@ export function createMutableSignal(
   createContext: (
     deps: SignalMap,
     onCleanup: Emitter,
-    onDepChange: VoidFunction
+    onDepChange: VoidFunction,
+    onRefresh?: () => void,
+    onStale?: () => void
   ) => any
 ): MutableSignal<any> {
   const {
@@ -62,6 +64,7 @@ export function createMutableSignal(
   let context: ReturnType<typeof createContext> | undefined;
   let instanceRef: MutableSignal<any> | undefined;
   let hasBeenModified = false; // Track if signal has been modified (for hydrate)
+  let refreshScheduled = false; // Track if refresh is scheduled (for batching)
 
   const isDisposed = () => disposed;
 
@@ -87,7 +90,15 @@ export function createMutableSignal(
     onCleanup.emitAndClear();
     context?.dispose();
 
-    context = createContext(deps, onCleanup, recompute);
+    context = createContext(
+      deps,
+      onCleanup,
+      recompute,
+      () => recompute(), // onRefresh
+      () => {
+        current = undefined;
+      } // onStale
+    );
 
     try {
       const result = fn(context);
@@ -132,6 +143,9 @@ export function createMutableSignal(
         current = { error, value: undefined };
         // Don't throw - just store error state
       }
+    } finally {
+      // Mark computation as complete - allow context.refresh() and context.stale() to be called
+      context._endComputing();
     }
   };
 
@@ -204,20 +218,51 @@ export function createMutableSignal(
     return pipeSignals(instance, operators);
   };
 
-  const to = function (...selectors: Array<(value: any) => any>): any {
+  const to = function (
+    ...selectors: Array<(value: any, context: SignalContext) => any>
+  ): any {
     if (selectors.length === 0) return instance;
-    
+
     return createComputedSignal(
       { source: instance } as any,
       (ctx: any) => {
         // Chain selectors: selector1(value) -> selector2(result1) -> selector3(result2)
-        return selectors.reduce((acc, selector) => selector(acc), ctx.deps.source);
+        return selectors.reduce(
+          (acc, selector) => selector(acc, ctx),
+          ctx.deps.source
+        );
       },
       {},
       createSignalContext,
       undefined // _signal parameter (unused)
     );
   };
+
+  const refresh = guardDisposed(
+    isDisposed,
+    "Cannot refresh disposed signal",
+    () => {
+      // Batch multiple refresh calls into a single recomputation
+      if (refreshScheduled) return;
+
+      refreshScheduled = true;
+      // Use queueMicrotask to batch multiple synchronous refresh() calls
+      queueMicrotask(() => {
+        if (!refreshScheduled) return; // Already processed
+        refreshScheduled = false;
+        recompute();
+      });
+    }
+  );
+
+  const stale = guardDisposed(
+    isDisposed,
+    "Cannot mark disposed signal as stale",
+    () => {
+      // Mark signal as stale - will recompute on next access
+      current = undefined;
+    }
+  );
 
   const instance = Object.assign(get, {
     [SIGNAL_TYPE]: true,
@@ -231,6 +276,8 @@ export function createMutableSignal(
     hydrate,
     pipe,
     to,
+    refresh,
+    stale,
   });
 
   instanceRef = instance as unknown as MutableSignal<any>;

@@ -12,6 +12,7 @@ type InternalComputedSignalContext = ComputedSignalContext<SignalMap> & {
   trackedDeps: Set<Signal<any>>;
   abortController: AbortController;
   dispose: VoidFunction;
+  _endComputing: VoidFunction;
 };
 
 /**
@@ -23,22 +24,29 @@ type InternalComputedSignalContext = ComputedSignalContext<SignalMap> & {
  * - `cleanup`: Register cleanup functions
  * - `trackedDeps`: Set of tracked signal dependencies
  * - `dispose`: Cleanup function for internal resources
+ * - `refresh`: Trigger immediate recomputation (with aborted guard)
+ * - `stale`: Mark signal as stale for lazy recomputation (with aborted guard)
  *
  * @param deps - Map of signal dependencies
  * @param onCleanup - Emitter for cleanup callbacks
  * @param onDepChange - Callback when any dependency changes
+ * @param onRefresh - Callback for refresh (called only if not aborted)
+ * @param onStale - Callback for stale (called only if not aborted)
  * @returns Context object with dependency tracking and cleanup
  */
 export function createSignalContext(
   deps: SignalMap,
   onCleanup: Emitter,
-  onDepChange: VoidFunction
+  onDepChange: VoidFunction,
+  onRefresh?: () => void,
+  onStale?: () => void
 ): InternalComputedSignalContext {
   let abortController: AbortController | undefined;
   let trackedDeps: Set<Signal<any>> | undefined;
   let depsProxy: any;
   let propValueCache: Map<string, { value: any; error: any }> | undefined;
   let aborted = false;
+  let isComputing = true; // Track if we're in synchronous computation phase (starts true)
 
   const getTrackedDeps = () => {
     if (!trackedDeps) {
@@ -138,7 +146,43 @@ export function createSignalContext(
     return run(() => logic(context, ...args));
   };
 
+  // Context methods for refresh and stale
+  // These are safe to call even if computation is aborted (no-op)
+  // But MUST be called asynchronously (not during computation)
+  const contextRefresh = () => {
+    // Must be called asynchronously
+    if (isComputing) {
+      throw new Error(
+        "context.refresh() can only be called asynchronously (e.g., in setTimeout, Promise callbacks). " +
+          "Calling it synchronously during computation would cause infinite recursion."
+      );
+    }
+
+    // Safe to call even if aborted - no-op
+    if (aborted) return;
+
+    // Call the refresh callback if provided
+    onRefresh?.();
+  };
+
+  const contextStale = () => {
+    // Must be called asynchronously
+    if (isComputing) {
+      throw new Error(
+        "context.stale() can only be called asynchronously (e.g., in setTimeout, Promise callbacks). " +
+          "Calling it synchronously during computation doesn't make sense."
+      );
+    }
+
+    // Safe to call even if aborted - no-op
+    if (aborted) return;
+
+    // Call the stale callback if provided
+    onStale?.();
+  };
+
   const context: InternalComputedSignalContext = {
+    aborted: () => aborted,
     get abortController() {
       if (aborted) {
         throw new AbortedComputationError();
@@ -151,9 +195,14 @@ export function createSignalContext(
     get abortSignal() {
       return getAbortController().signal;
     },
-    cleanup: onCleanup.on,
+    onCleanup: onCleanup.on,
     use: use as any,
     run: run as any,
+    refresh: contextRefresh,
+    stale: contextStale,
+    _endComputing: () => {
+      isComputing = false;
+    },
     // Proxy for dependency access with auto-tracking
     get deps() {
       if (!depsProxy) {

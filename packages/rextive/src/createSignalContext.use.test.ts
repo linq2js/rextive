@@ -31,16 +31,16 @@ describe("SignalContext.use()", () => {
       return context.use((ctx) => {
         // Access deps
         const value = ctx.deps.count;
-        
+
         // Access abortSignal
         expect(ctx.abortSignal).toBeInstanceOf(AbortSignal);
-        
+
         // Access cleanup
-        expect(typeof ctx.cleanup).toBe("function");
-        
+        expect(typeof ctx.onCleanup).toBe("function");
+
         // Access run
         expect(typeof ctx.run).toBe("function");
-        
+
         return value * 2;
       });
     });
@@ -55,7 +55,7 @@ describe("SignalContext.use()", () => {
       const multiply = (ctx: any, a: number, b: number, c: number) => {
         return ctx.deps.count * a * b * c;
       };
-      
+
       return context.use(multiply, 2, 3, 4);
     });
 
@@ -83,7 +83,7 @@ describe("SignalContext.use()", () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         return ctx.deps.count * factor;
       };
-      
+
       return await context.use(multiply, 5);
     });
 
@@ -96,7 +96,7 @@ describe("SignalContext.use()", () => {
 
     const computed = signal({ count }, async (context) => {
       await new Promise((resolve) => setTimeout(resolve, 10));
-      
+
       try {
         return context.use((ctx) => {
           logicExecuted = true;
@@ -109,15 +109,15 @@ describe("SignalContext.use()", () => {
 
     // Start first computation
     computed();
-    
+
     // Trigger abort
     await new Promise((resolve) => setTimeout(resolve, 5));
     count.set(2);
-    
+
     // Wait for second computation
     await new Promise((resolve) => setTimeout(resolve, 20));
     const result = await computed();
-    
+
     expect(result).toBe(4); // Second computation: 2 * 2
   });
 
@@ -126,7 +126,7 @@ describe("SignalContext.use()", () => {
 
     const computed = signal({ count }, async (context) => {
       await new Promise((resolve) => setTimeout(resolve, 10));
-      
+
       const result = await Promise.race([
         context.use(async (ctx) => {
           await new Promise((resolve) => setTimeout(resolve, 10));
@@ -134,21 +134,21 @@ describe("SignalContext.use()", () => {
         }),
         new Promise((resolve) => setTimeout(() => resolve("timeout"), 50)),
       ]);
-      
+
       return result;
     });
 
     // Start first computation
     computed();
-    
+
     // Trigger abort
     await new Promise((resolve) => setTimeout(resolve, 5));
     count.set(2);
-    
+
     // Wait for completion
     await new Promise((resolve) => setTimeout(resolve, 100));
     const result = await computed();
-    
+
     expect(result).toBe(4); // Second computation
   });
 
@@ -221,7 +221,7 @@ describe("SignalContext.use()", () => {
 
     const computed = signal({ count }, (context) => {
       return context.use((ctx) => {
-        ctx.cleanup(cleanupSpy);
+        ctx.onCleanup(cleanupSpy);
         return ctx.deps.count * 2;
       });
     });
@@ -277,7 +277,7 @@ describe("SignalContext.use()", () => {
     });
 
     expect(computed()).toBe("Test error");
-    
+
     count.set(2);
     expect(computed()).toBe(4);
   });
@@ -300,7 +300,7 @@ describe("SignalContext.use()", () => {
     });
 
     expect(await computed()).toBe("Async error");
-    
+
     count.set(2);
     expect(await computed()).toBe(4);
   });
@@ -376,7 +376,7 @@ describe("SignalContext.use()", () => {
         const value: number = ctx.deps.count;
         return value * 2;
       });
-      
+
       // result should be inferred as number
       const doubled: number = result;
       return doubled;
@@ -385,4 +385,3 @@ describe("SignalContext.use()", () => {
     expect(computed()).toBe(2);
   });
 });
-

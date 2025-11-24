@@ -145,9 +145,25 @@ export function rx<
 export function rx<T>(signal: Signal<T>, options?: RxOptions): ReactNode;
 
 // Overload 2b: Single signal with property access - renders specific property
+/**
+ * Subscribe to a signal with a selector function or property key.
+ * The selector receives the AWAITED value if the signal contains a promise.
+ *
+ * @example
+ * ```tsx
+ * // With async signal
+ * const user = signal(async () => fetchUser()); // Signal<Promise<User>>
+ *
+ * // Selector receives User, not Promise<User>!
+ * rx(user, (u) => u.name) // ✅ u is User
+ * rx(user, "name")        // ✅ Access property directly
+ * ```
+ */
 export function rx<T>(
   signal: Signal<T>,
-  prop: keyof ResolveAwaitable<T>,
+  selector:
+    | keyof ResolveAwaitable<T>
+    | ((value: ResolveAwaitable<T>) => unknown),
   options?: RxOptions
 ): ReactNode;
 
@@ -173,12 +189,15 @@ export function rx(...args: any[]): ReactNode {
     // Overload 2a or 2b: rx(signal) or rx(signal, prop, options?)
     const signal = args[0];
 
-    // Check if second argument is a property name (string)
-    if (typeof args[1] === "string") {
+    // Check if second argument is a property name (string) or selector function
+    if (typeof args[1] === "string" || typeof args[1] === "function") {
       // Overload 2b: rx(signal, prop, options?)
       const prop = args[1];
       signals = { value: signal };
-      render = (value: any) => value.value?.[prop];
+      render =
+        typeof prop === "function"
+          ? (value: any) => prop(value.value)
+          : (value: any) => value.value?.[prop];
       options = args[2];
     } else {
       // Overload 2a: rx(signal, options?)

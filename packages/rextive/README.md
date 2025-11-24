@@ -1219,7 +1219,7 @@ import { signal, disposable, rx, useScope } from "rextive/react";
 import { select } from "rextive/op";
 
 function TodoList() {
-  // Create component-scoped signals
+  // Create component-scoped signals and actions
   const scope = useScope(() => {
     // These signals exist only while this component is mounted
     const todos = signal([
@@ -1241,28 +1241,36 @@ function TodoList() {
       select((list) => list.filter((t) => t.status === "active").length)
     );
 
-    // ✅ disposable() automatically adds dispose property
-    // When component unmounts, all signals are cleaned up
-    return disposable({ todos, filter, filteredTodos, activeCount });
+    // Actions
+    const addTodo = (text) => {
+      todos.set((list) => [
+        ...list,
+        { id: Date.now(), text, status: "active" },
+      ]);
+    };
+
+    const toggleTodo = (id) => {
+      todos.set((list) =>
+        list.map((t) =>
+          t.id === id
+            ? { ...t, status: t.status === "active" ? "done" : "active" }
+            : t
+        )
+      );
+    };
+
+    // ✅ disposable() only disposes items with dispose method
+    // Regular functions (addTodo, toggleTodo) are included for convenience
+    // When component unmounts, signals are automatically cleaned up
+    return disposable({
+      todos,
+      filter,
+      filteredTodos,
+      activeCount,
+      addTodo,
+      toggleTodo,
+    });
   });
-
-  // Actions
-  const addTodo = (text) => {
-    scope.todos.set((list) => [
-      ...list,
-      { id: Date.now(), text, status: "active" },
-    ]);
-  };
-
-  const toggleTodo = (id) => {
-    scope.todos.set((list) =>
-      list.map((t) =>
-        t.id === id
-          ? { ...t, status: t.status === "active" ? "done" : "active" }
-          : t
-      )
-    );
-  };
 
   return (
     <div>
@@ -1284,7 +1292,7 @@ function TodoList() {
           {todos.map((todo) => (
             <li
               key={todo.id}
-              onClick={() => toggleTodo(todo.id)}
+              onClick={() => scope.toggleTodo(todo.id)}
               style={{
                 textDecoration:
                   todo.status === "done" ? "line-through" : "none",
@@ -1302,7 +1310,7 @@ function TodoList() {
         onSubmit={(e) => {
           e.preventDefault();
           const input = e.target.elements.todoInput;
-          addTodo(input.value);
+          scope.addTodo(input.value);
           input.value = "";
         }}
       >
@@ -2412,6 +2420,347 @@ useScope({
   },
 });
 ```
+
+</details>
+
+---
+
+## 🚀 Advanced Usages
+
+### Signals with React Context for Optimized Rendering
+
+One of the most powerful patterns is combining signals with React Context. Unlike traditional context that re-renders all consumers when the value changes, **signals in context only trigger re-renders when components actually access the signal's value** - thanks to lazy tracking!
+
+#### The Problem with Traditional Context
+
+```tsx
+// ❌ Traditional React Context
+const ThemeContext = createContext({ theme: "dark" });
+
+function Parent() {
+  const [theme, setTheme] = useState("dark");
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      <Child />
+    </ThemeContext.Provider>
+  );
+}
+
+function Child() {
+  const { theme } = useContext(ThemeContext);
+  // Problem: This component re-renders even if it doesn't use 'theme'!
+  // Just consuming the context causes re-renders
+
+  return <div>I don't even use theme, but I re-render!</div>;
+}
+```
+
+#### The Solution: Signals in Context
+
+**Option 1: Using the `provider()` utility (Recommended)**
+
+Rextive provides a built-in `provider()` function that handles all the boilerplate:
+
+```tsx
+import { provider, rx, signal, disposable } from "rextive/react";
+
+// ✨ Simple signal context
+const [useTheme, ThemeProvider] = provider<
+  { theme: ReturnType<typeof signal<"dark" | "light">> },
+  "dark" | "light"
+>({
+  name: "Theme",
+  create: (value) => {
+    // Create your context with signals
+    const theme = signal(value);
+    return disposable({ theme });
+  },
+  update: (context, value) => {
+    // Update when value prop changes
+    context.theme.set(value);
+  },
+});
+
+// That's it! Now use it:
+function App() {
+  return (
+    <ThemeProvider value="dark">
+      <ChildComponent />
+    </ThemeProvider>
+  );
+}
+
+function ChildComponent() {
+  const { theme } = useTheme();
+  return <div>Theme: {rx(theme)}</div>;
+}
+```
+
+**Option 2: Manual implementation (for understanding)**
+
+Here's what `provider()` does under the hood:
+
+```tsx
+import { signal, rx, useScope, useSignals, disposable } from "rextive/react";
+import { createContext, useContext, useLayoutEffect } from "react";
+
+// Step 1: Define your context shape
+type ThemeContext = {
+  theme: ReturnType<typeof signal<"dark" | "light">>;
+};
+
+// Step 2: Create React Context
+const ThemeContext = createContext<ThemeContext | null>(null);
+
+// Step 3: Custom hook to access the context
+const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error("useTheme must be used within ThemeProvider");
+  }
+  return context;
+};
+
+// Step 4: Provider component
+function ThemeProvider(props: {
+  value: "dark" | "light";
+  children: React.ReactNode;
+}) {
+  // Create context scope with useScope (auto-cleanup on unmount)
+  const context = useScope(() => {
+    const theme = signal(props.value);
+    return disposable({ theme });
+  }) as ThemeContext;
+
+  // Update context when props.value changes
+  useLayoutEffect(() => {
+    context.theme.set(props.value);
+  }, [props.value]);
+
+  return (
+    <ThemeContext.Provider value={context}>
+      {props.children}
+    </ThemeContext.Provider>
+  );
+}
+
+// Consumer components with smart re-rendering
+function ChildComponent(props: { showTheme: boolean }) {
+  // ✅ Get the context (contains the signal)
+  const { theme } = useTheme();
+
+  // This component does NOT re-render when theme changes!
+  // It only re-renders when props.showTheme changes
+
+  if (!props.showTheme) {
+    // ✅ No theme signal tracked here
+    return <div>Nothing to show</div>;
+  }
+
+  return (
+    <div>
+      {
+        // ✅ Theme signal is only accessed/tracked inside rx()
+        // Only THIS part re-renders when theme changes
+      }
+      Theme: {rx(theme)}
+      <OtherPart /> {/* This doesn't re-render! */}
+    </div>
+  );
+}
+
+// Alternative: Using useSignals for conditional tracking
+function SmartComponent(props: { showTheme: boolean }) {
+  const { theme } = useTheme();
+
+  // Use lazy tracking with useSignals
+  const [tracked] = useSignals({ theme });
+
+  if (!props.showTheme) {
+    // ✅ Theme signal NOT tracked here (we didn't access tracked.theme)
+    return <div>Nothing</div>;
+  }
+
+  // ✅ Theme signal is tracked ONLY when this branch executes
+  // Only re-renders when showTheme is true AND theme changes
+  return <div>Theme: {tracked.theme}</div>;
+}
+
+// Usage
+function App() {
+  return (
+    <ThemeProvider value="dark">
+      <ChildComponent showTheme={true} />
+      <SmartComponent showTheme={false} />
+    </ThemeProvider>
+  );
+}
+```
+
+<details>
+<summary>📖 <strong>Why This Pattern is Powerful</strong></summary>
+
+**Traditional React Context problems:**
+
+- ❌ Every consumer re-renders when context changes
+- ❌ No way to opt out of re-renders
+- ❌ Must use complex memoization to prevent cascading re-renders
+- ❌ All or nothing - can't selectively subscribe
+
+**Signals in Context benefits:**
+
+- ✅ **Zero re-renders** until signal is actually accessed
+- ✅ **Lazy tracking** - only subscribe to what you use
+- ✅ **Fine-grained updates** - only `rx()` parts re-render
+- ✅ **Conditional tracking** - access signal conditionally
+- ✅ **No memoization needed** - automatically optimized
+
+**Performance comparison:**
+
+```tsx
+// Traditional Context: N components re-render
+<ThemeContext.Provider value={theme}>
+  <Child1 />  {/* Re-renders */}
+  <Child2 />  {/* Re-renders */}
+  <Child3 />  {/* Re-renders */}
+  <Child4 />  {/* Re-renders */}
+</ThemeContext.Provider>
+
+// Signal in Context: Only parts that use the signal re-render
+<ThemeContext.Provider value={themeSignal}>
+  <Child1 />  {/* No re-render if doesn't access signal */}
+  <Child2 />  {/* No re-render if doesn't access signal */}
+  <Child3 />  {/* Only rx(theme) part re-renders */}
+  <Child4 />  {/* No re-render if doesn't access signal */}
+</ThemeContext.Provider>
+```
+
+</details>
+
+#### Real-World Example: User Session Store
+
+For complex stores with multiple signals and methods, the new `provider()` API shines:
+
+```tsx
+import { signal, disposable, provider, rx, useSignals } from "rextive/react";
+
+// Define your store shape
+interface UserSession {
+  user: ReturnType<typeof signal<User | null>>;
+  isAuthenticated: ReturnType<typeof signal<boolean>>;
+  login: (credentials: Credentials) => Promise<void>;
+  logout: () => void;
+}
+
+type Credentials = { username: string; password: string };
+type User = { id: number; name: string; email: string };
+
+// Create provider with multiple signals and methods
+export const [useSession, SessionProvider] = provider<UserSession, User | null>(
+  {
+    name: "Session",
+    create: (initialUser) => {
+      // Create signals
+      const user = signal(initialUser);
+      const isAuthenticated = user.to((u) => u !== null);
+
+      // Add methods that modify the signals
+      const login = async (credentials: Credentials) => {
+        const userData = await api.login(credentials);
+        user.set(userData);
+      };
+
+      const logout = () => {
+        user.set(null);
+        api.logout();
+      };
+
+      // Return the complete store
+      return disposable({ user, isAuthenticated, login, logout });
+    },
+    update: (context, value) => {
+      // Update user signal when value prop changes
+      context.user.set(value);
+    },
+  }
+);
+
+// Consumer component - smart re-rendering
+function UserProfile() {
+  const { user, logout } = useSession();
+
+  // ✅ Component only re-renders when user signal changes
+  // Not when isAuthenticated or other signals change
+  return rx(user, (userData) =>
+    userData ? (
+      <div>
+        <h2>{userData.name}</h2>
+        <button onClick={logout}>Logout</button>
+      </div>
+    ) : (
+      <div>Not logged in</div>
+    )
+  );
+}
+
+// Another consumer - conditional tracking
+function Sidebar(props: { showUserInfo: boolean }) {
+  const { user, isAuthenticated } = useSession();
+
+  const [tracked] = useSignals({ user, isAuthenticated });
+
+  // ✅ This component only re-renders when:
+  // - props.showUserInfo changes, OR
+  // - showUserInfo is true AND isAuthenticated changes
+
+  return (
+    <div>
+      <nav>{/* Navigation items */}</nav>
+
+      {props.showUserInfo && tracked.isAuthenticated && (
+        <div>Welcome, {tracked.user?.name}</div>
+      )}
+    </div>
+  );
+}
+
+// Usage in app
+function App() {
+  return (
+    <SessionProvider value={null}>
+      <UserProfile />
+      <Sidebar showUserInfo={true} />
+    </SessionProvider>
+  );
+}
+```
+
+<details>
+<summary>📖 <strong>Key Takeaways</strong></summary>
+
+1. **Use the `provider()` utility** - Flexible API that supports any context shape (see `rextive/react`)
+
+2. **Create rich context objects** - Combine multiple signals, computed values, and methods in one context
+
+3. **Full control over updates** - The `update` function lets you decide how to sync with prop changes
+
+4. **Use lazy tracking** - Access signals through `rx()` or `useSignals()` for automatic optimization
+
+5. **No manual optimization needed** - No `useMemo`, `useCallback`, or `React.memo` required
+
+6. **Scales beautifully** - Add more signals to store without performance concerns
+
+7. **Type-safe by default** - Full TypeScript inference for context shape and value prop
+
+8. **Works with any React pattern** - Context, composition, render props, etc.
+
+**This pattern turns signals into a full state management solution that's:**
+
+- ⚡ Faster than Redux
+- 🎯 More flexible than Zustand
+- 🧠 Smarter than React Context
+- ✨ Simpler than all of them
 
 </details>
 

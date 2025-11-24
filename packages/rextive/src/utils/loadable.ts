@@ -6,6 +6,7 @@ import {
   type SuccessLoadable,
   type ErrorLoadable,
   type Loadable,
+  SignalContext,
 } from "../types";
 
 // Re-export types
@@ -43,13 +44,20 @@ export type {
  * ```
  */
 export function loadable<TValue>(
-  value: TValue
+  value: TValue,
+  context?: SignalContext
 ): TValue extends Loadable<any>
   ? TValue
   : TValue extends PromiseLike<infer T>
   ? Loadable<T>
   : Loadable<TValue> {
-  return toLoadableImpl(value) as any;
+  const l = toLoadableImpl(value) as any;
+
+  if (context && l.status === "loading") {
+    l.promise.finally(context.refresh);
+  }
+
+  return l;
 }
 
 // Namespace with factory and helper methods
