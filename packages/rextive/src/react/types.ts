@@ -39,40 +39,6 @@ export type RxOptions = {
 };
 
 /**
- * Options for useScope hook
- */
-export type UseScopeOptions<TScope> = {
-  /**
-   * Called when the component mounts/updates
-   * Use this to sync disposables with latest props/state
-   * @param scope - The scoped disposable objects
-   */
-  onUpdate?:
-    | ((scope: TScope) => void)
-    | [(scope: TScope) => void, ...unknown[]];
-
-  /**
-   * Called before component unmounts
-   * Use this for cleanup before disposables are automatically disposed
-   * @param scope - The scoped disposable objects
-   */
-  onDispose?: (scope: TScope) => void;
-
-  /**
-   * Watch these values - recreates scope when they change
-   * Similar to React useEffect deps array
-   *
-   * @example
-   * ```tsx
-   * useScope(() => ({ timer: signal(0) }), {
-   *   watch: [userId] // Recreate when userId changes
-   * })
-   * ```
-   */
-  watch?: unknown[];
-};
-
-/**
  * Options for useRerender hook
  */
 export type RerenderOptions = {
@@ -90,4 +56,3 @@ export type RerenderFunction<TData = void> = {
   flush: () => void;
   immediate: (data?: TData) => void;
 };
-

@@ -28,10 +28,10 @@ export type {
 } from "./types";
 
 // Re-export lifecycle types for useScope
-export type { 
+export type {
   LifecyclePhase,
   ComponentLifecycleCallbacks,
-  ObjectLifecycleCallbacks,
+  LifecycleCallbacks as ObjectLifecycleCallbacks,
 } from "./useLifecycle";
 
 // Export React components and hooks
@@ -39,4 +39,3 @@ export { rx } from "./rx";
 export { useScope } from "./useScope";
 export { useSignals } from "./useSignals";
 export { useRerender } from "./useRerender";
-

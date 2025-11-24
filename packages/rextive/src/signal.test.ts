@@ -228,8 +228,8 @@ describe("signal", () => {
         return keysA.every((key) => a[key] === b[key]);
       };
 
-      // New shorthand: pass equals directly as second arg
-      const user = signal({ name: "Alice" }, shallowEquals);
+      // Use string shortcut as second arg (new sugar syntax)
+      const user = signal({ name: "Alice" }, "shallow");
       const listener = vi.fn();
       user.on(listener);
 
@@ -242,17 +242,19 @@ describe("signal", () => {
       expect(listener).toHaveBeenCalledOnce();
     });
 
-    it("should not confuse signal(value, equals) with signal(deps, compute)", () => {
-      const customEquals = (a: number, b: number) => a === b;
-      
-      // This should create a mutable signal with equals, not a computed signal
-      const count = signal(42, customEquals);
+    it("should not confuse signal(value, string) with signal(deps, compute)", () => {
+      // String as second arg creates mutable signal with equals shortcut
+      const count = signal(42, "strict");
       expect(count()).toBe(42);
       
       // Should be mutable (has set method)
       expect(typeof count.set).toBe("function");
       count.set(100);
       expect(count()).toBe(100);
+      
+      // For custom equals function, use options form
+      const customCount = signal(42, { equals: (a, b) => a === b });
+      expect(customCount()).toBe(42);
       
       // Now create an actual computed signal to verify it still works
       const a = signal(10);
@@ -1259,8 +1261,8 @@ describe("signal", () => {
       expect(listener).toHaveBeenCalledOnce();
     });
 
-    it("should support 'is' string shortcut (same as default)", () => {
-      const obj = signal({ name: "John" }, "is");
+    it("should support 'strict' string shortcut (same as default)", () => {
+      const obj = signal({ name: "John" }, "strict");
       const listener = vi.fn();
       obj.on(listener);
 

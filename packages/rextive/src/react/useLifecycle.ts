@@ -7,27 +7,9 @@ import { isDev } from "../utils/dev";
 export type LifecyclePhase = "render" | "mount" | "cleanup" | "disposed";
 
 /**
- * Lifecycle callbacks for component lifecycle (no target object)
- */
-export type ComponentLifecycleCallbacks = {
-  /** Called during component initialization (before first render) */
-  init?: VoidFunction;
-  /** Called after component renders and paints */
-  mount?: VoidFunction;
-  /** Called on every render (including first render) */
-  render?: VoidFunction;
-  /** Called synchronously during React cleanup phase */
-  cleanup?: VoidFunction;
-  /** Called ONLY on true unmount (StrictMode-aware) */
-  dispose?: VoidFunction;
-};
-
-/**
  * Lifecycle callbacks for tracked object lifecycle (with target)
  */
-export type ObjectLifecycleCallbacks<TTarget> = {
-  /** The target object to track - when reference changes, lifecycle restarts */
-  for: TTarget;
+export type LifecycleCallbacks<TTarget> = {
   /** Called when this object becomes active */
   init?: (target: TTarget) => void;
   /** Called after this object is initialized */
@@ -51,9 +33,6 @@ type InternalLifecycleOptions = {
   cleanup?: ((target: any) => void) | VoidFunction;
   dispose?: ((target: any) => void) | VoidFunction;
 };
-
-// Legacy export for backward compatibility
-export type UseLifecycleOptions = ComponentLifecycleCallbacks;
 
 /**
  * Hook for managing component lifecycle with fine-grained control
@@ -92,12 +71,12 @@ export type UseLifecycleOptions = ComponentLifecycleCallbacks;
 
 // Overload 1: Component lifecycle (no target object)
 export function useLifecycle(
-  options: ComponentLifecycleCallbacks
+  options: LifecycleCallbacks<void>
 ): () => LifecyclePhase;
 
 // Overload 2: Object lifecycle (with target object)
 export function useLifecycle<TTarget>(
-  options: ObjectLifecycleCallbacks<TTarget>
+  options: { for: TTarget } & LifecycleCallbacks<TTarget>
 ): () => LifecyclePhase;
 
 // Implementation

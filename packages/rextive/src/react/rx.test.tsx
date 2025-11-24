@@ -329,6 +329,78 @@ describe("rx", () => {
       rerender(<TestComponent dep={2} />);
       expect(screen.getByText("42")).toBeInTheDocument();
     });
+
+    describe("Property access (rx(signal, prop))", () => {
+      it("should render specific property of signal value", () => {
+        const user = signal({ name: "Alice", age: 30 });
+        const TestComponent = () => rx(user, "name");
+
+        render(<TestComponent />);
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+      });
+
+      it("should update when property value changes", async () => {
+        const user = signal({ name: "Alice", age: 30 });
+        const TestComponent = () => rx(user, "name");
+
+        render(<TestComponent />);
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+
+        act(() => {
+          user.set({ name: "Bob", age: 35 });
+        });
+
+        await waitFor(() => {
+          expect(screen.getByText("Bob")).toBeInTheDocument();
+        });
+      });
+
+      it("should work with properties from awaited values", async () => {
+        const data = signal(Promise.resolve({ title: "Hello World", count: 42 }));
+        const TestComponent = () => (
+          <Suspense fallback={<div data-testid="loading">Loading...</div>}>
+            {rx(data, "title")}
+          </Suspense>
+        );
+
+        render(<TestComponent />);
+        expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+        await waitFor(() => {
+          expect(screen.getByText("Hello World")).toBeInTheDocument();
+        });
+      });
+
+      it("should respect options parameter", () => {
+        const user = signal({ name: "Alice", age: 30 });
+        const TestComponent = ({ dep }: { dep: number }) => {
+          return rx(user, "name", { watch: [dep] });
+        };
+
+        const { rerender } = render(<TestComponent dep={1} />);
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+
+        // Change watch dep - should work
+        rerender(<TestComponent dep={2} />);
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+
+        // Change signal value
+        act(() => {
+          user.set({ name: "Bob", age: 35 });
+        });
+        expect(screen.getByText("Bob")).toBeInTheDocument();
+      });
+
+      it("should handle undefined properties gracefully", () => {
+        const data = signal<{ value?: string }>({});
+        const TestComponent = () => (
+          <div data-testid="container">{rx(data, "value")}</div>
+        );
+
+        render(<TestComponent />);
+        expect(screen.getByTestId("container")).toBeEmptyDOMElement();
+      });
+    });
   });
 
   describe("Overload 3: Reactive with signals", () => {

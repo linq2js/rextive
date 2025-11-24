@@ -8,7 +8,14 @@ import {
   useCallback,
   useRef,
 } from "react";
-import { SignalMap, ResolveValue, AnyFunc, Signal, Loadable } from "../types";
+import {
+  SignalMap,
+  ResolvedValueMap,
+  AnyFunc,
+  Signal,
+  Loadable,
+  ResolveAwaitable,
+} from "../types";
 import { RxOptions } from "./types";
 import { shallowEquals } from "../utils/shallowEquals";
 import { useSignals } from "./useSignals";
@@ -30,17 +37,22 @@ const SINGLE_SIGNAL_RENDER = (value: any) => value.value;
 /**
  * rx - Reactive rendering for signals
  *
- * Three overloads:
+ * Four overloads:
  * 1. **Component with reactive props**: `rx(Component, { ...props })`
  *    - Props can be signals or static values
  *    - Automatically tracks signal props and re-renders when they change
  *    - Static props are passed through unchanged
  *    - Convenient for using existing components with signals
  *
- * 2. **Single signal**: `rx(signal)`
+ * 2a. **Single signal**: `rx(signal, options?)`
  *    - Automatically renders the value of the signal
  *    - Equivalent to: `rx({ value: signal }, (value) => value.value)`
  *    - Convenient shorthand for displaying a single value
+ *
+ * 2b. **Single signal with property access**: `rx(signal, prop, options?)`
+ *    - Extracts and renders a specific property from the signal's value
+ *    - Useful for rendering nested properties without custom render function
+ *    - Equivalent to: `rx({ value: signal }, (value) => value.value[prop])`
  *
  * 3. **Reactive with signals**: `rx(signals, (value, loadable) => ReactNode, { watch?: [...] })`
  *    - Automatic lazy signal tracking via proxies
@@ -64,10 +76,16 @@ const SINGLE_SIGNAL_RENDER = (value: any) => value.value;
  * rx(UserCard, { user, theme: "dark" })
  * ```
  *
- * @example Overload 2 - Single signal
+ * @example Overload 2a - Single signal
  * ```tsx
  * const count = signal(42);
  * rx(count) // Renders: 42
+ * ```
+ *
+ * @example Overload 2b - Single signal with property access
+ * ```tsx
+ * const user = signal({ name: "Alice", age: 30 });
+ * rx(user, "name") // Renders: "Alice"
  * ```
  *
  * @example Overload 3 - Reactive with Suspense
@@ -102,15 +120,22 @@ export function rx<
   }
 ): ReactNode;
 
-// Overload 2: Single signal - automatically renders value
+// Overload 2a: Single signal - automatically renders value
 export function rx<T>(signal: Signal<T>, options?: RxOptions): ReactNode;
+
+// Overload 2b: Single signal with property access - renders specific property
+export function rx<T>(
+  signal: Signal<T>,
+  prop: keyof ResolveAwaitable<T>,
+  options?: RxOptions
+): ReactNode;
 
 // Overload 3: Explicit signals with value + loadable access
 export function rx<TSignals extends SignalMap>(
   signals: TSignals,
   render: RxRender<
-    ResolveValue<TSignals, "awaited">,
-    ResolveValue<TSignals, "loadable">
+    ResolvedValueMap<TSignals, "awaited">,
+    ResolvedValueMap<TSignals, "loadable">
   >,
   options?: RxOptions
 ): ReactNode;
@@ -124,11 +149,22 @@ export function rx(...args: any[]): ReactNode {
   // Parse arguments to determine which overload was called
   // Check is FIRST because signals are also functions
   if (is(args[0])) {
-    // Overload 2: rx(signal)
-    // Transform single signal into { value: signal } format
-    signals = { value: args[0] };
-    render = SINGLE_SIGNAL_RENDER;
-    options = undefined;
+    // Overload 2a or 2b: rx(signal) or rx(signal, prop, options?)
+    const signal = args[0];
+
+    // Check if second argument is a property name (string)
+    if (typeof args[1] === "string") {
+      // Overload 2b: rx(signal, prop, options?)
+      const prop = args[1];
+      signals = { value: signal };
+      render = (value: any) => value.value?.[prop];
+      options = args[2];
+    } else {
+      // Overload 2a: rx(signal, options?)
+      signals = { value: signal };
+      render = SINGLE_SIGNAL_RENDER;
+      options = args[1];
+    }
   } else if (typeof args[1] === "function") {
     // Overload 3: rx(signals, render, options?)
     [signals, render, options] = args;

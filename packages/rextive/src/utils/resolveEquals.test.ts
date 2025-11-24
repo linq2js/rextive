@@ -4,8 +4,8 @@ import { shallowEquals } from "./shallowEquals";
 import isEqual from "lodash/isEqual";
 
 describe("resolveEquals", () => {
-  it("should return undefined for 'is' strategy", () => {
-    const result = resolveEquals("is");
+  it("should return undefined for 'strict' strategy", () => {
+    const result = resolveEquals("strict");
     expect(result).toBeUndefined();
   });
 

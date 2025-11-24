@@ -5,7 +5,7 @@ import type { EqualsFn } from "../types";
 /**
  * Built-in equality strategies
  */
-export type EqualsStrategy = "is" | "shallow" | "deep";
+export type EqualsStrategy = "strict" | "shallow" | "deep";
 
 /**
  * Equals option that can be a strategy string or a custom function
@@ -16,7 +16,7 @@ export type EqualsOption<T = any> = EqualsStrategy | EqualsFn<T> | undefined;
  * Resolves an equals option to an actual equality function.
  *
  * Supports string shortcuts for common equality strategies:
- * - `'is'` or `undefined` → Object.is (default, reference equality)
+ * - `'strict'` or `undefined` → Object.is (default, strict equality)
  * - `'shallow'` → Shallow equality (compares object keys/array elements)
  * - `'deep'` → Deep equality (lodash isEqual, recursive comparison)
  * - Custom function → Returns as-is
@@ -27,9 +27,9 @@ export type EqualsOption<T = any> = EqualsStrategy | EqualsFn<T> | undefined;
  * @example
  * ```ts
  * // String shortcuts
- * const isEquals = resolveEquals('is');        // Object.is
- * const shallow = resolveEquals('shallow');    // shallowEquals
- * const deep = resolveEquals('deep');          // lodash isEqual
+ * const strictEquals = resolveEquals('strict');    // Object.is
+ * const shallow = resolveEquals('shallow');        // shallowEquals
+ * const deep = resolveEquals('deep');              // lodash isEqual
  *
  * // Custom function
  * const custom = resolveEquals((a, b) => a.id === b.id);
@@ -41,8 +41,8 @@ export type EqualsOption<T = any> = EqualsStrategy | EqualsFn<T> | undefined;
 export function resolveEquals<T = any>(
   equals: EqualsOption<T>
 ): EqualsFn<T> | undefined {
-  // Undefined or 'is' → use default Object.is (return undefined to use default)
-  if (equals === undefined || equals === "is") {
+  // Undefined or 'strict' → use default Object.is (return undefined to use default)
+  if (equals === undefined || equals === "strict") {
     return undefined; // Let signal use Object.is by default
   }
 

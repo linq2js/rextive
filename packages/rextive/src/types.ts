@@ -115,8 +115,8 @@ export type Signal<TValue, TInit = TValue> = Observable &
      * const name = user.map(u => u.name, 'shallow');
      * const data = user.map(u => u.data, 'deep');
      *
-     * // With custom equals function
-     * const name = user.map(u => u.name, (a, b) => a === b);
+     * // With custom equals function (use options object)
+     * const name = user.map(u => u.name, { equals: (a, b) => a === b });
      *
      * // With full options
      * const name = user.map(u => u.name, { equals: 'shallow', name: 'userName' });
@@ -124,7 +124,7 @@ export type Signal<TValue, TInit = TValue> = Observable &
      */
     map<U>(
       fn: (value: TValue | TInit) => U,
-      equalsOrOptions?: "is" | "shallow" | "deep" | EqualsFn<U> | SignalOptions<U>
+      equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
     ): ComputedSignal<U>;
 
     /**
@@ -162,11 +162,11 @@ export type Signal<TValue, TInit = TValue> = Observable &
      *   'shallow'
      * );
      *
-     * // With custom equals function
+     * // With custom equals function (use options object)
      * const stats = count.scan(
      *   (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
      *   { sum: 0, count: 0 },
-     *   (a, b) => a.sum === b.sum
+     *   { equals: (a, b) => a.sum === b.sum }
      * );
      *
      * // With full options
@@ -180,7 +180,7 @@ export type Signal<TValue, TInit = TValue> = Observable &
     scan<U>(
       fn: (accumulator: U, current: TValue | TInit) => U,
       initialValue: U,
-      equalsOrOptions?: "is" | "shallow" | "deep" | EqualsFn<U> | SignalOptions<U>
+      equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
     ): ComputedSignal<U>;
   };
 
@@ -290,30 +290,30 @@ export type ComputedSignalContext<TDependencies extends SignalMap = {}> =
      * Proxy object that provides access to dependency signal values.
      * Automatically tracks which dependencies are accessed.
      */
-    deps: ResolveValue<TDependencies, "value">;
+    deps: ResolvedValueMap<TDependencies, "value">;
   };
 
 /**
  * Options for signal creation
  */
 export type SignalOptions<T> = {
-  /** 
+  /**
    * Custom equality function or strategy to determine if value changed.
-   * 
+   *
    * Supports:
-   * - `'is'` or `undefined` - Object.is (default, reference equality)
+   * - `'strict'` or `undefined` - Object.is (default, strict equality)
    * - `'shallow'` - Shallow equality (compares object keys/array elements)
    * - `'deep'` - Deep equality (lodash isEqual, recursive comparison)
    * - Custom function - `(a: T, b: T) => boolean`
-   * 
+   *
    * @example
    * ```ts
    * signal(obj, 'shallow')              // String shortcut
    * signal(obj, { equals: 'deep' })     // In options
-   * signal(obj, (a, b) => a.id === b.id) // Custom function
+   * signal(obj, { equals: (a, b) => a.id === b.id }) // Custom function (use options)
    * ```
    */
-  equals?: "is" | "shallow" | "deep" | EqualsFn<T>;
+  equals?: "strict" | "shallow" | "deep" | EqualsFn<T>;
   /** Debug name for the signal */
   name?: string;
   /** Fallback function to recover from errors */
@@ -358,10 +358,16 @@ export type SignalOptions<T> = {
 
 export type ResolveValueType = "awaited" | "loadable" | "value";
 
+export type ResolveAwaitable<T> = T extends Signal<infer TValue>
+  ? ResolveAwaitable<TValue>
+  : T extends Loadable<any>
+  ? Awaited<T["promise"]>
+  : Awaited<T>;
+
 /**
  * Resolve signal values based on access type
  */
-export type ResolveValue<
+export type ResolvedValueMap<
   TMap extends SignalMap,
   TType extends ResolveValueType
 > = {

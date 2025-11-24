@@ -3,7 +3,7 @@ import {
   Signal,
   SignalMap,
   ComputedSignalContext,
-  ResolveValue,
+  ResolvedValueMap,
 } from "./types";
 import { createSignalAccessProxy } from "./utils/createSignalAccessProxy";
 
@@ -74,7 +74,7 @@ export function createSignalContext(
         depsProxy = createSignalAccessProxy<
           "value",
           SignalMap,
-          ResolveValue<SignalMap, "value">
+          ResolvedValueMap<SignalMap, "value">
         >({
           type: "value",
           getSignals: () => deps,

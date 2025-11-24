@@ -47,150 +47,198 @@ function isDependenciesObject(obj: any): boolean {
   return false;
 }
 
-export type SignalExports = {
-  /**
-   * Create mutable signal with no initial value
-   * get() returns T | undefined, but set() requires T
-   * @returns MutableSignal<T, undefined>
-   */
-  <TValue = unknown>(): MutableSignal<TValue, undefined>;
-
-  /**
-   * Create mutable signal with initial value and custom equality function/strategy
-   * @param valueOrCompute - Initial value or compute function
-   * @param equals - Equality strategy ('shallow', 'deep', 'is') or custom function
-   * @returns MutableSignal<T>
-   * @example
-   * ```ts
-   * // String shortcuts
-   * const user = signal({ name: 'John' }, 'shallow');
-   * const data = signal(complexObj, 'deep');
-   *
-   * // Custom function
-   * const count = signal(0, (a, b) => a === b);
-   * ```
-   */
-  <TValue>(
-    valueOrCompute: TValue | ((context: SignalContext) => TValue),
-    equals: "is" | "shallow" | "deep" | ((a: TValue, b: TValue) => boolean)
-  ): MutableSignal<TValue>;
-
-  /**
-   * Create mutable signal with initial value and options (non-function value)
-   * @param valueOrCompute - Initial value or compute function
-   * @param options - Signal options
-   * @returns MutableSignal<T>
-   */
-  <TValue>(
-    valueOrCompute: TValue | ((context: SignalContext) => TValue),
-    options?: SignalOptions<TValue>
-  ): MutableSignal<TValue>;
-
-  /**
-   * Create computed signal from dependencies with custom equality
-   * @param dependencies - Map of signals to depend on
-   * @param compute - Compute function that receives dependency values
-   * @param equals - Equality strategy ('shallow', 'deep', 'is') or custom function
-   * @returns ComputedSignal<T>
-   * @example
-   * ```ts
-   * // String shortcuts
-   * const fullName = signal({ firstName, lastName }, ({ deps }) =>
-   *   `${deps.firstName} ${deps.lastName}`, 'shallow');
-   *
-   * // Custom function
-   * const result = signal({ a, b }, ({ deps }) =>
-   *   ({ sum: deps.a + deps.b }), (x, y) => x.sum === y.sum);
-   * ```
-   */
-  <TValue, TDependencies extends SignalMap>(
-    dependencies: TDependencies,
-    compute: (context: ComputedSignalContext<NoInfer<TDependencies>>) => TValue,
-    equals: "is" | "shallow" | "deep" | ((a: TValue, b: TValue) => boolean)
-  ): ComputedSignal<TValue>;
-
-  /**
-   * Create computed signal from dependencies with options
-   * @param dependencies - Map of signals to depend on
-   * @param compute - Compute function that receives dependency values
-   * @param options - Signal options
-   * @returns ComputedSignal<T>
-   */
-  <TValue, TDependencies extends SignalMap>(
-    dependencies: TDependencies,
-    compute: (context: ComputedSignalContext<NoInfer<TDependencies>>) => TValue,
-    options?: SignalOptions<TValue>
-  ): ComputedSignal<TValue>;
-};
-
-export const signal = ((...args: any[]) => {
-  // overload: signal() - no arguments, creates MutableSignal<undefined>
-  if (args.length === 0) {
-    return createMutableSignal(
-      {},
-      () => undefined,
-      undefined,
-      { value: undefined },
-      createSignalContext
-    );
-  }
-
-  // Check if this is a computed signal: signal(deps, compute, options?)
-  // vs mutable signal with equals: signal(value, equals)
-  if (typeof args[1] === "function") {
-    // If first arg is a dependencies object, it's a computed signal
-    if (isDependenciesObject(args[0])) {
-      // Check if third arg is equals function/string shortcut
-      // signal(deps, fn, equals) -> signal(deps, fn, { equals })
-      let options = args[2];
-      if (typeof args[2] === "function" || typeof args[2] === "string") {
-        options = { equals: args[2] };
-      }
-
-      return createComputedSignal(
-        args[0],
-        args[1],
-        options,
-        createSignalContext,
-        signal
-      );
-    }
-
-    // Otherwise, treat second arg as equals function
-    // signal(value, equals) -> signal(value, { equals })
-    const isLazy = typeof args[0] === "function";
-    return createMutableSignal(
-      {},
-      isLazy ? args[0] : () => args[0],
-      { equals: args[1] }, // Wrap equals in options
-      isLazy ? undefined : { value: args[0] },
-      createSignalContext
-    );
-  }
-
-  // Check if second arg is an equals string shortcut ('shallow', 'deep', 'is')
-  // signal(value, 'shallow') -> signal(value, { equals: 'shallow' })
-  if (typeof args[1] === "string") {
-    const isLazy = typeof args[0] === "function";
-    return createMutableSignal(
-      {},
-      isLazy ? args[0] : () => args[0],
-      { equals: args[1] as "is" | "shallow" | "deep" }, // Wrap equals string in options
-      isLazy ? undefined : { value: args[0] },
-      createSignalContext
-    );
-  }
-
-  // overload: signal(value, options?) - creates MutableSignal
-  const isLazy = typeof args[0] === "function";
+/**
+ * Implementation: signal() - creates MutableSignal<undefined>
+ */
+function createEmptySignal(): MutableSignal<unknown, undefined> {
   return createMutableSignal(
     {},
-    isLazy ? args[0] : () => args[0],
-    args[1],
-    isLazy ? undefined : { value: args[0] },
+    () => undefined,
+    undefined,
+    { value: undefined },
     createSignalContext
   );
-}) as SignalExports;
+}
+
+/**
+ * Implementation: signal(value, equals) - creates MutableSignal with equality string shortcut
+ */
+function createSignalWithEquals<TValue>(
+  value: TValue | ((context: SignalContext) => TValue),
+  equals: "strict" | "shallow" | "deep"
+): MutableSignal<TValue> {
+  const isLazy = typeof value === "function";
+  return createMutableSignal(
+    {},
+    isLazy ? (value as (context: SignalContext) => TValue) : () => value,
+    { equals },
+    isLazy ? undefined : { value },
+    createSignalContext
+  );
+}
+
+/**
+ * Implementation: signal(value, options?) - creates MutableSignal
+ */
+function createMutableSignalWithOptions<TValue>(
+  value: TValue | ((context: SignalContext) => TValue),
+  options?: SignalOptions<TValue>
+): MutableSignal<TValue> {
+  const isLazy = typeof value === "function";
+  return createMutableSignal(
+    {},
+    isLazy ? (value as (context: SignalContext) => TValue) : () => value,
+    options,
+    isLazy ? undefined : { value },
+    createSignalContext
+  );
+}
+
+/**
+ * Implementation: signal(deps, compute, equals) - creates ComputedSignal with equality string shortcut
+ */
+function createComputedSignalWithEquals<
+  TValue,
+  TDependencies extends SignalMap
+>(
+  dependencies: TDependencies,
+  compute: (context: ComputedSignalContext<TDependencies>) => TValue,
+  equals: "strict" | "shallow" | "deep"
+): ComputedSignal<TValue> {
+  return createComputedSignal(
+    dependencies,
+    compute as any,
+    { equals },
+    createSignalContext,
+    signal as any
+  );
+}
+
+/**
+ * Implementation: signal(deps, compute, options?) - creates ComputedSignal
+ */
+function createComputedSignalWithOptions<
+  TValue,
+  TDependencies extends SignalMap
+>(
+  dependencies: TDependencies,
+  compute: (context: ComputedSignalContext<TDependencies>) => TValue,
+  options?: SignalOptions<TValue>
+): ComputedSignal<TValue> {
+  return createComputedSignal(
+    dependencies,
+    compute as any,
+    options,
+    createSignalContext,
+    signal as any
+  );
+}
+
+/**
+ * Create mutable signal with no initial value
+ * get() returns T | undefined, but set() requires T
+ * @returns MutableSignal<T, undefined>
+ */
+export function signal<TValue = unknown>(): MutableSignal<TValue, undefined>;
+
+/**
+ * Create mutable signal with initial value and equality string shortcut
+ * @param value - Initial value or compute function
+ * @param equals - Equality strategy shortcut ('shallow', 'deep', 'strict')
+ * @returns MutableSignal<T>
+ * @example
+ * ```ts
+ * // String shortcuts only
+ * const user = signal({ name: 'John' }, 'shallow');
+ * const data = signal(complexObj, 'deep');
+ * const count = signal(0, 'strict');
+ *
+ * // For custom equality function, use options form
+ * const custom = signal(0, { equals: (a, b) => a === b });
+ * ```
+ */
+export function signal<TValue>(
+  value: TValue | ((context: SignalContext) => TValue),
+  equals: "strict" | "shallow" | "deep"
+): MutableSignal<TValue>;
+
+/**
+ * Create mutable signal with initial value and options (non-function value)
+ * @param value - Initial value or compute function
+ * @param options - Signal options
+ * @returns MutableSignal<T>
+ */
+export function signal<TValue>(
+  value: TValue | ((context: SignalContext) => TValue),
+  options?: SignalOptions<TValue>
+): MutableSignal<TValue>;
+
+/**
+ * Create computed signal from dependencies with equality string shortcut
+ * @param dependencies - Map of signals to depend on
+ * @param compute - Compute function that receives dependency values
+ * @param equals - Equality strategy shortcut ('shallow', 'deep', 'strict')
+ * @returns ComputedSignal<T>
+ * @example
+ * ```ts
+ * // String shortcuts only
+ * const fullName = signal({ firstName, lastName }, ({ deps }) =>
+ *   `${deps.firstName} ${deps.lastName}`, 'shallow');
+ *
+ * // For custom equality function, use options form
+ * const result = signal({ a, b }, ({ deps }) =>
+ *   ({ sum: deps.a + deps.b }), { equals: (x, y) => x.sum === y.sum });
+ * ```
+ */
+export function signal<TValue, TDependencies extends SignalMap>(
+  dependencies: TDependencies,
+  compute: (context: ComputedSignalContext<NoInfer<TDependencies>>) => TValue,
+  equals: "strict" | "shallow" | "deep"
+): ComputedSignal<TValue>;
+/**
+ * Create computed signal from dependencies with options
+ * @param dependencies - Map of signals to depend on
+ * @param compute - Compute function that receives dependency values
+ * @param options - Signal options
+ * @returns ComputedSignal<T>
+ */
+export function signal<TValue, TDependencies extends SignalMap>(
+  dependencies: TDependencies,
+  compute: (context: ComputedSignalContext<NoInfer<TDependencies>>) => TValue,
+  options?: SignalOptions<TValue>
+): ComputedSignal<TValue>;
+export function signal(...args: any[]): any {
+  // Overload 1: signal() - no arguments
+  if (args.length === 0) {
+    return createEmptySignal();
+  }
+
+  const [first, second, third] = args;
+
+  // Overload 2 & 3: Computed signal with dependencies
+  // signal(deps, compute, equals?) or signal(deps, compute, options?)
+  if (typeof second === "function" && isDependenciesObject(first)) {
+    // Check if third arg is equals (function or string)
+    if (typeof third === "function" || typeof third === "string") {
+      return createComputedSignalWithEquals(first, second, third);
+    }
+    // Otherwise, third arg is options (or undefined)
+    return createComputedSignalWithOptions(first, second, third);
+  }
+
+  // Overload 4: Mutable signal with equals string shortcut
+  // signal(value, 'shallow' | 'deep' | 'strict')
+  if (typeof second === "string") {
+    return createSignalWithEquals(
+      first,
+      second as "strict" | "shallow" | "deep"
+    );
+  }
+
+  // Overload 5: Mutable signal with options (or no second arg)
+  // signal(value, options?) or signal(value)
+  return createMutableSignalWithOptions(first, second);
+}
 
 export class FallbackError extends Error {
   readonly originalError: unknown;

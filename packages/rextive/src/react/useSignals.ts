@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useState } from "react";
-import { ResolveValue, Signal, SignalMap } from "../types";
+import { ResolvedValueMap, Signal, SignalMap } from "../types";
 import { useRerender } from "./useRerender";
 import { createSignalAccessProxy } from "../utils/createSignalAccessProxy";
 import { emitter } from "../utils/emitter";
@@ -43,7 +43,10 @@ import { emitter } from "../utils/emitter";
  */
 export function useSignals<TSignals extends SignalMap>(
   signals: TSignals
-): [ResolveValue<TSignals, "awaited">, ResolveValue<TSignals, "loadable">] {
+): [
+  ResolvedValueMap<TSignals, "awaited">,
+  ResolvedValueMap<TSignals, "loadable">
+] {
   // Rerender function that triggers component re-render when signals change
   const rerender = useRerender();
 
@@ -97,7 +100,7 @@ export function useSignals<TSignals extends SignalMap>(
       return createSignalAccessProxy<
         TType,
         TSignals,
-        ResolveValue<TSignals, TType>
+        ResolvedValueMap<TSignals, TType>
       >({
         type,
         getSignals: () => ref.signals,
@@ -118,8 +121,11 @@ export function useSignals<TSignals extends SignalMap>(
     };
 
     // Create and return both proxies as a tuple
-    const value = createProxy("awaited") as ResolveValue<TSignals, "awaited">;
-    const loadable = createProxy("loadable") as ResolveValue<
+    const value = createProxy("awaited") as ResolvedValueMap<
+      TSignals,
+      "awaited"
+    >;
+    const loadable = createProxy("loadable") as ResolvedValueMap<
       TSignals,
       "loadable"
     >;

@@ -1,14 +1,29 @@
-import { useMemo, useState, useLayoutEffect } from "react";
+import { useMemo, useLayoutEffect, useRef } from "react";
 import { ExDisposable } from "../types";
-import { UseScopeOptions } from "./types";
-import { shallowEquals } from "../utils/shallowEquals";
 import { tryDispose } from "../disposable";
 import {
   useLifecycle,
-  ComponentLifecycleCallbacks,
-  ObjectLifecycleCallbacks,
+  LifecycleCallbacks,
   LifecyclePhase,
 } from "./useLifecycle";
+
+/**
+ * Options for useScope hook (factory mode only)
+ */
+export type UseScopeOptions<TScope = any> = LifecycleCallbacks<TScope> & {
+  /**
+   * Watch these values - recreates scope when they change
+   * Similar to React useEffect deps array
+   *
+   * @example
+   * ```tsx
+   * useScope(() => ({ timer: signal(0) }), {
+   *   watch: [userId] // Recreate when userId changes
+   * })
+   * ```
+   */
+  watch?: unknown[];
+};
 
 /**
  * useScope - Unified hook for lifecycle management and scoped services
@@ -75,12 +90,12 @@ import {
 
 // Overload 1: Component lifecycle (no target object)
 export function useScope(
-  callbacks: ComponentLifecycleCallbacks
+  options: LifecycleCallbacks<void>
 ): () => LifecyclePhase;
 
 // Overload 2: Object lifecycle (with target object)
 export function useScope<TTarget>(
-  callbacks: ObjectLifecycleCallbacks<TTarget>
+  options: { for: TTarget } & LifecycleCallbacks<TTarget>
 ): () => LifecyclePhase;
 
 // Overload 3: Factory mode (create scoped services)
@@ -91,10 +106,7 @@ export function useScope<TScope>(
 
 // Implementation
 export function useScope<TScope>(
-  createOrCallbacks:
-    | (() => ExDisposable & TScope)
-    | ComponentLifecycleCallbacks
-    | ObjectLifecycleCallbacks<any>,
+  createOrCallbacks: (() => ExDisposable & TScope) | LifecycleCallbacks<any>,
   options?: UseScopeOptions<TScope>
 ): Omit<TScope, "dispose"> | (() => LifecyclePhase) {
   // Detect which mode based on first argument
@@ -103,74 +115,57 @@ export function useScope<TScope>(
   if (isLifecycleMode) {
     // Mode 1 or 2: Lifecycle mode (component or object)
     // Need to check if it's object lifecycle (has 'for' property) or component lifecycle
-    if ("for" in createOrCallbacks) {
-      // Object lifecycle mode
-      return useLifecycle(createOrCallbacks as ObjectLifecycleCallbacks<any>);
-    } else {
-      // Component lifecycle mode
-      return useLifecycle(createOrCallbacks as ComponentLifecycleCallbacks);
-    }
+    return useLifecycle(createOrCallbacks as LifecycleCallbacks<any>);
   }
 
-  // Mode 3: Factory mode - create scoped services
+  // Mode 3: Factory mode - create scoped services with lifecycle
   const create = createOrCallbacks as () => ExDisposable & TScope;
-  const { watch, onUpdate, onDispose } = options || {};
-
-  // Persistent ref object that survives re-renders
-  // Stores options in a stable reference to avoid dependency array issues
-  // This pattern allows us to update options without recreating the ref
-  const [ref] = useState(() => {
-    return {
-      watch, // Dependencies that trigger scope recreation
-      onUpdate: undefined as ((scope: TScope) => void) | undefined, // Update callback
-      onUpdateDeps: [] as unknown[], // Dependencies for onUpdate callback
-      onDispose: undefined as ((scope: TScope) => void) | undefined, // Dispose callback
-    };
-  });
-
-  const onUpdateDeps = Array.isArray(onUpdate) ? onUpdate.slice(1) : [];
-  // Update ref with latest options on each render
-  // This allows options to change without recreating the ref
-  Object.assign(ref, {
+  const {
     watch,
-    // Handle onUpdate in two forms:
-    // 1. Function: onUpdate = (scope) => { ... }
-    // 2. Tuple: onUpdate = [(scope) => { ... }, dep1, dep2, ...]
-    onUpdate: typeof onUpdate === "function" ? onUpdate : onUpdate?.[0],
-    // Extract watch dependencies from tuple form (everything after first element)
-    // Maintain reference stability: reuse same array if shallowly equal
-    // This ensures React's dependency comparison (Object.is) works correctly
-    // Same reference = no re-render, different reference = re-render
-    onUpdateDeps: shallowEquals(ref.onUpdateDeps, onUpdateDeps)
-      ? ref.onUpdateDeps // Reuse same array reference if values are equal
-      : onUpdateDeps, // Use new array if values differ
-    onDispose,
-  });
+    init,
+    mount,
+    render,
+    cleanup,
+    dispose: disposeCallback,
+  } = options || {};
+
+  const scopeRef = useRef<TScope | null>(null);
 
   // Recreate scope when watch dependencies change
-  // Similar to useEffect dependency array - scope is recreated when deps change
-  // Empty array (or undefined) means scope is created once and never recreated
-  const scope = useMemo(create, ref.watch || []);
+  const scope = useMemo(() => {
+    const newScope = create();
+    scopeRef.current = newScope;
 
-  // Cleanup effect: dispose all disposables when scope changes or component unmounts
-  // Runs synchronously after render (useLayoutEffect) to ensure cleanup happens before next render
+    // Call init after scope is created (once per scope instance)
+    init?.(newScope);
+
+    return newScope;
+  }, watch || []);
+
+  // Update scopeRef on every render to ensure callbacks have latest scope
+  scopeRef.current = scope;
+
+  // Call render callback on every render
+  render?.(scope);
+
+  // Setup mount/cleanup/dispose lifecycle for the scope
   useLayoutEffect(() => {
+    // Call mount when scope is mounted
+    mount?.(scopeRef.current!);
+
     return () => {
-      // Call custom dispose callback first (if provided)
-      // This allows user to do custom cleanup before automatic disposal
-      ref.onDispose?.(scope);
+      // Call cleanup before scope changes or component unmounts
+      cleanup?.(scopeRef.current!);
 
-      tryDispose(scope);
+      // Call dispose and tryDispose for cleanup
+      disposeCallback?.(scopeRef.current!);
+      tryDispose(scopeRef.current!);
     };
-  }, [scope]); // Re-run cleanup when scope reference changes
+  }, [scope]); // Re-run when scope instance changes
 
-  // Update effect: call onUpdate callback when scope or update dependencies change
-  // Using useLayoutEffect (not useMemo) because this is a side effect, not memoization
-  // Runs synchronously after render to ensure updates happen before paint
-  useLayoutEffect(() => {
-    ref.onUpdate?.(scope);
-    // if onUpdateDeps is empty, use an empty object to trigger re-render
-  }, [!ref.onUpdateDeps?.length ? {} : ref.onUpdateDeps, scope]);
-
-  return scope;
+  // Return scope without the 'dispose' property
+  const { dispose: _dispose, ...scopeWithoutDispose } = scope as TScope & {
+    dispose?: any;
+  };
+  return scopeWithoutDispose as Omit<TScope, "dispose">;
 }
