@@ -11,7 +11,8 @@ import { scheduleNotification } from "./batch";
 import { SIGNAL_TYPE } from "./is";
 import { FallbackError } from "./signal";
 import { resolveEquals } from "./utils/resolveEquals";
-import { toSignals } from "./utils/toSignals";
+import { pipeSignals } from "./utils/pipeSignals";
+import { createSignalContext } from "./createSignalContext";
 
 /**
  * Create a computed signal (with dependencies)
@@ -209,8 +210,23 @@ export function createComputedSignal(
     return "success" as const;
   };
 
-  const to = function (...operators: Array<(source: any) => any>): any {
-    return toSignals(instance, operators);
+  const pipe = function (...operators: Array<(source: any) => any>): any {
+    return pipeSignals(instance, operators);
+  };
+
+  const to = function (...selectors: Array<(value: any) => any>): any {
+    if (selectors.length === 0) return instance;
+    
+    return createComputedSignal(
+      { source: instance } as any,
+      (ctx: any) => {
+        // Chain selectors: selector1(value) -> selector2(result1) -> selector3(result2)
+        return selectors.reduce((acc, selector) => selector(acc), ctx.deps.source);
+      },
+      {},
+      createSignalContext,
+      undefined // _signal parameter (unused)
+    );
   };
 
   const instance = Object.assign(get, {
@@ -225,6 +241,7 @@ export function createComputedSignal(
     resume,
     paused,
     hydrate,
+    pipe,
     to,
   });
 

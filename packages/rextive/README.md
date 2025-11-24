@@ -27,7 +27,7 @@ import { select } from "rextive/op";
 // Or use $ for concise code: import { $ } from "rextive";
 
 const count = signal(0);
-const doubled = count.to(select((x) => x * 2));
+const doubled = count.pipe(select((x) => x * 2));
 ```
 
 **Rextive replaces:**
@@ -46,8 +46,7 @@ const doubled = count.to(select((x) => x * 2));
 ### React in 30 seconds
 
 ```tsx
-import { signal } from "rextive";
-import { rx } from "rextive/react";
+import { signal, rx } from "rextive/react";
 
 const count = signal(0); // create signal
 const increment = () => count.set((x) => x + 1); // mutate signal
@@ -55,6 +54,14 @@ const Counter = <h1 onClick={increment}>{rx(count)}</h1>; // Counter UI
 ```
 
 **That's it.** No providers. No hooks. No boilerplate.
+
+> **💡 React Tip:** Import everything from `rextive/react` for convenience:
+>
+> ```tsx
+> import { signal, rx, useScope, wait, loadable } from "rextive/react";
+> ```
+>
+> No need to mix `rextive` and `rextive/react` imports!
 
 ### 💡 Shorthand: `$()` instead of `signal()`
 
@@ -101,13 +108,13 @@ For simple transformations of a single signal, use operators from `rextive/op`:
 import { select } from "rextive/op";
 
 const count = signal(0);
-const doubled = count.to(select((x) => x * 2));
-const formatted = count.to(select((x) => `Count: ${x}`));
+const doubled = count.pipe(select((x) => x * 2));
+const formatted = count.pipe(select((x) => `Count: ${x}`));
 
 // With custom equality (string shortcuts or functions)
 const user = signal({ name: "John", age: 30 });
-const name = user.to(select((u) => u.name, "shallow"));
-const data = user.to(select((u) => u.data, "deep"));
+const name = user.pipe(select((u) => u.name, "shallow"));
+const data = user.pipe(select((u) => u.data, "deep"));
 ```
 
 ### Custom Equality: Optimize Re-renders
@@ -226,7 +233,7 @@ userId.set(2); // Cancels previous fetch, starts new one
 
 | Pattern                      | Use When                         | Example                                           |
 | ---------------------------- | -------------------------------- | ------------------------------------------------- |
-| `.to(select(...))`           | Single dependency transformation | `count.to(select(x => x * 2))`                    |
+| `.pipe(select(...))`           | Single dependency transformation | `count.pipe(select(x => x * 2))`                    |
 | `signal(value, equals)`      | Custom equality for objects      | `signal({ name: 'John' }, shallowEquals)`         |
 | `signal({ deps }, fn)`       | Multiple dependencies            | `signal({ a, b }, ({ deps }) => deps.a + deps.b)` |
 | `signal({ deps }, async fn)` | Async with dependencies          | `signal({ id }, async ({ deps }) => fetch(...))`  |
@@ -256,12 +263,12 @@ rx({ user, posts, comments }, (value) => {
 ### ⚡ **Unified Sync/Async** - No special handling needed
 
 ```tsx
-import { signal } from "rextive";
-import { rx } from "rextive/react";
+import { signal, rx } from "rextive/react";
+import { select } from "rextive/op";
 
 const user = signal(async () => fetchUser()); // Async
 const count = signal(0); // Sync
-const doubled = count.to(select((x) => x * 2)); // Computed (transformation)
+const doubled = count.pipe(select((x) => x * 2)); // Computed (transformation)
 
 // Use them exactly the same way!
 rx({ user, count, doubled }, (value) => (
@@ -321,12 +328,11 @@ import { rx, useScope } from "rextive/react";
 ### Counter - The Simplest Example
 
 ```tsx
-import { signal } from "rextive";
-import { rx } from "rextive/react";
+import { signal, rx } from "rextive/react";
 import { select } from "rextive/op";
 
 const count = signal(0);
-const doubled = count.to(select((x) => x * 2));
+const doubled = count.pipe(select((x) => x * 2));
 
 function Counter() {
   return (
@@ -367,11 +373,74 @@ function Profile() {
 userId.set(2);
 ```
 
+### Advanced: Combining AbortSignals
+
+Use `AbortSignal.any()` and `AbortSignal.timeout()` with the context's `abortSignal` for advanced cancellation patterns:
+
+```tsx
+import { signal } from "rextive";
+
+const userId = signal(1);
+
+// Example 1: Add timeout to auto-cancel signal
+const user = signal({ userId }, async ({ deps, abortSignal }) => {
+  // Combine dependency cancellation + 5 second timeout
+  const combinedSignal = AbortSignal.any([
+    abortSignal,
+    AbortSignal.timeout(5000),
+  ]);
+
+  const res = await fetch(`/api/users/${deps.userId}`, {
+    signal: combinedSignal,
+  });
+  return res.json();
+});
+
+// Example 2: Manual cancellation + auto-cancel
+const controller = new AbortController();
+const search = signal({ searchTerm }, async ({ deps, abortSignal }) => {
+  // Combine auto-cancel + manual cancel + timeout
+  const combinedSignal = AbortSignal.any([
+    abortSignal, // Auto-cancel when searchTerm changes
+    controller.signal, // Manual cancel via controller
+    AbortSignal.timeout(10000), // 10 second timeout
+  ]);
+
+  const res = await fetch(`/search?q=${deps.searchTerm}`, {
+    signal: combinedSignal,
+  });
+  return res.json();
+});
+
+// Manually cancel all pending searches
+controller.abort();
+
+// Example 3: Timeout-only (no dependencies)
+const data = signal(async ({ abortSignal }) => {
+  // 3 second timeout
+  const timeoutSignal = AbortSignal.any([
+    abortSignal,
+    AbortSignal.timeout(3000),
+  ]);
+
+  const res = await fetch("/api/slow-endpoint", {
+    signal: timeoutSignal,
+  });
+  return res.json();
+});
+```
+
+**Benefits:**
+
+- ✅ **Automatic cancellation** - When dependencies change
+- ✅ **Timeout protection** - Prevent hanging requests
+- ✅ **Manual control** - Cancel via external controller
+- ✅ **Composable** - Combine multiple abort signals
+
 ### Component-Scoped State (Auto-Cleanup)
 
 ```tsx
-import { signal, disposable } from "rextive";
-import { rx, useScope } from "rextive/react";
+import { signal, disposable, rx, useScope } from "rextive/react";
 
 function TodoList() {
   const { todos, filter } = useScope(() => {
@@ -398,8 +467,7 @@ function TodoList() {
 ### React Query-like Patterns
 
 ```tsx
-import { signal, disposable } from "rextive";
-import { rx, useScope } from "rextive/react";
+import { signal, disposable, rx, useScope } from "rextive/react";
 
 function createQuery(endpoint) {
   const params = signal(); // No initial value needed!
@@ -441,8 +509,7 @@ function UserProfile() {
 ### Form Validation
 
 ```tsx
-import { signal, disposable } from "rextive";
-import { rx, useScope } from "rextive/react";
+import { signal, disposable, rx, useScope } from "rextive/react";
 
 function ContactForm() {
   const { form, errors, isValid } = useScope(() => {
@@ -480,8 +547,7 @@ function ContactForm() {
 ### Debounced Search
 
 ```tsx
-import { signal } from "rextive";
-import { useScope } from "rextive/react";
+import { signal, useScope } from "rextive/react";
 
 function SearchBox() {
   const { searchTerm, results } = useScope(() => {
@@ -573,10 +639,10 @@ import { select, filter, scan } from "rextive/op";
 const count = signal(1);
 
 // Single operator
-const doubled = count.to(select((x) => x * 2));
+const doubled = count.pipe(select((x) => x * 2));
 
 // Chain multiple operators
-const result = count.to(
+const result = count.pipe(
   filter((x) => x > 0), // Only positive numbers
   select((x) => x * 2), // Double the value
   scan((acc, x) => acc + x, 0) // Running total
@@ -587,7 +653,7 @@ const positiveOnly = filter((x: number) => x > 0);
 const double = select((x: number) => x * 2);
 const sum = scan((acc: number, x: number) => acc + x, 0);
 
-const pipeline = count.to(positiveOnly, double, sum);
+const pipeline = count.pipe(positiveOnly, double, sum);
 ```
 
 **Available Operators:**
@@ -654,7 +720,7 @@ const user = signal<User>(); // get() returns User | undefined
 user.set({ name: "Alice" }); // set() requires User (not undefined)
 
 // Computed signal (transformation)
-const doubled = count.to(select((x) => x * 2));
+const doubled = count.pipe(select((x) => x * 2));
 
 // Async signal
 const data = signal(async () => fetchData());
@@ -685,10 +751,10 @@ import { select, scan } from "rextive/op";
 
 // Transform object/array values with equality checks
 const user = signal({ name: "Alice", age: 30 });
-user.to(select((u) => ({ name: u.name }), "shallow")); // Shallow equality on result
+user.pipe(select((u) => ({ name: u.name }), "shallow")); // Shallow equality on result
 
 // Accumulate with deep equality
-count.to(scan((sum, x) => sum + x, 0)); // Stateful operation
+count.pipe(scan((sum, x) => sum + x, 0)); // Stateful operation
 ```
 
 **Options:**
@@ -709,6 +775,31 @@ signal(value, {
 // - 'shallow': Shallow comparison (object keys/array elements)
 // - 'deep': Deep comparison (lodash isEqual)
 // - Custom function: (a, b) => boolean
+```
+
+**Context Object (for computed/async signals):**
+
+```tsx
+signal({ deps }, ({ deps, abortSignal }) => {
+  // deps: Resolved values of dependencies
+  // abortSignal: Automatically aborted when:
+  //   - Dependencies change
+  //   - Signal is disposed
+  //   - Computation is cancelled
+
+  // Use with fetch
+  fetch("/api/data", { signal: abortSignal });
+
+  // Combine with timeout
+  const timeoutSignal = AbortSignal.any([
+    abortSignal,
+    AbortSignal.timeout(5000),
+  ]);
+
+  // Combine with manual controller
+  const controller = new AbortController();
+  const combinedSignal = AbortSignal.any([abortSignal, controller.signal]);
+});
 ```
 
 **Style Comparison:**
@@ -785,7 +876,7 @@ count.on(() => {}); // Throws error
 - Component unmounting (or use `useScope` for auto-cleanup)
 - Preventing memory leaks in long-lived applications
 
-#### `.to(...operators)` → `Signal`
+#### `.pipe(...operators)` → `Signal`
 
 Chain multiple transformations in a readable, left-to-right manner. Each operator is a function that takes a signal and returns a transformed signal.
 
@@ -795,21 +886,21 @@ import { select } from "rextive/op";
 const count = signal(5);
 
 // Single transformation
-const doubled = count.to(select((x) => x * 2));
+const doubled = count.pipe(select((x) => x * 2));
 
 // Chain multiple operators (linear, easy to read)
-const result = count.to(
+const result = count.pipe(
   select((x) => x * 2),
   select((x) => x + 1),
   select((x) => `Value: ${x}`)
 );
 
 // Reusable operators
-const double = <T extends number>(s: Signal<T>) => s.to(select((x) => x * 2));
-const addOne = <T extends number>(s: Signal<T>) => s.to(select((x) => x + 1));
-const format = <T,>(s: Signal<T>) => s.to(select((x) => `Value: ${x}`));
+const double = <T extends number>(s: Signal<T>) => s.pipe(select((x) => x * 2));
+const addOne = <T extends number>(s: Signal<T>) => s.pipe(select((x) => x + 1));
+const format = <T,>(s: Signal<T>) => s.pipe(select((x) => `Value: ${x}`));
 
-const result = count.to(double, addOne, format);
+const result = count.pipe(double, addOne, format);
 // result() === "Value: 11"
 ```
 
@@ -825,7 +916,7 @@ const result = count.to(double, addOne, format);
 ```tsx
 import { select } from "rextive/op";
 
-const result = count.to(
+const result = count.pipe(
   select((x) => x * 2), // intermediate1
   select((x) => x + 1), // intermediate2
   select((x) => `Value: ${x}`) // result
@@ -879,6 +970,56 @@ const sig2 = signal(2, { tags: [myTag] });
 myTag.forEach((s) => s.reset()); // Reset all
 ```
 
+### `awaited(...selectors)` - Work with Promise Values
+
+Helper to create selectors that work with both promise and non-promise values. Accepts multiple selectors that will be chained together, where each selector receives the awaited result of the previous one.
+
+```tsx
+import { signal, awaited } from "rextive";
+
+// Single selector
+const todoList = signal(fetchTodos()); // Signal<Promise<Todo[]>>
+const titles = todoList.to(awaited((todos) => todos.map((t) => t.title)));
+// titles() returns Promise<string[]>
+
+// Multiple selectors (chained within awaited)
+const result = todoList.to(
+  awaited(
+    (todos) => todos.filter((t) => !t.done), // Filter incomplete
+    (todos) => todos.map((t) => t.title), // Extract titles
+    (titles) => titles.join(", ") // Join into string
+  )
+);
+// result() returns Promise<string>
+
+// With non-promise values (works the same!)
+const todoList = signal([{ title: "Buy milk", done: false }]); // Signal<Todo[]>
+const titles = todoList.to(awaited((todos) => todos.map((t) => t.title)));
+// titles() returns string[] (sync, no promise!)
+
+// Use with .pipe() and select operator
+import { select } from "rextive/op";
+
+const titles = todoList.pipe(
+  select(awaited((todos) => todos.map((t) => t.title)))
+);
+
+// Mixed promise/non-promise values
+const data = signal<number | Promise<number>>(5);
+const doubled = data.to(awaited((x) => x * 2));
+
+doubled(); // 10 (sync)
+data.set(Promise.resolve(10));
+await doubled(); // 20 (async)
+```
+
+**Benefits:**
+
+- ✅ Works with both promise and non-promise values
+- ✅ Type-safe: TypeScript infers `Awaited<T>` correctly
+- ✅ Composable: Chain with other selectors
+- ✅ Flexible: Use with `.to()` or inside `.pipe(select(...))`
+
 ### `rx()` - React Reactive Rendering
 
 ```tsx
@@ -931,7 +1072,7 @@ Unified hook for lifecycle management and scoped services.
 const { count, doubled } = useScope(
   () => {
     const count = signal(0);
-    const doubled = count.to(select((x) => x * 2));
+    const doubled = count.pipe(select((x) => x * 2));
 
     return {
       count,
@@ -1052,57 +1193,24 @@ import { select } from "rextive/op";
 const count = signal(5);
 
 // Single transformation
-const doubled = count.to(select((x) => x * 2));
+const doubled = count.pipe(select((x) => x * 2));
 
 // With equality check
-const name = user.to(select((u) => u.name, "shallow"));
+const name = user.pipe(select((u) => u.name, "shallow"));
 
 // With options
-const formatted = count.to(
+const formatted = count.pipe(
   select((x) => `Count: ${x}`, {
     equals: "strict",
     name: "formatted",
   })
 );
+
 ```
 
 **Parameters:**
 
 - `fn: (value: T) => U` - Transformation function
-- `equals?` - Equality strategy: `"strict"` | `"shallow"` | `"deep"` | options object
-
-### `select.then(fn, equals?)` - Transform Promise Values
-
-Transform values after awaiting them (if they're promises). Named after `Promise.then()` for familiarity. Uses `loadable()` internally to cache promise states and avoid re-awaiting already resolved promises.
-
-```tsx
-import { signal } from "rextive";
-import { select } from "rextive/op";
-
-// Transform promise values
-const userPromise = signal(fetchUser());
-const userName = userPromise.to(select.then((user) => user.name));
-
-// Handle mixed promise/non-promise values
-const data = signal<number | Promise<number>>(5);
-const doubled = data.to(select.then((x) => x * 2));
-
-doubled(); // 10 (sync)
-data.set(Promise.resolve(10));
-await doubled(); // 20 (async)
-
-// Async selector function
-const processed = userPromise.to(
-  select.then(async (user) => {
-    const profile = await fetchProfile(user.id);
-    return profile.bio;
-  })
-);
-```
-
-**Parameters:**
-
-- `fn: (value: Awaited<T>) => U` - Transformation function (can be sync or async)
 - `equals?` - Equality strategy: `"strict"` | `"shallow"` | `"deep"` | options object
 
 **Benefits:**
@@ -1124,7 +1232,7 @@ import { filter } from "rextive/op";
 const count = signal(1);
 
 // Only positive numbers
-const positiveOnly = count.to(filter((x) => x > 0));
+const positiveOnly = count.pipe(filter((x) => x > 0));
 
 count.set(2); // positiveOnly() === 2
 count.set(-1); // positiveOnly() === 2 (unchanged, filtered out)
@@ -1132,7 +1240,7 @@ count.set(5); // positiveOnly() === 5
 
 // Type narrowing
 const value = signal<string | number>(1);
-const numbersOnly = value.to(filter((x): x is number => typeof x === "number"));
+const numbersOnly = value.pipe(filter((x): x is number => typeof x === "number"));
 // Type: ComputedSignal<number>
 ```
 
@@ -1151,16 +1259,16 @@ import { scan } from "rextive/op";
 const count = signal(1);
 
 // Running total
-const total = count.to(scan((acc, curr) => acc + curr, 0));
+const total = count.pipe(scan((acc, curr) => acc + curr, 0));
 
 count.set(2); // total() === 3
 count.set(3); // total() === 6
 
 // Keep history
-const history = count.to(scan((acc, curr) => [...acc, curr], [] as number[]));
+const history = count.pipe(scan((acc, curr) => [...acc, curr], [] as number[]));
 
 // Build statistics
-const stats = count.to(
+const stats = count.pipe(
   scan(
     (acc, curr) => ({
       sum: acc.sum + curr,
@@ -1188,7 +1296,7 @@ import { select, filter, scan } from "rextive/op";
 
 const count = signal(1);
 
-const result = count.to(
+const result = count.pipe(
   filter((x) => x > 0), // Only positive
   select((x) => x * 2), // Double it
   scan((acc, x) => acc + x, 0) // Running sum
@@ -1199,8 +1307,8 @@ const positiveOnly = filter((x: number) => x > 0);
 const double = select((x: number) => x * 2);
 const sum = scan((acc: number, x: number) => acc + x, 0);
 
-const pipeline1 = count.to(positiveOnly, double, sum);
-const pipeline2 = otherSignal.to(positiveOnly, double, sum);
+const pipeline1 = count.pipe(positiveOnly, double, sum);
+const pipeline2 = otherSignal.pipe(positiveOnly, double, sum);
 ```
 
 **Benefits:**
@@ -1232,7 +1340,7 @@ import { select } from "rextive/op";
 
 const count = signal(0);
 const name = signal("");
-const doubled = count.to(select((x) => x * 2));
+const doubled = count.pipe(select((x) => x * 2));
 
 count.on(() => console.log("count changed"));
 ```

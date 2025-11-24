@@ -2,12 +2,12 @@
  * React-specific exports for rextive
  *
  * This module provides React hooks and components for reactive state management.
- * It builds on top of the core rextive primitives (signal, wait, etc.)
+ * It re-exports all core rextive exports so React users only need a single import.
  *
  * @example
  * ```tsx
- * import { signal } from 'rextive';
- * import { rx, useScope, useSignals } from 'rextive/react';
+ * // All-in-one import for React users
+ * import { signal, rx, useScope, wait, loadable } from 'rextive/react';
  *
  * const count = signal(0);
  *
@@ -19,12 +19,18 @@
  * ```
  */
 
+// =============================================================================
+// Re-export ALL core rextive exports for convenience
+// =============================================================================
+
+export * from "../index";
+
+// =============================================================================
+// React-specific exports
+// =============================================================================
+
 // Re-export React-specific types
-export type {
-  RxOptions,
-  RerenderOptions,
-  RerenderFunction,
-} from "./types";
+export type { RxOptions, RerenderOptions, RerenderFunction } from "./types";
 
 // Re-export lifecycle types for useScope
 export type {

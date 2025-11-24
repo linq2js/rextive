@@ -14,16 +14,16 @@ describe("operators", () => {
       expect(doubled()).toBe(20);
     });
 
-    it("should work with .to() method", () => {
+    it("should work with .pipe() method", () => {
       const count = signal(5);
-      const doubled = count.to(select((x) => x * 2));
+      const doubled = count.pipe(select((x) => x * 2));
 
       expect(doubled()).toBe(10);
     });
 
     it("should support equality shortcuts", () => {
       const user = signal({ name: "Alice", age: 30 });
-      const name = user.to(select((u) => u.name, "shallow"));
+      const name = user.pipe(select((u) => u.name, "shallow"));
 
       expect(name()).toBe("Alice");
 
@@ -34,7 +34,7 @@ describe("operators", () => {
 
     it("should support options object", () => {
       const count = signal(5);
-      const doubled = count.to(
+      const doubled = count.pipe(
         select((x) => x * 2, { equals: "strict", name: "doubled" })
       );
 
@@ -44,7 +44,7 @@ describe("operators", () => {
 
     it("should notify listeners on changes", () => {
       const count = signal(5);
-      const doubled = count.to(select((x) => x * 2));
+      const doubled = count.pipe(select((x) => x * 2));
       const listener = vi.fn();
 
       doubled.on(listener);
@@ -57,7 +57,7 @@ describe("operators", () => {
   describe("scan", () => {
     it("should accumulate values", () => {
       const count = signal(1);
-      const sum = count.to(scan((acc, curr) => acc + curr, 0));
+      const sum = count.pipe(scan((acc, curr) => acc + curr, 0));
 
       expect(sum()).toBe(1);
 
@@ -70,7 +70,7 @@ describe("operators", () => {
 
     it("should maintain state across updates", () => {
       const count = signal(1);
-      const history = count.to(
+      const history = count.pipe(
         scan((acc, curr) => [...acc, curr], [] as number[])
       );
 
@@ -85,7 +85,7 @@ describe("operators", () => {
 
     it("should support equality shortcuts", () => {
       const count = signal(1);
-      const stats = count.to(
+      const stats = count.pipe(
         scan(
           (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
           { sum: 0, count: 0 },
@@ -101,7 +101,7 @@ describe("operators", () => {
 
     it("should work with different types", () => {
       const count = signal(1);
-      const formatted = count.to(
+      const formatted = count.pipe(
         scan((acc, curr) => `${acc},${curr}`, "0")
       );
 
@@ -115,7 +115,7 @@ describe("operators", () => {
   describe("filter", () => {
     it("should filter values based on predicate", () => {
       const count = signal(1);
-      const evenOnly = count.to(filter((x) => x % 2 === 0));
+      const evenOnly = count.pipe(filter((x) => x % 2 === 0));
 
       expect(evenOnly()).toBe(1); // First value always emitted
 
@@ -131,7 +131,7 @@ describe("operators", () => {
 
     it("should support type narrowing", () => {
       const value = signal<string | number>(1);
-      const numbersOnly = value.to(
+      const numbersOnly = value.pipe(
         filter((x): x is number => typeof x === "number")
       );
 
@@ -144,9 +144,9 @@ describe("operators", () => {
       expect(numbersOnly()).toBe(42);
     });
 
-    it("should work with .to() chaining", () => {
+    it("should work with .pipe() chaining", () => {
       const count = signal(1);
-      const result = count.to(
+      const result = count.pipe(
         filter((x) => x > 0),
         select((x) => x * 2)
       );
@@ -162,14 +162,14 @@ describe("operators", () => {
 
     it("should support equality shortcuts", () => {
       const count = signal(1);
-      const filtered = count.to(filter((x) => x > 0, "strict"));
+      const filtered = count.pipe(filter((x) => x > 0, "strict"));
 
       expect(filtered()).toBe(1);
     });
 
     it("should notify listeners only when value passes filter", () => {
       const count = signal(1);
-      const evenOnly = count.to(filter((x) => x % 2 === 0));
+      const evenOnly = count.pipe(filter((x) => x % 2 === 0));
       const listener = vi.fn();
 
       evenOnly.on(listener);
@@ -186,7 +186,7 @@ describe("operators", () => {
 
     it("should handle complex objects", () => {
       const user = signal({ name: "Alice", age: 25 });
-      const adults = user.to(filter((u) => u.age >= 18));
+      const adults = user.pipe(filter((u) => u.age >= 18));
 
       expect(adults()).toEqual({ name: "Alice", age: 25 });
 
@@ -201,7 +201,7 @@ describe("operators", () => {
   describe("operator composition", () => {
     it("should compose multiple operators", () => {
       const count = signal(1);
-      const result = count.to(
+      const result = count.pipe(
         filter((x) => x > 0),
         select((x) => x * 2),
         scan((acc, curr) => acc + curr, 0)
@@ -224,8 +224,8 @@ describe("operators", () => {
       const count1 = signal(5);
       const count2 = signal(10);
 
-      const result1 = count1.to(positiveOnly, double, addOne);
-      const result2 = count2.to(positiveOnly, double, addOne);
+      const result1 = count1.pipe(positiveOnly, double, addOne);
+      const result2 = count2.pipe(positiveOnly, double, addOne);
 
       expect(result1()).toBe(11); // 5 * 2 + 1
       expect(result2()).toBe(21); // 10 * 2 + 1

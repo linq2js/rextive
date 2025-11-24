@@ -1,26 +1,26 @@
 import { describe, it, expect, vi } from "vitest";
-import { toSignals } from "./toSignals";
+import { pipeSignals } from "./pipeSignals";
 import { signal } from "../signal";
 import { select } from "../operators";
 
-describe("toSignals", () => {
+describe("pipeSignals", () => {
   it("should return source when no operators provided", () => {
     const source = signal(5);
-    const result = toSignals(source, []);
+    const result = pipeSignals(source, []);
 
     expect(result).toBe(source);
   });
 
   it("should apply single operator", () => {
     const source = signal(5);
-    const result = toSignals(source, [(s) => select((x: number) => x * 2)(s)]);
+    const result = pipeSignals(source, [(s) => select((x: number) => x * 2)(s)]);
 
     expect(result()).toBe(10);
   });
 
   it("should chain multiple operators", () => {
     const source = signal(5);
-    const result = toSignals(source, [
+    const result = pipeSignals(source, [
       (s) => select((x: number) => x * 2)(s),
       (s) => select((x: number) => x + 1)(s),
       (s) => select((x: number) => `Value: ${x}`)(s),
@@ -43,7 +43,7 @@ describe("toSignals", () => {
       return s;
     };
 
-    const result = toSignals(source, [
+    const result = pipeSignals(source, [
       (s) => trackDispose(select((x: number) => x * 2)(s), intermediate1Spy),
       (s) => trackDispose(select((x: number) => x + 1)(s), intermediate2Spy),
       (s) => select((x: number) => `Value: ${x}`)(s),
@@ -64,7 +64,7 @@ describe("toSignals", () => {
     const originalDispose = source.dispose;
 
     // Single operator that returns the same signal
-    const result = toSignals(source, [(s) => s]);
+    const result = pipeSignals(source, [(s) => s]);
 
     // Should return the source as-is
     expect(result).toBe(source);
@@ -74,7 +74,7 @@ describe("toSignals", () => {
   it("should handle operators that return the same signal", () => {
     const source = signal(5);
 
-    const result = toSignals(source, [
+    const result = pipeSignals(source, [
       (s) => {
         // Side effect but returns same signal
         s.on(() => console.log("changed"));
@@ -99,7 +99,7 @@ describe("toSignals", () => {
       return s;
     };
 
-    const result = toSignals(source, [
+    const result = pipeSignals(source, [
       (s) => s, // Returns same
       (s) => trackDispose(select((x: number) => x * 2)(s), spy), // Creates new
       (s) => s, // Returns same
@@ -118,7 +118,7 @@ describe("toSignals", () => {
     const source = signal(5);
 
     // Create a mock operator that returns an object without dispose
-    const result = toSignals(source, [
+    const result = pipeSignals(source, [
       (s) => select((x: number) => x * 2)(s),
       (s) => ({ ...s, dispose: undefined }), // Remove dispose
     ]);

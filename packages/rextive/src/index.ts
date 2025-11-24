@@ -39,6 +39,7 @@ export { resolveEquals } from "./utils/resolveEquals";
 export type { EqualsStrategy, EqualsOption } from "./utils/resolveEquals";
 export { dev } from "./utils/dev";
 export { wait, type Awaitable } from "./wait";
+export { awaited } from "./awaited";
 
 // Disposable utilities
 export { disposable, DisposalAggregateError } from "./disposable";

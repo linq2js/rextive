@@ -86,14 +86,27 @@ export type SignalOperator<TSource, TResult> = (source: TSource) => TResult;
  * // Result = Signal<string>
  * ```
  */
-export type ToResult<
+export type PipeResult<
   TOperators extends readonly SignalOperator<any, any>[],
   TResult
 > = TOperators extends [
   infer First extends SignalOperator<any, any>,
   ...infer Rest extends SignalOperator<any, any>[]
 ]
-  ? ToResult<Rest, ReturnType<First>>
+  ? PipeResult<Rest, ReturnType<First>>
+  : TResult;
+
+/**
+ * Type helper to infer the final result of chaining value selectors
+ */
+export type ToChainResult<
+  TSelectors extends ReadonlyArray<(value: any) => any>,
+  TResult = never
+> = TSelectors extends [
+  infer First extends (value: any) => any,
+  ...infer Rest extends ReadonlyArray<(value: any) => any>
+]
+  ? ToChainResult<Rest, ReturnType<First>>
   : TResult;
 
 /**
@@ -182,7 +195,7 @@ export type Signal<TValue, TInit = TValue> = Observable &
      * const format = (s: Signal<number>) => s.map(x => `Value: ${x}`);
      *
      * // Compose them
-     * const result = count.to(double, addOne, format);
+     * const result = count.pipe(double, addOne, format);
      * // Type: ComputedSignal<string>
      * ```
      *
@@ -190,25 +203,218 @@ export type Signal<TValue, TInit = TValue> = Observable &
      * ```ts
      * const user = signal({ name: "Alice", age: 30 });
      *
-     * const displayName = user.to(
+     * const displayName = user.pipe(
      *   s => s.map(u => u.name),              // Signal<string>
      *   s => s.map(name => name.toUpperCase()) // Signal<string>
      * );
      * // Type: ComputedSignal<string>
      * ```
      */
-    to<
-      TResult,
-      const TOperators extends readonly SignalOperator<TResult, any>[]
-    >(
-      op: SignalOperator<Signal<TValue, TInit>, TResult>,
-      ...operators: TOperators
-    ): TryInjectDispose<
-      ToResult<
-        [SignalOperator<Signal<TValue, TInit>, TResult>, ...TOperators],
-        never
-      >
-    >;
+    // 1 operator
+    pipe<T1>(
+      op1: SignalOperator<Signal<TValue, TInit>, T1>
+    ): TryInjectDispose<T1>;
+
+    // 2 operators
+    pipe<T1, T2>(
+      op1: SignalOperator<Signal<TValue, TInit>, T1>,
+      op2: SignalOperator<T1, T2>
+    ): TryInjectDispose<T2>;
+
+    // 3 operators
+    pipe<T1, T2, T3>(
+      op1: SignalOperator<Signal<TValue, TInit>, T1>,
+      op2: SignalOperator<T1, T2>,
+      op3: SignalOperator<T2, T3>
+    ): TryInjectDispose<T3>;
+
+    // 4 operators
+    pipe<T1, T2, T3, T4>(
+      op1: SignalOperator<Signal<TValue, TInit>, T1>,
+      op2: SignalOperator<T1, T2>,
+      op3: SignalOperator<T2, T3>,
+      op4: SignalOperator<T3, T4>
+    ): TryInjectDispose<T4>;
+
+    // 5 operators
+    pipe<T1, T2, T3, T4, T5>(
+      op1: SignalOperator<Signal<TValue, TInit>, T1>,
+      op2: SignalOperator<T1, T2>,
+      op3: SignalOperator<T2, T3>,
+      op4: SignalOperator<T3, T4>,
+      op5: SignalOperator<T4, T5>
+    ): TryInjectDispose<T5>;
+
+    // 6 operators
+    pipe<T1, T2, T3, T4, T5, T6>(
+      op1: SignalOperator<Signal<TValue, TInit>, T1>,
+      op2: SignalOperator<T1, T2>,
+      op3: SignalOperator<T2, T3>,
+      op4: SignalOperator<T3, T4>,
+      op5: SignalOperator<T4, T5>,
+      op6: SignalOperator<T5, T6>
+    ): TryInjectDispose<T6>;
+
+    // 7 operators
+    pipe<T1, T2, T3, T4, T5, T6, T7>(
+      op1: SignalOperator<Signal<TValue, TInit>, T1>,
+      op2: SignalOperator<T1, T2>,
+      op3: SignalOperator<T2, T3>,
+      op4: SignalOperator<T3, T4>,
+      op5: SignalOperator<T4, T5>,
+      op6: SignalOperator<T5, T6>,
+      op7: SignalOperator<T6, T7>
+    ): TryInjectDispose<T7>;
+
+    // 8 operators
+    pipe<T1, T2, T3, T4, T5, T6, T7, T8>(
+      op1: SignalOperator<Signal<TValue, TInit>, T1>,
+      op2: SignalOperator<T1, T2>,
+      op3: SignalOperator<T2, T3>,
+      op4: SignalOperator<T3, T4>,
+      op5: SignalOperator<T4, T5>,
+      op6: SignalOperator<T5, T6>,
+      op7: SignalOperator<T6, T7>,
+      op8: SignalOperator<T7, T8>
+    ): TryInjectDispose<T8>;
+
+    // 9 operators
+    pipe<T1, T2, T3, T4, T5, T6, T7, T8, T9>(
+      op1: SignalOperator<Signal<TValue, TInit>, T1>,
+      op2: SignalOperator<T1, T2>,
+      op3: SignalOperator<T2, T3>,
+      op4: SignalOperator<T3, T4>,
+      op5: SignalOperator<T4, T5>,
+      op6: SignalOperator<T5, T6>,
+      op7: SignalOperator<T6, T7>,
+      op8: SignalOperator<T7, T8>,
+      op9: SignalOperator<T8, T9>
+    ): TryInjectDispose<T9>;
+
+    // 10 operators
+    pipe<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(
+      op1: SignalOperator<Signal<TValue, TInit>, T1>,
+      op2: SignalOperator<T1, T2>,
+      op3: SignalOperator<T2, T3>,
+      op4: SignalOperator<T3, T4>,
+      op5: SignalOperator<T4, T5>,
+      op6: SignalOperator<T5, T6>,
+      op7: SignalOperator<T6, T7>,
+      op8: SignalOperator<T7, T8>,
+      op9: SignalOperator<T8, T9>,
+      op10: SignalOperator<T9, T10>
+    ): TryInjectDispose<T10>;
+
+    /**
+     * Chain value transformations (selector pipeline)
+     *
+     * Unlike `pipe()` which works with signal operators, `to()` chains value selectors.
+     * Each selector receives the result value of the previous selector.
+     *
+     * @example
+     * ```ts
+     * const user = signal({ name: "Alice", age: 30 });
+     *
+     * const greeting = user.to(
+     *   u => u.name,              // "Alice"
+     *   name => name.toUpperCase(), // "ALICE"
+     *   name => `Hello, ${name}!`   // "Hello, ALICE!"
+     * );
+     * // greeting() === "Hello, ALICE!"
+     * ```
+     */
+    // 1 selector
+    to<T1>(s1: (value: TValue) => T1): ComputedSignal<T1>;
+
+    // 2 selectors
+    to<T1, T2>(
+      s1: (value: TValue) => T1,
+      s2: (value: T1) => T2
+    ): ComputedSignal<T2>;
+
+    // 3 selectors
+    to<T1, T2, T3>(
+      s1: (value: TValue) => T1,
+      s2: (value: T1) => T2,
+      s3: (value: T2) => T3
+    ): ComputedSignal<T3>;
+
+    // 4 selectors
+    to<T1, T2, T3, T4>(
+      s1: (value: TValue) => T1,
+      s2: (value: T1) => T2,
+      s3: (value: T2) => T3,
+      s4: (value: T3) => T4
+    ): ComputedSignal<T4>;
+
+    // 5 selectors
+    to<T1, T2, T3, T4, T5>(
+      s1: (value: TValue) => T1,
+      s2: (value: T1) => T2,
+      s3: (value: T2) => T3,
+      s4: (value: T3) => T4,
+      s5: (value: T4) => T5
+    ): ComputedSignal<T5>;
+
+    // 6 selectors
+    to<T1, T2, T3, T4, T5, T6>(
+      s1: (value: TValue) => T1,
+      s2: (value: T1) => T2,
+      s3: (value: T2) => T3,
+      s4: (value: T3) => T4,
+      s5: (value: T4) => T5,
+      s6: (value: T5) => T6
+    ): ComputedSignal<T6>;
+
+    // 7 selectors
+    to<T1, T2, T3, T4, T5, T6, T7>(
+      s1: (value: TValue) => T1,
+      s2: (value: T1) => T2,
+      s3: (value: T2) => T3,
+      s4: (value: T3) => T4,
+      s5: (value: T4) => T5,
+      s6: (value: T5) => T6,
+      s7: (value: T6) => T7
+    ): ComputedSignal<T7>;
+
+    // 8 selectors
+    to<T1, T2, T3, T4, T5, T6, T7, T8>(
+      s1: (value: TValue) => T1,
+      s2: (value: T1) => T2,
+      s3: (value: T2) => T3,
+      s4: (value: T3) => T4,
+      s5: (value: T4) => T5,
+      s6: (value: T5) => T6,
+      s7: (value: T6) => T7,
+      s8: (value: T7) => T8
+    ): ComputedSignal<T8>;
+
+    // 9 selectors
+    to<T1, T2, T3, T4, T5, T6, T7, T8, T9>(
+      s1: (value: TValue) => T1,
+      s2: (value: T1) => T2,
+      s3: (value: T2) => T3,
+      s4: (value: T3) => T4,
+      s5: (value: T4) => T5,
+      s6: (value: T5) => T6,
+      s7: (value: T6) => T7,
+      s8: (value: T7) => T8,
+      s9: (value: T8) => T9
+    ): ComputedSignal<T9>;
+
+    // 10 selectors
+    to<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(
+      s1: (value: TValue) => T1,
+      s2: (value: T1) => T2,
+      s3: (value: T2) => T3,
+      s4: (value: T3) => T4,
+      s5: (value: T4) => T5,
+      s6: (value: T5) => T6,
+      s7: (value: T6) => T7,
+      s8: (value: T7) => T8,
+      s9: (value: T8) => T9,
+      s10: (value: T9) => T10
+    ): ComputedSignal<T10>;
   };
 
 export type TryInjectDispose<T> = T extends object
