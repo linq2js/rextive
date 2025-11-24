@@ -34,6 +34,7 @@ export function createSignalContext(
   let abortController: AbortController | undefined;
   let trackedDeps: Set<Signal<any>> | undefined;
   let depsProxy: any;
+  let propValueCache: Map<string, { value: any; error: any }> | undefined;
 
   const getTrackedDeps = () => {
     if (!trackedDeps) {
@@ -53,6 +54,7 @@ export function createSignalContext(
     abortController?.abort();
     abortController = undefined;
     trackedDeps?.clear();
+    propValueCache?.clear();
     trackedDeps = undefined;
     depsProxy = undefined;
   };
@@ -71,13 +73,19 @@ export function createSignalContext(
     // Proxy for dependency access with auto-tracking
     get deps() {
       if (!depsProxy) {
+        if (!propValueCache) {
+          propValueCache = new Map();
+        }
+
         depsProxy = createSignalAccessProxy<
           "value",
           SignalMap,
           ResolvedValueMap<SignalMap, "value">
         >({
           type: "value",
+
           getSignals: () => deps,
+          propValueCache,
           onSignalAccess: (depSignal) => {
             // Auto-subscribe to dependency if not already tracked
             if (!getTrackedDeps().has(depSignal)) {
