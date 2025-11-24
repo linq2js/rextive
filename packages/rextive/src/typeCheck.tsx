@@ -368,7 +368,7 @@ function signalTests() {
   const lazySignal = signal((context: SignalContext) => {
     expectType<SignalContext>(context);
     expectType<AbortSignal>(context.abortSignal);
-    context.cleanup(() => {});
+    context.onCleanup(() => {});
     return 42;
   });
   const lazyObjectSignal = signal(() => ({
@@ -399,7 +399,7 @@ function signalTests() {
     expectType<{ count: number }>(ctx.deps);
     expectType<number>(ctx.deps.count);
     expectType<AbortSignal>(ctx.abortSignal);
-    ctx.cleanup(() => {});
+    ctx.onCleanup(() => {});
     return ctx.deps.count * 2;
   });
   const firstName = signal("John");
@@ -1713,7 +1713,7 @@ function contextUseTests() {
     return context.use((ctx) => {
       expectType<number>(ctx.deps.count);
       expectType<AbortSignal>(ctx.abortSignal);
-      expectType<(fn: VoidFunction) => void>(ctx.cleanup);
+      expectType<(fn: VoidFunction) => void>(ctx.onCleanup);
       expectType<
         {
           <T>(fn: () => T): T;
@@ -1738,7 +1738,7 @@ function contextUseTests() {
   // With cleanup
   const computed8 = signal({ count }, (context) => {
     return context.use((ctx) => {
-      ctx.cleanup(() => console.log("cleanup"));
+      ctx.onCleanup(() => console.log("cleanup"));
       return ctx.deps.count * 2;
     });
   });
