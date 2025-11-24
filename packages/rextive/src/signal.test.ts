@@ -1328,48 +1328,8 @@ describe("signal", () => {
       expect(listener).toHaveBeenCalledOnce();
     });
 
-    it("should work with .map() method", () => {
-      const user = signal({ name: "John", age: 30 });
-      const userName = user.map(
-        (u) => ({ firstName: u.name }),
-        "shallow"
-      );
-
-      const listener = vi.fn();
-      userName.on(listener);
-
-      expect(userName()).toEqual({ firstName: "John" });
-
-      // Same name, different age - userName should not trigger
-      user.set({ name: "John", age: 31 });
-      expect(listener).not.toHaveBeenCalled();
-
-      // Different name - should trigger
-      user.set({ name: "Jane", age: 31 });
-      expect(listener).toHaveBeenCalledOnce();
-    });
-
-    it("should work with .scan() method", () => {
-      const count = signal(1);
-      const stats = count.scan(
-        (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
-        { sum: 0, count: 0 },
-        "shallow"
-      );
-
-      const listener = vi.fn();
-      stats.on(listener);
-
-      expect(stats()).toEqual({ sum: 1, count: 1 });
-
-      count.set(2);
-      expect(stats()).toEqual({ sum: 3, count: 2 });
-      expect(listener).toHaveBeenCalledOnce();
-
-      count.set(3);
-      expect(stats()).toEqual({ sum: 6, count: 3 });
-      expect(listener).toHaveBeenCalledTimes(2);
-    });
+    // .map() method removed - use select operator from rextive/op instead
+    // .scan() method removed - use scan operator from rextive/op instead
 
     it("should work with signal(deps, fn, equals) - shallow string", () => {
       const count = signal(1);

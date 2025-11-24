@@ -2,18 +2,16 @@ import { Emitter, emitter } from "./utils/emitter";
 import { guardDisposed } from "./utils/guardDisposed";
 import {
   MutableSignal,
-  ComputedSignal,
   SignalContext,
   SignalMap,
   SignalOptions,
   HydrateStatus,
 } from "./types";
 import { scheduleNotification } from "./batch";
-import { mapSignal } from "./utils/mapSignal";
-import { scanSignal } from "./utils/scanSignal";
 import { SIGNAL_TYPE } from "./is";
 import { FallbackError } from "./signal";
 import { resolveEquals } from "./utils/resolveEquals";
+import { toSignals } from "./utils/toSignals";
 
 /**
  * Create a mutable signal (no dependencies)
@@ -200,19 +198,8 @@ export function createMutableSignal(
     return "success";
   };
 
-  const map = function <U>(
-    fn: (value: any) => U,
-    equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
-  ): ComputedSignal<U> {
-    return mapSignal(instance, fn, equalsOrOptions);
-  };
-
-  const scan = function <U>(
-    fn: (accumulator: U, current: any) => U,
-    initialValue: U,
-    equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
-  ): ComputedSignal<U> {
-    return scanSignal(instance, fn, initialValue, equalsOrOptions);
+  const to = function (...operators: Array<(source: any) => any>): any {
+    return toSignals(instance, operators);
   };
 
   const instance = Object.assign(get, {
@@ -225,8 +212,7 @@ export function createMutableSignal(
     reset,
     toJSON: get,
     hydrate,
-    map,
-    scan,
+    to,
   });
 
   instanceRef = instance as unknown as MutableSignal<any>;
@@ -241,4 +227,3 @@ export function createMutableSignal(
 
   return instance as unknown as MutableSignal<any>;
 }
-

@@ -18,6 +18,10 @@
     "./immer": {
       "types": "./dist/immer/index.d.ts",
       "default": "./dist/immer/index.js"
+    },
+    "./op": {
+      "types": "./dist/op.d.ts",
+      "default": "./dist/op.js"
     }
   },
   "files": [

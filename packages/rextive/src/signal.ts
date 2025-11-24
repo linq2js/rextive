@@ -9,7 +9,6 @@ import {
 import { createMutableSignal } from "./createMutableSignal";
 import { createComputedSignal } from "./createComputedSignal";
 import { createSignalContext } from "./createSignalContext";
-import { SIGNAL_TYPE } from "./is";
 
 export const DISPOSED_MESSAGE = "Signal is disposed";
 
@@ -18,33 +17,15 @@ export const DISPOSED_MESSAGE = "Signal is disposed";
  * vs a regular value (for mutable signals)
  */
 function isDependenciesObject(obj: any): boolean {
-  if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+  if (
+    !obj ||
+    Array.isArray(obj) ||
+    typeof obj === "function" ||
+    typeof obj !== "object"
+  ) {
     return false;
   }
-
-  // Empty object {} is treated as dependencies (even with no signals)
-  // This allows signal({}, () => 42) to work
-  const keys = Object.keys(obj);
-  if (keys.length === 0) {
-    return true;
-  }
-
-  // If any property is a signal, it's definitely a dependencies object
-  for (const key in obj) {
-    const value = obj[key];
-    if (
-      value &&
-      typeof value === "function" &&
-      (value as any)[SIGNAL_TYPE] === true
-    ) {
-      return true;
-    }
-  }
-
-  // Plain objects with non-signal properties are ambiguous.
-  // We treat them as values (not deps) to support signal(obj, equals)
-  // Users can still use signal({ obj }, () => ...) for computed signals
-  return false;
+  return true;
 }
 
 /**

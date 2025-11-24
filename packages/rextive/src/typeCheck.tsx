@@ -15,6 +15,8 @@ import type { ReactNode } from "react";
 import { signal } from "./signal";
 import { loadable } from "./utils/loadable";
 import { wait, type Awaitable, type AwaitedFromAwaitable } from "./wait";
+// Operators imported when needed for type checking
+// import { select, scan, filter } from "./operators";
 import type {
   Signal,
   MutableSignal,
@@ -189,24 +191,7 @@ const computedWithOptions = signal({ count }, (ctx) => ctx.deps.count * 2, {
 });
 
 const testSignal = signal(42);
-const mapped = count.map((x) => x * 2);
-const mappedShallow = user.map((u) => u.name, "shallow");
-const mappedWithOptions = user.map((u) => u.name, {
-  equals: (a, b) => a === b,
-  name: "userName",
-});
-
-const scanned = count.scan((acc, curr) => acc + curr, 0);
-const scannedShallow = count.scan(
-  (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
-  { sum: 0, count: 0 },
-  "shallow"
-);
-
-const scannedWithOptions = count.scan((acc, curr) => acc + curr, 0, {
-  equals: (a, b) => a === b,
-  name: "total",
-});
+// .map() and .scan() methods removed - use select/scan operators from rextive/op instead
 
 const unionSignal = signal<string | number>(42);
 const optionalSignal = signal<string | undefined>(undefined);
@@ -739,32 +724,7 @@ testSignal.reset();
 // displayName
 expectType<string | undefined>(testSignal.displayName);
 
-// map() method
-expectType<ComputedSignal<number>>(mapped);
-
-expectType<ComputedSignal<string>>(mappedShallow);
-
-expectType<ComputedSignal<string>>(mappedWithOptions);
-
-count.map(
-  (x) => x * 2,
-  // @ts-expect-error - custom equals function not allowed as second arg (use options)
-  (a, b) => a === b
-);
-
-// scan() method
-expectType<ComputedSignal<number>>(scanned);
-
-expectType<ComputedSignal<{ sum: number; count: number }>>(scannedShallow);
-
-expectType<ComputedSignal<number>>(scannedWithOptions);
-
-count.scan(
-  (acc, curr) => acc + curr,
-  0,
-  // @ts-expect-error - custom equals function not allowed as third arg (use options)
-  (a, b) => a === b
-);
+// .map() and .scan() methods removed - use select/scan operators from rextive/op instead
 
 // toJSON method
 expectType<number>(count.toJSON());
@@ -1352,6 +1312,289 @@ expectType<ReactNode>(emptySignals);
 
 // Single signal in signals object
 expectType<ReactNode>(singleInObject);
+
+// =============================================================================
+// SIGNAL OPERATORS TYPE CHECKS (.to() method)
+// =============================================================================
+
+// Import operators (commented out to avoid runtime issues)
+// import { select, scan, filter } from "./operators";
+
+// For type checking, we'll use inline operator definitions
+type SelectOp = <T, U>(
+  fn: (value: T) => U
+) => (source: Signal<T>) => ComputedSignal<U>;
+type ScanOp = <T, U>(
+  fn: (acc: U, value: T) => U,
+  initial: U
+) => (source: Signal<T>) => ComputedSignal<U>;
+type FilterOp = <T>(
+  fn: (value: T) => boolean
+) => (source: Signal<T>) => ComputedSignal<T>;
+
+declare const selectOp: SelectOp;
+declare const scanOp: ScanOp;
+declare const filterOp: FilterOp;
+
+// -----------------------------------------------------------------------------
+// Single operator
+// -----------------------------------------------------------------------------
+
+const countSignal = signal(5);
+
+// select: number -> string
+const result1 = countSignal.to(selectOp((x) => `Count: ${x}`));
+expectType<ComputedSignal<string>>(result1);
+expectType<string>(result1());
+
+// scan: accumulate numbers
+const result2 = countSignal.to(scanOp((sum, x) => sum + x, 0));
+expectType<ComputedSignal<number>>(result2);
+expectType<number>(result2());
+
+// filter: keep only positive
+const result3 = countSignal.to(filterOp((x) => x > 0));
+expectType<ComputedSignal<number>>(result3);
+expectType<number>(result3());
+
+// -----------------------------------------------------------------------------
+// Multiple operators - type transformation chain
+// -----------------------------------------------------------------------------
+
+// number -> number -> string
+const chain1 = countSignal.to(
+  selectOp((x) => x * 2), // number -> number
+  selectOp((x) => `Result: ${x}`) // number -> string
+);
+expectType<ComputedSignal<string>>(chain1);
+expectType<string>(chain1());
+
+// number -> number -> number -> string
+const chain2 = countSignal.to(
+  selectOp((x: number) => x * 2), // number -> number
+  selectOp((x: number) => x + 1), // number -> number
+  selectOp((x: number) => `Value: ${x}`) // number -> string
+);
+expectType<ComputedSignal<string>>(chain2);
+expectType<string>(chain2());
+
+// -----------------------------------------------------------------------------
+// Complex type transformations
+// -----------------------------------------------------------------------------
+
+interface Person {
+  id: number;
+  name: string;
+  age: number;
+}
+
+const personSignal = signal<Person>({ id: 1, name: "Alice", age: 30 });
+
+// Person -> string
+const personName = personSignal.to(selectOp((u) => u.name));
+expectType<ComputedSignal<string>>(personName);
+expectType<string>(personName());
+
+// Person -> { name: string } -> string
+const personNameChain = personSignal.to(
+  selectOp((u: Person) => ({ name: u.name })),
+  selectOp((obj: { name: string }) => obj.name)
+);
+expectType<ComputedSignal<string>>(personNameChain);
+expectType<string>(personNameChain());
+
+// -----------------------------------------------------------------------------
+// Array transformations
+// -----------------------------------------------------------------------------
+
+const numbersSignal = signal([1, 2, 3]);
+
+// Array<number> -> Array<number>
+const doubledArray = numbersSignal.to(selectOp((arr) => arr.map((x) => x * 2)));
+expectType<ComputedSignal<number[]>>(doubledArray);
+expectType<number[]>(doubledArray());
+
+// Array<number> -> number (sum)
+const sum = numbersSignal.to(selectOp((arr) => arr.reduce((a, b) => a + b, 0)));
+expectType<ComputedSignal<number>>(sum);
+expectType<number>(sum());
+
+// -----------------------------------------------------------------------------
+// Mixed operators
+// -----------------------------------------------------------------------------
+
+// select -> filter -> scan
+const mixed1 = countSignal.to(
+  selectOp((x: number) => x * 2), // number -> number
+  filterOp((x: number) => x > 5), // number -> number
+  scanOp((acc: number, x: number) => acc + x, 0) // number -> number
+);
+expectType<ComputedSignal<number>>(mixed1);
+expectType<number>(mixed1());
+
+// -----------------------------------------------------------------------------
+// Operator returning signal (custom operator)
+// -----------------------------------------------------------------------------
+
+declare const customOp: <T extends number>(
+  s: Signal<T>
+) => ComputedSignal<string>;
+
+const custom1 = countSignal.to(customOp);
+expectType<ComputedSignal<string>>(custom1);
+expectType<string>(custom1());
+
+// Chain with custom operator
+const custom2 = countSignal.to(
+  selectOp((x: number) => x * 2),
+  customOp
+);
+expectType<ComputedSignal<string>>(custom2);
+expectType<string>(custom2());
+
+// -----------------------------------------------------------------------------
+// Type inference through chains
+// -----------------------------------------------------------------------------
+
+// 3 operators: number -> number -> number -> string
+const chain3Ops = countSignal.to(
+  selectOp((x: number) => x * 2), // number -> number
+  selectOp((x: number) => x + 1), // number -> number
+  selectOp((x: number) => `Value: ${x}`) // number -> string
+);
+expectType<ComputedSignal<string>>(chain3Ops);
+expectType<string>(chain3Ops());
+
+// 4 operators: number -> number -> number -> number -> string
+const chain4Ops = countSignal.to(
+  selectOp((x: number) => x * 2), // number -> number
+  selectOp((x: number) => x + 1), // number -> number
+  selectOp((x: number) => x - 1), // number -> number
+  selectOp((x: number) => `Result: ${x}`) // number -> string
+);
+expectType<ComputedSignal<string>>(chain4Ops);
+expectType<string>(chain4Ops());
+
+// =============================================================================
+// SELECT.THEN OPERATOR TYPE CHECKS (Promise handling)
+// =============================================================================
+
+// For type checking, we'll use inline operator definition
+type SelectThenOp = <T, U>(
+  fn: (value: Awaited<T>) => U
+) => (
+  source: Signal<T>
+) => ComputedSignal<T extends PromiseLike<any> ? PromiseLike<U> : U>;
+
+declare const selectThen: SelectThenOp;
+
+// -----------------------------------------------------------------------------
+// Promise values
+// -----------------------------------------------------------------------------
+
+const promiseSignal = signal(Promise.resolve(42));
+
+// Promise<number> -> Promise<string>
+const promiseResult = promiseSignal.to(selectThen((x) => `Value: ${x}`));
+expectType<ComputedSignal<PromiseLike<string>>>(promiseResult);
+
+// Awaiting the result
+(async () => {
+  const value = await promiseResult();
+  expectType<string>(value);
+})();
+
+// -----------------------------------------------------------------------------
+// Non-promise values (should work synchronously)
+// -----------------------------------------------------------------------------
+
+const syncSignal = signal(42);
+
+// number -> string (sync)
+const syncResult = syncSignal.to(selectThen((x) => `Value: ${x}`));
+expectType<ComputedSignal<string>>(syncResult);
+expectType<string>(syncResult());
+
+// -----------------------------------------------------------------------------
+// Mixed promise/non-promise values
+// -----------------------------------------------------------------------------
+
+const mixedSignal = signal<number | Promise<number>>(42);
+
+// Union type handling
+const mixedResult = mixedSignal.to(selectThen((x) => x * 2));
+expectType<ComputedSignal<number | PromiseLike<number>>>(mixedResult);
+
+// -----------------------------------------------------------------------------
+// Complex promise transformations
+// -----------------------------------------------------------------------------
+
+interface Account {
+  id: number;
+  name: string;
+  email: string;
+}
+
+const accountPromise = signal(
+  Promise.resolve<Account>({ id: 1, name: "Alice", email: "alice@example.com" })
+);
+
+// Promise<Account> -> Promise<string>
+const accountName = accountPromise.to(selectThen((u) => u.name));
+expectType<ComputedSignal<PromiseLike<string>>>(accountName);
+
+// Promise<Account> -> Promise<{ name: string }>
+const accountInfo = accountPromise.to(selectThen((u) => ({ name: u.name })));
+expectType<ComputedSignal<PromiseLike<{ name: string }>>>(accountInfo);
+
+// -----------------------------------------------------------------------------
+// Array of promises
+// -----------------------------------------------------------------------------
+
+const accountsPromise = signal(
+  Promise.resolve<Account[]>([
+    { id: 1, name: "Alice", email: "alice@example.com" },
+    { id: 2, name: "Bob", email: "bob@example.com" },
+  ])
+);
+
+// Promise<Account[]> -> Promise<string[]>
+const accountNames = accountsPromise.to(
+  selectThen((accounts) => accounts.map((u) => u.name))
+);
+expectType<ComputedSignal<PromiseLike<string[]>>>(accountNames);
+
+// Promise<Account[]> -> Promise<number>
+const accountCount = accountsPromise.to(
+  selectThen((accounts) => accounts.length)
+);
+expectType<ComputedSignal<PromiseLike<number>>>(accountCount);
+
+// auto inject dispose method if the result is an object or function
+expectType<number>(accountsPromise.to(() => 2));
+expectType<{ dispose: VoidFunction }>(accountsPromise.to(() => ({})));
+expectType<{ dispose: VoidFunction }>(accountsPromise.to(() => []));
+
+// -----------------------------------------------------------------------------
+// Chaining with other operators
+// -----------------------------------------------------------------------------
+
+// Promise -> select.then -> select
+const chainedWithSelect = promiseSignal.to(
+  selectThen((x) => x * 2),
+  selectOp((x: number | PromiseLike<number>) => `Result: ${x}`)
+);
+expectType<ComputedSignal<string>>(chainedWithSelect);
+
+// -----------------------------------------------------------------------------
+// Type inference with nested promises
+// -----------------------------------------------------------------------------
+
+const nestedPromise = signal(Promise.resolve(Promise.resolve(42)));
+
+// Should handle nested promises
+const nestedResult = nestedPromise.to(selectThen((x) => x * 2));
+expectType<ComputedSignal<PromiseLike<number>>>(nestedResult);
 
 // =============================================================================
 // Export nothing to avoid runtime issues

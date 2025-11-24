@@ -56,6 +56,47 @@ export type UnionToIntersection<U> = (
   : never;
 
 /**
+ * Signal operator function type
+ *
+ * A function that takes a signal and returns a transformed signal.
+ * Used for composing signal transformations in a type-safe manner.
+ *
+ * @template TSource - The input signal type
+ * @template TResult - The output signal type
+ */
+export type SignalOperator<TSource, TResult> = (source: TSource) => TResult;
+
+/**
+ * Infer the result type of a transformation chain
+ *
+ * Recursively applies operators left-to-right, threading the output type
+ * of each operator as the input type to the next operator.
+ *
+ * @template TSource - The starting signal type
+ * @template TOperators - Array of operators to apply sequentially
+ *
+ * @example
+ * ```ts
+ * // Given operators:
+ * const op1 = (s: Signal<number>) => s.map(x => x * 2);      // Signal<number> -> Signal<number>
+ * const op2 = (s: Signal<number>) => s.map(x => String(x));  // Signal<number> -> Signal<string>
+ *
+ * // ToResult infers:
+ * type Result = ToResult<Signal<number>, [typeof op1, typeof op2]>;
+ * // Result = Signal<string>
+ * ```
+ */
+export type ToResult<
+  TOperators extends readonly SignalOperator<any, any>[],
+  TResult
+> = TOperators extends [
+  infer First extends SignalOperator<any, any>,
+  ...infer Rest extends SignalOperator<any, any>[]
+]
+  ? ToResult<Rest, ReturnType<First>>
+  : TResult;
+
+/**
  * Status returned by hydrate() method
  */
 export type HydrateStatus = "success" | "skipped";
@@ -95,94 +136,84 @@ export type Signal<TValue, TInit = TValue> = Observable &
      */
     hydrate(value: TValue): HydrateStatus;
 
-    /**
-     * Transform signal value (stateless, pure function)
-     *
-     * Creates a new computed signal that applies the transform function
-     * to each value from the source signal.
-     *
-     * @param fn - Pure transformation function (value: T) => U
-     * @param equalsOrOptions - Optional equality strategy/function or full options object
-     * @returns New computed signal with transformed values
-     *
-     * @example
-     * ```ts
-     * const count = signal(0);
-     * const doubled = count.map(x => x * 2);
-     * const formatted = count.map(x => `Count: ${x}`);
-     *
-     * // With equality string shortcuts
-     * const name = user.map(u => u.name, 'shallow');
-     * const data = user.map(u => u.data, 'deep');
-     *
-     * // With custom equals function (use options object)
-     * const name = user.map(u => u.name, { equals: (a, b) => a === b });
-     *
-     * // With full options
-     * const name = user.map(u => u.name, { equals: 'shallow', name: 'userName' });
-     * ```
-     */
-    map<U>(
-      fn: (value: TValue | TInit) => U,
-      equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
-    ): ComputedSignal<U>;
+    // .map() method removed - use select operator from rextive/op instead
+    // This avoids confusion with Array.map when signal values are arrays
 
     /**
-     * Accumulate values with state (stateful operation)
+     * Transform signal through a chain of operators
      *
-     * Creates a new computed signal that maintains an accumulator value,
-     * similar to Array.reduce(). The accumulator is updated on each
-     * source signal change.
+     * Applies a series of operator functions to the signal, passing the result
+     * of each operator to the next. This enables composing complex transformations
+     * in a readable, left-to-right manner.
      *
-     * @param fn - Accumulator function (accumulator: U, current: T) => U
-     * @param initialValue - Initial accumulator value (determines output type)
-     * @param equalsOrOptions - Optional equality strategy/function or full options object
-     * @returns New computed signal with accumulated values
+     * **Type Safety:** Each operator must return a signal. The output type of each
+     * operator becomes the input type of the next, ensuring type safety through
+     * the entire chain.
      *
-     * @example
+     * **Memory Management:** When the final result is disposed, all intermediate
+     * signals created by the operators are automatically disposed.
+     *
+     * @template TResult - The output type of the first operator
+     * @template TOperators - Array of subsequent operators
+     * @param op - First operator (required) - transforms this signal
+     * @param operators - Additional operators to apply sequentially
+     * @returns The final transformed signal
+     *
+     * @example Basic usage
      * ```ts
      * const count = signal(0);
      *
-     * // Running total
-     * const total = count.scan((sum, curr) => sum + curr, 0);
+     * // Without to() (nested, hard to read)
+     * const result = count.map(x => x * 2).map(x => x + 1).map(x => `Value: ${x}`);
      *
-     * // Delta from previous
-     * const delta = count.scan((prev, curr) => curr - prev, 0);
-     *
-     * // Keep last N values
-     * const last5 = count.scan(
-     *   (acc, curr) => [...acc, curr].slice(-5),
-     *   [] as number[]
-     * );
-     *
-     * // With equality string shortcuts
-     * const stats = count.scan(
-     *   (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
-     *   { sum: 0, count: 0 },
-     *   'shallow'
-     * );
-     *
-     * // With custom equals function (use options object)
-     * const stats = count.scan(
-     *   (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
-     *   { sum: 0, count: 0 },
-     *   { equals: (a, b) => a.sum === b.sum }
-     * );
-     *
-     * // With full options
-     * const stats = count.scan(
-     *   (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
-     *   { sum: 0, count: 0 },
-     *   { equals: 'deep', name: 'stats' }
+     * // With to() (linear, easy to read)
+     * const result = count.to(
+     *   s => s.map(x => x * 2),
+     *   s => s.map(x => x + 1),
+     *   s => s.map(x => `Value: ${x}`)
      * );
      * ```
+     *
+     * @example Reusable operators
+     * ```ts
+     * // Define reusable operators
+     * const double = (s: Signal<number>) => s.map(x => x * 2);
+     * const addOne = (s: Signal<number>) => s.map(x => x + 1);
+     * const format = (s: Signal<number>) => s.map(x => `Value: ${x}`);
+     *
+     * // Compose them
+     * const result = count.to(double, addOne, format);
+     * // Type: ComputedSignal<string>
+     * ```
+     *
+     * @example Type inference
+     * ```ts
+     * const user = signal({ name: "Alice", age: 30 });
+     *
+     * const displayName = user.to(
+     *   s => s.map(u => u.name),              // Signal<string>
+     *   s => s.map(name => name.toUpperCase()) // Signal<string>
+     * );
+     * // Type: ComputedSignal<string>
+     * ```
      */
-    scan<U>(
-      fn: (accumulator: U, current: TValue | TInit) => U,
-      initialValue: U,
-      equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
-    ): ComputedSignal<U>;
+    to<
+      TResult,
+      const TOperators extends readonly SignalOperator<TResult, any>[]
+    >(
+      op: SignalOperator<Signal<TValue, TInit>, TResult>,
+      ...operators: TOperators
+    ): TryInjectDispose<
+      ToResult<
+        [SignalOperator<Signal<TValue, TInit>, TResult>, ...TOperators],
+        never
+      >
+    >;
   };
+
+export type TryInjectDispose<T> = T extends object
+  ? T & { dispose: VoidFunction }
+  : T;
 
 /**
  * Mutable signal - can be modified with set()

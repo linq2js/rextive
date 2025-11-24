@@ -65,87 +65,8 @@ describe("createComputedSignal", () => {
     });
   });
 
-  describe("map method", () => {
-    it("should map computed signal values", () => {
-      const source = signal(5);
-      const computed = signal({ source }, ({ deps }) => deps.source * 2);
-      const mapped = computed.map((x) => x + 100);
-
-      expect(mapped()).toBe(110); // (5 * 2) + 100
-
-      source.set(10);
-      expect(mapped()).toBe(120); // (10 * 2) + 100
-    });
-
-    it("should map with custom equals function", () => {
-      const source = signal(5);
-      const computed = signal({ source }, ({ deps }) => deps.source * 2);
-
-      const listener = vi.fn();
-      const mapped = computed.map(
-        (x) => ({ value: x }),
-        (a, b) => a && b && a.value === b.value // Custom equals with null check
-      );
-      
-      // Get initial value first
-      const initial = mapped();
-      expect(initial).toEqual({ value: 10 });
-      
-      // Now subscribe
-      mapped.on(listener);
-
-      // Change to same value - should not notify due to custom equals
-      source.set(5); // Still results in 10
-      expect(listener).toHaveBeenCalledTimes(0);
-
-      // Change to different value
-      source.set(10);
-      expect(mapped()).toEqual({ value: 20 });
-      expect(listener).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("scan method", () => {
-    it("should accumulate values from computed signal", () => {
-      const source = signal(1);
-      const computed = signal({ source }, ({ deps }) => deps.source);
-      const accumulated = computed.scan((acc, curr) => acc + curr, 0);
-
-      expect(accumulated()).toBe(1); // 0 + 1
-
-      source.set(2);
-      expect(accumulated()).toBe(3); // 1 + 2
-
-      source.set(3);
-      expect(accumulated()).toBe(6); // 3 + 3
-    });
-
-    it("should scan with custom equals function", () => {
-      const source = signal(1);
-      const computed = signal({ source }, ({ deps }) => deps.source);
-
-      const listener = vi.fn();
-      const scanned = computed.scan(
-        (acc, curr) => ({ sum: acc.sum + curr }),
-        { sum: 0 },
-        (a, b) => a && b && a.sum === b.sum
-      );
-      
-      // Get initial value first
-      expect(scanned()).toEqual({ sum: 1 });
-      
-      // Now subscribe
-      scanned.on(listener);
-
-      source.set(0); // Results in same sum: 1 + 0 = 1
-      expect(scanned()).toEqual({ sum: 1 });
-      expect(listener).toHaveBeenCalledTimes(0); // No change
-
-      source.set(5); // Results in: 1 + 5 = 6
-      expect(scanned()).toEqual({ sum: 6 });
-      expect(listener).toHaveBeenCalledTimes(1);
-    });
-  });
+  // .map() method removed - use select operator from rextive/op instead
+  // .scan() method removed - use scan operator from rextive/op instead
 
   describe("tags integration", () => {
     it("should register computed signal with tags and allow operations", () => {

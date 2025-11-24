@@ -60,6 +60,27 @@ const SINGLE_SIGNAL_RENDER = (value: any) => value.value;
  *    - Provides both Suspense (value) and manual (loadable) access patterns
  *    - Watch array controls when render function reference changes
  *
+ * @warning **IMPORTANT: Do NOT use `rx()` directly in element attributes!**
+ *
+ * ❌ **WRONG** - This will NOT be reactive:
+ * ```tsx
+ * <input value={rx(signal)} />  // ❌ Won't update!
+ * <div className={rx(theme)} /> // ❌ Won't update!
+ * ```
+ *
+ * ✅ **CORRECT** - Use one of these patterns instead:
+ * ```tsx
+ * // Option 1: Wrap the entire element in rx() with render function
+ * {rx({ signal }, (value) => <input value={value.signal} />)}
+ *
+ * // Option 2: Use rx() with component + signal props (Overload 1)
+ * {rx("input", { value: signal })}
+ * ```
+ *
+ * **Why?** `rx()` returns a React component that subscribes to signals.
+ * When used in attributes, it's evaluated once during render and won't
+ * re-subscribe on updates. Always wrap the entire element or use Overload 1.
+ *
  * @example Overload 1 - Component with mixed props
  * ```tsx
  * const count = signal(42);

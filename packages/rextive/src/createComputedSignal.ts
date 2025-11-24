@@ -11,6 +11,7 @@ import { scheduleNotification } from "./batch";
 import { SIGNAL_TYPE } from "./is";
 import { FallbackError } from "./signal";
 import { resolveEquals } from "./utils/resolveEquals";
+import { toSignals } from "./utils/toSignals";
 
 /**
  * Create a computed signal (with dependencies)
@@ -26,7 +27,7 @@ export function createComputedSignal(
     onCleanup: Emitter,
     onDepChange: VoidFunction
   ) => any,
-  signal: any // Pass signal function to avoid circular dependency
+  _signal: any // Pass signal function to avoid circular dependency (unused here)
 ): ComputedSignal<any> {
   // Similar to createSignal but without set()
   // and with pause/resume functionality
@@ -208,41 +209,8 @@ export function createComputedSignal(
     return "success" as const;
   };
 
-  const map = function <U>(
-    this: ComputedSignal<any>,
-    fn: (value: any) => U,
-    equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
-  ): ComputedSignal<U> {
-    // Convert equals function/string to options if needed
-    const options: SignalOptions<U> | undefined =
-      typeof equalsOrOptions === "function" || typeof equalsOrOptions === "string"
-        ? { equals: equalsOrOptions }
-        : equalsOrOptions;
-    
-    return signal({ source: this }, (ctx: any) => fn(ctx.deps.source), options);
-  };
-
-  const scan = function <U>(
-    this: ComputedSignal<any>,
-    fn: (accumulator: U, current: any) => U,
-    initialValue: U,
-    equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
-  ): ComputedSignal<U> {
-    let acc = initialValue;
-    // Convert equals function/string to options if needed
-    const options: SignalOptions<U> | undefined =
-      typeof equalsOrOptions === "function" || typeof equalsOrOptions === "string"
-        ? { equals: equalsOrOptions }
-        : equalsOrOptions;
-
-    return signal(
-      { source: this },
-      (ctx: any) => {
-        acc = fn(acc, ctx.deps.source);
-        return acc;
-      },
-      options
-    );
+  const to = function (...operators: Array<(source: any) => any>): any {
+    return toSignals(instance, operators);
   };
 
   const instance = Object.assign(get, {
@@ -257,8 +225,7 @@ export function createComputedSignal(
     resume,
     paused,
     hydrate,
-    map,
-    scan,
+    to,
   });
 
   instanceRef = instance as unknown as ComputedSignal<any>;

@@ -23,10 +23,11 @@ useEffect(() => {
 
 // ✅ Rextive - One concept for everything
 import { signal } from "rextive";
+import { select } from "rextive/op";
 // Or use $ for concise code: import { $ } from "rextive";
 
 const count = signal(0);
-const doubled = count.map((x) => x * 2);
+const doubled = count.to(select((x) => x * 2));
 ```
 
 **Rextive replaces:**
@@ -92,19 +93,21 @@ count.set((x) => x + 1);
 
 ## 📖 Core Concepts
 
-### Single Dependency: Use `.map()`
+### Single Dependency: Use Operators
 
-For simple transformations of a single signal, use `.map()`:
+For simple transformations of a single signal, use operators from `rextive/op`:
 
 ```tsx
+import { select } from "rextive/op";
+
 const count = signal(0);
-const doubled = count.map((x) => x * 2);
-const formatted = count.map((x) => `Count: ${x}`);
+const doubled = count.to(select((x) => x * 2));
+const formatted = count.to(select((x) => `Count: ${x}`));
 
 // With custom equality (string shortcuts or functions)
 const user = signal({ name: "John", age: 30 });
-const name = user.map((u) => u.name, "shallow");
-const data = user.map((u) => u.data, "deep");
+const name = user.to(select((u) => u.name, "shallow"));
+const data = user.to(select((u) => u.data, "deep"));
 ```
 
 ### Custom Equality: Optimize Re-renders
@@ -136,7 +139,7 @@ user.set({ name: "Jane", age: 30 }); // ✅ Updates (name changed)
 
 **Built-in equality strategies:**
 
-- `'is'` (default) - Reference equality using `Object.is`
+- `'strict'` (default) - Reference equality using `Object.is`
 - `'shallow'` - Shallow comparison (compares object keys/array elements)
 - `'deep'` - Deep comparison using lodash `isEqual` (recursive)
 
@@ -223,7 +226,7 @@ userId.set(2); // Cancels previous fetch, starts new one
 
 | Pattern                      | Use When                         | Example                                           |
 | ---------------------------- | -------------------------------- | ------------------------------------------------- |
-| `.map()`                     | Single dependency transformation | `count.map(x => x * 2)`                           |
+| `.to(select(...))`           | Single dependency transformation | `count.to(select(x => x * 2))`                    |
 | `signal(value, equals)`      | Custom equality for objects      | `signal({ name: 'John' }, shallowEquals)`         |
 | `signal({ deps }, fn)`       | Multiple dependencies            | `signal({ a, b }, ({ deps }) => deps.a + deps.b)` |
 | `signal({ deps }, async fn)` | Async with dependencies          | `signal({ id }, async ({ deps }) => fetch(...))`  |
@@ -258,7 +261,7 @@ import { rx } from "rextive/react";
 
 const user = signal(async () => fetchUser()); // Async
 const count = signal(0); // Sync
-const doubled = count.map((x) => x * 2); // Computed (transformation)
+const doubled = count.to(select((x) => x * 2)); // Computed (transformation)
 
 // Use them exactly the same way!
 rx({ user, count, doubled }, (value) => (
@@ -319,15 +322,17 @@ import { rx, useScope } from "rextive/react";
 
 ```tsx
 import { signal } from "rextive";
+import { rx } from "rextive/react";
+import { select } from "rextive/op";
 
 const count = signal(0);
-const doubled = count.map((x) => x * 2);
+const doubled = count.to(select((x) => x * 2));
 
 function Counter() {
   return (
     <div>
-      <h1>Count: {count()}</h1>
-      <h2>Doubled: {doubled()}</h2>
+      <h1>Count: {rx(count)}</h1>
+      <h2>Doubled: {rx(doubled)}</h2>
       <button onClick={() => count.set((x) => x + 1)}>+1</button>
       <button onClick={() => count.reset()}>Reset</button>
     </div>
@@ -351,7 +356,11 @@ const user = signal({ userId }, async ({ deps, abortSignal }) => {
 });
 
 function Profile() {
-  return <Suspense fallback={<div>Loading...</div>}>{user().name}</Suspense>;
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      {rx(user, (u) => u.name)}
+    </Suspense>
+  );
 }
 
 // Change user - previous fetch cancelled automatically!
@@ -361,7 +370,7 @@ userId.set(2);
 ### Component-Scoped State (Auto-Cleanup)
 
 ```tsx
-import { signal } from "rextive";
+import { signal, disposable } from "rextive";
 import { rx, useScope } from "rextive/react";
 
 function TodoList() {
@@ -369,11 +378,8 @@ function TodoList() {
     const todos = signal([]);
     const filter = signal("all");
 
-    return {
-      todos,
-      filter,
-      dispose: [todos, filter], // ✅ Auto-disposed when component unmounts!
-    };
+    // ✅ disposable() helper automatically adds dispose property
+    return disposable({ todos, filter });
   });
 
   return (
@@ -392,7 +398,7 @@ function TodoList() {
 ### React Query-like Patterns
 
 ```tsx
-import { signal } from "rextive";
+import { signal, disposable } from "rextive";
 import { rx, useScope } from "rextive/react";
 
 function createQuery(endpoint) {
@@ -410,11 +416,11 @@ function createQuery(endpoint) {
     return res.json();
   });
 
-  return {
-    params,
-    data,
-    dispose: [params, data], // Dispose signals when scope unmounts
-  };
+  // ✅ Shorter: disposable() automatically adds dispose property
+  return disposable({ params, data });
+
+  // Or explicit (equivalent):
+  // return { params, data, dispose: [params, data] };
 }
 
 // Use it
@@ -435,7 +441,7 @@ function UserProfile() {
 ### Form Validation
 
 ```tsx
-import { signal } from "rextive";
+import { signal, disposable } from "rextive";
 import { rx, useScope } from "rextive/react";
 
 function ContactForm() {
@@ -454,12 +460,7 @@ function ContactForm() {
       ({ deps }) => Object.keys(deps.errors).length === 0
     );
 
-    return {
-      form,
-      errors,
-      isValid,
-      dispose: [form, errors, isValid], // Dispose all signals
-    };
+    return disposable({ form, errors, isValid });
   });
 
   return rx({ form, errors, isValid }, (value) => (
@@ -498,22 +499,18 @@ function SearchBox() {
       return res.json();
     });
 
-    return {
-      searchTerm,
-      results,
-      dispose: [searchTerm, results], // Dispose signals on unmount
-    };
+    return disposable({ searchTerm, results });
   });
 
   return (
     <div>
-      <input
-        value={searchTerm()}
-        onChange={(e) => searchTerm.set(e.target.value)}
-      />
-      {results().map((item) => (
-        <div key={item.id}>{item.name}</div>
-      ))}
+      {rx("input", {
+        value: searchTerm,
+        onChange: (e: any) => searchTerm.set(e.target.value),
+      })}
+      {rx(results, (items) =>
+        items.map((item) => <div key={item.id}>{item.name}</div>)
+      )}
     </div>
   );
 }
@@ -565,65 +562,41 @@ signals.theme.set("light");
 
 ## 🎯 Advanced Patterns
 
-### Transform with `.map()` (Stateless)
+### Advanced Transformations with Operators
+
+For complex transformations like filtering, accumulation, or composition, use operators from `rextive/op`:
 
 ```tsx
 import { signal } from "rextive";
-
-const count = signal(5);
-
-const doubled = count.map((x) => x * 2);
-const formatted = count.map((x) => `Count: ${x}`);
-
-// Chainable
-const result = count
-  .map((x) => x * 2)
-  .map((x) => x + 1)
-  .map((x) => `Result: ${x}`);
-
-// With custom equality
-const user = signal({ name: "John", age: 30 });
-const name = user.map(
-  (u) => u.name,
-  (a, b) => a === b // Only notify if name changes
-);
-```
-
-### Accumulate with `.scan()` (Stateful)
-
-```tsx
-import { signal } from "rextive";
+import { select, filter, scan } from "rextive/op";
 
 const count = signal(1);
 
-// Running total
-const total = count.scan((sum, curr) => sum + curr, 0);
-count.set(2); // total = 3
-count.set(3); // total = 6
+// Single operator
+const doubled = count.to(select((x) => x * 2));
 
-// Keep last 3 values
-const last3 = count.scan((acc, curr) => [...acc, curr].slice(-3), []);
-
-// Build statistics with shallow equality
-const stats = count.scan(
-  (acc, curr) => ({
-    sum: acc.sum + curr,
-    count: acc.count + 1,
-    avg: (acc.sum + curr) / (acc.count + 1),
-    min: Math.min(acc.min, curr),
-    max: Math.max(acc.max, curr),
-  }),
-  { sum: 0, count: 0, avg: 0, min: Infinity, max: -Infinity },
-  "shallow" // String shortcut for shallow equality
+// Chain multiple operators
+const result = count.to(
+  filter((x) => x > 0), // Only positive numbers
+  select((x) => x * 2), // Double the value
+  scan((acc, x) => acc + x, 0) // Running total
 );
 
-// Or with full options
-const stats = count.scan(
-  (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
-  { sum: 0, count: 0 },
-  { equals: "shallow", name: "runningStats" }
-);
+// Reusable operators
+const positiveOnly = filter((x: number) => x > 0);
+const double = select((x: number) => x * 2);
+const sum = scan((acc: number, x: number) => acc + x, 0);
+
+const pipeline = count.to(positiveOnly, double, sum);
 ```
+
+**Available Operators:**
+
+- **`select(fn, equals?)`** - Transform each value
+- **`filter(predicate, equals?)`** - Only emit values that pass the test
+- **`scan(fn, initial, equals?)`** - Accumulate values with state (like Array.reduce)
+
+See [Operators](#operators) section for detailed documentation.
 
 ### Group Signals with Tags
 
@@ -681,7 +654,7 @@ const user = signal<User>(); // get() returns User | undefined
 user.set({ name: "Alice" }); // set() requires User (not undefined)
 
 // Computed signal (transformation)
-const doubled = count.map((x) => x * 2);
+const doubled = count.to(select((x) => x * 2));
 
 // Async signal
 const data = signal(async () => fetchData());
@@ -707,9 +680,15 @@ count.reset(); // Reset to initial value
 count.on((value) => console.log(value)); // Subscribe to changes
 count.dispose(); // Cleanup and stop reactivity
 
-// Transformations
-count.map((x) => x * 2, "shallow"); // Transform value (stateless)
-count.scan((sum, x) => sum + x, 0, "deep"); // Accumulate value (stateful)
+// Transformations with operators
+import { select, scan } from "rextive/op";
+
+// Transform object/array values with equality checks
+const user = signal({ name: "Alice", age: 30 });
+user.to(select((u) => ({ name: u.name }), "shallow")); // Shallow equality on result
+
+// Accumulate with deep equality
+count.to(scan((sum, x) => sum + x, 0)); // Stateful operation
 ```
 
 **Options:**
@@ -718,7 +697,7 @@ count.scan((sum, x) => sum + x, 0, "deep"); // Accumulate value (stateful)
 signal(value, {
   name: "mySignal", // For debugging
   lazy: true, // Compute only when accessed
-  equals: "shallow", // String shortcut: 'is' | 'shallow' | 'deep' | custom function
+  equals: "shallow", // String shortcut: 'strict' | 'shallow' | 'deep' | custom function
   fallback: (error) => value, // Error fallback value
   onChange: (value) => {}, // Change callback
   onError: (error) => {}, // Error callback
@@ -726,7 +705,7 @@ signal(value, {
 });
 
 // Equals option accepts:
-// - 'is' (default): Object.is (reference equality)
+// - 'strict' (default): Object.is (reference equality)
 // - 'shallow': Shallow comparison (object keys/array elements)
 // - 'deep': Deep comparison (lodash isEqual)
 // - Custom function: (a, b) => boolean
@@ -806,48 +785,57 @@ count.on(() => {}); // Throws error
 - Component unmounting (or use `useScope` for auto-cleanup)
 - Preventing memory leaks in long-lived applications
 
-#### `.map(fn, equals?)` → `ComputedSignal`
+#### `.to(...operators)` → `Signal`
 
-Transform signal value (stateless). Returns a new computed signal.
-
-```tsx
-const count = signal(0);
-
-// Basic transformation
-const doubled = count.map((x) => x * 2);
-
-// With equality check
-const user = signal({ name: "John", age: 30 });
-const name = user.map((u) => u.name, "shallow");
-
-// With custom equals
-const data = user.map(
-  (u) => ({ name: u.name }),
-  (a, b) => a.name === b.name
-);
-```
-
-**Equals options:** `'is'` | `'shallow'` | `'deep'` | `(a, b) => boolean`
-
-#### `.scan(fn, initial, equals?)` → `ComputedSignal`
-
-Accumulate values with state (stateful). Returns a new computed signal.
+Chain multiple transformations in a readable, left-to-right manner. Each operator is a function that takes a signal and returns a transformed signal.
 
 ```tsx
-const count = signal(1);
+import { select } from "rextive/op";
 
-// Running total
-const total = count.scan((sum, curr) => sum + curr, 0);
+const count = signal(5);
 
-// With equality check
-const stats = count.scan(
-  (acc, curr) => ({ sum: acc.sum + curr, count: acc.count + 1 }),
-  { sum: 0, count: 0 },
-  "shallow"
+// Single transformation
+const doubled = count.to(select((x) => x * 2));
+
+// Chain multiple operators (linear, easy to read)
+const result = count.to(
+  select((x) => x * 2),
+  select((x) => x + 1),
+  select((x) => `Value: ${x}`)
 );
+
+// Reusable operators
+const double = <T extends number>(s: Signal<T>) => s.to(select((x) => x * 2));
+const addOne = <T extends number>(s: Signal<T>) => s.to(select((x) => x + 1));
+const format = <T,>(s: Signal<T>) => s.to(select((x) => `Value: ${x}`));
+
+const result = count.to(double, addOne, format);
+// result() === "Value: 11"
 ```
 
-**Equals options:** `'is'` | `'shallow'` | `'deep'` | `(a, b) => boolean`
+**Benefits:**
+
+- **Composability**: Build complex transformations from simple, reusable operators
+- **Readability**: Linear flow from left to right, easier to understand than nested calls
+- **Type Safety**: Full TypeScript support with proper type inference through the chain
+- **Automatic Cleanup**: When you dispose the result, all intermediate signals are automatically disposed
+
+**Memory Management:**
+
+```tsx
+import { select } from "rextive/op";
+
+const result = count.to(
+  select((x) => x * 2), // intermediate1
+  select((x) => x + 1), // intermediate2
+  select((x) => `Value: ${x}`) // result
+);
+
+// Dispose the result
+result.dispose();
+// ✅ Automatically disposes intermediate1 and intermediate2
+// No memory leaks!
+```
 
 ---
 
@@ -919,6 +907,20 @@ rx({ user, posts }, (value, loadable) => (
 ));
 ```
 
+> **⚠️ Common Mistake: Don't use `rx()` in element attributes!**
+>
+> ```tsx
+> // ❌ WRONG - Not reactive, renders once
+> <input value={rx(signal)} />
+> <div className={rx(theme)} />
+>
+> // ✅ CORRECT - Use one of these patterns:
+> {rx("input", { value: signal })}
+> {rx({ signal }, (value) => <input value={value.signal} />)}
+> ```
+>
+> **Why?** `rx()` returns a React component. When used in attributes, it's evaluated once and won't update. Always wrap the entire element or use the component overload.
+
 ### `useScope()` - Three Modes
 
 Unified hook for lifecycle management and scoped services.
@@ -929,7 +931,7 @@ Unified hook for lifecycle management and scoped services.
 const { count, doubled } = useScope(
   () => {
     const count = signal(0);
-    const doubled = count.map((x) => x * 2);
+    const doubled = count.to(select((x) => x * 2));
 
     return {
       count,
@@ -1031,6 +1033,185 @@ await wait.delay(1000); // Sleep
 
 ---
 
+## 🔧 Operators
+
+Operators are composable functions for transforming signals. Import from `rextive/op`:
+
+```tsx
+import { select, filter, scan } from "rextive/op";
+```
+
+### `select(fn, equals?)` - Transform Values
+
+Transform each value from the source signal.
+
+```tsx
+import { signal } from "rextive";
+import { select } from "rextive/op";
+
+const count = signal(5);
+
+// Single transformation
+const doubled = count.to(select((x) => x * 2));
+
+// With equality check
+const name = user.to(select((u) => u.name, "shallow"));
+
+// With options
+const formatted = count.to(
+  select((x) => `Count: ${x}`, {
+    equals: "strict",
+    name: "formatted",
+  })
+);
+```
+
+**Parameters:**
+
+- `fn: (value: T) => U` - Transformation function
+- `equals?` - Equality strategy: `"strict"` | `"shallow"` | `"deep"` | options object
+
+### `select.then(fn, equals?)` - Transform Promise Values
+
+Transform values after awaiting them (if they're promises). Named after `Promise.then()` for familiarity. Uses `loadable()` internally to cache promise states and avoid re-awaiting already resolved promises.
+
+```tsx
+import { signal } from "rextive";
+import { select } from "rextive/op";
+
+// Transform promise values
+const userPromise = signal(fetchUser());
+const userName = userPromise.to(select.then((user) => user.name));
+
+// Handle mixed promise/non-promise values
+const data = signal<number | Promise<number>>(5);
+const doubled = data.to(select.then((x) => x * 2));
+
+doubled(); // 10 (sync)
+data.set(Promise.resolve(10));
+await doubled(); // 20 (async)
+
+// Async selector function
+const processed = userPromise.to(
+  select.then(async (user) => {
+    const profile = await fetchProfile(user.id);
+    return profile.bio;
+  })
+);
+```
+
+**Parameters:**
+
+- `fn: (value: Awaited<T>) => U` - Transformation function (can be sync or async)
+- `equals?` - Equality strategy: `"strict"` | `"shallow"` | `"deep"` | options object
+
+**Benefits:**
+
+- ✅ Avoids re-awaiting already resolved promises (uses cached loadable state)
+- ✅ Works with both promise and non-promise values
+- ✅ Supports async transformation functions
+- ✅ Properly handles errors from rejected promises
+
+### `filter(predicate, equals?)` - Filter Values
+
+Only emit values that pass the predicate test. If the predicate returns false, the signal keeps its previous value.
+
+**Note:** The first value is always emitted, regardless of the predicate.
+
+```tsx
+import { filter } from "rextive/op";
+
+const count = signal(1);
+
+// Only positive numbers
+const positiveOnly = count.to(filter((x) => x > 0));
+
+count.set(2); // positiveOnly() === 2
+count.set(-1); // positiveOnly() === 2 (unchanged, filtered out)
+count.set(5); // positiveOnly() === 5
+
+// Type narrowing
+const value = signal<string | number>(1);
+const numbersOnly = value.to(filter((x): x is number => typeof x === "number"));
+// Type: ComputedSignal<number>
+```
+
+**Parameters:**
+
+- `predicate: (value: T) => boolean` - Test function
+- `equals?` - Equality strategy: `"strict"` | `"shallow"` | `"deep"` | options object
+
+### `scan(fn, initialValue, equals?)` - Accumulate Values
+
+Accumulate values with state, similar to `Array.reduce()`. The accumulator is updated on each source signal change.
+
+```tsx
+import { scan } from "rextive/op";
+
+const count = signal(1);
+
+// Running total
+const total = count.to(scan((acc, curr) => acc + curr, 0));
+
+count.set(2); // total() === 3
+count.set(3); // total() === 6
+
+// Keep history
+const history = count.to(scan((acc, curr) => [...acc, curr], [] as number[]));
+
+// Build statistics
+const stats = count.to(
+  scan(
+    (acc, curr) => ({
+      sum: acc.sum + curr,
+      count: acc.count + 1,
+      avg: (acc.sum + curr) / (acc.count + 1),
+    }),
+    { sum: 0, count: 0, avg: 0 },
+    "shallow" // Shallow equality check
+  )
+);
+```
+
+**Parameters:**
+
+- `fn: (accumulator: U, current: T) => U` - Accumulator function
+- `initialValue: U` - Initial accumulator value
+- `equals?` - Equality strategy: `"strict"` | `"shallow"` | `"deep"` | options object
+
+### Composing Operators
+
+Chain multiple operators for complex transformations:
+
+```tsx
+import { select, filter, scan } from "rextive/op";
+
+const count = signal(1);
+
+const result = count.to(
+  filter((x) => x > 0), // Only positive
+  select((x) => x * 2), // Double it
+  scan((acc, x) => acc + x, 0) // Running sum
+);
+
+// Reusable operators
+const positiveOnly = filter((x: number) => x > 0);
+const double = select((x: number) => x * 2);
+const sum = scan((acc: number, x: number) => acc + x, 0);
+
+const pipeline1 = count.to(positiveOnly, double, sum);
+const pipeline2 = otherSignal.to(positiveOnly, double, sum);
+```
+
+**Benefits:**
+
+- **Composable**: Build complex transformations from simple operators
+- **Reusable**: Define operators once, use everywhere
+- **Type-safe**: Full TypeScript inference through the chain
+- **Automatic cleanup**: Intermediate signals are disposed automatically
+
+---
+
 ## 🆚 Comparison with Other Libraries
 
 ### vs React useState + useEffect
@@ -1047,10 +1228,11 @@ useEffect(() => {
 
 // ✅ Rextive - Simple and unified
 import { signal } from "rextive";
+import { select } from "rextive/op";
 
 const count = signal(0);
 const name = signal("");
-const doubled = count.map((x) => x * 2);
+const doubled = count.to(select((x) => x * 2));
 
 count.on(() => console.log("count changed"));
 ```

@@ -22,7 +22,6 @@
 // Re-export React-specific types
 export type {
   RxOptions,
-  UseScopeOptions,
   RerenderOptions,
   RerenderFunction,
 } from "./types";
@@ -30,9 +29,12 @@ export type {
 // Re-export lifecycle types for useScope
 export type {
   LifecyclePhase,
-  ComponentLifecycleCallbacks,
+  LifecycleCallbacks as ComponentLifecycleCallbacks,
   LifecycleCallbacks as ObjectLifecycleCallbacks,
 } from "./useLifecycle";
+
+// Re-export useScope options
+export type { UseScopeOptions } from "./useScope";
 
 // Export React components and hooks
 export { rx } from "./rx";
