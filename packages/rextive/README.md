@@ -1546,7 +1546,7 @@ function UserProfile({ userId }) {
       <button onClick={() => userQuery.refetch()}>Refresh</button>
       <button onClick={handleManualFetch}>Manual Fetch</button>
 
-      {/* Render with loadable states - pass object to avoid Suspense */}
+      {/* rx(signals, render) provides loadables parameter (2nd parameter) with loading/error states for all input signals */}
       {rx(userQuery, (_, loadables) => {
         // Handle loading
         if (loadables.result.status === "loading") {
@@ -1716,9 +1716,26 @@ function RegistrationForm() {
     return disposable({ fields, errors });
   });
 
-  // Reusable field renderer
-  // Reusable field renderer - always treats validation as loadable
-  // Works for both sync and async validation
+  /**
+   * Mental Model & Design:
+   *
+   * rx({ signals }, (awaited, loadables) => JSX) provides two parameters:
+   * 1. `awaited`: Resolved values of all input signals (Promise → value, non-Promise → as-is)
+   * 2. `loadables`: Loading/error states for each signal with structure:
+   *    - loadables.signalName.loading: boolean (true while Promise is pending)
+   *    - loadables.signalName.value: resolved value (for Promises) or the value itself
+   *    - loadables.signalName.error: rejected reason (only for failed Promises)
+   *    - loadables.signalName.status: "loading" | "error" | "success"
+   *
+   * Design Choice:
+   * - Use `loadables` to handle async states WITHOUT triggering React Suspense
+   * - Uniform handling: sync and async validation use the same rendering logic
+   * - For sync values: loadables.value immediately contains the value, loading is false
+   * - For async Promises: loadables tracks loading→success/error lifecycle
+   *
+   * This pattern allows graceful loading states and error handling in the UI.
+   */
+  // Reusable field renderer using the loadables pattern
   const renderField = (
     key: string,
     field: MutableSignal<string>,
@@ -1742,7 +1759,8 @@ function RegistrationForm() {
           </div>
         )}
 
-        {/* Show error message (works for both sync and async) */}
+        {/* Show error message (works for both sync and async).
+          Loadable.value is resolved value of the promise. Loadable.error is rejected reason of the promise */}
         {(loadables.validation.value || loadables.validation.error) && (
           <div style={{ color: "red", fontSize: "0.9em" }}>
             {String(loadables.validation.value || loadables.validation.error)}
