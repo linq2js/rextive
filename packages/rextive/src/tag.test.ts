@@ -613,8 +613,10 @@ describe("tag", () => {
 
         myTag.delete(sig);
 
-        // Signal should be disposed
-        expect(() => sig()).toThrow();
+        // Signal should be disposed - verify by trying to set (which throws)
+        expect(() => sig.set(2)).toThrow("Cannot set value on disposed signal");
+        // Can still read last value
+        expect(sig()).toBe(1);
       });
 
       it("should dispose all signals when tag is cleared", () => {
@@ -625,9 +627,12 @@ describe("tag", () => {
 
         myTag.clear();
 
-        // Both signals should be disposed
-        expect(() => sig1()).toThrow();
-        expect(() => sig2()).toThrow();
+        // Both signals should be disposed - verify by trying to set
+        expect(() => sig1.set(10)).toThrow("Cannot set value on disposed signal");
+        expect(() => sig2.set(20)).toThrow("Cannot set value on disposed signal");
+        // Can still read last values
+        expect(sig1()).toBe(1);
+        expect(sig2()).toBe(2);
       });
 
       it("should not double-dispose when signal is already being disposed", () => {
@@ -655,7 +660,8 @@ describe("tag", () => {
         autoTag.delete(sig);
 
         // Signal should be disposed and removed from both tags
-        expect(() => sig()).toThrow();
+        expect(() => sig.set(10)).toThrow("Cannot set value on disposed signal");
+        expect(sig()).toBe(1); // Can still read
         expect(autoTag.has(sig)).toBe(false);
         expect(normalTag.has(sig)).toBe(false);
       });
@@ -690,7 +696,8 @@ describe("tag", () => {
         myTag.delete(sig1);
 
         // sig1 should be disposed
-        expect(() => sig1()).toThrow();
+        expect(() => sig1.set(10)).toThrow("Cannot set value on disposed signal");
+        expect(sig1()).toBe(1); // Can still read
 
         // Should allow adding new signal now
         expect(() => {

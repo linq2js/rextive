@@ -9,7 +9,7 @@ import {
 } from "./types";
 import { scheduleNotification } from "./batch";
 import { SIGNAL_TYPE } from "./is";
-import { FallbackError } from "./signal";
+import { FallbackError } from "./common";
 import { resolveEquals } from "./utils/resolveEquals";
 import { pipeSignals } from "./utils/pipeSignals";
 import { createComputedSignal } from "./createComputedSignal";
@@ -77,7 +77,7 @@ export function createMutableSignal(
     context = undefined;
 
     if (tags && tags.length > 0 && instanceRef) {
-      tags.forEach((tag) => (tag as any)._remove(instanceRef));
+      tags.forEach((tag) => (tag as any)._delete(instanceRef));
     }
 
     // Cleanup when() subscriptions
@@ -156,6 +156,8 @@ export function createMutableSignal(
   };
 
   const get = () => {
+    // Allow reading last value/error even after disposal
+    // Only recompute if not disposed and no current value
     if (!current && !disposed) {
       recompute();
     }

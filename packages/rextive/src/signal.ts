@@ -12,7 +12,8 @@ import { createSignalContext } from "./createSignalContext";
 import { EqualsStrategy } from "./utils/resolveEquals";
 import { Tag } from "./tag";
 
-export const DISPOSED_MESSAGE = "Signal is disposed";
+// Re-export constants for backward compatibility
+export { DISPOSED_MESSAGE, FallbackError } from "./common";
 
 /**
  * Check if value looks like a dependencies object (for computed signals)
@@ -223,20 +224,4 @@ export function signal(...args: any[]): any {
   // Overload 5: Mutable signal with options (or no second arg)
   // signal(value, options?) or signal(value)
   return createMutableSignalWithOptions(first, second);
-}
-
-export class FallbackError extends Error {
-  readonly originalError: unknown;
-  readonly fallbackError: unknown;
-  readonly signalName?: string;
-
-  constructor(error: unknown, fallbackError: unknown, signalName?: string) {
-    super(
-      `Signal computation failed with: ${error}\nFallback also failed with: ${fallbackError}`
-    );
-    this.name = "FallbackError";
-    this.originalError = error;
-    this.fallbackError = fallbackError;
-    this.signalName = signalName;
-  }
 }
