@@ -1684,7 +1684,12 @@ function contextUseTests() {
 
   // Multiple arguments
   const computed3 = signal({ count }, (context) => {
-    const calculate = (ctx: typeof context, a: number, b: number, c: string) => {
+    const calculate = (
+      ctx: typeof context,
+      a: number,
+      b: number,
+      c: string
+    ) => {
       return `${ctx.deps.count * a * b} ${c}`;
     };
     return context.use(calculate, 2, 3, "result");
@@ -1714,12 +1719,10 @@ function contextUseTests() {
       expectType<number>(ctx.deps.count);
       expectType<AbortSignal>(ctx.abortSignal);
       expectType<(fn: VoidFunction) => void>(ctx.onCleanup);
-      expectType<
-        {
-          <T>(fn: () => T): T;
-          <T, TArgs extends any[]>(fn: (...args: TArgs) => T, ...args: TArgs): T;
-        }
-      >(ctx.run);
+      expectType<{
+        <T>(fn: () => T): T;
+        <T, TArgs extends any[]>(fn: (...args: TArgs) => T, ...args: TArgs): T;
+      }>(ctx.safe);
       return ctx.deps.count;
     });
   });
