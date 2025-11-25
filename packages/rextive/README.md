@@ -451,7 +451,7 @@ count.set(10)  // Change count
 result = 10 × 2 = 20  // Automatically recalculated!
 ```
 
-**Key features:**
+**Key Features:**
 
 - ✅ **Auto-tracking** - Updates when ANY dependency changes
 - ✅ **Type-safe** - Full TypeScript inference
@@ -1888,12 +1888,7 @@ function SearchBox() {
       }
     );
 
-    // Is searching? (for loading indicator)
-    const isSearching = signal({ searchInput, results }, ({ deps }) => {
-      return deps.searchInput.trim().length >= 2;
-    });
-
-    return disposable({ searchInput, results, isSearching });
+    return disposable({ searchInput, results });
   });
 
   return (
@@ -1921,10 +1916,11 @@ function SearchBox() {
           )
       )}
 
-      {/* Results with loading state */}
+      {/* Results with loading state - using loadables.results.loading instead of separate isSearching signal */}
       {rx(
         { results: scope.results, searchInput: scope.searchInput },
         (awaited, loadables) => {
+          // Check if results Promise is pending
           if (loadables.results.status === "loading") {
             return <div>Searching...</div>;
           }
@@ -1995,7 +1991,7 @@ const results = signal(
 // Result: Only ONE fetch for "react", not 5 fetches
 ```
 
-**Key advantages:**
+**Key Features:**
 
 - ✅ Reduced API calls (only after user stops typing)
 - ✅ Automatic cancellation (no race conditions)
@@ -2488,13 +2484,14 @@ function Component() {
 <details>
 <summary>📖 <strong>Lifecycle Phase Details</strong></summary>
 
-| Phase       | When                | Runs in StrictMode | Use For                        |
-| ----------- | ------------------- | ------------------ | ------------------------------ |
-| **init**    | Before first render | Once               | Signal creation, initial setup |
-| **mount**   | After first paint   | Once               | DOM measurements, animations   |
-| **render**  | Every render        | Every render       | Tracking, debugging            |
-| **cleanup** | React cleanup       | 2-3 times          | Pause, not for final cleanup   |
-| **dispose** | True unmount        | **Exactly once**   | Final cleanup, unsubscribe     |
+| Phase       | When                     | Runs in StrictMode | Use For                        |
+| ----------- | ------------------------ | ------------------ | ------------------------------ |
+| **init**    | Before first render      | Once               | Signal creation, initial setup |
+| **mount**   | After first paint        | Once               | DOM measurements, animations   |
+| **update**  | After render (with deps) | Every effect run   | Sync effects, side effects     |
+| **render**  | Every render             | Every render       | Tracking, debugging            |
+| **cleanup** | React cleanup            | 2-3 times          | Pause, not for final cleanup   |
+| **dispose** | True unmount             | **Exactly once**   | Final cleanup, unsubscribe     |
 
 ```tsx
 // Example: Analytics tracking
@@ -2518,6 +2515,25 @@ useScope({
 
   dispose: () => {
     ws.close(); // Clean disconnect
+  },
+});
+
+// Example: Update with dependencies
+useScope({
+  update: [
+    () => {
+      // Runs after render when userId changes
+      analytics.track("user-changed", { userId });
+    },
+    userId, // Dependency
+  ],
+});
+
+// Example: Update without dependencies (every render)
+useScope({
+  update: () => {
+    // Runs after every render - use sparingly!
+    console.log("Component updated");
   },
 });
 
@@ -2579,11 +2595,11 @@ import { provider, rx, signal } from "rextive/react";
 
 type ThemeValue = "dark" | "light";
 
-// ✨ Simple signal context
+// ✨ Simple signal context - returns [hook, Provider]
 const [useTheme, ThemeProvider] = provider({
-  name: "Theme",
+  name: "Theme", // For debugging
   create: (value: ThemeValue) => {
-    // Create your context with signals
+    // Factory function: receives prop value, returns signal
     return signal(value);
   },
 });
@@ -2591,6 +2607,7 @@ const [useTheme, ThemeProvider] = provider({
 // That's it! Now use it:
 function App() {
   return (
+    // ThemeProvider creates and provides the theme signal to all children
     <ThemeProvider value="dark">
       <ChildComponent />
     </ThemeProvider>
@@ -2598,7 +2615,10 @@ function App() {
 }
 
 function ChildComponent() {
+  // Access signal from context - no Provider component needed, provider() handles it
   const theme = useTheme();
+
+  // Render signal value reactively - auto-subscribes to theme changes
   return <div>Theme: {rx(theme)}</div>;
 }
 ```
@@ -2608,14 +2628,13 @@ function ChildComponent() {
 Here's what `provider()` does under the hood:
 
 ```tsx
-import { signal, rx, useScope, useWatch } from "rextive/react";
+import { signal, rx, useScope, useWatch, Signal } from "rextive/react";
 import { createContext, useContext, useLayoutEffect } from "react";
 
 type ThemeValue = "dark" | "light";
-type ThemeSignal = ReturnType<typeof signal<ThemeValue>>;
 
 // Step 1: Create React Context
-const ThemeContext = createContext<ThemeSignal | null>(null);
+const ThemeContext = createContext<Signal<ThemeValue> | null>(null);
 
 // Step 2: Custom hook to access the context
 const useTheme = () => {
@@ -2744,12 +2763,19 @@ function App() {
 For complex stores with multiple signals and methods, the new `provider()` API shines:
 
 ```tsx
-import { signal, disposable, provider, rx, useWatch } from "rextive/react";
+import {
+  signal,
+  disposable,
+  provider,
+  rx,
+  useWatch,
+  Signal,
+} from "rextive/react";
 
 // Define your store shape
 interface UserSession {
-  user: ReturnType<typeof signal<User | null>>;
-  isAuthenticated: ReturnType<typeof signal<boolean>>;
+  user: Signal<User | null>;
+  isAuthenticated: Signal<boolean>;
   login: (credentials: Credentials) => Promise<void>;
   logout: () => void;
 }
@@ -3031,6 +3057,59 @@ count(); // ❌ Error: signal disposed
 count.set(1); // ❌ Error: signal disposed
 ```
 
+#### Refresh: `.refresh()`
+
+Force immediate recomputation for computed/async signals:
+
+```tsx
+const user = signal(async () => fetchUser());
+
+// Force immediate re-fetch
+user.refresh();
+
+// Use case: After mutation
+async function updateUser(data) {
+  await api.updateUser(data);
+  user.refresh(); // Reload immediately
+}
+```
+
+**Behavior:**
+
+- **Computed/async signals**: Triggers immediate recomputation
+- **Mutable signals**: No-op (nothing to recompute)
+
+#### Stale: `.stale()`
+
+Mark signal as stale for lazy recomputation:
+
+```tsx
+const posts = signal(async () => fetchPosts());
+
+// Mark as stale (doesn't fetch yet)
+posts.stale();
+
+// Later: access triggers recomputation
+console.log(posts()); // Fetches now
+
+// Use case: Batch invalidations
+userData.stale();
+userPosts.stale();
+userComments.stale();
+// None have recomputed yet - will fetch on first access
+```
+
+**Behavior:**
+
+- **Computed/async signals**: Marks as stale, recomputes on next access
+- **Mutable signals**: No-op (nothing to recompute)
+- Multiple `stale()` calls = single recomputation on access
+
+**`refresh()` vs `stale()`:**
+
+- `refresh()` - Eager: recomputes immediately
+- `stale()` - Lazy: recomputes on next access
+
 ---
 
 ### Signal Options
@@ -3080,34 +3159,147 @@ const fullName = signal(
 
 ---
 
-### Compute Function Context
+### Compute Function Context (`SignalContext`)
 
-For computed and async signals, the compute function receives a context object:
+For computed and async signals, the compute function receives a **context object** with powerful lifecycle methods:
+
+#### Properties
+
+**`context.deps`** - Access dependency values (only available with dependencies):
 
 ```tsx
-signal({ dep1, dep2 }, (context) => {
-  // context.deps - Current values of dependencies
-  const value1 = context.deps.dep1;
-  const value2 = context.deps.dep2;
-
-  // context.abortSignal - Automatically aborted when:
-  //   - Any dependency changes
-  //   - Signal is disposed
-  //   - Computation is cancelled
-
-  // Use with fetch
-  fetch("/api", { signal: context.abortSignal });
-
-  // Combine with other abort signals
-  const combined = AbortSignal.any([
-    context.abortSignal,
-    AbortSignal.timeout(5000),
-  ]);
+signal({ userId, filter }, ({ deps }) => {
+  return `User ${deps.userId} with filter: ${deps.filter}`;
 });
+```
 
-// Destructure for convenience
+**`context.abortSignal`** - Auto-aborted when dependencies change or signal is disposed:
+
+```tsx
 signal({ userId }, async ({ deps, abortSignal }) => {
-  return fetch(`/api/users/${deps.userId}`, { signal: abortSignal });
+  const res = await fetch(`/api/users/${deps.userId}`, {
+    signal: abortSignal, // Canceled if userId changes
+  });
+  return res.json();
+});
+```
+
+#### Methods
+
+**`context.safe(fn | promise)`** - Execute safely with abort awareness:
+
+```tsx
+signal(async ({ safe, abortSignal }) => {
+  const res = await fetch("/api/data", { signal: abortSignal });
+  const json = await res.json();
+
+  // Safely delay - never resolves if aborted
+  await safe(wait.delay(300));
+
+  // Safely run expensive operation - throws if aborted
+  const processed = safe(() => expensiveProcessing(json));
+
+  return processed;
+});
+```
+
+**`context.onCleanup(fn)`** - Register cleanup functions:
+
+```tsx
+signal({ userId }, async ({ deps, onCleanup }) => {
+  const ws = new WebSocket(`/ws/user/${deps.userId}`);
+
+  onCleanup(() => {
+    ws.close(); // Cleanup when recomputing or disposing
+  });
+
+  return new Promise((resolve) => {
+    ws.onmessage = (e) => resolve(JSON.parse(e.data));
+  });
+});
+```
+
+**`context.use(logic, ...args)`** - Execute reusable logic with context:
+
+```tsx
+// Define reusable logic
+const fetchUser = async (ctx, options) => {
+  const res = await fetch(`/api/users/${ctx.deps.userId}`, {
+    signal: ctx.abortSignal,
+    ...options,
+  });
+  return res.json();
+};
+
+// Use it
+const user = signal({ userId }, async (context) => {
+  return await context.use(fetchUser, { cache: "no-cache" });
+});
+```
+
+**`context.refresh()`** - Trigger recomputation from within (polling):
+
+```tsx
+const liveData = signal(async (context) => {
+  const data = await fetchData();
+
+  // Poll every second
+  setTimeout(() => context.refresh(), 1000);
+
+  return data;
+});
+```
+
+**`context.stale()`** - Mark as stale for lazy recomputation (TTL cache):
+
+```tsx
+const cachedData = signal(async (context) => {
+  const data = await fetchExpensiveData();
+
+  // Mark stale after 5 minutes (won't refetch until accessed)
+  setTimeout(() => context.stale(), 5 * 60 * 1000);
+
+  return data;
+});
+```
+
+**`context.aborted()`** - Check if computation was aborted:
+
+```tsx
+signal(async ({ aborted, abortSignal }) => {
+  const res = await fetch("/api/data", { signal: abortSignal });
+
+  if (aborted()) {
+    return null; // Exit early if aborted
+  }
+
+  return res.json();
+});
+```
+
+#### Complete Example
+
+```tsx
+const userData = signal({ userId }, async (context) => {
+  const { deps, abortSignal, safe, onCleanup } = context;
+
+  // Setup WebSocket with cleanup
+  const ws = new WebSocket(`/ws/user/${deps.userId}`);
+  onCleanup(() => ws.close());
+
+  // Fetch initial data with abort support
+  const res = await fetch(`/api/users/${deps.userId}`, {
+    signal: abortSignal,
+  });
+  const data = await res.json();
+
+  // Safely process (throws if aborted)
+  const processed = safe(() => processUserData(data));
+
+  // Schedule next refresh
+  setTimeout(() => context.refresh(), 60000);
+
+  return processed;
 });
 ```
 
@@ -3316,6 +3508,86 @@ console.log(composed(1, 5, 3, 2)); // 10 (max is 5, doubled)
 - ✅ Combining validators or formatters
 
 **Note:** `compose` supports up to 11 functions with full type inference. For more functions, types fall back to `(...args: any[]) => R`.
+
+---
+
+#### `disposable(obj)`
+
+Mark an object as disposable, adding a `dispose()` method that cleans up all disposable properties:
+
+```tsx
+import { signal, disposable } from "rextive";
+
+// Create multiple signals
+const count = signal(0);
+const name = signal("");
+const derived = count.to((x) => x * 2);
+
+// Mark as disposable - adds dispose() method
+const scope = disposable({ count, name, derived });
+
+// Later: dispose all signals at once
+scope.dispose(); // Calls count.dispose(), name.dispose(), derived.dispose()
+```
+
+**With useScope:**
+
+```tsx
+import { useScope, disposable } from "rextive/react";
+
+function Component() {
+  const scope = useScope(() => {
+    const todos = signal([]);
+    const filter = signal("all");
+    const filtered = signal({ todos, filter }, ({ deps }) => {
+      return deps.filter === "all"
+        ? deps.todos
+        : deps.todos.filter((t) => t.status === deps.filter);
+    });
+
+    // disposable() enables auto-cleanup on unmount
+    return disposable({ todos, filter, filtered });
+  });
+
+  // When component unmounts, all signals are automatically disposed
+}
+```
+
+**How it works:**
+
+```tsx
+const obj = disposable({
+  signal1,
+  signal2,
+  normalValue: 42, // Non-disposable values are fine
+  method: () => {}, // Functions are fine
+});
+
+// obj.dispose() will:
+// 1. Call signal1.dispose() if it has dispose method
+// 2. Call signal2.dispose() if it has dispose method
+// 3. Skip normalValue (no dispose method)
+// 4. Skip method (not disposable)
+```
+
+**Manual dispose array:**
+
+```tsx
+// Explicitly specify what to dispose
+const obj = {
+  signal1,
+  signal2,
+  value: 42,
+  dispose: [signal1, signal2], // Only dispose these
+};
+```
+
+**Benefits:**
+
+- ✅ **Automatic cleanup** - All signals disposed together
+- ✅ **Type-safe** - Returns same type with added `dispose()`
+- ✅ **Flexible** - Works with any object shape
+- ✅ **React integration** - Works with `useScope` for auto-cleanup
 
 ---
 
@@ -3632,6 +3904,97 @@ function Component() {
 
 ---
 
+### `provider()` - Signal Context
+
+Create signal-based React Context with optimized rendering:
+
+```tsx
+import { provider, signal } from "rextive/react";
+
+// Define context shape and create provider
+const [useTheme, ThemeProvider] = provider({
+  name: "Theme", // For debugging
+  create: (initialValue: "dark" | "light") => {
+    // Factory: receives prop value, returns signal or object with signals
+    return signal(initialValue);
+  },
+});
+
+// Usage in app
+function App() {
+  return (
+    <ThemeProvider value="dark">
+      <ChildComponent />
+    </ThemeProvider>
+  );
+}
+
+// Access in child components
+function ChildComponent() {
+  const theme = useTheme();
+  return <div>Theme: {rx(theme)}</div>;
+}
+```
+
+**With complex state:**
+
+```tsx
+interface UserSession {
+  user: Signal<User | null>;
+  isAuthenticated: Signal<boolean>;
+  login: (credentials: Credentials) => Promise<void>;
+  logout: () => void;
+}
+
+const [useSession, SessionProvider] = provider<UserSession, User | null>({
+  name: "Session",
+  create: (initialUser) => {
+    const user = signal(initialUser);
+    const isAuthenticated = user.to((u) => u !== null);
+
+    const login = async (credentials: Credentials) => {
+      const userData = await api.login(credentials);
+      user.set(userData);
+    };
+
+    const logout = () => {
+      user.set(null);
+    };
+
+    return disposable({ user, isAuthenticated, login, logout });
+  },
+  update: (context, newUser) => {
+    // Optional: sync context when value prop changes
+    context.user.set(newUser);
+  },
+});
+```
+
+**Options:**
+
+```tsx
+provider<TContext, TValue>({
+  name: string;                              // Debug name
+  create: (value: TValue) => TContext;       // Factory function
+  update?: (context: TContext, value: TValue) => void;  // Optional: update handler
+})
+```
+
+**Returns:** `[useContext, Provider]`
+
+- `useContext()` - Hook to access context in child components
+- `Provider` - React component with `value` prop
+
+**Benefits:**
+
+- ✅ **Lazy tracking** - Only subscribes to signals actually accessed
+- ✅ **Fine-grained updates** - Only `rx()` parts re-render
+- ✅ **Type-safe** - Full TypeScript inference
+- ✅ **Flexible** - Return any shape (signal, object, methods)
+- ✅ **Auto-cleanup** - Context disposed when provider unmounts
+
+---
+
 ### `wait()` - Promise Utilities
 
 Utilities for working with promises and async signals:
@@ -3714,7 +4077,7 @@ console.log("1 second passed");
 
 ---
 
-## 🔧 Operators
+## 🔧 Operators (`rextive/op`)
 
 Operators are composable, reusable functions for transforming signals. They work like array methods but for reactive values.
 
@@ -4046,6 +4409,144 @@ const result3 = createPositiveDoubleSum(signal(15));
 
 ---
 
+## 🔧 Immer Integration (`rextive/immer`)
+
+Rextive provides built-in Immer integration for immutable updates with a mutable API.
+
+**Installation:**
+
+```bash
+npm install immer
+```
+
+### `produce()`
+
+Create immutable updates using Immer's "mutating" API:
+
+```tsx
+import { signal } from "rextive";
+import { produce } from "rextive/immer";
+
+const state = signal({ count: 0, user: { name: "John" } });
+
+// Update using produce - write "mutations" that are actually immutable
+state.set(
+  produce((draft) => {
+    draft.count++;
+    draft.user.name = "Jane";
+  })
+);
+```
+
+**With arrays:**
+
+```tsx
+const todos = signal([
+  { id: 1, text: "Learn React", done: false },
+  { id: 2, text: "Learn Immer", done: false },
+]);
+
+// Toggle first todo
+todos.set(
+  produce((draft) => {
+    draft[0].done = !draft[0].done;
+  })
+);
+
+// Add new todo
+todos.set(
+  produce((draft) => {
+    draft.push({ id: 3, text: "Build app", done: false });
+  })
+);
+
+// Remove todo
+todos.set(
+  produce((draft) => {
+    draft.splice(0, 1);
+  })
+);
+```
+
+**Complex nested updates:**
+
+```tsx
+const app = signal({
+  user: { name: "John", settings: { theme: "dark", lang: "en" } },
+  posts: [],
+  ui: { sidebar: true, modal: null },
+});
+
+app.set(
+  produce((draft) => {
+    // Update nested properties
+    draft.user.settings.theme = "light";
+    draft.user.settings.lang = "fr";
+
+    // Add to arrays
+    draft.posts.push({ id: 1, title: "Hello" });
+
+    // Update UI state
+    draft.ui.sidebar = false;
+    draft.ui.modal = { type: "confirm", message: "Save changes?" };
+  })
+);
+```
+
+**Why use Immer with signals?**
+
+- ✅ **Simpler updates** - No spread operators or deep cloning
+- ✅ **Fewer bugs** - Hard to accidentally mutate
+- ✅ **More readable** - Clear intent in complex updates
+- ✅ **Type-safe** - Full TypeScript support
+- ✅ **Works with equality** - Pair with `"shallow"` or `"deep"` equality
+
+**Example: Todo list with Immer**
+
+```tsx
+import { signal } from "rextive";
+import { produce } from "rextive/immer";
+
+const todos = signal(
+  [
+    { id: 1, text: "Learn Rextive", done: false },
+    { id: 2, text: "Build app", done: false },
+  ],
+  "shallow" // Use shallow equality with Immer
+);
+
+// Add todo
+const addTodo = (text: string) => {
+  todos.set(
+    produce((draft) => {
+      draft.push({ id: Date.now(), text, done: false });
+    })
+  );
+};
+
+// Toggle todo
+const toggleTodo = (id: number) => {
+  todos.set(
+    produce((draft) => {
+      const todo = draft.find((t) => t.id === id);
+      if (todo) todo.done = !todo.done;
+    })
+  );
+};
+
+// Delete todo
+const deleteTodo = (id: number) => {
+  todos.set(
+    produce((draft) => {
+      const index = draft.findIndex((t) => t.id === id);
+      if (index !== -1) draft.splice(index, 1);
+    })
+  );
+};
+```
+
+---
+
 ## 🆚 Comparison with Other Libraries
 
 ### vs React useState + useEffect
@@ -4206,21 +4707,38 @@ const data = signal(async () => fetchData());
 ```bash
 rextive/          # Core - works anywhere
 rextive/react     # React integration
+rextive/op        # Operators for signal transformations
+rextive/immer     # Immer integration
 ```
 
-**Core features:**
+**Core (`rextive`):**
 
-- `signal` - Reactive state primitive
+- `signal` / `$` - Reactive state primitive
 - `signal.batch` - Batch updates
 - `signal.persist` - Persistence utilities
 - `signal.tag` - Group signals
-- `wait` - Promise utilities
+- `wait` - Promise utilities (`wait.any`, `wait.race`, `wait.settled`, `wait.timeout`, `wait.delay`)
+- `awaited` - Transform async/sync values uniformly
+- `compose` - Function composition utility
+- `disposable` - Automatic cleanup for objects
 
-**React features:**
+**React (`rextive/react`):**
 
-- `rx` - Reactive rendering
+- `rx` - Reactive rendering (4 patterns)
 - `useScope` - Component-scoped signals & lifecycle control (3 modes)
 - `useWatch` - Subscribe with lazy tracking
+- `provider` - Create signal-based React Context
+- All core features re-exported
+
+**Operators (`rextive/op`):**
+
+- `select` - Transform values (like `Array.map`)
+- `filter` - Filter values (like `Array.filter`)
+- `scan` - Accumulate values (like `Array.reduce`)
+
+**Immer (`rextive/immer`):**
+
+- `produce` - Immutable updates with mutable API (requires `immer` peer dependency)
 
 ---
 
