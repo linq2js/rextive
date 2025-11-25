@@ -4,8 +4,9 @@ import {
   useContext,
   useLayoutEffect,
 } from "react";
-import { ExDisposable } from "../types";
+import { ExDisposable, Signal } from "../types";
 import { useScope } from "./useScope";
+import { is } from "../is";
 
 /**
  * Options for configuring a provider's behavior.
@@ -52,7 +53,7 @@ export type ProviderOptions<TContext, TValue> = {
    * }
    * ```
    */
-  update: (context: NoInfer<TContext>, value: NoInfer<TValue>) => void;
+  update?: (context: NoInfer<TContext>, value: NoInfer<TValue>) => void;
 };
 
 /**
@@ -61,7 +62,9 @@ export type ProviderOptions<TContext, TValue> = {
  * - [1]: Provider component to wrap the tree
  */
 export type ProviderResult<TContext, TValue> = [
-  useContext: () => TContext,
+  useContext: () => TContext extends Signal<any>
+    ? TContext
+    : Omit<TContext, "dispose">,
   Provider: (props: PropsWithChildren<{ value: TValue }>) => JSX.Element
 ];
 
@@ -154,7 +157,9 @@ export function provider<TContext, TValue>(
         );
       }
 
-      return value;
+      return value as TContext extends Signal<any>
+        ? TContext
+        : Omit<TContext, "dispose">;
     },
 
     // Provider component
@@ -169,7 +174,13 @@ export function provider<TContext, TValue>(
       // Update the context when props.value changes
       // Using useLayoutEffect ensures this happens synchronously before paint
       useLayoutEffect(() => {
-        options.update(scope, props.value);
+        if (options.update) {
+          options.update(scope, props.value);
+        }
+        // auto update if the scope is a mutable signal
+        else if (is(scope, "mutable")) {
+          scope.set(props.value);
+        }
       }, [props.value, context]);
 
       return (

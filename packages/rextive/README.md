@@ -222,7 +222,7 @@ The effect automatically:
 
 ## 📖 Core Concepts
 
-Rextive is built on **three simple patterns**. Master these, and you master everything:
+Rextive is built on **four simple patterns**. Master these, and you master everything:
 
 ### 1️⃣ Single Dependency: Transform with `.to()`
 
@@ -1375,17 +1375,18 @@ function GoodComponent() {
 
 Build a reusable query pattern similar to React Query:
 
+> **💡 Key Pattern:** When using `rx()` with async signals, pass an object `rx({ result }, ...)` to manually handle loading/error states via `loadable`. Passing a single signal `rx(result, ...)` will await the value and throw to Suspense if loading.
+
 ```tsx
 import { signal, disposable, rx, useScope } from "rextive/react";
-import { loadable } from "rextive";
 
 // Reusable query factory
 function createQuery(endpoint, options = {}) {
   // Parameters for the query (starts undefined = not loaded yet)
   const params = signal();
 
-  // Data signal (fetches when params change)
-  const data = signal({ params }, async ({ deps, abortSignal }) => {
+  // Result signal (fetches when params change)
+  const result = signal({ params }, async ({ deps, abortSignal }) => {
     if (!deps.params) return null; // Don't fetch without params
 
     const res = await fetch(endpoint, {
@@ -1400,32 +1401,40 @@ function createQuery(endpoint, options = {}) {
     return await res.json();
   });
 
-  // Convert async data to loadable (handles loading/error states)
-  const result = data.to(loadable);
+  // Query function - trigger with new params
+  const query = (newParams) => {
+    params.set(newParams);
+    // Return the promise so you can await the result if needed
+    return result();
+  };
 
-  // Mutation function (like React Query's mutate)
-  const mutate = (newParams) => params.set(newParams);
-
-  // Return disposable object
+  // Return query object
   return {
     params,
     result,
-    mutate,
-    refetch: data.refresh, // Trigger immediate re-fetch
-    stale: data.stale, // Mark stale (lazy re-fetch on next access)
-    // Create dispose method but don't expose internal signals
-    dispose: disposable({ data, result, params }).dispose,
+    query,
+    refetch: result.refresh, // Trigger immediate re-fetch
+    stale: result.stale, // Mark stale (lazy re-fetch on next access)
+    dispose: disposable({ result, params }).dispose,
   };
 }
 
 // Option 1: Component-scoped query (cleaned up on unmount)
 function UserProfile({ userId }) {
-  const userQuery = useScope(() => createQuery("/api/user"));
+  // Create query and auto-trigger when userId changes
+  const userQuery = useScope(() => createQuery("/api/user"), {
+    update: [(q) => q.query({ id: userId }), userId],
+  });
 
-  // Trigger query when userId prop changes
-  useEffect(() => {
-    userQuery.mutate({ id: userId });
-  }, [userId]);
+  // Optional: Manually trigger and await result
+  const handleManualFetch = async () => {
+    try {
+      const user = await userQuery.query({ id: userId });
+      console.log("Fetched user:", user);
+    } catch (error) {
+      console.error("Failed to fetch:", error);
+    }
+  };
 
   return (
     <div>
@@ -1433,23 +1442,26 @@ function UserProfile({ userId }) {
 
       {/* Refresh button */}
       <button onClick={() => userQuery.refetch()}>Refresh</button>
+      <button onClick={handleManualFetch}>Manual Fetch</button>
 
-      {/* Render with loadable states */}
-      {rx(userQuery.result, (result) => {
+      {/* Render with loadable states - pass object to avoid Suspense */}
+      {rx(userQuery, (_, loadable) => {
         // Handle loading
-        if (result.status === "loading") {
+        if (loadable.result.status === "loading") {
           return <div>Loading user...</div>;
         }
 
         // Handle error
-        if (result.status === "error") {
+        if (loadable.result.status === "error") {
           return (
-            <div style={{ color: "red" }}>Error: {result.error.message}</div>
+            <div style={{ color: "red" }}>
+              Error: {loadable.result.error.message}
+            </div>
           );
         }
 
         // Handle no data
-        const user = result.value;
+        const user = loadable.result.value;
         if (!user) {
           return <div>No user selected</div>;
         }
@@ -1474,13 +1486,18 @@ function AnotherComponent() {
   return (
     <div>
       {/* Consume the same global query */}
-      {rx(userQuery.result, (result) => {
-        if (result.status === "loading") return <div>Loading...</div>;
-        if (result.status === "error") return <div>Error!</div>;
-        return <div>User: {result.value?.name}</div>;
+      {rx(userQuery, (_, loadable) => {
+        if (loadable.result.status === "loading") return <div>Loading...</div>;
+        if (loadable.result.status === "error") return <div>Error!</div>;
+        return <div>User: {loadable.result.value?.name}</div>;
       })}
 
-      {/* Refresh from anywhere */}
+      {/* Trigger query for a specific user */}
+      <button onClick={() => userQuery.query({ id: 123 })}>
+        Load User 123
+      </button>
+
+      {/* Refresh current query */}
       <button onClick={() => userQuery.refetch()}>Refresh</button>
     </div>
   );
@@ -1499,27 +1516,38 @@ function AnotherComponent() {
 <summary>📖 <strong>Pattern Breakdown</strong></summary>
 
 ```tsx
-// 1. Create params signal without initial value
-const params = signal();
-// params() === undefined initially
+// 1. Create a query
+const userQuery = createQuery("/api/user");
 
-// 2. Data signal depends on params
-const data = signal({ params }, async ({ deps, abortSignal }) => {
-  if (!deps.params) return null; // Don't fetch without params
-  // This only runs when params is set to a value
+// 2. Trigger query with params
+userQuery.query({ id: 123 });
+// Returns a promise you can await if needed
+
+// 3. Change params - previous fetch is auto-cancelled
+userQuery.query({ id: 456 });
+
+// 4. Manually refetch with same params
+userQuery.refetch();
+
+// 5. In React components with useScope
+const userQuery = useScope(() => createQuery("/api/user"), {
+  // Auto-trigger when userId changes using update option
+  update: [(q) => q.query({ id: userId }), userId],
 });
 
-// 3. Trigger fetch by setting params
-params.set({ id: 123 });
-// Now data signal starts fetching
+// 6. At UI layer, access loadable state via rx()
+// ⚠️ Important: Pass the query object to avoid Suspense and access loadable
+rx(userQuery, (_, loadable) => {
+  // loadable.result.status: "loading" | "success" | "error"
+  // loadable.result.error: Error object if status === "error"
+  // loadable.result.value: the resolved promise value
+});
 
-// 4. Change params
-params.set({ id: 456 });
-// Previous fetch is cancelled, new fetch starts
-
-// 5. Refetch same data
-params.set({ ...params() });
-// Create new object reference = triggers refetch
+// Alternative: Use single signal to throw to Suspense
+rx(userQuery.result, (value) => {
+  // This awaits the signal - throws to Suspense if loading
+  // Use this when you want Suspense boundaries to handle loading
+});
 ```
 
 **Advantages over React Query:**
@@ -2476,22 +2504,16 @@ function Child() {
 Rextive provides a built-in `provider()` function that handles all the boilerplate:
 
 ```tsx
-import { provider, rx, signal, disposable } from "rextive/react";
+import { provider, rx, signal } from "rextive/react";
+
+type ThemeValue = "dark" | "light";
 
 // ✨ Simple signal context
-const [useTheme, ThemeProvider] = provider<
-  { theme: ReturnType<typeof signal<"dark" | "light">> },
-  "dark" | "light"
->({
+const [useTheme, ThemeProvider] = provider({
   name: "Theme",
-  create: (value) => {
+  create: (value: ThemeValue) => {
     // Create your context with signals
-    const theme = signal(value);
-    return disposable({ theme });
-  },
-  update: (context, value) => {
-    // Update when value prop changes
-    context.theme.set(value);
+    return signal(value);
   },
 });
 
@@ -2505,7 +2527,7 @@ function App() {
 }
 
 function ChildComponent() {
-  const { theme } = useTheme();
+  const theme = useTheme();
   return <div>Theme: {rx(theme)}</div>;
 }
 ```
@@ -2515,18 +2537,16 @@ function ChildComponent() {
 Here's what `provider()` does under the hood:
 
 ```tsx
-import { signal, rx, useScope, useWatch, disposable } from "rextive/react";
+import { signal, rx, useScope, useWatch } from "rextive/react";
 import { createContext, useContext, useLayoutEffect } from "react";
 
-// Step 1: Define your context shape
-type ThemeContext = {
-  theme: ReturnType<typeof signal<"dark" | "light">>;
-};
+type ThemeValue = "dark" | "light";
+type ThemeSignal = ReturnType<typeof signal<ThemeValue>>;
 
-// Step 2: Create React Context
-const ThemeContext = createContext<ThemeContext | null>(null);
+// Step 1: Create React Context
+const ThemeContext = createContext<ThemeSignal | null>(null);
 
-// Step 3: Custom hook to access the context
+// Step 2: Custom hook to access the context
 const useTheme = () => {
   const context = useContext(ThemeContext);
   if (!context) {
@@ -2535,24 +2555,21 @@ const useTheme = () => {
   return context;
 };
 
-// Step 4: Provider component
+// Step 3: Provider component
 function ThemeProvider(props: {
-  value: "dark" | "light";
+  value: ThemeValue;
   children: React.ReactNode;
 }) {
-  // Create context scope with useScope (auto-cleanup on unmount)
-  const context = useScope(() => {
-    const theme = signal(props.value);
-    return disposable({ theme });
-  }) as ThemeContext;
+  // Create signal with useScope (auto-cleanup on unmount)
+  const theme = useScope(() => signal(props.value));
 
-  // Update context when props.value changes
+  // Update signal when props.value changes
   useLayoutEffect(() => {
-    context.theme.set(props.value);
+    theme.set(props.value);
   }, [props.value]);
 
   return (
-    <ThemeContext.Provider value={context}>
+    <ThemeContext.Provider value={theme}>
       {props.children}
     </ThemeContext.Provider>
   );
@@ -2560,8 +2577,8 @@ function ThemeProvider(props: {
 
 // Consumer components with smart re-rendering
 function ChildComponent(props: { showTheme: boolean }) {
-  // ✅ Get the context (contains the signal)
-  const { theme } = useTheme();
+  // ✅ Get the theme signal from context
+  const theme = useTheme();
 
   // This component does NOT re-render when theme changes!
   // It only re-renders when props.showTheme changes
@@ -2585,7 +2602,7 @@ function ChildComponent(props: { showTheme: boolean }) {
 
 // Alternative: Using useWatch for conditional tracking
 function SmartComponent(props: { showTheme: boolean }) {
-  const { theme } = useTheme();
+  const theme = useTheme();
 
   // Use lazy tracking with useWatch
   const [tracked] = useWatch({ theme });

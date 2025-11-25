@@ -13,17 +13,19 @@ export function pipeSignals(
 ): any {
   if (operators.length === 0) return source;
 
-  const intermediates: any[] = [];
+  const intermediates = new Set<any>();
   const result = operators.reduce((acc, op) => {
     const next = op(acc);
     if (next !== acc && next !== source) {
-      intermediates.push(acc);
+      intermediates.add(acc);
     }
     return next;
   }, source);
 
+  intermediates.delete(source);
+
   // If no intermediates were created, return as-is
-  if (intermediates.length === 0 || result === source) return result;
+  if (intermediates.size === 0 || result === source) return result;
 
   if (result && (typeof result === "object" || typeof result === "function")) {
     // Attach dispose that cleans up intermediates
