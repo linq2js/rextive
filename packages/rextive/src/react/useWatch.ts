@@ -1,12 +1,8 @@
 import { useLayoutEffect, useMemo, useState } from "react";
-import { ExDisposable, ResolvedValueMap, Signal, SignalMap } from "../types";
+import { ResolvedValueMap, Signal, SignalMap } from "../types";
 import { useRerender } from "./useRerender";
 import { createSignalAccessProxy } from "../utils/createSignalAccessProxy";
 import { emitter } from "../utils/emitter";
-import { signal } from "../signal";
-import { disposable } from "../disposable";
-
-export type WatchSignals = ExDisposable & SignalMap;:
 
 /**
  * useWatch - Hook for watching signals with lazy tracking
@@ -45,7 +41,7 @@ export type WatchSignals = ExDisposable & SignalMap;:
  * // b, c not accessed → no subscription
  * ```
  */
-export function useWatch<TSignals extends WatchSignals>(
+export function useWatch<TSignals extends SignalMap>(
   signals: TSignals
 ): [
   ResolvedValueMap<TSignals, "awaited">,
@@ -137,6 +133,3 @@ export function useWatch<TSignals extends WatchSignals>(
     return [value, loadable];
   }, [rerender]);
 }
-const aa = disposable({ params: signal(1) });
-useWatch(aa);
-
