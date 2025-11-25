@@ -730,6 +730,107 @@ rx({ user, posts, comments }, (value) => {
 
 ---
 
+### 🎭 Transparent Async States - No Separate Loading/Error/Data Concepts
+
+Unlike Apollo, React Query, or other data fetching libraries, **you don't need to explicitly destructure or manage** `loading`, `error`, and `data` states. Rextive handles async states transparently - access them however you need:
+
+```tsx
+import { signal, rx, useWatch } from "rextive/react";
+
+const user = signal(async () => fetchUser());
+
+// ❌ Traditional libraries: Always deal with loading/error/data
+const { loading, error, data } = useQuery(FETCH_USER);
+if (loading) return <div>Loading...</div>;
+if (error) return <div>Error: {error.message}</div>;
+return <div>User: {data.name}</div>;
+
+// ✅ Rextive Option 1: Just use the value (throws to Suspense)
+rx(user, (value) => <div>User: {value.name}</div>);
+
+// ✅ Rextive Option 2: Access loadable when you need it
+rx({ user }, (_, loadable) => {
+  if (loadable.user.status === "loading") return <div>Loading...</div>;
+  if (loadable.user.status === "error") return <div>Error!</div>;
+  return <div>User: {loadable.user.value.name}</div>;
+});
+
+// ✅ Rextive Option 3: Mix and match as needed
+const [value, loadable] = useWatch({ user, posts });
+// Access awaited value: value.user.name
+// Or loadable state: loadable.user.status
+```
+
+<details>
+<summary>📖 <strong>Why This is Powerful</strong></summary>
+
+**No Separate Concepts - Just Signals:**
+
+```tsx
+// Traditional data fetching libraries force you to think in terms of:
+// - loading state
+// - error state
+// - data state
+// This creates artificial separation and boilerplate
+
+// Rextive: A signal is just a signal
+const user = signal(async () => fetchUser());
+const count = signal(0);
+
+// Use both the SAME way - no special handling needed!
+rx({ user, count }, (value) => (
+  <div>
+    {value.user.name} has count: {value.count}
+  </div>
+));
+```
+
+**Choose Your Style:**
+
+```tsx
+// Style 1: Let Suspense handle it (cleanest for happy path)
+function UserProfile() {
+  return rx(user, (value) => <div>{value.name}</div>);
+}
+
+// Style 2: Manual control (when you need custom loading UI)
+function UserProfile() {
+  return rx({ user }, (_, loadable) => {
+    if (loadable.user.status === "loading") return <Spinner />;
+    return <div>{loadable.user.value.name}</div>;
+  });
+}
+
+// Style 3: Mix both approaches in one component
+function UserProfile() {
+  const [value, loadable] = useWatch({ user, posts });
+
+  // Show custom loading for user
+  if (loadable.user.status === "loading") return <UserSkeleton />;
+
+  // But use Suspense for posts (just access value.posts)
+  return (
+    <div>
+      <h1>{value.user.name}</h1>
+      <Suspense fallback={<div>Loading posts...</div>}>
+        <PostsList posts={value.posts} />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+**Benefits:**
+
+- 🎯 **No boilerplate** - Don't destructure `loading`/`error`/`data` everywhere
+- 🔄 **Flexible** - Choose Suspense OR manual control per component
+- ✨ **Unified** - Async signals work exactly like sync signals
+- 🧠 **Simpler mental model** - Everything is just a signal
+
+</details>
+
+---
+
 ### ⚡ Unified Sync/Async - Same API for Everything
 
 No need to learn different APIs for sync vs async state. Everything works the same way:
