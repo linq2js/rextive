@@ -16,6 +16,7 @@ import { signal } from "./signal";
 import { loadable } from "./utils/loadable";
 import { wait, type Awaitable, type AwaitedFromAwaitable } from "./wait";
 import { awaited } from "./awaited";
+import { compose } from "./utils/compose";
 // Operators imported when needed for type checking
 // import { select, scan, filter } from "./operators";
 import type {
@@ -1799,6 +1800,209 @@ function contextUseTests() {
 }
 
 // =============================================================================
+// compose() utility - Function composition type tests
+// =============================================================================
+
+function composeTests() {
+  // Single function
+  const f1 = compose((x: number) => x + 1);
+  expectType<(x: number) => number>(f1);
+
+  // Two functions with type transformation
+  const f2 = compose(
+    (x: number) => x.toString(),
+    (x: string) => x.length
+  );
+  expectType<(x: string) => string>(f2);
+
+  // Three functions
+  const f3 = compose(
+    (x: number) => x + 1,
+    (x: number) => x * 2,
+    (x: number) => x - 3
+  );
+  expectType<(x: number) => number>(f3);
+
+  // Type transformations through multiple functions
+  const f4 = compose(
+    (s: string) => s.length,
+    (n: number) => n.toString(),
+    (b: boolean) => (b ? 1 : 0)
+  );
+  expectType<(b: boolean) => number>(f4);
+
+  // Object transformations
+  interface User {
+    name: string;
+    age: number;
+  }
+
+  const f5 = compose(
+    (u: User) => u.name,
+    (id: number): User => ({ name: `User${id}`, age: id * 2 })
+  );
+  expectType<(id: number) => string>(f5);
+
+  // Array transformations
+  const f6 = compose(
+    (arr: number[]) => arr.reduce((a, b) => a + b, 0),
+    (arr: number[]) => arr.filter((x) => x % 2 === 0),
+    (arr: number[]) => arr.map((x) => x * 2)
+  );
+  expectType<(arr: number[]) => number>(f6);
+
+  // Multiple arguments in rightmost function
+  const f7 = compose(
+    (x: number) => x * 2,
+    (a: number, b: number) => a + b
+  );
+  expectType<(a: number, b: number) => number>(f7);
+
+  // Rest parameters
+  const f8 = compose(
+    (x: number) => x.toString(),
+    (x: number) => x * 2,
+    (...nums: number[]) => Math.max(...nums)
+  );
+  expectType<(...nums: number[]) => string>(f8);
+
+  // No arguments
+  const f9 = compose(
+    (x: string) => x.toUpperCase(),
+    () => "hello"
+  );
+  expectType<() => string>(f9);
+
+  // Four functions
+  const f10 = compose(
+    (x: string) => x.length,
+    (x: number) => x.toString(),
+    (x: number) => x * 2,
+    (x: number) => x + 1
+  );
+  expectType<(x: number) => number>(f10);
+
+  // Five functions
+  const f11 = compose(
+    (x: boolean) => !x,
+    (x: number) => x > 0,
+    (x: string) => x.length,
+    (x: number) => x.toString(),
+    (x: number) => x * 2
+  );
+  expectType<(x: number) => boolean>(f11);
+
+  // Six functions
+  const f12 = compose(
+    (x: string) => x.toUpperCase(),
+    (x: string) => x + "!",
+    (x: number) => x.toString(),
+    (x: number) => x * 2,
+    (x: string) => x.length,
+    (x: string) => x.trim()
+  );
+  expectType<(x: string) => string>(f12);
+
+  // Seven functions
+  const f13 = compose(
+    (x: number) => x + 1,
+    (x: number) => x * 2,
+    (x: number) => x - 3,
+    (x: number) => x / 2,
+    (x: number) => x + 5,
+    (x: number) => x * 3,
+    (x: number) => x - 1
+  );
+  expectType<(x: number) => number>(f13);
+
+  // Eight functions
+  const f14 = compose(
+    (x: string) => x.length,
+    (x: string) => x.toUpperCase(),
+    (x: string) => x.trim(),
+    (x: string) => x + "!",
+    (x: number) => x.toString(),
+    (x: number) => x * 2,
+    (x: string) => x.length,
+    (x: string) => x.toLowerCase()
+  );
+  expectType<(x: string) => number>(f14);
+
+  // Nine functions
+  const f15 = compose(
+    (x: number) => x + 10,
+    (x: number) => x / 5,
+    (x: number) => x - 1,
+    (x: number) => x * 3,
+    (x: number) => x + 5,
+    (x: number) => x / 2,
+    (x: number) => x - 3,
+    (x: number) => x * 2,
+    (x: number) => x + 1
+  );
+  expectType<(x: number) => number>(f15);
+
+  // Ten functions
+  const f16 = compose(
+    (x: number) => x * 10,
+    (x: number) => x + 10,
+    (x: number) => x / 5,
+    (x: number) => x - 1,
+    (x: number) => x * 3,
+    (x: number) => x + 5,
+    (x: number) => x / 2,
+    (x: number) => x - 3,
+    (x: number) => x * 2,
+    (x: number) => x + 1
+  );
+  expectType<(x: number) => number>(f16);
+
+  // Eleven functions (uses general case)
+  const f17 = compose(
+    (x: number) => x - 1,
+    (x: number) => x * 10,
+    (x: number) => x + 10,
+    (x: number) => x / 5,
+    (x: number) => x - 1,
+    (x: number) => x * 3,
+    (x: number) => x + 5,
+    (x: number) => x / 2,
+    (x: number) => x - 3,
+    (x: number) => x * 2,
+    (x: number) => x + 1
+  );
+  expectType<(...args: any[]) => number>(f17);
+
+  // Complex type transformations with multiple arguments
+  const f18 = compose(
+    (user: User) => user.age,
+    (name: string, age: number): User => ({ name, age })
+  );
+  expectType<(name: string, age: number) => number>(f18);
+
+  // Optional parameters
+  const f19 = compose(
+    (x: string) => x.length,
+    (x: number, suffix?: string) => x.toString() + (suffix || "")
+  );
+  expectType<(x: number, suffix?: string) => number>(f19);
+
+  // Nullable transformations
+  const f20 = compose(
+    (x: string | null) => (x !== null ? x.length : 0),
+    (x: number | null) => (x !== null ? x.toString() : null)
+  );
+  expectType<(x: number | null) => number>(f20);
+
+  // Promise transformations
+  const f21 = compose(
+    (x: Promise<number>) => x.then((n) => n * 2),
+    (x: number) => Promise.resolve(x)
+  );
+  expectType<(x: number) => Promise<number>>(f21);
+}
+
+// =============================================================================
 // Export test functions to avoid unused warnings
 // (These are never actually called - this file is for type checking only)
 // =============================================================================
@@ -1813,4 +2017,5 @@ export {
   signalToTests,
   awaitedTests,
   contextUseTests,
+  composeTests,
 };

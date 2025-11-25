@@ -1720,7 +1720,7 @@ function RegistrationForm() {
   const renderField = (
     key: string,
     field: MutableSignal<string>,
-    error: Signal<string | Promise<string | undefined>>,
+    error: Signal<void | string | Promise<string | void>>,
     isAsync: boolean
   ) => {
     return rx({ field, error }, (awaited, loadables) => (
@@ -1921,36 +1921,39 @@ function SearchBox() {
       )}
 
       {/* Results with loading state */}
-      {rx({ results: scope.results }, (_awaited, loadables) => {
-        if (loadables.results.status === "loading") {
-          return <div>Searching...</div>;
-        }
+      {rx(
+        { results: scope.results, searchInput: scope.searchInput },
+        (awaited, loadables) => {
+          if (loadables.results.status === "loading") {
+            return <div>Searching...</div>;
+          }
 
-        if (loadables.results.status === "error") {
+          if (loadables.results.status === "error") {
+            return (
+              <div style={{ color: "red" }}>
+                Error: {loadables.results.error.message}
+              </div>
+            );
+          }
+
+          const items = loadables.results.value;
+
+          if (items.length === 0 && awaited.searchInput.trim().length >= 2) {
+            return <div>No results found</div>;
+          }
+
           return (
-            <div style={{ color: "red" }}>
-              Error: {loadables.results.error.message}
-            </div>
+            <ul>
+              {items.map((item) => (
+                <li key={item.id}>
+                  <strong>{item.name}</strong>
+                  <p>{item.description}</p>
+                </li>
+              ))}
+            </ul>
           );
         }
-
-        const items = loadables.results.value;
-
-        if (items.length === 0 && scope.searchInput().trim().length >= 2) {
-          return <div>No results found</div>;
-        }
-
-        return (
-          <ul>
-            {items.map((item) => (
-              <li key={item.id}>
-                <strong>{item.name}</strong>
-                <p>{item.description}</p>
-              </li>
-            ))}
-          </ul>
-        );
-      })}
+      )}
     </div>
   );
 }
@@ -3189,11 +3192,6 @@ const message = signal("", { tags: [formTag] });
 // Operate on all tagged signals
 formTag.forEach((s) => s.reset()); // Reset all
 console.log(`Tag has ${formTag.size} signals`); // Count
-
-// Check if signal has tag
-if (name.hasTag(formTag)) {
-  console.log("Name is part of form");
-}
 ```
 
 See [Pattern 2: Group Signals with Tags](#pattern-2-group-signals-with-tags) for more details.
@@ -3244,6 +3242,79 @@ const syncTitles = syncTodos.pipe(
 - ✅ Type-safe with proper `Awaited<T>` inference
 - ✅ Composable with other operators
 - ✅ No need to check if value is a promise
+
+---
+
+#### `compose(...fns)`
+
+Compose multiple functions into a single function. Functions are applied from **right to left** (like mathematical function composition):
+
+```tsx
+import { compose } from "rextive";
+
+// Basic composition
+const add1 = (x: number) => x + 1;
+const multiply2 = (x: number) => x * 2;
+const subtract3 = (x: number) => x - 3;
+
+const composed = compose(subtract3, multiply2, add1);
+// composed(5) = subtract3(multiply2(add1(5)))
+//             = subtract3(multiply2(6))
+//             = subtract3(12)
+//             = 9
+
+console.log(composed(5)); // 9
+```
+
+**Type transformations:**
+
+```tsx
+// compose preserves types through the chain
+const toString = (x: number): string => x.toString();
+const getLength = (s: string): number => s.length;
+const isEven = (n: number): boolean => n % 2 === 0;
+
+const pipeline = compose(isEven, getLength, toString);
+// Type: (x: number) => boolean
+
+console.log(pipeline(12345)); // false (length 5 is odd)
+```
+
+**Multiple arguments:**
+
+The rightmost function can accept any number of arguments:
+
+```tsx
+const add = (a: number, b: number): number => a + b;
+const double = (x: number): number => x * 2;
+const format = (x: number): string => `Result: ${x}`;
+
+const composed = compose(format, double, add);
+// Type: (a: number, b: number) => string
+
+console.log(composed(3, 4)); // "Result: 14"
+```
+
+**Rest parameters:**
+
+```tsx
+const max = (...nums: number[]): number => Math.max(...nums);
+const double = (x: number): number => x * 2;
+
+const composed = compose(double, max);
+// Type: (...nums: number[]) => number
+
+console.log(composed(1, 5, 3, 2)); // 10 (max is 5, doubled)
+```
+
+**Use cases:**
+
+- ✅ Building data transformation pipelines
+- ✅ Creating reusable function chains
+- ✅ Point-free programming style
+- ✅ Combining validators or formatters
+
+**Note:** `compose` supports up to 11 functions with full type inference. For more functions, types fall back to `(...args: any[]) => R`.
 
 ---
 

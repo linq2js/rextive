@@ -47,3 +47,4 @@ export { rx } from "./rx";
 export { useScope } from "./useScope";
 export { useWatch } from "./useWatch";
 export { useRerender } from "./useRerender";
+export * from "./provider";

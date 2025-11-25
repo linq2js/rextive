@@ -169,7 +169,6 @@ describe("compose", () => {
       const handleUndefined = (x: undefined): string => "handled";
       const composed = compose(handleUndefined, returnUndefined);
 
-      // @ts-expect-error: Expected 1 arguments, but got 0.
       expect(composed()).toBe("handled");
     });
 
@@ -178,7 +177,6 @@ describe("compose", () => {
       const handleNull = (x: null): string => "null handled";
       const composed = compose(handleNull, returnNull);
 
-      // @ts-expect-error: Expected 1 arguments, but got 0.
       expect(composed()).toBe("null handled");
     });
 
@@ -235,7 +233,6 @@ describe("compose", () => {
       const double = (x: number): number => x * 2;
       const composed = compose(double, add);
 
-      // @ts-expect-error: Expected 2 arguments, but got 1.
       expect(composed(3, 4)).toBe(14); // (3 + 4) * 2
     });
 
