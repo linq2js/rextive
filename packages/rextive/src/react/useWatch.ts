@@ -13,31 +13,31 @@ import { emitter } from "../utils/emitter";
  * - Sets up subscriptions in useLayoutEffect (after render completes)
  * - Automatically cleans up subscriptions on unmount
  *
- * Returns a tuple of [value, loadable] proxies:
- * - value: Direct value access - throws promises/errors (for Suspense)
- * - loadable: Manual state handling (returns Loadable objects)
+ * Returns a tuple of [awaited, loadables] proxies:
+ * - awaited: Direct value access - throws promises/errors (for Suspense)
+ * - loadables: Manual state handling (returns Loadable objects)
  *
  * @param signals - Object mapping names to signal instances
- * @returns Tuple of [value, loadable] proxies
+ * @returns Tuple of [awaited, loadables] proxies
  *
  * @example
  * ```tsx
- * const [value, loadable] = useWatch({ user, posts });
+ * const [awaited, loadables] = useWatch({ user, posts });
  *
  * // Suspense pattern
- * return <div>{value.user.name}</div>;
+ * return <div>{awaited.user.name}</div>;
  *
  * // Manual loading state pattern
- * if (loadable.user.status === "loading") return <Spinner />;
- * return <div>{loadable.user.value.name}</div>;
+ * if (loadables.user.status === "loading") return <Spinner />;
+ * return <div>{loadables.user.value.name}</div>;
  * ```
  *
  * @example Lazy tracking behavior
  * ```tsx
- * const [value] = useWatch({ a, b, c });
+ * const [awaited] = useWatch({ a, b, c });
  *
  * // Only subscribes to signals actually accessed:
- * value.a;  // ✅ Tracks a
+ * awaited.a;  // ✅ Tracks a
  * // b, c not accessed → no subscription
  * ```
  */
@@ -121,15 +121,15 @@ export function useWatch<TSignals extends SignalMap>(
     };
 
     // Create and return both proxies as a tuple
-    const value = createProxy("awaited") as ResolvedValueMap<
+    const awaited = createProxy("awaited") as ResolvedValueMap<
       TSignals,
       "awaited"
     >;
-    const loadable = createProxy("loadable") as ResolvedValueMap<
+    const loadables = createProxy("loadable") as ResolvedValueMap<
       TSignals,
       "loadable"
     >;
 
-    return [value, loadable];
+    return [awaited, loadables];
   }, [rerender]);
 }

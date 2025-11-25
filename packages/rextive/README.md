@@ -745,20 +745,20 @@ if (loading) return <div>Loading...</div>;
 if (error) return <div>Error: {error.message}</div>;
 return <div>User: {data.name}</div>;
 
-// ✅ Rextive Option 1: Just use the value (throws to Suspense)
-rx(user, (value) => <div>User: {value.name}</div>);
+// ✅ Rextive Option 1: Just use the awaited value (throws to Suspense)
+rx(user, (awaited) => <div>User: {awaited.name}</div>);
 
-// ✅ Rextive Option 2: Access loadable when you need it
-rx({ user }, (_, loadable) => {
-  if (loadable.user.status === "loading") return <div>Loading...</div>;
-  if (loadable.user.status === "error") return <div>Error!</div>;
-  return <div>User: {loadable.user.value.name}</div>;
+// ✅ Rextive Option 2: Access loadable state when you need it
+rx({ user }, (_, loadables) => {
+  if (loadables.user.status === "loading") return <div>Loading...</div>;
+  if (loadables.user.status === "error") return <div>Error!</div>;
+  return <div>User: {loadables.user.value.name}</div>;
 });
 
 // ✅ Rextive Option 3: Mix and match as needed
-const [value, loadable] = useWatch({ user, posts });
-// Access awaited value: value.user.name
-// Or loadable state: loadable.user.status
+const [awaited, loadables] = useWatch({ user, posts });
+// Access awaited value: awaited.user.name
+// Or loadable state: loadables.user.status
 ```
 
 <details>
@@ -795,25 +795,25 @@ function UserProfile() {
 
 // Style 2: Manual control (when you need custom loading UI)
 function UserProfile() {
-  return rx({ user }, (_, loadable) => {
-    if (loadable.user.status === "loading") return <Spinner />;
-    return <div>{loadable.user.value.name}</div>;
+  return rx({ user }, (_, loadables) => {
+    if (loadables.user.status === "loading") return <Spinner />;
+    return <div>{loadables.user.value.name}</div>;
   });
 }
 
 // Style 3: Mix both approaches in one component
 function UserProfile() {
-  const [value, loadable] = useWatch({ user, posts });
+  const [awaited, loadables] = useWatch({ user, posts });
 
   // Show custom loading for user
-  if (loadable.user.status === "loading") return <UserSkeleton />;
+  if (loadables.user.status === "loading") return <UserSkeleton />;
 
-  // But use Suspense for posts (just access value.posts)
+  // But use Suspense for posts (just access awaited.posts)
   return (
     <div>
-      <h1>{value.user.name}</h1>
+      <h1>{awaited.user.name}</h1>
       <Suspense fallback={<div>Loading posts...</div>}>
-        <PostsList posts={value.posts} />
+        <PostsList posts={awaited.posts} />
       </Suspense>
     </div>
   );
@@ -1169,18 +1169,18 @@ Instead of Suspense, you can handle loading/error states manually:
 
 ```tsx
 function ProfileManual() {
-  return rx({ user }, (value, loadable) => {
-    // loadable.user contains status info
-    if (loadable.user.status === "loading") {
+  return rx({ user }, (awaited, loadables) => {
+    // loadables.user contains status info
+    if (loadables.user.status === "loading") {
       return <div>Loading user...</div>;
     }
 
-    if (loadable.user.status === "error") {
-      return <div>Error: {loadable.user.error.message}</div>;
+    if (loadables.user.status === "error") {
+      return <div>Error: {loadables.user.error.message}</div>;
     }
 
-    // loadable.user.status === "success"
-    const userData = loadable.user.value;
+    // loadables.user.status === "success"
+    const userData = loadables.user.value;
     return (
       <div>
         <h3>{userData.name}</h3>
@@ -1547,23 +1547,23 @@ function UserProfile({ userId }) {
       <button onClick={handleManualFetch}>Manual Fetch</button>
 
       {/* Render with loadable states - pass object to avoid Suspense */}
-      {rx(userQuery, (_, loadable) => {
+      {rx(userQuery, (_, loadables) => {
         // Handle loading
-        if (loadable.result.status === "loading") {
+        if (loadables.result.status === "loading") {
           return <div>Loading user...</div>;
         }
 
         // Handle error
-        if (loadable.result.status === "error") {
+        if (loadables.result.status === "error") {
           return (
             <div style={{ color: "red" }}>
-              Error: {loadable.result.error.message}
+              Error: {loadables.result.error.message}
             </div>
           );
         }
 
         // Handle no data
-        const user = loadable.result.value;
+        const user = loadables.result.value;
         if (!user) {
           return <div>No user selected</div>;
         }
@@ -1588,10 +1588,10 @@ function AnotherComponent() {
   return (
     <div>
       {/* Consume the same global query */}
-      {rx(userQuery, (_, loadable) => {
-        if (loadable.result.status === "loading") return <div>Loading...</div>;
-        if (loadable.result.status === "error") return <div>Error!</div>;
-        return <div>User: {loadable.result.value?.name}</div>;
+      {rx(userQuery, (_, loadables) => {
+        if (loadables.result.status === "loading") return <div>Loading...</div>;
+        if (loadables.result.status === "error") return <div>Error!</div>;
+        return <div>User: {loadables.result.value?.name}</div>;
       })}
 
       {/* Trigger query for a specific user */}
@@ -1661,219 +1661,178 @@ rx(userQuery.result, (value) => {
 
 </details>
 
-### Example 6: Form Validation
+### Example 6: Form Validation with Async Checks
 
-Build a contact form with real-time validation:
+Build a registration form with both **sync** and **async** validation (e.g., checking username availability):
+
+> **💡 Key Pattern:** This example demonstrates how to handle async validation with loading states using `loadables` parameter in `rx()`. The `safe()` method ensures async work is cancelled if the field value changes.
 
 ```tsx
-import { signal, disposable, rx, useScope } from "rextive/react";
+import { signal, disposable, rx, useScope, wait } from "rextive/react";
 
-function ContactForm() {
+function RegistrationForm() {
   const scope = useScope(() => {
-    // Form state
-    const form = signal({
-      name: "",
-      email: "",
-      message: "",
-    });
+    // Simulated database of existing usernames
+    const existingUsernames = ["admin", "testuser", "john123"];
 
-    // Validation errors (computed from form)
-    const errors = signal({ form }, ({ deps }) => {
-      const errs = {};
+    // Form fields
+    const fields = {
+      name: signal(""),
+      username: signal(""),
+    };
 
-      // Name validation
-      if (!deps.form.name.trim()) {
-        errs.name = "Name is required";
-      } else if (deps.form.name.length < 2) {
-        errs.name = "Name must be at least 2 characters";
-      }
+    // Validation errors - each derives from its field
+    const errors = {
+      // Sync validation: name field
+      name: fields.name.to((value) => {
+        if (value.length === 0) {
+          return "Name is required";
+        }
+        if (value.length < 2) {
+          return "Name must be at least 2 characters";
+        }
+        return undefined;
+      }),
 
-      // Email validation
-      if (!deps.form.email.trim()) {
-        errs.email = "Email is required";
-      } else if (!deps.form.email.includes("@")) {
-        errs.email = "Email must contain @";
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(deps.form.email)) {
-        errs.email = "Invalid email format";
-      }
+      // Async validation: username field
+      // Uses safe() to cancel if user changes input during validation
+      username: fields.username.to(async (value, { safe }) => {
+        if (value.length === 0) {
+          return "Username is required";
+        }
 
-      // Message validation
-      if (!deps.form.message.trim()) {
-        errs.message = "Message is required";
-      } else if (deps.form.message.length < 10) {
-        errs.message = "Message must be at least 10 characters";
-      }
+        // Simulate async validation (e.g., API call to check username)
+        // safe() ensures this never resolves if the signal is aborted
+        await safe(wait.delay(500));
 
-      return errs;
-    });
+        if (existingUsernames.includes(value)) {
+          return "Username already taken";
+        }
 
-    // Is form valid? (computed from errors)
-    const isValid = signal(
-      { errors },
-      ({ deps }) => Object.keys(deps.errors).length === 0
-    );
+        return undefined;
+      }),
+    };
 
-    // Submission state
-    const isSubmitting = signal(false);
-    const submitError = signal(null);
-
-    return disposable({ form, errors, isValid, isSubmitting, submitError });
+    return disposable({ fields, errors });
   });
 
-  // Update a field
-  const updateField = (field, value) => {
-    scope.form.set((current) => ({
-      ...current,
-      [field]: value,
-    }));
-  };
-
-  // Submit handler
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!scope.isValid()) return;
-
-    scope.isSubmitting.set(true);
-    scope.submitError.set(null);
-
-    try {
-      const res = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(scope.form()),
-      });
-
-      if (!res.ok) throw new Error("Failed to submit");
-
-      alert("Form submitted successfully!");
-
-      // Reset form
-      scope.form.set({ name: "", email: "", message: "" });
-    } catch (error) {
-      scope.submitError.set(error.message);
-    } finally {
-      scope.isSubmitting.set(false);
-    }
-  };
-
-  return rx(
-    { form: scope.form, errors: scope.errors, isValid: scope.isValid },
-    (value) => (
-      <form onSubmit={handleSubmit}>
-        <h2>Contact Us</h2>
-
-        {/* Name field */}
-        <div>
-          <label>Name:</label>
+  // Reusable field renderer
+  const renderField = (
+    key: string,
+    field: MutableSignal<string>,
+    error: Signal<string | Promise<string | undefined>>,
+    isAsync: boolean
+  ) => {
+    return rx({ field, error }, (awaited, loadables) => (
+      <div style={{ marginBottom: "1rem" }}>
+        <label>
+          {key.charAt(0).toUpperCase() + key.slice(1)}:
           <input
             type="text"
-            value={value.form.name}
-            onChange={(e) => updateField("name", e.target.value)}
-            style={{ borderColor: value.errors.name ? "red" : undefined }}
+            value={awaited.field}
+            onChange={(e) => field.set(e.target.value)}
+            style={{
+              borderColor:
+                (isAsync &&
+                  loadables.error.status === "success" &&
+                  loadables.error.value) ||
+                (!isAsync && awaited.error)
+                  ? "red"
+                  : undefined,
+            }}
           />
-          {value.errors.name && (
-            <span style={{ color: "red", fontSize: "0.9em" }}>
-              {value.errors.name}
-            </span>
-          )}
-        </div>
+        </label>
 
-        {/* Email field */}
-        <div>
-          <label>Email:</label>
-          <input
-            type="email"
-            value={value.form.email}
-            onChange={(e) => updateField("email", e.target.value)}
-            style={{ borderColor: value.errors.email ? "red" : undefined }}
-          />
-          {value.errors.email && (
-            <span style={{ color: "red", fontSize: "0.9em" }}>
-              {value.errors.email}
-            </span>
-          )}
-        </div>
-
-        {/* Message field */}
-        <div>
-          <label>Message:</label>
-          <textarea
-            value={value.form.message}
-            onChange={(e) => updateField("message", e.target.value)}
-            rows={4}
-            style={{ borderColor: value.errors.message ? "red" : undefined }}
-          />
-          {value.errors.message && (
-            <span style={{ color: "red", fontSize: "0.9em" }}>
-              {value.errors.message}
-            </span>
-          )}
-        </div>
-
-        {/* Submit error */}
-        {rx(
-          scope.submitError,
-          (error) =>
-            error && (
-              <div style={{ color: "red", marginTop: "1em" }}>
-                Submit error: {error}
-              </div>
-            )
+        {/* Show loading state for async validation */}
+        {isAsync && loadables.error.status === "loading" && (
+          <div style={{ color: "blue", fontSize: "0.9em" }}>
+            Checking availability...
+          </div>
         )}
 
-        {/* Submit button */}
-        <button
-          type="submit"
-          disabled={!value.isValid || rx(scope.isSubmitting)}
-        >
-          {rx(scope.isSubmitting, (submitting) =>
-            submitting ? "Submitting..." : "Submit"
+        {/* Show error message */}
+        {isAsync &&
+          loadables.error.status === "success" &&
+          loadables.error.value && (
+            <div style={{ color: "red", fontSize: "0.9em" }}>
+              {loadables.error.value}
+            </div>
           )}
-        </button>
-      </form>
-    )
+        {!isAsync && awaited.error && (
+          <div style={{ color: "red", fontSize: "0.9em" }}>{awaited.error}</div>
+        )}
+      </div>
+    ));
+  };
+
+  return (
+    <form>
+      <h2>Register</h2>
+
+      {/* Sync validation field */}
+      {renderField("name", scope.fields.name, scope.errors.name, false)}
+
+      {/* Async validation field */}
+      {renderField(
+        "username",
+        scope.fields.username,
+        scope.errors.username,
+        true
+      )}
+
+      <button type="submit">Register</button>
+    </form>
   );
 }
 ```
 
+**Key Features:**
+
+- **🔄 Sync validation** - Instant feedback for name field
+- **⏳ Async validation** - Username availability check with loading state
+- **🚫 Auto-cancellation** - `safe()` cancels pending checks when user types
+- **📊 Loading states** - Access via `loadables` parameter: `loadables.error.status === "loading"`
+- **✨ Clean separation** - Sync uses `awaited.error`, async uses `loadables.error`
+
 <details>
-<summary>📖 <strong>Reactive Validation Flow</strong></summary>
+<summary>📖 <strong>How Async Validation Works</strong></summary>
+
+**Flow for username field:**
 
 ```tsx
-// User types in name field
-updateField("name", "Jo");
-
-// 1. form signal updates
-form = { name: "Jo", email: "", message: "" }
+// 1. User types "ad"
+username.set("ad");
 ↓
-// 2. errors signal automatically recomputes
-errors = {
-  name: "Name must be at least 2 characters",
-  email: "Email is required",
-  message: "Message is required"
-}
+// 2. Error signal starts async validation
+errors.username (async computation begins)
+  → Check if empty: No
+  → await safe(wait.delay(500))  // Simulate API call
 ↓
-// 3. isValid signal automatically recomputes
-isValid = false  // (because errors object is not empty)
+// 3. UI shows loading state via loadables
+{loadables.error.status === "loading"}
+  → Show "Checking availability..."
 ↓
-// 4. UI automatically updates
-// - Error message appears below name field
-// - Submit button stays disabled
-
-// User continues typing
-updateField("name", "John");
-
-// errors recomputes → { email: "...", message: "..." }
-// name error is gone!
+// 4. If user types again during validation
+username.set("admin");
+↓
+// 5. Previous validation is CANCELLED (safe() never resolves)
+// 6. New validation starts from scratch
+errors.username (new async computation)
+  → await safe(wait.delay(500))
+  → Check database: "admin" exists
+  → Return "Username already taken"
+↓
+// 7. UI shows error via loadables
+{loadables.error.status === "success" && loadables.error.value}
+  → Show "Username already taken"
 ```
 
-**Key benefits:**
+**Key Patterns:**
 
-- ✅ Real-time validation as user types
-- ✅ All validation logic in one place
-- ✅ No manual state management
-- ✅ Automatically derived from form state
+- **`safe()` for cancellation** - Async work is cancelled if field value changes
+- **`loadables.error.status`** - Access loading/success/error states for async validation
+- **`awaited.error`** - Access sync validation errors directly
+- **No race conditions** - Previous validations are automatically cancelled
 
 </details>
 
@@ -1962,20 +1921,20 @@ function SearchBox() {
       )}
 
       {/* Results with loading state */}
-      {rx({ results: scope.results }, (_value, loadable) => {
-        if (loadable.results.status === "loading") {
+      {rx({ results: scope.results }, (_awaited, loadables) => {
+        if (loadables.results.status === "loading") {
           return <div>Searching...</div>;
         }
 
-        if (loadable.results.status === "error") {
+        if (loadables.results.status === "error") {
           return (
             <div style={{ color: "red" }}>
-              Error: {loadable.results.error.message}
+              Error: {loadables.results.error.message}
             </div>
           );
         }
 
-        const items = loadable.results.value;
+        const items = loadables.results.value;
 
         if (items.length === 0 && scope.searchInput().trim().length >= 2) {
           return <div>No results found</div>;
@@ -3347,24 +3306,24 @@ rx(UserCard, {
 const user = signal(async () => fetchUser());
 const posts = signal(async () => fetchPosts());
 
-rx({ user, posts }, (value, loadable) => {
-  // value: unwrapped values (throws if promise pending/rejected)
-  // loadable: status info for each signal
+rx({ user, posts }, (awaited, loadables) => {
+  // awaited: unwrapped values (throws if promise pending/rejected)
+  // loadables: status info for each signal
 
-  if (loadable.user.status === "loading") {
+  if (loadables.user.status === "loading") {
     return <div>Loading user...</div>;
   }
 
-  if (loadable.user.status === "error") {
-    return <div>Error: {loadable.user.error.message}</div>;
+  if (loadables.user.status === "error") {
+    return <div>Error: {loadables.user.error.message}</div>;
   }
 
   return (
     <div>
-      <h1>{value.user.name}</h1>
-      {loadable.posts.status === "loading" && <Spinner />}
-      {loadable.posts.status === "success" && (
-        <PostList posts={loadable.posts.value} />
+      <h1>{awaited.user.name}</h1>
+      {loadables.posts.status === "loading" && <Spinner />}
+      {loadables.posts.status === "success" && (
+        <PostList posts={loadables.posts.value} />
       )}
     </div>
   );
@@ -3561,31 +3520,31 @@ function Component() {
   const user = signal(async () => fetchUser());
   const posts = signal(async () => fetchPosts());
 
-  const [value, loadable] = useWatch({ user, posts });
+  const [awaited, loadables] = useWatch({ user, posts });
 
   // Option 1: Use with React Suspense
   return (
     <Suspense fallback={<Loading />}>
       <div>
-        <h1>{value.user.name}</h1>
-        <p>Posts: {value.posts.length}</p>
+        <h1>{awaited.user.name}</h1>
+        <p>Posts: {awaited.posts.length}</p>
       </div>
     </Suspense>
   );
 
   // Option 2: Manual loading states
-  if (loadable.user.status === "loading") {
+  if (loadables.user.status === "loading") {
     return <Spinner />;
   }
 
-  if (loadable.user.status === "error") {
-    return <Error message={loadable.user.error.message} />;
+  if (loadables.user.status === "error") {
+    return <Error message={loadables.user.error.message} />;
   }
 
-  // loadable.user.status === "success"
+  // loadables.user.status === "success"
   return (
     <div>
-      <h1>{loadable.user.value.name}</h1>
+      <h1>{loadables.user.value.name}</h1>
     </div>
   );
 }

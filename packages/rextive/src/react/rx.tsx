@@ -54,10 +54,10 @@ const SINGLE_SIGNAL_RENDER = (value: any) => value.value;
  *    - Useful for rendering nested properties without custom render function
  *    - Equivalent to: `rx({ value: signal }, (value) => value.value[prop])`
  *
- * 3. **Reactive with signals**: `rx(signals, (value, loadable) => ReactNode, { watch?: [...] })`
+ * 3. **Reactive with signals**: `rx(signals, (awaited, loadables) => ReactNode, { watch?: [...] })`
  *    - Automatic lazy signal tracking via proxies
  *    - Re-renders when accessed signals change
- *    - Provides both Suspense (value) and manual (loadable) access patterns
+ *    - Provides both Suspense (awaited) and manual (loadables) access patterns
  *    - Watch array controls when render function reference changes
  *
  * @warning **IMPORTANT: Do NOT use `rx()` directly in element attributes!**
@@ -111,16 +111,16 @@ const SINGLE_SIGNAL_RENDER = (value: any) => value.value;
  *
  * @example Overload 3 - Reactive with Suspense
  * ```tsx
- * rx({ user, posts }, (value) => (
- *   <div>{value.user.name}</div>
+ * rx({ user, posts }, (awaited) => (
+ *   <div>{awaited.user.name}</div>
  * ))
  * ```
  *
  * @example Overload 3 - Reactive with loadable
  * ```tsx
- * rx({ data }, (_, loadable) => {
- *   if (loadable.data.status === 'loading') return <Spinner />;
- *   return <div>{loadable.data.value}</div>;
+ * rx({ data }, (_, loadables) => {
+ *   if (loadables.data.status === 'loading') return <Spinner />;
+ *   return <div>{loadables.data.value}</div>;
  * })
  * ```
  */
