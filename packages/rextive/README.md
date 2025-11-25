@@ -3110,6 +3110,87 @@ userComments.stale();
 - `refresh()` - Eager: recomputes immediately
 - `stale()` - Lazy: recomputes on next access
 
+#### React to Other Signals: `.when(target, callback)`
+
+Create reactive relationships between signals - watch other signals and react when they change:
+
+```tsx
+const userId = signal(1);
+const userData = signal(async () => fetchUser(userId()));
+
+// Refresh userData when userId changes
+userData.when(userId, (current) => {
+  current.refresh();
+});
+
+// Or watch multiple signals
+const filter = signal("");
+const sortBy = signal("name");
+const results = signal(async () => fetchResults());
+
+results.when([filter, sortBy], (current) => {
+  current.refresh();
+});
+```
+
+**Key Patterns:**
+
+```tsx
+// Pattern 1: Cross-signal cache invalidation
+const userCache = signal(async () => fetchUser());
+const postsCache = signal(async () => fetchPosts());
+
+userCache.when(userId, (current) => {
+  current.stale(); // Lazy invalidation
+});
+
+// Pattern 2: Different actions for different triggers
+const searchResults = signal(async () => fetchResults());
+
+searchResults
+  .when(searchTerm, (current) => {
+    current.refresh(); // Immediate refresh for search
+  })
+  .when(sortPreference, (current) => {
+    current.stale(); // Lazy for sort changes
+  });
+
+// Pattern 3: Coordinated updates
+const masterState = signal("idle");
+const replica1 = signal("idle");
+const replica2 = signal("idle");
+
+replica1.when(masterState, (current, trigger) => {
+  current.set(trigger()); // Sync with master
+});
+
+replica2.when(masterState, (current, trigger) => {
+  current.set(trigger());
+});
+
+// Pattern 4: Detect which trigger fired
+const log = signal<string[]>([]);
+
+log.when([signal1, signal2], (current, trigger) => {
+  const name = trigger.displayName || "unknown";
+  current.set((prev) => [...prev, `Changed: ${name}`]);
+});
+```
+
+**Behavior:**
+
+- Returns the signal for method chaining
+- Automatically unsubscribes when signal is disposed
+- Callback receives `(currentSignal, triggerSignal)`
+- Works with both mutable and computed signals
+
+**When to use:**
+
+- ✅ Cache invalidation across multiple signals
+- ✅ Coordinating state between signals
+- ✅ Triggering side effects from other signals
+- ✅ Building reactive workflows
+
 ---
 
 ### Signal Options

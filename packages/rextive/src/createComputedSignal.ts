@@ -68,6 +68,7 @@ export function createComputedSignal(
   let isPaused = false;
   let hasComputed = false; // Track if signal has been computed (for hydrate)
   let refreshScheduled = false; // Track if refresh is scheduled (for batching)
+  let whenUnsubscribers: VoidFunction[] = []; // Store when() subscriptions separately
 
   const isDisposed = () => disposed;
 
@@ -80,6 +81,10 @@ export function createComputedSignal(
     if (tags && tags.length > 0 && instanceRef) {
       tags.forEach((tag) => (tag as any)._remove(instanceRef));
     }
+
+    // Cleanup when() subscriptions
+    whenUnsubscribers.forEach((unsub) => unsub());
+    whenUnsubscribers = [];
 
     onChange.clear();
     onCleanup.emitAndClear();
@@ -226,15 +231,10 @@ export function createComputedSignal(
     return pipeSignals(instance, operators);
   };
 
-  const to = function (...selectors: Array<(value: any, ctx: any) => any>): any {
-    if (selectors.length === 0) return instance;
-    
+  const to = function (selector: (value: any, ctx: any) => any): any {
     return createComputedSignal(
       { source: instance } as any,
-      (ctx: any) => {
-        // Chain selectors: selector1(value, ctx) -> selector2(result1, ctx) -> selector3(result2, ctx)
-        return selectors.reduce((acc, selector) => selector(acc, ctx), ctx.deps.source);
-      },
+      (ctx: any) => selector(ctx.deps.source, ctx),
       {},
       createSignalContext,
       undefined // _signal parameter (unused)
@@ -267,6 +267,26 @@ export function createComputedSignal(
     }
   );
 
+  const when = guardDisposed(
+    isDisposed,
+    "Cannot attach when() listener to disposed signal",
+    (target: any, callback: any) => {
+      const targets = Array.isArray(target) ? target : [target];
+
+      // Subscribe to each target signal
+      targets.forEach((targetSignal) => {
+        const unsubscribe = targetSignal.on(() => {
+          callback(instance, targetSignal);
+        });
+
+        // Store unsubscribe function to clean up on disposal (not on recompute)
+        whenUnsubscribers.push(unsubscribe);
+      });
+
+      return instance;
+    }
+  );
+
   const instance = Object.assign(get, {
     [SIGNAL_TYPE]: true,
     displayName: name,
@@ -283,6 +303,7 @@ export function createComputedSignal(
     to,
     refresh,
     stale,
+    when,
   });
 
   instanceRef = instance as unknown as ComputedSignal<any>;

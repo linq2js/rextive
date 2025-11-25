@@ -1,85 +1,62 @@
 /**
- * Tests for signal.to() - value selector chaining
+ * Tests for signal.to() - single value selector
  */
 import { describe, it, expect, vi } from "vitest";
 import { signal } from "./signal";
 import { loadable } from "./utils/loadable";
 import { wait } from "./wait";
 
-describe("signal.to() - value selector chaining", () => {
-  it("should chain single selector", () => {
+describe("signal.to() - single selector", () => {
+  it("should apply single selector", () => {
     const user = signal({ name: "Alice", age: 30 });
     const name = user.to((u) => u.name);
 
     expect(name()).toBe("Alice");
   });
 
-  it("should chain two selectors", () => {
-    const user = signal({ name: "Alice", age: 30 });
-    const greeting = user.to(
-      (u) => u.name,
-      (name) => `Hello, ${name}!`
-    );
+  it("should transform number to string", () => {
+    const count = signal(42);
+    const result = count.to((x) => `Count: ${x}`);
 
-    expect(greeting()).toBe("Hello, Alice!");
+    expect(result()).toBe("Count: 42");
   });
 
-  it("should chain three selectors", () => {
-    const user = signal({ name: "Alice", age: 30 });
-    const result = user.to(
-      (u) => u.name,
-      (name) => name.toUpperCase(),
-      (name) => `Hello, ${name}!`
-    );
+  it("should extract nested property", () => {
+    const user = signal({ profile: { name: "Alice", age: 30 } });
+    const userName = user.to((u) => u.profile.name);
 
-    expect(result()).toBe("Hello, ALICE!");
+    expect(userName()).toBe("Alice");
   });
 
   it("should handle type transformations", () => {
     const count = signal(42);
-    const result = count.to(
-      (x) => x * 2, // 84
-      (x) => x + 10, // 94
-      (x) => `Count: ${x}` // "Count: 94"
-    );
+    const doubled = count.to((x) => x * 2);
 
-    expect(result()).toBe("Count: 94");
+    expect(doubled()).toBe(84);
   });
 
   it("should update when source changes", () => {
     const count = signal(5);
-    const result = count.to(
-      (x) => x * 2,
-      (x) => x + 1
-    );
+    const doubled = count.to((x) => x * 2);
 
-    expect(result()).toBe(11); // (5 * 2) + 1
+    expect(doubled()).toBe(10);
 
     count.set(10);
-    expect(result()).toBe(21); // (10 * 2) + 1
+    expect(doubled()).toBe(20);
   });
 
   it("should work with array operations", () => {
     const numbers = signal([1, 2, 3, 4, 5]);
-    const sum = numbers.to(
-      (arr) => arr.filter((x) => x > 2),
-      (arr) => arr.map((x) => x * 2),
-      (arr) => arr.reduce((a, b) => a + b, 0)
-    );
+    const sum = numbers.to((arr) => arr.reduce((a, b) => a + b, 0));
 
-    expect(sum()).toBe(24); // (3 + 4 + 5) * 2 = 24
+    expect(sum()).toBe(15);
   });
 
   it("should work with object transformations", () => {
     const user = signal({ firstName: "Alice", lastName: "Smith", age: 30 });
-    const result = user.to(
-      (u) => ({ fullName: `${u.firstName} ${u.lastName}`, age: u.age }),
-      (u) => u.fullName,
-      (name) => name.split(" "),
-      (parts) => parts[0]
-    );
+    const fullName = user.to((u) => `${u.firstName} ${u.lastName}`);
 
-    expect(result()).toBe("Alice");
+    expect(fullName()).toBe("Alice Smith");
   });
 
   it("should subscribe to changes", () => {
@@ -102,12 +79,9 @@ describe("signal.to() - value selector chaining", () => {
 
   it("should dispose properly", () => {
     const count = signal(5);
-    const result = count.to(
-      (x) => x * 2,
-      (x) => x + 1
-    );
+    const result = count.to((x) => x * 2);
 
-    expect(result()).toBe(11);
+    expect(result()).toBe(10);
 
     const spy = vi.fn();
     result.on(spy);
@@ -124,23 +98,17 @@ describe("signal.to() - value selector chaining", () => {
     const b = signal(10);
     const sum = signal({ a, b }, ({ deps }) => deps.a + deps.b);
 
-    const result = sum.to(
-      (x) => x * 2,
-      (x) => `Result: ${x}`
-    );
+    const result = sum.to((x) => `Result: ${x}`);
 
-    expect(result()).toBe("Result: 30");
+    expect(result()).toBe("Result: 15");
 
     a.set(10);
-    expect(result()).toBe("Result: 40");
+    expect(result()).toBe("Result: 20");
   });
 
   it("should handle nullable values", () => {
     const value = signal<string | null>("test");
-    const result = value.to(
-      (str) => str?.toUpperCase(),
-      (str) => str ?? "default"
-    );
+    const result = value.to((str) => str?.toUpperCase() ?? "default");
 
     expect(result()).toBe("TEST");
 
@@ -150,29 +118,24 @@ describe("signal.to() - value selector chaining", () => {
 
   it("should handle union types", () => {
     const value = signal<number | string>(42);
-    const result = value.to(
-      (val) => (typeof val === "number" ? val * 2 : val.length),
-      (num) => `Value: ${num}`
+    const result = value.to((val) => 
+      typeof val === "number" ? val * 2 : val.length
     );
 
-    expect(result()).toBe("Value: 84");
+    expect(result()).toBe(84);
 
     value.set("hello");
-    expect(result()).toBe("Value: 5");
+    expect(result()).toBe(5);
   });
 
   it("should work with boolean transformations", () => {
     const count = signal(42);
-    const result = count.to(
-      (x) => x > 50,
-      (bool) => !bool,
-      (bool) => (bool ? "yes" : "no")
-    );
+    const isLarge = count.to((x) => x > 50);
 
-    expect(result()).toBe("yes");
+    expect(isLarge()).toBe(false);
 
     count.set(100);
-    expect(result()).toBe("no");
+    expect(isLarge()).toBe(true);
   });
 
   it("should handle complex nested transformations", () => {
@@ -183,18 +146,15 @@ describe("signal.to() - value selector chaining", () => {
       ],
     });
 
-    const result = data.to(
-      (d) => d.users,
-      (users) =>
-        users.map((u) => ({
-          name: u.name,
-          avg: u.scores.reduce((a, b) => a + b, 0) / u.scores.length,
-        })),
-      (users) => users.find((u) => u.avg > 85),
-      (user) => user?.name ?? "None"
-    );
+    const topUser = data.to((d) => {
+      const usersWithAvg = d.users.map((u) => ({
+        name: u.name,
+        avg: u.scores.reduce((a, b) => a + b, 0) / u.scores.length,
+      }));
+      return usersWithAvg.find((u) => u.avg > 85)?.name ?? "None";
+    });
 
-    expect(result()).toBe("Alice");
+    expect(topUser()).toBe("Alice");
   });
 
   it("should not re-compute unnecessarily", () => {
@@ -218,12 +178,16 @@ describe("signal.to() - value selector chaining", () => {
     expect(computeCount).toBe(2);
   });
 
-  it("should work with empty selector list", () => {
-    const count = signal(42);
-    // @ts-expect-error - empty selector list
-    const result = count.to();
+  it("should access context parameter", () => {
+    const count = signal(5);
+    const result = count.to((x, ctx) => {
+      // Context should be available
+      expect(ctx).toBeDefined();
+      expect(ctx.abortSignal).toBeDefined();
+      return x * 2;
+    });
 
-    expect(result()).toBe(42);
+    expect(result()).toBe(10);
   });
 
   it("to: loadable", async () => {

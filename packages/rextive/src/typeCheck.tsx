@@ -18,7 +18,7 @@ import { wait, type Awaitable, type AwaitedFromAwaitable } from "./wait";
 import { awaited } from "./awaited";
 import { compose } from "./utils/compose";
 // Operators imported when needed for type checking
-// import { select, scan, filter } from "./operators";
+import { select } from "./operators";
 import type {
   Signal,
   MutableSignal,
@@ -1462,91 +1462,91 @@ function signalToTests() {
   const userName = userSig.to((u) => u.name);
   expectType<ComputedSignal<string>>(userName);
 
-  // Two selectors
-  const upperName = userSig.to(
-    (u) => u.name,
-    (name) => name.toUpperCase()
+  // Two selectors - use pipe() for multiple transformations
+  const upperName = userSig.pipe(
+    select((u) => u.name),
+    select((name) => name.toUpperCase())
   );
   expectType<ComputedSignal<string>>(upperName);
 
   // Three selectors with type changes
-  const greeting = userSig.to(
-    (u) => u.name, // string
-    (name) => name.toUpperCase(), // string
-    (name) => `Hello, ${name}!` // string
+  const greeting = userSig.pipe(
+    select((u) => u.name), // string
+    select((name) => name.toUpperCase()), // string
+    select((name) => `Hello, ${name}!`) // string
   );
   expectType<ComputedSignal<string>>(greeting);
 
   // Type transformation chain
-  const ageString = userSig.to(
-    (u) => u.age, // number
-    (age) => age.toString(), // string
-    (str) => str.length // number
+  const ageString = userSig.pipe(
+    select((u) => u.age), // number
+    select((age) => age.toString()), // string
+    select((str) => str.length) // number
   );
   expectType<ComputedSignal<number>>(ageString);
 
   // Complex object transformations
-  const transformed = userSig.to(
-    (u) => ({ fullName: u.name, years: u.age }), // { fullName: string, years: number }
-    (obj) => obj.fullName, // string
-    (name) => name.split(" "), // string[]
-    (parts) => parts[0] // string | undefined
+  const transformed = userSig.pipe(
+    select((u) => ({ fullName: u.name, years: u.age })), // { fullName: string, years: number }
+    select((obj) => obj.fullName), // string
+    select((name) => name.split(" ")), // string[]
+    select((parts) => parts[0]) // string | undefined
   );
   expectType<ComputedSignal<string | undefined>>(transformed);
 
   // Array operations
   const arraySig = signal([1, 2, 3, 4, 5]);
 
-  const arrayResult = arraySig.to(
-    (arr: number[]) => arr.filter((x: number) => x > 2), // number[]
-    (arr: number[]) => arr.map((x: number) => x * 2), // number[]
-    (arr: number[]) => arr.reduce((a: number, b: number) => a + b, 0) // number
+  const arrayResult = arraySig.pipe(
+    select((arr: number[]) => arr.filter((x: number) => x > 2)), // number[]
+    select((arr: number[]) => arr.map((x: number) => x * 2)), // number[]
+    select((arr: number[]) => arr.reduce((a: number, b: number) => a + b, 0)) // number
   );
   expectType<ComputedSignal<number>>(arrayResult);
 
   // With computed signals
   const computedUser = signal({ userSig }, ({ deps }) => deps.userSig);
 
-  const computedGreeting = computedUser.to(
-    (u) => u.name,
-    (name) => `Hi, ${name}`
+  const computedGreeting = computedUser.pipe(
+    select((u) => u.name),
+    select((name) => `Hi, ${name}`)
   );
   expectType<ComputedSignal<string>>(computedGreeting);
 
   // Chaining with numbers
   const numSig = signal(42);
 
-  const numChain = numSig.to(
-    (x) => x * 2, // 84
-    (x) => x + 10, // 94
-    (x) => x / 2, // 47
-    (x) => Math.floor(x) // 47
+  const numChain = numSig.pipe(
+    select((x) => x * 2), // 84
+    select((x) => x + 10), // 94
+    select((x) => x / 2), // 47
+    select((x) => Math.floor(x)) // 47
   );
   expectType<ComputedSignal<number>>(numChain);
 
   // Boolean transformations
-  const boolChain = numSig.to(
-    (x) => x > 50, // boolean
-    (bool) => !bool, // boolean
-    (bool) => (bool ? "yes" : "no") // string
+  const boolChain = numSig.pipe(
+    select((x) => x > 50), // boolean
+    select((bool) => !bool), // boolean
+    select((bool) => (bool ? "yes" : "no")) // string
   );
   expectType<ComputedSignal<string>>(boolChain);
 
   // Nullable values
   const nullableSig = signal<string | null>("test");
 
-  const nullableChain = nullableSig.to(
-    (str) => str?.toUpperCase(), // string | undefined
-    (str) => str ?? "default" // string
+  const nullableChain = nullableSig.pipe(
+    select((str) => str?.toUpperCase()), // string | undefined
+    select((str) => str ?? "default") // string
   );
   expectType<ComputedSignal<string>>(nullableChain);
 
   // Union types
   const unionSig = signal<number | string>(42);
 
-  const unionChain = unionSig.to(
-    (val) => (typeof val === "number" ? val * 2 : val.length), // number
-    (num) => num.toString() // string
+  const unionChain = unionSig.pipe(
+    select((val) => (typeof val === "number" ? val * 2 : val.length)), // number
+    select((num) => num.toString()) // string
   );
   expectType<ComputedSignal<string>>(unionChain);
 }
