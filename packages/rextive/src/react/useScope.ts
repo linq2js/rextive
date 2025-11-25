@@ -1,4 +1,4 @@
-import { useMemo, useLayoutEffect, useRef } from "react";
+import { useMemo } from "react";
 import { ExDisposable, Signal } from "../types";
 import { tryDispose } from "../disposable";
 
@@ -41,6 +41,7 @@ export type UseScopeOptions<TScope = any> = LifecycleCallbacks<TScope> & {
  *   init: () => console.log('Component initializing'),
  *   mount: () => console.log('Component mounted'),
  *   render: () => console.log('Component rendering'),
+ *   update: () => console.log('After every render'), // Runs after each render
  *   cleanup: () => console.log('Component cleaning up'),
  *   dispose: () => console.log('Component disposed'),
  * });
@@ -87,6 +88,47 @@ export type UseScopeOptions<TScope = any> = LifecycleCallbacks<TScope> & {
  *   { watch: [userId] } // Recreate when userId changes
  * );
  * ```
+ *
+ * @example Factory mode with update callback (sync after render)
+ * ```tsx
+ * const { size, updateSize } = useScope(() => {
+ *   const size = signal({ width: 0, height: 0 });
+ *   const ref = createRef();
+ *
+ *   return { size, ref };
+ * }, {
+ *   // Update runs after every render - measure DOM and sync to signal
+ *   update: (scope) => {
+ *     if (scope.ref.current) {
+ *       const { width, height } = scope.ref.current.getBoundingClientRect();
+ *       scope.size.set({ width, height });
+ *     }
+ *   },
+ *   // Or with deps - only run when userId changes
+ *   // update: [(scope) => scope.refetch(), userId],
+ * });
+ * ```
+ *
+ * @example Factory mode with args (args become watch dependencies)
+ * ```tsx
+ * // ✅ Type-safe: args match factory params, auto-recreates when args change
+ * const { userData } = useScope(
+ *   (userId, filter) => {
+ *     const userData = signal(fetchUser(userId, filter));
+ *     return { userData };
+ *   },
+ *   [userId, filter] // Args passed to factory & used as watch deps
+ * );
+ *
+ * // Compare to manual watch (less type-safe):
+ * const { userData } = useScope(
+ *   () => {
+ *     const userData = signal(fetchUser(userId, filter));
+ *     return { userData };
+ *   },
+ *   { watch: [userId, filter] } // Easy to forget to update
+ * );
+ * ```
  */
 
 // Overload 1: Component lifecycle (no target object)
@@ -105,10 +147,18 @@ export function useScope<TScope>(
   options?: UseScopeOptions<TScope>
 ): TScope extends Signal<any> ? TScope : Omit<TScope, "dispose">;
 
+// Overload 4: Factory mode with args (args become watch dependencies)
+export function useScope<TScope, TArgs extends any[]>(
+  create: (...args: TArgs) => ExDisposable & TScope,
+  args: TArgs,
+  options?: Omit<UseScopeOptions<TScope>, "watch">
+): TScope extends Signal<any> ? TScope : Omit<TScope, "dispose">;
+
 // Implementation
 export function useScope<TScope>(
   createOrCallbacks: (() => ExDisposable & TScope) | LifecycleCallbacks<any>,
-  options?: UseScopeOptions<TScope>
+  argsOrOptions?: any[] | UseScopeOptions<TScope>,
+  optionsIfArgs?: Omit<UseScopeOptions<TScope>, "watch">
 ): Omit<TScope, "dispose"> | (() => LifecyclePhase) {
   // Detect which mode based on first argument
   const isLifecycleMode = typeof createOrCallbacks !== "function";
@@ -119,50 +169,54 @@ export function useScope<TScope>(
     return useLifecycle(createOrCallbacks as LifecycleCallbacks<any>);
   }
 
-  // Mode 3: Factory mode - create scoped services with lifecycle
-  const create = createOrCallbacks as () => ExDisposable & TScope;
+  // Mode 3 or 4: Factory mode
+  // Detect if second arg is args array or options object
+  const isArgsMode = Array.isArray(argsOrOptions);
+
+  const create = createOrCallbacks as (...args: any[]) => ExDisposable & TScope;
+  const args = isArgsMode ? argsOrOptions : undefined;
+  const options = isArgsMode
+    ? optionsIfArgs
+    : (argsOrOptions as UseScopeOptions<TScope> | undefined);
+
   const {
-    watch,
+    watch = undefined,
     init,
     mount,
     render,
+    update,
     cleanup,
     dispose: disposeCallback,
-  } = options || {};
-
-  const scopeRef = useRef<TScope | null>(null);
+  } = (options || {}) as UseScopeOptions<TScope>;
 
   // Recreate scope when watch dependencies change
+  // In args mode, args become the watch dependencies
+  const watchDeps = isArgsMode ? args || [] : watch || [];
+
   const scope = useMemo(() => {
-    const newScope = create();
-    scopeRef.current = newScope;
+    const newScope = isArgsMode ? create(...(args || [])) : create();
 
     // Call init after scope is created (once per scope instance)
     init?.(newScope);
 
     return newScope;
-  }, watch || []);
+  }, watchDeps);
 
-  // Update scopeRef on every render to ensure callbacks have latest scope
-  scopeRef.current = scope;
-
-  // Call render callback on every render
-  render?.(scope);
-
-  // Setup mount/cleanup/dispose lifecycle for the scope
-  useLayoutEffect(() => {
-    // Call mount when scope is mounted
-    mount?.(scopeRef.current!);
-
-    return () => {
-      // Call cleanup before scope changes or component unmounts
-      cleanup?.(scopeRef.current!);
-
-      // Call dispose and tryDispose for cleanup
-      disposeCallback?.(scopeRef.current!);
-      tryDispose(scopeRef.current!);
-    };
-  }, [scope]); // Re-run when scope instance changes
+  // Use useLifecycle to manage scope object lifecycle (StrictMode-safe)
+  useLifecycle({
+    for: scope, // Track this scope object
+    // Note: init already called in useMemo above, so we skip it here
+    mount,
+    render,
+    update,
+    cleanup,
+    dispose: (s) => {
+      // Call user's dispose callback
+      disposeCallback?.(s);
+      // Dispose scope resources
+      tryDispose(s);
+    },
+  });
 
   // we return fully scoped object, Typescript will omit the dispose property
   // why? if users create a scope with some methods and its methods are not binded to the scope, Invoking those methods will throw an error

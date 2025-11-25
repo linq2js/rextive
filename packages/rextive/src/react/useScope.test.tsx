@@ -72,7 +72,7 @@ describe("useScope", () => {
   });
 
   describe("automatic cleanup", () => {
-    it("should dispose all disposables on unmount", () => {
+    it("should dispose all disposables on unmount", async () => {
       const dispose1 = vi.fn();
       const dispose2 = vi.fn();
 
@@ -91,11 +91,12 @@ describe("useScope", () => {
       expect(dispose2).not.toHaveBeenCalled();
 
       unmount();
+      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
       expect(dispose1).toHaveBeenCalledOnce();
       expect(dispose2).toHaveBeenCalledOnce();
     });
 
-    it("should dispose signals on unmount", () => {
+    it("should dispose signals on unmount", async () => {
       const disposeSpy = vi.fn();
       const count = { dispose: disposeSpy, value: 0 } as any;
 
@@ -112,6 +113,7 @@ describe("useScope", () => {
       expect(disposeSpy).not.toHaveBeenCalled();
 
       unmount();
+      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
       expect(disposeSpy).toHaveBeenCalledOnce();
     });
 
@@ -376,7 +378,7 @@ describe("useScope", () => {
   });
 
   describe("complex scenarios", () => {
-    it("should handle scope with mixed disposable types", () => {
+    it("should handle scope with mixed disposable types", async () => {
       const signalDispose = vi.fn();
       const customDispose = vi.fn();
 
@@ -399,6 +401,7 @@ describe("useScope", () => {
 
       const { unmount } = render(<TestComponent />);
       unmount();
+      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
 
       expect(signalDispose).toHaveBeenCalledOnce();
       expect(customDispose).toHaveBeenCalledOnce();
@@ -473,7 +476,7 @@ describe("useScope", () => {
       unmount();
     });
 
-    it("should handle dispose as a function", () => {
+    it("should handle dispose as a function", async () => {
       const disposeFn = vi.fn();
 
       const TestComponent = () => {
@@ -489,10 +492,11 @@ describe("useScope", () => {
       expect(disposeFn).not.toHaveBeenCalled();
 
       unmount();
+      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
       expect(disposeFn).toHaveBeenCalledOnce();
     });
 
-    it("should handle dispose as a single Disposable object", () => {
+    it("should handle dispose as a single Disposable object", async () => {
       const disposeFn = vi.fn();
 
       const TestComponent = () => {
@@ -508,10 +512,11 @@ describe("useScope", () => {
       expect(disposeFn).not.toHaveBeenCalled();
 
       unmount();
+      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
       expect(disposeFn).toHaveBeenCalledOnce();
     });
 
-    it("should dispose signals listed in dispose property", () => {
+    it("should dispose signals listed in dispose property", async () => {
       const disposeSpy1 = vi.fn();
       const disposeSpy2 = vi.fn();
 
@@ -535,11 +540,12 @@ describe("useScope", () => {
       expect(disposeSpy2).not.toHaveBeenCalled();
 
       unmount();
+      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
       expect(disposeSpy1).toHaveBeenCalledOnce();
       expect(disposeSpy2).toHaveBeenCalledOnce();
     });
 
-    it("should only dispose items in dispose property", () => {
+    it("should only dispose items in dispose property", async () => {
       const signalDispose = vi.fn();
       const regularFn = vi.fn();
 
@@ -557,6 +563,7 @@ describe("useScope", () => {
 
       const { unmount } = render(<TestComponent />);
       unmount();
+      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
       // Only signal's dispose should be called
       expect(signalDispose).toHaveBeenCalledOnce();
       // Regular function should not be called during dispose

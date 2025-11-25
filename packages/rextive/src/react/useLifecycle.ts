@@ -16,6 +16,12 @@ export type LifecycleCallbacks<TTarget> = {
   mount?: (target: TTarget) => void;
   /** Called on every render with current object */
   render?: (target: TTarget) => void;
+  /**
+   * Called after render (after DOM updates) - use to update/sync scope state
+   * - Simple form: `(target) => void` - runs after every render
+   * - With deps: `[(target) => void, dep1, dep2]` - runs when deps change
+   */
+  update?: ((target: TTarget) => void) | [(target: TTarget) => void, ...any[]];
   /** Called when this object is being replaced or component unmounts */
   cleanup?: (target: TTarget) => void;
   /** Called when this object is truly done (StrictMode-safe) */
@@ -30,6 +36,7 @@ type InternalLifecycleOptions = {
   init?: ((target: any) => void) | VoidFunction;
   mount?: ((target: any) => void) | VoidFunction;
   render?: ((target: any) => void) | VoidFunction;
+  update?: ((target: any) => void) | VoidFunction | [(target: any) => void, ...any[]];
   cleanup?: ((target: any) => void) | VoidFunction;
   dispose?: ((target: any) => void) | VoidFunction;
 };
@@ -224,6 +231,25 @@ export function useLifecycle(
     },
     hasTarget ? [target] : []
   ); // Re-mount when target changes, or empty deps for component lifecycle
+
+  // Parse update callback and deps
+  const updateCallback = Array.isArray(options.update)
+    ? options.update[0]
+    : options.update;
+  const updateDeps = Array.isArray(options.update)
+    ? options.update.slice(1)
+    : undefined;
+
+  // Call update callback after render (with optional deps)
+  useLayoutEffect(() => {
+    if (updateCallback) {
+      if (hasTarget) {
+        (updateCallback as any)(target);
+      } else {
+        (updateCallback as VoidFunction)();
+      }
+    }
+  }, updateDeps); // No deps = every render, with deps = when deps change
 
   /**
    * Return getPhase function for dynamic phase inspection
