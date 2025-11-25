@@ -1,5 +1,3 @@
-import type { Tag } from "./tag";
-
 /**
  * Function type for use with proxies.
  */
@@ -839,13 +837,7 @@ export type SignalOptions<T> = {
   name?: string;
   /** Fallback function to recover from errors */
   fallback?: (error: unknown) => T;
-  /**
-   * Optional tags for grouping signals together.
-   *
-   * Tags allow batch operations on multiple signals. A signal can belong
-   * to multiple tags at once.
-   */
-  tags?: readonly Tag<T>[];
+
   /** Called whenever signal value changes (receives new value) */
   onChange?: SingleOrMultipleListeners<T>;
   /** Called whenever signal computation throws an error (receives error) */

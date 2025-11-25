@@ -13,6 +13,7 @@ import { FallbackError } from "./signal";
 import { resolveEquals } from "./utils/resolveEquals";
 import { pipeSignals } from "./utils/pipeSignals";
 import { createSignalContext } from "./createSignalContext";
+import { Tag } from "./tag";
 
 /**
  * Create a computed signal (with dependencies)
@@ -43,7 +44,9 @@ export function createComputedSignal(
     onError: onErrorCallbacks,
     tags,
     lazy = true,
-  } = options;
+  } = options as SignalOptions<any> & {
+    tags?: readonly Tag<any, "computed">[];
+  };
 
   // Resolve equals option to actual function (handles string shortcuts)
   const equals = resolveEquals(equalsOption) || Object.is;
@@ -107,7 +110,9 @@ export function createComputedSignal(
         }
       },
       () => recompute(), // onRefresh
-      () => { current = undefined; } // onStale
+      () => {
+        current = undefined;
+      } // onStale
     );
 
     try {
@@ -247,7 +252,7 @@ export function createComputedSignal(
     () => {
       // Batch multiple refresh calls into a single recomputation
       if (refreshScheduled) return;
-      
+
       refreshScheduled = true;
       // Use queueMicrotask to batch multiple synchronous refresh() calls
       queueMicrotask(() => {
@@ -322,4 +327,3 @@ export function createComputedSignal(
 
   return instance as unknown as ComputedSignal<any>;
 }
-

@@ -231,23 +231,23 @@ describe("tag", () => {
     });
   });
 
-  describe("_remove() internal method", () => {
-    it("should remove signal from tag", () => {
+  describe("_delete() internal method", () => {
+    it("should delete signal from tag", () => {
       const myTag = tag<number>();
       const count = signal(0, { tags: [myTag] });
 
       expect(myTag.size).toBe(1);
-      (myTag as any)._remove(count);
+      (myTag as any)._delete(count);
 
       expect(myTag.size).toBe(0);
     });
 
-    it("should handle removing non-existent signal", () => {
+    it("should handle deleting non-existent signal", () => {
       const myTag = tag<number>();
       const count = signal(0);
 
       expect(() => {
-        (myTag as any)._remove(count);
+        (myTag as any)._delete(count);
       }).not.toThrow();
     });
   });
@@ -407,6 +407,296 @@ describe("tag", () => {
 
       expect(names).toEqual(["counter1", "counter2"]);
       expect(values).toEqual([0, 0]);
+    });
+  });
+
+  describe("Tag options", () => {
+    describe("onAdd callback", () => {
+      it("should call onAdd when signal is added", () => {
+        const addedSignals: Signal<number>[] = [];
+        const myTag = tag<number>({
+          onAdd: (sig) => addedSignals.push(sig),
+        });
+
+        const sig1 = signal(1, { tags: [myTag] });
+        const sig2 = signal(2, { tags: [myTag] });
+
+        expect(addedSignals).toEqual([sig1, sig2]);
+      });
+
+      it("should pass tag instance to onAdd", () => {
+        let receivedTag: any = null;
+        const myTag = tag<number>({
+          onAdd: (sig, t) => {
+            receivedTag = t;
+          },
+        });
+
+        signal(1, { tags: [myTag] });
+
+        expect(receivedTag).toBe(myTag);
+      });
+
+      it("should not call onAdd for duplicate additions", () => {
+        let callCount = 0;
+        const myTag = tag<number>({
+          onAdd: () => callCount++,
+        });
+
+        const sig = signal(1);
+        (myTag as any)._add(sig);
+        (myTag as any)._add(sig); // Try to add again
+
+        expect(callCount).toBe(1);
+      });
+    });
+
+    describe("onDelete callback", () => {
+      it("should call onDelete when signal is removed", () => {
+        const deletedSignals: Signal<number>[] = [];
+        const myTag = tag<number>({
+          onDelete: (sig) => deletedSignals.push(sig),
+        });
+
+        const sig1 = signal(1, { tags: [myTag] });
+        const sig2 = signal(2, { tags: [myTag] });
+
+        myTag.delete(sig1);
+
+        expect(deletedSignals).toEqual([sig1]);
+        expect(deletedSignals).not.toContain(sig2);
+      });
+
+      it("should call onDelete when signal is disposed", () => {
+        const deletedSignals: Signal<number>[] = [];
+        const myTag = tag<number>({
+          onDelete: (sig) => deletedSignals.push(sig),
+        });
+
+        const sig = signal(1, { tags: [myTag] });
+        sig.dispose();
+
+        expect(deletedSignals).toEqual([sig]);
+      });
+
+      it("should call onDelete for each signal when tag is cleared", () => {
+        const deletedSignals: Signal<number>[] = [];
+        const myTag = tag<number>({
+          onDelete: (sig) => deletedSignals.push(sig),
+        });
+
+        const sig1 = signal(1, { tags: [myTag] });
+        const sig2 = signal(2, { tags: [myTag] });
+
+        myTag.clear();
+
+        expect(deletedSignals).toEqual([sig1, sig2]);
+      });
+
+      it("should pass tag instance to onDelete", () => {
+        let receivedTag: any = null;
+        const myTag = tag<number>({
+          onDelete: (sig, t) => {
+            receivedTag = t;
+          },
+        });
+
+        const sig = signal(1, { tags: [myTag] });
+        myTag.delete(sig);
+
+        expect(receivedTag).toBe(myTag);
+      });
+    });
+
+    describe("onChange callback", () => {
+      it("should call onChange when signal is added", () => {
+        const changes: Array<{ type: string; signal: Signal<number> }> = [];
+        const myTag = tag<number>({
+          onChange: (type, sig) => changes.push({ type, signal: sig }),
+        });
+
+        const sig1 = signal(1, { tags: [myTag] });
+        const sig2 = signal(2, { tags: [myTag] });
+
+        expect(changes).toEqual([
+          { type: "add", signal: sig1 },
+          { type: "add", signal: sig2 },
+        ]);
+      });
+
+      it("should call onChange when signal is deleted", () => {
+        const changes: Array<{ type: string; signal: Signal<number> }> = [];
+        const myTag = tag<number>({
+          onChange: (type, sig) => changes.push({ type, signal: sig }),
+        });
+
+        const sig = signal(1, { tags: [myTag] });
+        myTag.delete(sig);
+
+        expect(changes).toEqual([
+          { type: "add", signal: sig },
+          { type: "delete", signal: sig },
+        ]);
+      });
+
+      it("should call onChange when signal is disposed", () => {
+        const changes: Array<{ type: string }> = [];
+        const myTag = tag<number>({
+          onChange: (type) => changes.push({ type }),
+        });
+
+        const sig = signal(1, { tags: [myTag] });
+        sig.dispose();
+
+        expect(changes).toEqual([{ type: "add" }, { type: "delete" }]);
+      });
+
+      it("should pass tag instance to onChange", () => {
+        let receivedTag: any = null;
+        const myTag = tag<number>({
+          onChange: (type, sig, t) => {
+            receivedTag = t;
+          },
+        });
+
+        signal(1, { tags: [myTag] });
+
+        expect(receivedTag).toBe(myTag);
+      });
+    });
+
+    describe("maxSize option", () => {
+      it("should enforce maximum size limit", () => {
+        const myTag = tag<number>({ maxSize: 2 });
+
+        signal(1, { tags: [myTag] });
+        signal(2, { tags: [myTag] });
+
+        expect(() => {
+          signal(3, { tags: [myTag] });
+        }).toThrow('Tag has reached maximum size of 2');
+      });
+
+      it("should include tag name in error message", () => {
+        const myTag = tag<number>({ name: "limitedTag", maxSize: 1 });
+
+        signal(1, { tags: [myTag] });
+
+        expect(() => {
+          signal(2, { tags: [myTag] });
+        }).toThrow('Tag "limitedTag" has reached maximum size of 1');
+      });
+
+      it("should allow adding signals after some are removed", () => {
+        const myTag = tag<number>({ maxSize: 2 });
+
+        const sig1 = signal(1, { tags: [myTag] });
+        const sig2 = signal(2, { tags: [myTag] });
+
+        myTag.delete(sig1);
+
+        expect(() => {
+          signal(3, { tags: [myTag] });
+        }).not.toThrow();
+
+        expect(myTag.size).toBe(2);
+      });
+    });
+
+    describe("autoDispose option", () => {
+      it("should automatically dispose signals when deleted from tag", () => {
+        const myTag = tag<number>({ autoDispose: true });
+
+        const sig = signal(1, { tags: [myTag] });
+
+        expect(() => sig()).not.toThrow();
+
+        myTag.delete(sig);
+
+        // Signal should be disposed
+        expect(() => sig()).toThrow();
+      });
+
+      it("should dispose all signals when tag is cleared", () => {
+        const myTag = tag<number>({ autoDispose: true });
+
+        const sig1 = signal(1, { tags: [myTag] });
+        const sig2 = signal(2, { tags: [myTag] });
+
+        myTag.clear();
+
+        // Both signals should be disposed
+        expect(() => sig1()).toThrow();
+        expect(() => sig2()).toThrow();
+      });
+
+      it("should not double-dispose when signal is already being disposed", () => {
+        const disposeCalls: number[] = [];
+        const myTag = tag<number>({
+          autoDispose: true,
+          onDelete: () => disposeCalls.push(1),
+        });
+
+        const sig = signal(1, { tags: [myTag] });
+
+        // Dispose the signal directly (not via tag.delete)
+        sig.dispose();
+
+        // onDelete should be called once (from signal disposal)
+        expect(disposeCalls.length).toBe(1);
+      });
+
+      it("should work with multiple tags, only disposing from autoDispose tag", () => {
+        const autoTag = tag<number>({ autoDispose: true });
+        const normalTag = tag<number>();
+
+        const sig = signal(1, { tags: [autoTag, normalTag] });
+
+        autoTag.delete(sig);
+
+        // Signal should be disposed and removed from both tags
+        expect(() => sig()).toThrow();
+        expect(autoTag.has(sig)).toBe(false);
+        expect(normalTag.has(sig)).toBe(false);
+      });
+    });
+
+    describe("Combined options", () => {
+      it("should work with all callbacks together", () => {
+        const events: string[] = [];
+        const myTag = tag<number>({
+          name: "combined",
+          onAdd: () => events.push("add"),
+          onDelete: () => events.push("delete"),
+          onChange: (type) => events.push(`change:${type}`),
+        });
+
+        const sig = signal(1, { tags: [myTag] });
+        myTag.delete(sig);
+
+        expect(events).toEqual(["add", "change:add", "delete", "change:delete"]);
+      });
+
+      it("should work with maxSize and autoDispose", () => {
+        const myTag = tag<number>({ maxSize: 2, autoDispose: true });
+
+        const sig1 = signal(1, { tags: [myTag] });
+        const sig2 = signal(2, { tags: [myTag] });
+
+        expect(() => {
+          signal(3, { tags: [myTag] });
+        }).toThrow();
+
+        myTag.delete(sig1);
+
+        // sig1 should be disposed
+        expect(() => sig1()).toThrow();
+
+        // Should allow adding new signal now
+        expect(() => {
+          signal(3, { tags: [myTag] });
+        }).not.toThrow();
+      });
     });
   });
 });

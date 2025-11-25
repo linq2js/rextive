@@ -14,6 +14,7 @@ import { resolveEquals } from "./utils/resolveEquals";
 import { pipeSignals } from "./utils/pipeSignals";
 import { createComputedSignal } from "./createComputedSignal";
 import { createSignalContext } from "./createSignalContext";
+import { Tag } from "./tag";
 
 /**
  * Create a mutable signal (no dependencies)
@@ -41,7 +42,7 @@ export function createMutableSignal(
     onError: onErrorCallbacks,
     tags,
     lazy = true,
-  } = options;
+  } = options as SignalOptions<any> & { tags?: readonly Tag<any, "mutable">[] };
 
   // Resolve equals option to actual function (handles string shortcuts)
   const equals = resolveEquals(equalsOption) || Object.is;

@@ -9,6 +9,8 @@ import {
 import { createMutableSignal } from "./createMutableSignal";
 import { createComputedSignal } from "./createComputedSignal";
 import { createSignalContext } from "./createSignalContext";
+import { EqualsStrategy } from "./utils/resolveEquals";
+import { Tag } from "./tag";
 
 export const DISPOSED_MESSAGE = "Signal is disposed";
 
@@ -46,7 +48,7 @@ function createEmptySignal(): MutableSignal<unknown, undefined> {
  */
 function createSignalWithEquals<TValue>(
   value: TValue | ((context: SignalContext) => TValue),
-  equals: "strict" | "shallow" | "deep"
+  equals: EqualsStrategy
 ): MutableSignal<TValue> {
   const isLazy = typeof value === "function";
   return createMutableSignal(
@@ -151,7 +153,7 @@ export function signal<TValue>(
  */
 export function signal<TValue>(
   value: TValue | ((context: SignalContext) => TValue),
-  options?: SignalOptions<TValue>
+  options?: SignalOptions<TValue> & { tags?: readonly Tag<TValue, "mutable">[] }
 ): MutableSignal<TValue>;
 
 /**
@@ -186,7 +188,9 @@ export function signal<TValue, TDependencies extends SignalMap>(
 export function signal<TValue, TDependencies extends SignalMap>(
   dependencies: TDependencies,
   compute: (context: ComputedSignalContext<NoInfer<TDependencies>>) => TValue,
-  options?: SignalOptions<TValue>
+  options?: SignalOptions<TValue> & {
+    tags?: readonly Tag<TValue, "computed">[];
+  }
 ): ComputedSignal<TValue>;
 export function signal(...args: any[]): any {
   // Overload 1: signal() - no arguments
