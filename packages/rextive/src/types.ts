@@ -583,27 +583,31 @@ export interface SignalContext {
   onCleanup: (fn: VoidFunction) => void;
 
   /**
-   * Execute a function only if the computation is still active (not aborted).
+   * Execute a function or promise safely within the abort-aware context.
    *
    * - For sync functions: Throws if aborted, otherwise executes normally
    * - For async functions: Returns a never-resolving promise if aborted, otherwise executes normally
+   * - For promises: Returns a never-resolving promise if aborted, otherwise awaits the promise
    *
    * This prevents wasted work after a computation has been cancelled.
    *
-   * @param fn - Function to execute
-   * @param args - Arguments to pass to the function
-   * @returns The result of the function, or a never-resolving promise if aborted
+   * @param fnOrPromise - Function to execute or promise to await
+   * @param args - Arguments to pass to the function (if applicable)
+   * @returns The result of the function/promise, or a never-resolving promise if aborted
    *
    * @example
    * ```ts
-   * const mySignal = signal({ count }, async ({ deps, run }) => {
+   * const mySignal = signal({ count }, async ({ deps, safe }) => {
    *   await fetch('/api/data', { signal: abortSignal });
    *
-   *   // Only runs if not aborted
-   *   const processed = run(() => expensiveOperation(deps.count));
+   *   // Safely delay - never resolves if aborted
+   *   await safe(wait.delay(300));
+   *
+   *   // Safely run expensive operation
+   *   const processed = safe(() => expensiveOperation(deps.count));
    *
    *   // Works with async functions too
-   *   const result = await run(async () => {
+   *   const result = await safe(async () => {
    *     return processData(processed);
    *   });
    *
@@ -611,17 +615,18 @@ export interface SignalContext {
    * });
    * ```
    */
-  run<T>(fn: () => T): T;
-  run<T, TArgs extends any[]>(fn: (...args: TArgs) => T, ...args: TArgs): T;
+  safe<T>(promise: PromiseLike<T>): Promise<T>;
+  safe<T>(fn: () => T): T;
+  safe<T, TArgs extends any[]>(fn: (...args: TArgs) => T, ...args: TArgs): T;
 
   /**
    * Execute a logic function with the context itself as the first argument.
    *
-   * This is a convenience method that combines `run()` with passing the context,
+   * This is a convenience method that combines `safe()` with passing the context,
    * allowing you to write reusable logic functions that receive the full context.
    *
    * **Behavior:**
-   * - Wraps the logic function with `run()` for abort safety
+   * - Wraps the logic function with `safe()` for abort safety
    * - Passes the context as the first argument to the logic function
    * - Supports additional arguments after the context
    * - Works with both sync and async logic functions
@@ -703,8 +708,8 @@ export interface SignalContext {
    *
    * const computed = signal({ count }, (context) => {
    *   return context.use((ctx) => {
-   *     const step1 = ctx.run(() => ctx.deps.count * 2);
-   *     const step2 = ctx.run(() => step1 + 10);
+   *     const step1 = ctx.safe(() => ctx.deps.count * 2);
+   *     const step2 = ctx.safe(() => step1 + 10);
    *     return step2;
    *   });
    * });

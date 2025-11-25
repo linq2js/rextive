@@ -1747,7 +1747,7 @@ function contextUseTests() {
   // With run inside use
   const computed9 = signal({ count }, (context) => {
     return context.use((ctx) => {
-      const step1 = ctx.run(() => ctx.deps.count * 2);
+      const step1 = ctx.safe(() => ctx.deps.count * 2);
       return step1;
     });
   });

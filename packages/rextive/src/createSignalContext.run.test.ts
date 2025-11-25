@@ -1,16 +1,16 @@
 /**
- * Tests for SignalContext.run() method
+ * Tests for SignalContext.safe() method
  */
 import { describe, it, expect, vi } from "vitest";
 import { signal } from "./signal";
 
-describe("SignalContext.run()", () => {
+describe("SignalContext.safe()", () => {
   it("should execute sync functions normally when not aborted", () => {
     const count = signal(1);
     let executed = false;
 
-    const computed = signal({ count }, ({ deps, run }) => {
-      const result = run(() => {
+    const computed = signal({ count }, ({ deps, safe }) => {
+      const result = safe(() => {
         executed = true;
         return deps.count * 2;
       });
@@ -25,8 +25,8 @@ describe("SignalContext.run()", () => {
     const count = signal(1);
     let executed = false;
 
-    const computed = signal({ count }, async ({ deps, run }) => {
-      const result = await run(async () => {
+    const computed = signal({ count }, async ({ deps, safe }) => {
+      const result = await safe(async () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         executed = true;
         return deps.count * 2;
@@ -42,9 +42,9 @@ describe("SignalContext.run()", () => {
   it("should pass arguments to the function", () => {
     const count = signal(1);
 
-    const computed = signal({ count }, ({ deps, run }) => {
+    const computed = signal({ count }, ({ deps, safe }) => {
       const multiply = (a: number, b: number, c: number) => a * b * c;
-      return run(multiply, deps.count, 2, 3);
+      return safe(multiply, deps.count, 2, 3);
     });
 
     expect(computed()).toBe(6); // 1 * 2 * 3
@@ -53,12 +53,12 @@ describe("SignalContext.run()", () => {
   it("should pass arguments to async functions", async () => {
     const count = signal(1);
 
-    const computed = signal({ count }, async ({ deps, run }) => {
+    const computed = signal({ count }, async ({ deps, safe }) => {
       const multiply = async (a: number, b: number) => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         return a * b;
       };
-      return await run(multiply, deps.count, 5);
+      return await safe(multiply, deps.count, 5);
     });
 
     expect(await computed()).toBe(5); // 1 * 5
@@ -68,12 +68,12 @@ describe("SignalContext.run()", () => {
     const count = signal(1);
     let expensiveOpCalled = false;
 
-    const computed = signal({ count }, async ({ deps, run, abortSignal }) => {
+    const computed = signal({ count }, async ({ deps, safe, abortSignal }) => {
       await new Promise((resolve) => setTimeout(resolve, 10));
       
       // This should throw if aborted
       try {
-        return run(() => {
+        return safe(() => {
           expensiveOpCalled = true;
           return deps.count * 2;
         });
@@ -101,7 +101,7 @@ describe("SignalContext.run()", () => {
     const count = signal(1);
     const executionLog: string[] = [];
 
-    const computed = signal({ count }, async ({ deps, run, abortSignal }) => {
+    const computed = signal({ count }, async ({ deps, safe, abortSignal }) => {
       executionLog.push("start");
       
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -110,7 +110,7 @@ describe("SignalContext.run()", () => {
       
       // This should return a never-resolving promise if aborted
       const result = await Promise.race([
-        run(async () => {
+        safe(async () => {
           executionLog.push("expensive-op");
           return deps.count * 2;
         }),
@@ -135,13 +135,13 @@ describe("SignalContext.run()", () => {
     expect(result).toBe(4); // Second computation: 2 * 2
   });
 
-  it("should work with multiple run() calls", () => {
+  it("should work with multiple safe() calls", () => {
     const count = signal(1);
 
-    const computed = signal({ count }, ({ deps, run }) => {
-      const step1 = run(() => deps.count * 2);
-      const step2 = run(() => step1 + 10);
-      const step3 = run(() => step2 * 3);
+    const computed = signal({ count }, ({ deps, safe }) => {
+      const step1 = safe(() => deps.count * 2);
+      const step2 = safe(() => step1 + 10);
+      const step3 = safe(() => step2 * 3);
       return step3;
     });
 
@@ -151,11 +151,11 @@ describe("SignalContext.run()", () => {
   it("should work in loops", () => {
     const items = signal([1, 2, 3, 4, 5]);
 
-    const computed = signal({ items }, ({ deps, run }) => {
+    const computed = signal({ items }, ({ deps, safe }) => {
       const results: number[] = [];
       
       for (const item of deps.items) {
-        const processed = run((x: number) => x * 2, item);
+        const processed = safe((x: number) => x * 2, item);
         results.push(processed);
       }
       
@@ -168,9 +168,9 @@ describe("SignalContext.run()", () => {
   it("should work with array methods", () => {
     const items = signal([1, 2, 3, 4, 5]);
 
-    const computed = signal({ items }, ({ deps, run }) => {
+    const computed = signal({ items }, ({ deps, safe }) => {
       return deps.items.map((item) => {
-        return run((x: number) => x * 2, item);
+        return safe((x: number) => x * 2, item);
       });
     });
 
@@ -180,9 +180,9 @@ describe("SignalContext.run()", () => {
   it("should handle errors in sync functions", () => {
     const count = signal(1);
 
-    const computed = signal({ count }, ({ deps, run }) => {
+    const computed = signal({ count }, ({ deps, safe }) => {
       try {
-        return run(() => {
+        return safe(() => {
           if (deps.count === 1) {
             throw new Error("Test error");
           }
@@ -202,9 +202,9 @@ describe("SignalContext.run()", () => {
   it("should handle errors in async functions", async () => {
     const count = signal(1);
 
-    const computed = signal({ count }, async ({ deps, run }) => {
+    const computed = signal({ count }, async ({ deps, safe }) => {
       try {
-        return await run(async () => {
+        return await safe(async () => {
           await new Promise((resolve) => setTimeout(resolve, 10));
           if (deps.count === 1) {
             throw new Error("Async error");
@@ -225,13 +225,13 @@ describe("SignalContext.run()", () => {
   it("should work with nested async operations", async () => {
     const count = signal(1);
 
-    const computed = signal({ count }, async ({ deps, run }) => {
-      const step1 = await run(async () => {
+    const computed = signal({ count }, async ({ deps, safe }) => {
+      const step1 = await safe(async () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         return deps.count * 2;
       });
       
-      const step2 = await run(async () => {
+      const step2 = await safe(async () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         return step1 + 10;
       });
@@ -246,14 +246,14 @@ describe("SignalContext.run()", () => {
     const userId = signal(1);
     const fetchSpy = vi.fn();
 
-    const userData = signal({ userId }, async ({ deps, run, abortSignal }) => {
+    const userData = signal({ userId }, async ({ deps, safe, abortSignal }) => {
       // Fetch data
       await new Promise((resolve) => setTimeout(resolve, 10));
       fetchSpy(deps.userId);
       const data = { id: deps.userId, name: `User ${deps.userId}` };
       
       // Process data only if not aborted
-      const processed = await run(async () => {
+      const processed = await safe(async () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         return { ...data, processed: true };
       });
@@ -270,7 +270,7 @@ describe("SignalContext.run()", () => {
     const query = signal("test");
     const steps: string[] = [];
 
-    const searchResults = signal({ query }, async ({ deps, run, abortSignal }) => {
+    const searchResults = signal({ query }, async ({ deps, safe, abortSignal }) => {
       steps.push("fetch-start");
       await new Promise((resolve) => setTimeout(resolve, 10));
       steps.push("fetch-done");
@@ -278,7 +278,7 @@ describe("SignalContext.run()", () => {
       const rawData = { query: deps.query, items: [1, 2, 3] };
       
       // Process data
-      const processed = await run(async () => {
+      const processed = await safe(async () => {
         steps.push("process-start");
         await new Promise((resolve) => setTimeout(resolve, 10));
         steps.push("process-done");
@@ -286,7 +286,7 @@ describe("SignalContext.run()", () => {
       });
       
       // Format results
-      const formatted = run(() => {
+      const formatted = safe(() => {
         steps.push("format");
         return processed.map((x) => `Item: ${x}`);
       });

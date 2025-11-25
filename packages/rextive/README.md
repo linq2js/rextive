@@ -1204,7 +1204,7 @@ function ProfileManual() {
 Combine automatic cancellation with timeouts and manual control:
 
 ```tsx
-import { signal } from "rextive";
+import { signal, wait } from "rextive";
 
 const userId = signal(1);
 
@@ -1253,7 +1253,7 @@ const searchResults = signal({ searchTerm }, async ({ deps, abortSignal }) => {
 manualController.abort();
 
 // Pattern 3: Retry with timeout
-const data = signal(async ({ abortSignal }) => {
+const data = signal(async ({ abortSignal, safe }) => {
   const maxRetries = 3;
   let attempt = 0;
 
@@ -1272,7 +1272,8 @@ const data = signal(async ({ abortSignal }) => {
       if (res.ok) return res.json();
 
       attempt++;
-      await new Promise((r) => setTimeout(r, 1000)); // Wait 1s before retry
+      // Wait 1s before retry - never resolves if aborted
+      await safe(wait.delay(1000));
     } catch (error) {
       if (error.name === "TimeoutError") {
         attempt++;
@@ -1881,7 +1882,7 @@ updateField("name", "John");
 Build a search box with debouncing and automatic cancellation:
 
 ```tsx
-import { signal, disposable, rx, useScope } from "rextive/react";
+import { signal, disposable, rx, useScope, wait } from "rextive/react";
 
 function SearchBox() {
   const scope = useScope(() => {
@@ -1889,40 +1890,43 @@ function SearchBox() {
     const searchInput = signal("");
 
     // Search results (debounced and async)
-    const results = signal({ searchInput }, async ({ deps, abortSignal }) => {
-      const query = deps.searchInput.trim();
+    const results = signal(
+      { searchInput },
+      async ({ deps, abortSignal, safe }) => {
+        const query = deps.searchInput.trim();
 
-      // Don't search for empty queries
-      if (!query) return [];
+        // Don't search for empty queries
+        if (!query) return [];
 
-      // Don't search for very short queries
-      if (query.length < 2) return [];
+        // Don't search for very short queries
+        if (query.length < 2) return [];
 
-      // Debounce: wait 300ms before searching
-      await new Promise((r) => setTimeout(r, 300));
+        // Debounce: wait 300ms - never resolves if aborted
+        await safe(wait.delay(300));
 
-      // Check if search was cancelled during debounce
-      if (abortSignal?.aborted) return [];
+        console.log(`Searching for: ${query}`);
 
-      console.log(`Searching for: ${query}`);
+        // Perform the search
+        try {
+          const res = await fetch(
+            `/api/search?q=${encodeURIComponent(query)}`,
+            {
+              signal: abortSignal, // Cancel if user types more
+            }
+          );
 
-      // Perform the search
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
-          signal: abortSignal, // Cancel if user types more
-        });
+          if (!res.ok) throw new Error("Search failed");
 
-        if (!res.ok) throw new Error("Search failed");
-
-        return await res.json();
-      } catch (error) {
-        if (error.name === "AbortError") {
-          console.log("Search cancelled");
-          return []; // Return empty on cancel
+          return await res.json();
+        } catch (error) {
+          if (error.name === "AbortError") {
+            console.log("Search cancelled");
+            return []; // Return empty on cancel
+          }
+          throw error; // Re-throw other errors
         }
-        throw error; // Re-throw other errors
       }
-    });
+    );
 
     // Is searching? (for loading indicator)
     const isSearching = signal({ searchInput, results }, ({ deps }) => {
@@ -1997,16 +2001,16 @@ function SearchBox() {
 <summary>📖 <strong>How Debouncing Works</strong></summary>
 
 ```tsx
-const results = signal({ searchInput }, async ({ deps, abortSignal }) => {
-  // Wait 300ms
-  await new Promise(r => setTimeout(r, 300));
+const results = signal(
+  { searchInput },
+  async ({ deps, abortSignal, safe }) => {
+    // Wait 300ms - never resolves if aborted
+    await safe(wait.delay(300));
 
-  // Check if cancelled during wait
-  if (abortSignal?.aborted) return [];
-
-  // Proceed with search
-  return fetch(...);
-});
+    // Proceed with search (no need to check aborted - safe handles it)
+    return fetch(...);
+  }
+);
 
 // User types "react" quickly:
 // - User types "r"
@@ -2042,26 +2046,29 @@ const results = signal({ searchInput }, async ({ deps, abortSignal }) => {
 
 ```tsx
 // Fast debounce (100ms) - for local data
-await new Promise((r) => setTimeout(r, 100));
+await safe(wait.delay(100));
 
 // Normal debounce (300ms) - for most searches
-await new Promise((r) => setTimeout(r, 300));
+await safe(wait.delay(300));
 
 // Slow debounce (500ms) - for expensive searches
-await new Promise((r) => setTimeout(r, 500));
+await safe(wait.delay(500));
 
 // Or make it configurable:
 function createDebouncedSearch(debounceMs = 300) {
   const searchInput = signal("");
 
-  const results = signal({ searchInput }, async ({ deps, abortSignal }) => {
-    if (!deps.searchInput) return [];
+  const results = signal(
+    { searchInput },
+    async ({ deps, abortSignal, safe }) => {
+      if (!deps.searchInput) return [];
 
-    await new Promise((r) => setTimeout(r, debounceMs));
-    if (abortSignal?.aborted) return [];
+      // Never resolves if aborted
+      await safe(wait.delay(debounceMs));
 
-    return fetch(`/search?q=${deps.searchInput}`);
-  });
+      return fetch(`/search?q=${deps.searchInput}`);
+    }
+  );
 
   return { searchInput, results };
 }

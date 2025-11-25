@@ -74,26 +74,29 @@ export function createSignalContext(
   };
 
   /**
-   * Execute a function only if the computation is still active.
+   * Execute a function or promise safely within the abort-aware context.
    *
    * Prevents wasted work after a computation has been cancelled by:
    * - Throwing AbortedComputationError for sync functions if already aborted
-   * - Returning a never-resolving promise for async functions if aborted during execution
+   * - Returning a never-resolving promise for async functions/promises if aborted during execution
    *
-   * @param fn - The function to execute
-   * @param args - Arguments to pass to the function
-   * @returns The result of the function
+   * @param fnOrPromise - The function to execute or promise to await
+   * @param args - Arguments to pass to the function (if applicable)
+   * @returns The result of the function/promise
    * @throws {AbortedComputationError} If the computation was aborted before execution
    *
    * @example Prevent expensive operations after fetch
    * ```ts
-   * const data = signal({ userId }, async ({ deps, run, abortSignal }) => {
+   * const data = signal({ userId }, async ({ deps, safe, abortSignal }) => {
    *   const response = await fetch(`/api/users/${deps.userId}`, { signal: abortSignal });
    *   const json = await response.json();
    *
+   *   // Safely delay - never resolves if aborted
+   *   await safe(wait.delay(300));
+   *
    *   // Only runs if not aborted - no manual checks needed
-   *   const processed = run(() => expensiveProcessing(json));
-   *   const formatted = run(formatData, processed, "options");
+   *   const processed = safe(() => expensiveProcessing(json));
+   *   const formatted = safe(formatData, processed, "options");
    *
    *   return formatted;
    * });
@@ -101,12 +104,37 @@ export function createSignalContext(
    *
    * @example Use in loops
    * ```ts
-   * const results = signal({ items }, ({ deps, run }) => {
-   *   return deps.items.map(item => run(processItem, item));
+   * const results = signal({ items }, ({ deps, safe }) => {
+   *   return deps.items.map(item => safe(processItem, item));
    * });
    * ```
    */
-  const run = function <T>(fn: (...args: any[]) => T, ...args: any[]): T {
+  const safe = function <T>(fnOrPromise: any, ...args: any[]): T {
+    // If it's a promise, wrap it to handle abort
+    if (isPromiseLike(fnOrPromise)) {
+      // If already aborted, return never-resolving promise
+      if (aborted) {
+        return new Promise(() => {}) as any;
+      }
+
+      // Wrap the promise to handle abort during execution
+      return new Promise((resolve, reject) => {
+        fnOrPromise.then(
+          (value: any) => {
+            // Don't resolve if aborted while promise was pending
+            if (aborted) return;
+            resolve(value);
+          },
+          (error: any) => {
+            // Don't reject if aborted while promise was pending
+            if (aborted) return;
+            reject(error);
+          }
+        );
+      }) as any;
+    }
+
+    // It's a function - execute it
     // If computation was already aborted, throw immediately
     // This prevents execution of sync functions
     if (aborted) {
@@ -114,7 +142,7 @@ export function createSignalContext(
     }
 
     // Execute the function
-    const result = fn(...args);
+    const result = fnOrPromise(...args);
 
     // If result is a promise, wrap it to handle abort during async execution
     // If aborted while promise is pending, it becomes a never-resolving promise
@@ -143,7 +171,7 @@ export function createSignalContext(
     logic: (context: InternalComputedSignalContext, ...args: any[]) => any,
     ...args: any[]
   ) => {
-    return run(() => logic(context, ...args));
+    return safe(() => logic(context, ...args));
   };
 
   // Context methods for refresh and stale
@@ -197,7 +225,7 @@ export function createSignalContext(
     },
     onCleanup: onCleanup.on,
     use: use as any,
-    run: run as any,
+    safe: safe as any,
     refresh: contextRefresh,
     stale: contextStale,
     _endComputing: () => {
@@ -240,7 +268,7 @@ export function createSignalContext(
 /**
  * Error thrown when attempting to execute code in an aborted computation.
  *
- * This error is thrown by `context.run()` when:
+ * This error is thrown by `context.safe()` when:
  * - The computation has been cancelled (dependency changed during async operation)
  * - The signal has been disposed
  *
@@ -249,12 +277,12 @@ export function createSignalContext(
  *
  * @example
  * ```ts
- * const mySignal = signal({ count }, async ({ deps, run }) => {
+ * const mySignal = signal({ count }, async ({ deps, safe }) => {
  *   await fetch('/api/data');
  *
  *   try {
  *     // This will throw AbortedComputationError if computation was cancelled
- *     return run(() => expensiveOperation());
+ *     return safe(() => expensiveOperation());
  *   } catch (e) {
  *     if (e instanceof AbortedComputationError) {
  *       console.log('Computation was cancelled');

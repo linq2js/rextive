@@ -20,7 +20,7 @@ describe("SignalContext.use()", () => {
     expect(receivedContext).toBeTruthy();
     expect(receivedContext.deps).toBeDefined();
     expect(receivedContext.abortSignal).toBeDefined();
-    expect(receivedContext.run).toBeDefined();
+    expect(receivedContext.safe).toBeDefined();
     expect(receivedContext.use).toBeDefined();
   });
 
@@ -38,8 +38,8 @@ describe("SignalContext.use()", () => {
         // Access cleanup
         expect(typeof ctx.onCleanup).toBe("function");
 
-        // Access run
-        expect(typeof ctx.run).toBe("function");
+        // Access safe
+        expect(typeof ctx.safe).toBe("function");
 
         return value * 2;
       });
@@ -90,7 +90,7 @@ describe("SignalContext.use()", () => {
     expect(await computed()).toBe(5);
   });
 
-  it("should be protected by run() - throw if aborted (sync)", async () => {
+  it("should be protected by safe() - throw if aborted (sync)", async () => {
     const count = signal(1);
     let logicExecuted = false;
 
@@ -121,7 +121,7 @@ describe("SignalContext.use()", () => {
     expect(result).toBe(4); // Second computation: 2 * 2
   });
 
-  it("should be protected by run() - never-resolving promise if aborted (async)", async () => {
+  it("should be protected by safe() - never-resolving promise if aborted (async)", async () => {
     const count = signal(1);
 
     const computed = signal({ count }, async (context) => {
@@ -201,13 +201,13 @@ describe("SignalContext.use()", () => {
     expect(computed()).toBe(5);
   });
 
-  it("should allow using run() inside use() logic", () => {
+  it("should allow using safe() inside use() logic", () => {
     const count = signal(1);
 
     const computed = signal({ count }, (context) => {
       return context.use((ctx) => {
-        const step1 = ctx.run(() => ctx.deps.count * 2);
-        const step2 = ctx.run(() => step1 + 10);
+        const step1 = ctx.safe(() => ctx.deps.count * 2);
+        const step2 = ctx.safe(() => step1 + 10);
         return step2;
       });
     });
