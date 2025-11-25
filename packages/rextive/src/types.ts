@@ -561,7 +561,7 @@ export type ComputedSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
  * Map of signal names to signal instances
  * Accepts both MutableSignal and ComputedSignal
  */
-export type SignalMap = Record<string, Signal<any>>;
+export type SignalMap = ExDisposable | Record<string, Signal<any>>;
 
 /**
  * Base context for signal computation functions

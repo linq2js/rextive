@@ -419,12 +419,12 @@ const getPhase = useScope({
 
 ### Signal Subscription
 
-#### `useSignals(signals)`
+#### `useWatch(signals)`
 
 Subscribe to signals with lazy tracking.
 
 ```tsx
-const [value, loadable] = useSignals({ user, posts });
+const [value, loadable] = useWatch({ user, posts });
 
 // value: { user: User, posts: Post[] }
 // loadable: { user: Loadable<User>, posts: Loadable<Post[]> }
@@ -504,7 +504,7 @@ import type {
 
 - `rx` - Reactive rendering (3 overloads)
 - `useScope` - Lifecycle & scoped state (3 modes)
-- `useSignals` - Signal subscription
+- `useWatch` - Signal subscription
 - `useRerender` - Manual rerender
 
 **Total: 44 Public APIs**

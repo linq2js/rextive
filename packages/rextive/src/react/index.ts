@@ -45,5 +45,5 @@ export type { UseScopeOptions } from "./useScope";
 // Export React components and hooks
 export { rx } from "./rx";
 export { useScope } from "./useScope";
-export { useSignals } from "./useSignals";
+export { useWatch } from "./useWatch";
 export { useRerender } from "./useRerender";

@@ -766,7 +766,7 @@ const count = signal(0);
 const doubled = count.to((x) => x * 2);
 const user = signal(async () => fetchUser());
 
-// All work with rx(), wait(), useSignals(), etc.
+// All work with rx(), wait(), useWatch(), etc.
 ```
 
 **Benefits:**
@@ -1377,61 +1377,49 @@ Build a reusable query pattern similar to React Query:
 
 ```tsx
 import { signal, disposable, rx, useScope } from "rextive/react";
+import { loadable } from "rextive";
 
 // Reusable query factory
 function createQuery(endpoint, options = {}) {
   // Parameters for the query (starts undefined = not loaded yet)
   const params = signal();
 
-  // Loading state
-  const isLoading = signal(false);
-
   // Data signal (fetches when params change)
   const data = signal({ params }, async ({ deps, abortSignal }) => {
     if (!deps.params) return null; // Don't fetch without params
 
-    isLoading.set(true);
+    const res = await fetch(endpoint, {
+      method: options.method || "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(deps.params),
+      signal: abortSignal, // Auto-cancel when params change
+    });
 
-    try {
-      const res = await fetch(endpoint, {
-        method: options.method || "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(deps.params),
-        signal: abortSignal, // Auto-cancel when params change
-      });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      return await res.json();
-    } finally {
-      isLoading.set(false);
-    }
+    return await res.json();
   });
+
+  // Convert async data to loadable (handles loading/error states)
+  const result = data.to(loadable);
 
   // Mutation function (like React Query's mutate)
   const mutate = (newParams) => params.set(newParams);
 
-  // Refetch with same params
-  const refetch = () => {
-    const current = params();
-    if (current) {
-      params.set({ ...current }); // Create new reference to trigger refetch
-    }
-  };
-
   // Return disposable object
-  return disposable({
+  return {
     params,
-    data,
-    isLoading,
+    result,
     mutate,
-    refetch,
-  });
+    refetch: data.refresh, // Trigger immediate re-fetch
+    stale: data.stale, // Mark stale (lazy re-fetch on next access)
+    // Create dispose method but don't expose internal signals
+    dispose: disposable({ data, result, params }).dispose,
+  };
 }
 
-// Use in a component
+// Option 1: Component-scoped query (cleaned up on unmount)
 function UserProfile({ userId }) {
-  // Create component-scoped query
   const userQuery = useScope(() => createQuery("/api/user"));
 
   // Trigger query when userId prop changes
@@ -1447,23 +1435,21 @@ function UserProfile({ userId }) {
       <button onClick={() => userQuery.refetch()}>Refresh</button>
 
       {/* Render with loadable states */}
-      {rx({ data: userQuery.data }, (_value, loadable) => {
+      {rx(userQuery.result, (result) => {
         // Handle loading
-        if (loadable.data.status === "loading") {
+        if (result.status === "loading") {
           return <div>Loading user...</div>;
         }
 
         // Handle error
-        if (loadable.data.status === "error") {
+        if (result.status === "error") {
           return (
-            <div style={{ color: "red" }}>
-              Error: {loadable.data.error.message}
-            </div>
+            <div style={{ color: "red" }}>Error: {result.error.message}</div>
           );
         }
 
         // Handle no data
-        const user = loadable.data.value;
+        const user = result.value;
         if (!user) {
           return <div>No user selected</div>;
         }
@@ -1480,7 +1466,34 @@ function UserProfile({ userId }) {
     </div>
   );
 }
+
+// Option 2: Global query (shared across components, manual cleanup)
+export const userQuery = createQuery("/api/user");
+
+function AnotherComponent() {
+  return (
+    <div>
+      {/* Consume the same global query */}
+      {rx(userQuery.result, (result) => {
+        if (result.status === "loading") return <div>Loading...</div>;
+        if (result.status === "error") return <div>Error!</div>;
+        return <div>User: {result.value?.name}</div>;
+      })}
+
+      {/* Refresh from anywhere */}
+      <button onClick={() => userQuery.refetch()}>Refresh</button>
+    </div>
+  );
+}
+
+// Note: Global queries should be disposed manually when no longer needed
+// userQuery.dispose();
 ```
+
+**When to use each pattern:**
+
+- **Component-scoped (`useScope`)**: Best for component-specific data. Automatically cleaned up when component unmounts. Perfect for user profiles, form data, etc.
+- **Global scope (`export const`)**: Best for app-wide shared data. Multiple components can access the same query. Perfect for current user, settings, cached lists. Remember to dispose manually when done!
 
 <details>
 <summary>📖 <strong>Pattern Breakdown</strong></summary>
@@ -2502,7 +2515,7 @@ function ChildComponent() {
 Here's what `provider()` does under the hood:
 
 ```tsx
-import { signal, rx, useScope, useSignals, disposable } from "rextive/react";
+import { signal, rx, useScope, useWatch, disposable } from "rextive/react";
 import { createContext, useContext, useLayoutEffect } from "react";
 
 // Step 1: Define your context shape
@@ -2570,12 +2583,12 @@ function ChildComponent(props: { showTheme: boolean }) {
   );
 }
 
-// Alternative: Using useSignals for conditional tracking
+// Alternative: Using useWatch for conditional tracking
 function SmartComponent(props: { showTheme: boolean }) {
   const { theme } = useTheme();
 
-  // Use lazy tracking with useSignals
-  const [tracked] = useSignals({ theme });
+  // Use lazy tracking with useWatch
+  const [tracked] = useWatch({ theme });
 
   if (!props.showTheme) {
     // ✅ Theme signal NOT tracked here (we didn't access tracked.theme)
@@ -2643,7 +2656,7 @@ function App() {
 For complex stores with multiple signals and methods, the new `provider()` API shines:
 
 ```tsx
-import { signal, disposable, provider, rx, useSignals } from "rextive/react";
+import { signal, disposable, provider, rx, useWatch } from "rextive/react";
 
 // Define your store shape
 interface UserSession {
@@ -2708,7 +2721,7 @@ function UserProfile() {
 function Sidebar(props: { showUserInfo: boolean }) {
   const { user, isAuthenticated } = useSession();
 
-  const [tracked] = useSignals({ user, isAuthenticated });
+  const [tracked] = useWatch({ user, isAuthenticated });
 
   // ✅ This component only re-renders when:
   // - props.showUserInfo changes, OR
@@ -2745,7 +2758,7 @@ function App() {
 
 3. **Full control over updates** - The `update` function lets you decide how to sync with prop changes
 
-4. **Use lazy tracking** - Access signals through `rx()` or `useSignals()` for automatic optimization
+4. **Use lazy tracking** - Access signals through `rx()` or `useWatch()` for automatic optimization
 
 5. **No manual optimization needed** - No `useMemo`, `useCallback`, or `React.memo` required
 
@@ -3155,7 +3168,7 @@ const syncTitles = syncTodos.pipe(
 Import from `rextive/react` for React-specific features:
 
 ```tsx
-import { signal, rx, useScope, useSignals, wait } from "rextive/react";
+import { signal, rx, useScope, useWatch, wait } from "rextive/react";
 ```
 
 ### `rx()` - Reactive Rendering
@@ -3249,8 +3262,8 @@ rx({ user, posts }, (value, loadable) => {
 // Option 2: Use render function
 {rx({ signal }, (value) => <input value={value.signal} />)}
 
-// Option 3: Use useSignals hook
-const [value] = useSignals({ signal });
+// Option 3: Use useWatch hook
+const [value] = useWatch({ signal });
 <input value={value.signal} />
 ```
 
@@ -3412,18 +3425,18 @@ function UserAnalytics({ user }) {
 
 ---
 
-### `useSignals()` - Subscribe to Signals
+### `useWatch()` - Subscribe to Signals
 
 React hook for subscribing to signals with lazy tracking:
 
 ```tsx
-import { useSignals } from "rextive/react";
+import { useWatch } from "rextive/react";
 
 function Component() {
   const user = signal(async () => fetchUser());
   const posts = signal(async () => fetchPosts());
 
-  const [value, loadable] = useSignals({ user, posts });
+  const [value, loadable] = useWatch({ user, posts });
 
   // Option 1: Use with React Suspense
   return (
@@ -4051,7 +4064,7 @@ rextive/react     # React integration
 
 - `rx` - Reactive rendering
 - `useScope` - Component-scoped signals & lifecycle control (3 modes)
-- `useSignals` - Subscribe with lazy tracking
+- `useWatch` - Subscribe with lazy tracking
 
 ---
 

@@ -59,7 +59,7 @@ rextive/
 │       ├── types.ts                # React types
 │       ├── rx.tsx
 │       ├── useScope.ts
-│       ├── useSignals.ts
+│       ├── useWatch.ts
 │       ├── useRerender.ts
 │       ├── useLifecycle.ts
 │       ├── rx.type.check.tsx
@@ -94,7 +94,7 @@ import {
 import {
   rx,            // Reactive JSX
   useScope,      // Scoped signals
-  useSignals,    // Signal tracking
+  useWatch,    // Signal tracking
   useRerender,   // Rerender control
   useLifecycle,  // Lifecycle management
 } from 'rextive/react';
@@ -246,7 +246,7 @@ Test Files  12 passed (12)
 ### Moved Files
 - `rx.tsx` → `react/rx.tsx`
 - `useScope.ts` → `react/useScope.ts`
-- `useSignals.ts` → `react/useSignals.ts`
+- `useWatch.ts` → `react/useWatch.ts`
 - `useRerender.ts` → `react/useRerender.ts`
 - `useLifecycle.ts` → `react/useLifecycle.ts`
 - All React test files → `react/` directory

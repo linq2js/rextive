@@ -85,7 +85,7 @@ type ResolveValue<
  * })
  * ```
  *
- * @example Usage in useSignals.ts (signals proxy with lazy tracking)
+ * @example Usage in useWatch.ts (signals proxy with lazy tracking)
  * ```ts
  * proxy = createSignalAccessProxy<TSignals, ResolveValue<TSignals, "awaited">>({
  *   getSignals: () => ref.signals,

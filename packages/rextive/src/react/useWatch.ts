@@ -5,9 +5,9 @@ import { createSignalAccessProxy } from "../utils/createSignalAccessProxy";
 import { emitter } from "../utils/emitter";
 
 /**
- * useSignals - Hook for reactive signal access with lazy tracking
+ * useWatch - Hook for watching signals with lazy tracking
  *
- * This hook implements conditional/lazy signal tracking:
+ * This hook subscribes to signals and triggers re-renders when they change:
  * - Only subscribes to signals that are actually accessed during render
  * - Tracks signals during render phase (when rerender.rendering() === true)
  * - Sets up subscriptions in useLayoutEffect (after render completes)
@@ -22,7 +22,7 @@ import { emitter } from "../utils/emitter";
  *
  * @example
  * ```tsx
- * const [value, loadable] = useSignals({ user, posts });
+ * const [value, loadable] = useWatch({ user, posts });
  *
  * // Suspense pattern
  * return <div>{value.user.name}</div>;
@@ -34,14 +34,14 @@ import { emitter } from "../utils/emitter";
  *
  * @example Lazy tracking behavior
  * ```tsx
- * const [value] = useSignals({ a, b, c });
+ * const [value] = useWatch({ a, b, c });
  *
  * // Only subscribes to signals actually accessed:
  * value.a;  // ✅ Tracks a
  * // b, c not accessed → no subscription
  * ```
  */
-export function useSignals<TSignals extends SignalMap>(
+export function useWatch<TSignals extends SignalMap>(
   signals: TSignals
 ): [
   ResolvedValueMap<TSignals, "awaited">,
@@ -103,7 +103,7 @@ export function useSignals<TSignals extends SignalMap>(
         ResolvedValueMap<TSignals, TType>
       >({
         type,
-        getSignals: () => ref.signals,
+        getSignals: () => ref.signals as any,
         onSignalAccess: (signal) => {
           // Track signal for subscription setup
           ref.trackedSignals.add(signal);

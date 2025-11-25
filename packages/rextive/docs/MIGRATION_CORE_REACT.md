@@ -30,7 +30,7 @@ Contains React hooks and components:
 import {
   rx,            // Reactive JSX rendering
   useScope,      // Component-scoped signals & lifecycle (3 modes)
-  useSignals,    // Signal tracking hook
+  useWatch,    // Signal tracking hook
   useRerender,   // Manual rerender control
 } from 'rextive/react';
 ```
@@ -44,7 +44,7 @@ import {
   signal,
   rx,
   useScope,
-  useSignals,
+  useWatch,
   wait,
   batch,
 } from 'rextive';
@@ -57,7 +57,7 @@ import {
 import { signal, wait, batch } from 'rextive';
 
 // React imports
-import { rx, useScope, useSignals } from 'rextive/react';
+import { rx, useScope, useWatch } from 'rextive/react';
 ```
 
 ## Type Imports

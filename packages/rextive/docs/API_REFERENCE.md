@@ -632,7 +632,7 @@ const { store } = useScope(
 
 ### Other React Hooks
 
-- `useSignals(signals)` - Subscribe to signals and track changes
+- `useWatch(signals)` - Subscribe to signals and track changes
 - `useRerender()` - Manual rerender control
 - `rx()` - Reactive rendering helper
 - And more...

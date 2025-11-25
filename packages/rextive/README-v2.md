@@ -322,10 +322,10 @@ Wrap the entire element instead of calling `rx()` inside props—`rx()` returns 
 2. **Lifecycle** – observe `init`, `mount`, `render`, `cleanup`, `dispose`
 3. **Object lifecycle** – track when arbitrary objects change references
 
-### `useSignals()` – subscribe with full loadable metadata
+### `useWatch()` – subscribe with full loadable metadata
 
 ```tsx
-const [value, loadable] = useSignals({ user, posts });
+const [value, loadable] = useWatch({ user, posts });
 if (loadable.user.status === "loading") return <Spinner />;
 return <div>{value.user.name}</div>;
 ```

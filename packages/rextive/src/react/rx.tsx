@@ -18,7 +18,7 @@ import {
 } from "../types";
 import { RxOptions } from "./types";
 import { shallowEquals } from "../utils/shallowEquals";
-import { useSignals } from "./useSignals";
+import { useWatch } from "./useWatch";
 import { is } from "../is";
 
 /**
@@ -218,8 +218,8 @@ export function rx(...args: any[]): ReactNode {
 
     for (const key in props) {
       if (is(props[key])) {
-        signals[key] = props[key];
-      } else {
+        (signals as any)[key] = props[key];
+      } else if (key !== "dispose") {
         staticProps[key] = props[key];
       }
     }
@@ -281,12 +281,12 @@ const Rx = (props: {
  * Memoized component for reactive signal tracking (all overloads).
  *
  * Responsibilities:
- * 1. Creates lazy tracking proxies via useSignals hook
+ * 1. Creates lazy tracking proxies via useWatch hook
  * 2. Provides both value (Suspense) and loadable (manual) proxies
  * 3. Only re-renders when:
  *    - render function reference changes (via watch deps)
  *    - signals object reference changes (shallow comparison)
- *    - accessed signals change (via useSignals subscriptions)
+ *    - accessed signals change (via useWatch subscriptions)
  *
  * Performance optimization:
  * - memo() prevents re-renders when parent re-renders
@@ -305,11 +305,11 @@ const Rx = (props: {
 const RxWithSignals = memo(
   (props: { render: RxRender<any, any>; signals: SignalMap }) => {
     // Get value and loadable proxies
-    // useSignals handles:
+    // useWatch handles:
     // - Lazy subscription (only when signals accessed)
     // - Automatic cleanup on unmount
     // - Re-rendering when tracked signals change
-    const [value, loadable] = useSignals(props.signals);
+    const [value, loadable] = useWatch(props.signals);
 
     // Call render with both proxy types
     // value: throws promises for Suspense

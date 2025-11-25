@@ -29,7 +29,7 @@ packages/rextive/
 │       ├── types.ts                # React types
 │       ├── rx.tsx                  # Reactive rendering
 │       ├── useScope.ts             # Scoped signals & lifecycle (3 modes)
-│       ├── useSignals.ts           # Signal tracking hook
+│       ├── useWatch.ts           # Signal tracking hook
 │       ├── useRerender.ts          # Rerender control
 │       └── useLifecycle.ts         # Lifecycle management (internal)
 ├── dist/
@@ -82,7 +82,7 @@ React hooks and components:
 import {
   rx, // Reactive JSX rendering (3 overloads)
   useScope, // Scoped signals & lifecycle (3 modes)
-  useSignals, // Signal tracking hook
+  useWatch, // Signal tracking hook
   useRerender, // Manual rerender control
 } from "rextive/react";
 ```
@@ -167,7 +167,7 @@ Located in `src/react/`:
 
 - `rx.test.tsx`
 - `useScope.test.tsx`
-- `useSignals.test.tsx`
+- `useWatch.test.tsx`
 - `useRerender.test.tsx`
 - `useLifecycle.test.tsx`
 
