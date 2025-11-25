@@ -3485,28 +3485,22 @@ import { signal, awaited } from "rextive";
 const todoList = signal(async () => fetchTodos()); // Signal<Promise<Todo[]>>
 
 // Transform with awaited
-const titles = todoList.pipe(
-  select(awaited((todos) => todos.map((t) => t.title)))
-);
+const titles = todoList.to(awaited((todos) => todos.map((t) => t.title)));
 // titles() returns Promise<string[]>
 
 // Chain multiple transformations
-const summary = todoList.pipe(
-  select(
-    awaited(
-      (todos) => todos.filter((t) => !t.done), // Filter
-      (todos) => todos.map((t) => t.title), // Map
-      (titles) => titles.join(", ") // Join
-    )
+const summary = todoList.to(
+  awaited(
+    (todos) => todos.filter((t) => !t.done), // Filter
+    (todos) => todos.map((t) => t.title), // Map
+    (titles) => titles.join(", ") // Join
   )
 );
 // summary() returns Promise<string>
 
 // Works with sync values too!
 const syncTodos = signal([{ title: "Buy milk", done: false }]);
-const syncTitles = syncTodos.pipe(
-  select(awaited((todos) => todos.map((t) => t.title)))
-);
+const syncTitles = syncTodos.to(awaited((todos) => todos.map((t) => t.title)));
 // syncTitles() returns string[] (no promise!)
 ```
 
