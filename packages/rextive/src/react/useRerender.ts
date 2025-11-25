@@ -9,7 +9,7 @@ import { RerenderOptions, RerenderFunction } from "./types";
  * @template TData - Type of data to pass with re-render
  * @param options - Configuration options
  * @param options.debounce - Debounce delay in milliseconds (0 = microtask queue)
- * @returns Stable rerender function with cancel, flush, immediate, data, and rendering properties
+ * @returns Stable rerender function with cancel, flush, immediate, requestRerender, data, and rendering properties
  *
  * @example
  * ```tsx
@@ -68,6 +68,7 @@ class RerenderController<TData = void> {
   private renderWrapper: (data?: TData) => void;
 
   private isRendering: boolean = false;
+  private renderGeneration: number = 0; // Increments on each render cycle
   private options: RerenderOptions = {};
 
   // Cache debounced function to avoid recreating on each rerender call
@@ -108,6 +109,30 @@ class RerenderController<TData = void> {
         rendering: () => this.isRendering,
         // Current render data (updated via onRender)
         data: undefined,
+        // Factory that creates render-once functions for coalescing multiple updates.
+        // Each created function captures the current render generation at creation time.
+        // When called, it only triggers a rerender if no render has happened since creation.
+        // Multiple call sites can create functions, but only the first call triggers a render.
+        //
+        // Example:
+        //   const renderFn1 = rerender.requestRerender();
+        //   const renderFn2 = rerender.requestRerender();
+        //   renderFn2();  // triggers rerender (same generation as creation)
+        //   renderFn1();  // skipped (generation changed after renderFn2's render)
+        requestRerender: () => {
+          // Capture current render generation at creation time
+          const snapshotGeneration = this.renderGeneration;
+          return (data?: TData) => {
+            // Check if a render has occurred since this function was created
+            // by comparing current generation to the snapshot
+            const hasRenderedSinceCreation =
+              snapshotGeneration !== this.renderGeneration;
+            // Only trigger render if no render has happened since creation
+            if (!hasRenderedSinceCreation) {
+              this.rerender(data);
+            }
+          };
+        },
       }
     );
   }
@@ -184,6 +209,7 @@ class RerenderController<TData = void> {
    */
   onRender(newOptions: RerenderOptions, newData: TData | undefined) {
     this.isRendering = true; // Set true during render
+    this.renderGeneration++; // Increment generation to invalidate requestRerender functions
     this.options = newOptions; // Update options (may change debounce config)
     // Mutate rerender.data to update the exposed API
     Object.assign(this.rerender, {

@@ -64,7 +64,7 @@ describe("examples", () => {
      *
      * @param key - Field identifier for test IDs
      * @param field - Mutable signal for field value
-     * @param error - Signal that computes validation errors (sync or async)
+     * @param validation - Signal that computes validation errors (sync or async)
      * @param isAsyncValidation - Whether this field uses async validation
      *
      * Key pattern: Uses rx() with two parameters:
@@ -74,49 +74,25 @@ describe("examples", () => {
     const renderField = (
       key: string,
       field: MutableSignal<string>,
-      error: Signal<void | string | Promise<string | void>>,
-      isAsyncValidation: boolean
-    ) => {
-      return rx({ field, error }, (awaited, loadables) => {
-        // Render the input field
-        const inputPart = (
+      validation: Signal<void | string | Promise<string | void>>
+    ) =>
+      rx({ field, validation }, (awaited, loadables) => (
+        <>
           <input
             data-testid={`${key}-field`}
             type="text"
             value={awaited.field}
             onChange={(e) => field.set(e.currentTarget.value)}
           />
-        );
-        // Render the error message
-        let errorPart: React.ReactNode = null;
-
-        if (isAsyncValidation) {
-          // For async validation, check loadable status
-          if (loadables.error.status === "loading") {
-            errorPart = <div data-testid={`${key}-loading`}>Checking...</div>;
-          } else if (
-            loadables.error.status === "success" &&
-            loadables.error.value
-          ) {
-            errorPart = (
-              <span data-testid={`${key}-error`}>
-                {String(loadables.error.value)}
-              </span>
-            );
-          }
-        } else if (awaited.error) {
-          // For sync validation, just use the awaited value
-          errorPart = <span data-testid={`${key}-error`}>{awaited.error}</span>;
-        }
-
-        return (
-          <>
-            {inputPart}
-            {errorPart}
-          </>
-        );
-      });
-    };
+          {loadables.validation.loading ? (
+            <div data-testid={`${key}-loading`}>Checking...</div>
+          ) : loadables.validation.value || loadables.validation.error ? (
+            <div data-testid={`${key}-error`}>
+              {String(loadables.validation.value || loadables.validation.error)}
+            </div>
+          ) : null}
+        </>
+      ));
 
     // Form component using useScope for automatic cleanup
     const Form = () => {
@@ -125,9 +101,9 @@ describe("examples", () => {
       return (
         <>
           {/* Sync validation field */}
-          {renderField("name", fields.name, errors.name, false)}
+          {renderField("name", fields.name, errors.name)}
           {/* Async validation field */}
-          {renderField("username", fields.username, errors.username, true)}
+          {renderField("username", fields.username, errors.username)}
         </>
       );
     };

@@ -1717,13 +1717,14 @@ function RegistrationForm() {
   });
 
   // Reusable field renderer
+  // Reusable field renderer - always treats validation as loadable
+  // Works for both sync and async validation
   const renderField = (
     key: string,
     field: MutableSignal<string>,
-    error: Signal<void | string | Promise<string | void>>,
-    isAsync: boolean
-  ) => {
-    return rx({ field, error }, (awaited, loadables) => (
+    validation: Signal<void | string | Promise<string | void>>
+  ) =>
+    rx({ field, validation }, (awaited, loadables) => (
       <div style={{ marginBottom: "1rem" }}>
         <label>
           {key.charAt(0).toUpperCase() + key.slice(1)}:
@@ -1731,54 +1732,34 @@ function RegistrationForm() {
             type="text"
             value={awaited.field}
             onChange={(e) => field.set(e.target.value)}
-            style={{
-              borderColor:
-                (isAsync &&
-                  loadables.error.status === "success" &&
-                  loadables.error.value) ||
-                (!isAsync && awaited.error)
-                  ? "red"
-                  : undefined,
-            }}
           />
         </label>
 
-        {/* Show loading state for async validation */}
-        {isAsync && loadables.error.status === "loading" && (
+        {/* Show loading state (only visible for async validation) */}
+        {loadables.validation.loading && (
           <div style={{ color: "blue", fontSize: "0.9em" }}>
             Checking availability...
           </div>
         )}
 
-        {/* Show error message */}
-        {isAsync &&
-          loadables.error.status === "success" &&
-          loadables.error.value && (
-            <div style={{ color: "red", fontSize: "0.9em" }}>
-              {loadables.error.value}
-            </div>
-          )}
-        {!isAsync && awaited.error && (
-          <div style={{ color: "red", fontSize: "0.9em" }}>{awaited.error}</div>
+        {/* Show error message (works for both sync and async) */}
+        {(loadables.validation.value || loadables.validation.error) && (
+          <div style={{ color: "red", fontSize: "0.9em" }}>
+            {String(loadables.validation.value || loadables.validation.error)}
+          </div>
         )}
       </div>
     ));
-  };
 
   return (
     <form>
       <h2>Register</h2>
 
       {/* Sync validation field */}
-      {renderField("name", scope.fields.name, scope.errors.name, false)}
+      {renderField("name", scope.fields.name, scope.errors.name)}
 
       {/* Async validation field */}
-      {renderField(
-        "username",
-        scope.fields.username,
-        scope.errors.username,
-        true
-      )}
+      {renderField("username", scope.fields.username, scope.errors.username)}
 
       <button type="submit">Register</button>
     </form>
@@ -1788,11 +1769,12 @@ function RegistrationForm() {
 
 **Key Features:**
 
+- **🎯 Unified approach** - Always treat validation as loadable (works for both sync and async)
 - **🔄 Sync validation** - Instant feedback for name field
 - **⏳ Async validation** - Username availability check with loading state
 - **🚫 Auto-cancellation** - `safe()` cancels pending checks when user types
-- **📊 Loading states** - Access via `loadables` parameter: `loadables.error.status === "loading"`
-- **✨ Clean separation** - Sync uses `awaited.error`, async uses `loadables.error`
+- **📊 Loading states** - Access via `loadables.validation.loading`
+- **✨ Simple API** - Use `loadables.validation.value` or `loadables.validation.error` for results
 
 <details>
 <summary>📖 <strong>How Async Validation Works</strong></summary>
@@ -1803,13 +1785,13 @@ function RegistrationForm() {
 // 1. User types "ad"
 username.set("ad");
 ↓
-// 2. Error signal starts async validation
+// 2. Validation signal starts async check
 errors.username (async computation begins)
   → Check if empty: No
   → await safe(wait.delay(500))  // Simulate API call
 ↓
 // 3. UI shows loading state via loadables
-{loadables.error.status === "loading"}
+{loadables.validation.loading}
   → Show "Checking availability..."
 ↓
 // 4. If user types again during validation
@@ -1823,15 +1805,16 @@ errors.username (new async computation)
   → Return "Username already taken"
 ↓
 // 7. UI shows error via loadables
-{loadables.error.status === "success" && loadables.error.value}
+{loadables.validation.value}
   → Show "Username already taken"
 ```
 
 **Key Patterns:**
 
 - **`safe()` for cancellation** - Async work is cancelled if field value changes
-- **`loadables.error.status`** - Access loading/success/error states for async validation
-- **`awaited.error`** - Access sync validation errors directly
+- **`loadables.validation.loading`** - Check if validation is in progress
+- **`loadables.validation.value`** - Access validation result (works for sync and async)
+- **`loadables.validation.error`** - Access any error that occurred
 - **No race conditions** - Previous validations are automatically cancelled
 
 </details>

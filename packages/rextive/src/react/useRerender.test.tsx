@@ -570,6 +570,227 @@ describe("useRerender", () => {
     });
   });
 
+  describe("requestRerender", () => {
+    it("should have requestRerender property", () => {
+      const TestComponent = () => {
+        const rerender = useRerender();
+        expect(typeof rerender.requestRerender).toBe("function");
+        return <div>Test</div>;
+      };
+
+      render(<TestComponent />);
+    });
+
+    it("should return a callable function", () => {
+      const TestComponent = () => {
+        const rerender = useRerender();
+        const requestFn = rerender.requestRerender();
+        expect(typeof requestFn).toBe("function");
+        return <div>Test</div>;
+      };
+
+      render(<TestComponent />);
+    });
+
+    it("should trigger render on first call", async () => {
+      let renderCount = 0;
+      let savedRequestFn: (() => void) | null = null;
+
+      const TestComponent = () => {
+        const rerender = useRerender();
+        renderCount++;
+
+        // Create requestRerender once and save it
+        if (!savedRequestFn) {
+          savedRequestFn = rerender.requestRerender();
+        }
+
+        return (
+          <div>
+            <button onClick={() => savedRequestFn?.()}>Request</button>
+            <span data-testid="count">{renderCount}</span>
+          </div>
+        );
+      };
+
+      const { getByText, getByTestId } = render(<TestComponent />);
+      expect(getByTestId("count").textContent).toBe("1");
+
+      // First call should trigger render
+      act(() => {
+        getByText("Request").click();
+      });
+
+      await waitFor(() => {
+        expect(getByTestId("count").textContent).toBe("2");
+      });
+    });
+
+    it("should skip second call after render already triggered", async () => {
+      let renderCount = 0;
+      let requestFn1: ((data?: number) => void) | null = null;
+      let requestFn2: ((data?: number) => void) | null = null;
+
+      const TestComponent = () => {
+        const rerender = useRerender<number>();
+        renderCount++;
+
+        // Create both requestRerender functions on first render
+        if (!requestFn1) {
+          requestFn1 = rerender.requestRerender();
+          requestFn2 = rerender.requestRerender();
+        }
+
+        return (
+          <div>
+            <button data-testid="request1" onClick={() => requestFn1?.()}>
+              Request1
+            </button>
+            <button data-testid="request2" onClick={() => requestFn2?.()}>
+              Request2
+            </button>
+            <span data-testid="count">{renderCount}</span>
+            <span data-testid="data">{String(rerender.data ?? "none")}</span>
+          </div>
+        );
+      };
+
+      const { getByTestId } = render(<TestComponent />);
+      expect(getByTestId("count").textContent).toBe("1");
+
+      // First requestFn2 triggers render
+      act(() => {
+        getByTestId("request2").click();
+      });
+
+      await waitFor(() => {
+        expect(getByTestId("count").textContent).toBe("2");
+      });
+
+      // requestFn1 should skip (render already happened since its creation)
+      const countAfterRender = renderCount;
+      act(() => {
+        getByTestId("request1").click();
+      });
+
+      // Give time for potential render
+      await waitFor(
+        () => {
+          // Count should remain the same
+          expect(renderCount).toBe(countAfterRender);
+        },
+        { timeout: 100 }
+      );
+    });
+
+    it("should work with new requestRerender after render cycle", async () => {
+      let renderCount = 0;
+
+      const TestComponent = () => {
+        const rerender = useRerender();
+        renderCount++;
+
+        // Create new requestRerender on each render
+        const requestFn = rerender.requestRerender();
+
+        return (
+          <div>
+            <button onClick={() => requestFn()}>Request</button>
+            <span data-testid="count">{renderCount}</span>
+          </div>
+        );
+      };
+
+      const { getByText, getByTestId } = render(<TestComponent />);
+      expect(getByTestId("count").textContent).toBe("1");
+
+      // Click multiple times - each render creates a new requestFn
+      act(() => {
+        getByText("Request").click();
+      });
+
+      await waitFor(() => {
+        expect(getByTestId("count").textContent).toBe("2");
+      });
+
+      // Click again - new requestFn from previous render should work
+      act(() => {
+        getByText("Request").click();
+      });
+
+      await waitFor(() => {
+        expect(getByTestId("count").textContent).toBe("3");
+      });
+    });
+
+    it("should pass data to rerender", async () => {
+      const TestComponent = () => {
+        const rerender = useRerender<{ value: number }>();
+        const requestFn = rerender.requestRerender();
+
+        return (
+          <div>
+            <button onClick={() => requestFn({ value: 42 })}>Request</button>
+            <span data-testid="data">
+              {String(rerender.data?.value ?? "none")}
+            </span>
+          </div>
+        );
+      };
+
+      const { getByText, getByTestId } = render(<TestComponent />);
+      expect(getByTestId("data").textContent).toBe("none");
+
+      act(() => {
+        getByText("Request").click();
+      });
+
+      await waitFor(() => {
+        expect(getByTestId("data").textContent).toBe("42");
+      });
+    });
+
+    it("should coalesce multiple call sites into single render", async () => {
+      let renderCount = 0;
+      let fn1: (() => void) | null = null;
+      let fn2: (() => void) | null = null;
+      let fn3: (() => void) | null = null;
+
+      const TestComponent = () => {
+        const rerender = useRerender();
+        renderCount++;
+
+        // Create all on first render
+        if (!fn1) {
+          fn1 = rerender.requestRerender();
+          fn2 = rerender.requestRerender();
+          fn3 = rerender.requestRerender();
+        }
+
+        return (
+          <div>
+            <span data-testid="count">{renderCount}</span>
+          </div>
+        );
+      };
+
+      const { getByTestId } = render(<TestComponent />);
+      expect(getByTestId("count").textContent).toBe("1");
+
+      // Call all three functions rapidly
+      act(() => {
+        fn1?.();
+        fn2?.();
+        fn3?.();
+      });
+
+      await waitFor(() => {
+        // Should only render once more (first fn triggered, others skipped)
+        expect(getByTestId("count").textContent).toBe("2");
+      });
+    });
+  });
+
   describe("type safety", () => {
     beforeEach(() => {
       vi.useFakeTimers();
