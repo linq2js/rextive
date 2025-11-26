@@ -728,7 +728,7 @@ export type SignalOf<T, K extends SignalKind> = K extends "any"
  */
 export type Plugin<TValue, TKind extends SignalKind = "any"> = (
   signal: SignalOf<TValue, TKind>
-) => (() => void) | void;
+) => VoidFunction | void;
 
 /**
  * A tag for grouping signals together.
@@ -756,8 +756,6 @@ export type Plugin<TValue, TKind extends SignalKind = "any"> = (
  */
 export type Tag<TValue, TKind extends SignalKind = "any"> = {
   [TAG_TYPE]: true;
-
-  kind: TKind;
 
   /**
    * Plugins attached to this tag.
@@ -799,6 +797,29 @@ export type Tag<TValue, TKind extends SignalKind = "any"> = {
    * Removes all signals from this tag.
    */
   clear(): void;
+
+  /**
+   * Map over all signals in this tag and collect results.
+   *
+   * @param mapper - Function to call for each signal
+   * @returns Array of results from each signal (in iteration order)
+   *
+   * @example
+   * ```ts
+   * const formTag = signal.tag<string>();
+   * // ... add signals to tag
+   *
+   * // Get all current values
+   * const values = formTag.map(s => s.get()); // string[]
+   *
+   * // Reset all signals
+   * formTag.map(s => s.reset());
+   *
+   * // Get signal names
+   * const names = formTag.map(s => s.displayName);
+   * ```
+   */
+  map<TResult>(mapper: (signal: SignalOf<TValue, TKind>) => TResult): TResult[];
 
   /**
    * Number of signals in this tag.

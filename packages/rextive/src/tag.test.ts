@@ -276,8 +276,10 @@ describe("tag", () => {
         const tag2 = tag<number>();
 
         const shared = signal(1, { use: [tag1, tag2] });
-        const _a = signal(2, { use: [tag1] });; void _a
-        const _b = signal(3, { use: [tag2] });; void _b
+        const _a = signal(2, { use: [tag1] });
+        void _a;
+        const _b = signal(3, { use: [tag2] });
+        void _b;
 
         const visited: any[] = [];
         tag.forEach([tag1, tag2], (sig) => visited.push(sig));
@@ -325,7 +327,8 @@ describe("tag", () => {
         const tag2 = tag<number>();
 
         const shared = signal(1, { use: [tag1, tag2] });
-        const _a = signal(2, { use: [tag1] });; void _a
+        const _a = signal(2, { use: [tag1] });
+        void _a;
 
         const result = tag.signals([tag1, tag2]);
 
@@ -427,7 +430,8 @@ describe("tag", () => {
       it("should pass tag instance to onAdd", () => {
         let receivedTag: any = null;
         const myTag = tag<number>({
-          onAdd: (sig, t) => {; void sig
+          onAdd: (sig, t) => {
+            void sig;
             receivedTag = t;
           },
         });
@@ -496,7 +500,8 @@ describe("tag", () => {
       it("should pass tag instance to onDelete", () => {
         let receivedTag: any = null;
         const myTag = tag<number>({
-          onDelete: (sig, t) => {; void sig
+          onDelete: (sig, t) => {
+            void sig;
             receivedTag = t;
           },
         });
@@ -554,7 +559,9 @@ describe("tag", () => {
       it("should pass tag instance to onChange", () => {
         let receivedTag: any = null;
         const myTag = tag<number>({
-          onChange: (type, sig, t) => {; void type; void sig
+          onChange: (type, sig, t) => {
+            void type;
+            void sig;
             receivedTag = t;
           },
         });
@@ -591,7 +598,8 @@ describe("tag", () => {
         const myTag = tag<number>({ maxSize: 2 });
 
         const sig1 = signal(1, { use: [myTag] });
-        const sig2 = signal(2, { use: [myTag] });; void sig2
+        const sig2 = signal(2, { use: [myTag] });
+        void sig2;
 
         myTag.delete(sig1);
 
@@ -880,6 +888,177 @@ describe("tag", () => {
 
       expect(cleanup1).toHaveBeenCalledOnce();
       expect(cleanup2).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("map()", () => {
+    it("should call reset() on all signals in the tag", () => {
+      const myTag = tag<number>();
+      const a = signal(10, { use: [myTag] });
+      const b = signal(20, { use: [myTag] });
+      const c = signal(30, { use: [myTag] });
+
+      // Modify signals
+      a.set(100);
+      b.set(200);
+      c.set(300);
+
+      expect(a()).toBe(100);
+      expect(b()).toBe(200);
+      expect(c()).toBe(300);
+
+      // Reset all signals in the tag
+      myTag.map((s) => s.reset());
+
+      expect(a()).toBe(10);
+      expect(b()).toBe(20);
+      expect(c()).toBe(30);
+    });
+
+    it("should call dispose() on all signals in the tag", () => {
+      const myTag = tag<number>();
+      const disposeCallbacks = [vi.fn(), vi.fn(), vi.fn()];
+
+      const a = signal(1, { use: [myTag], onChange: disposeCallbacks[0] });
+      const b = signal(2, { use: [myTag], onChange: disposeCallbacks[1] });
+      const c = signal(3, { use: [myTag], onChange: disposeCallbacks[2] });
+
+      // Verify signals are active
+      a.set(10);
+      b.set(20);
+      c.set(30);
+
+      expect(disposeCallbacks[0]).toHaveBeenCalledTimes(1);
+      expect(disposeCallbacks[1]).toHaveBeenCalledTimes(1);
+      expect(disposeCallbacks[2]).toHaveBeenCalledTimes(1);
+
+      // Dispose all signals
+      myTag.map((s) => s.dispose());
+
+      // Signals should be removed from tag after dispose
+      expect(myTag.size).toBe(0);
+    });
+
+    it("should call refresh() on signals in the tag", () => {
+      const myTag = tag<number>();
+      const base = signal(5);
+
+      const computed = signal({ base }, ({ deps }) => deps.base * 2, {
+        use: [myTag],
+      });
+
+      // Spy on refresh method
+      const refreshSpy = vi.spyOn(computed, "refresh");
+
+      // Refresh via tag
+      myTag.map((s) => s.refresh());
+
+      // Verify refresh was called
+      expect(refreshSpy).toHaveBeenCalledTimes(1);
+
+      refreshSpy.mockRestore();
+    });
+
+    it("should work on empty tag without errors", () => {
+      const myTag = tag<number>();
+
+      // Should not throw
+      expect(() => myTag.map((s) => s.reset())).not.toThrow();
+      expect(() => myTag.map((s) => s.dispose())).not.toThrow();
+    });
+
+    it("should pass arguments via closure", () => {
+      const myTag = tag<number, "mutable">();
+      const a = signal(0, { use: [myTag] });
+      const b = signal(0, { use: [myTag] });
+
+      // Use set with a value via closure
+      myTag.map((s) => s.set(42));
+
+      expect(a()).toBe(42);
+      expect(b()).toBe(42);
+    });
+
+    it("should work with computed signal methods", () => {
+      const myTag = tag<number, "computed">();
+      const base = signal(5);
+
+      const computed = signal({ base }, ({ deps }) => deps.base * 2, {
+        use: [myTag],
+      });
+
+      expect(computed.paused()).toBe(false);
+
+      // Pause via map
+      myTag.map((s) => s.pause());
+      expect(computed.paused()).toBe(true);
+
+      // Resume via map
+      myTag.map((s) => s.resume());
+      expect(computed.paused()).toBe(false);
+    });
+
+    it("should return array of results from get()", () => {
+      const myTag = tag<number>();
+      const a = signal(10, { use: [myTag] });
+      const b = signal(20, { use: [myTag] });
+      const c = signal(30, { use: [myTag] });
+
+      const values = myTag.map((s) => s.get());
+
+      expect(values).toEqual([10, 20, 30]);
+    });
+
+    it("should return array of results from paused()", () => {
+      const myTag = tag<number, "computed">();
+      const base = signal(5);
+
+      const comp1 = signal({ base }, ({ deps }) => deps.base * 2, {
+        use: [myTag],
+      });
+      const comp2 = signal({ base }, ({ deps }) => deps.base * 3, {
+        use: [myTag],
+      });
+
+      comp1.pause();
+
+      const pausedStates = myTag.map((s) => s.paused());
+
+      expect(pausedStates).toEqual([true, false]);
+    });
+
+    it("should return empty array for empty tag", () => {
+      const myTag = tag<number>();
+
+      const results = myTag.map((s) => s.get());
+
+      expect(results).toEqual([]);
+    });
+
+    it("should return array with undefined for void methods", () => {
+      const myTag = tag<number>();
+      const a = signal(10, { use: [myTag] });
+      const b = signal(20, { use: [myTag] });
+
+      const results = myTag.map((s) => s.reset());
+
+      // reset() returns undefined
+      expect(results).toEqual([undefined, undefined]);
+    });
+
+    it("should allow custom transformations", () => {
+      const myTag = tag<number>();
+      signal(10, { use: [myTag], name: "a" });
+      signal(20, { use: [myTag], name: "b" });
+      signal(30, { use: [myTag], name: "c" });
+
+      // Get signal names
+      const names = myTag.map((s) => s.displayName);
+      expect(names).toEqual(["a", "b", "c"]);
+
+      // Get doubled values
+      const doubled = myTag.map((s) => s.get() * 2);
+      expect(doubled).toEqual([20, 40, 60]);
     });
   });
 });

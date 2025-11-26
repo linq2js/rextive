@@ -330,10 +330,6 @@ export function tag<TValue, TKind extends SignalKind = "any">(
   const tagInstance: Tag<NoInfer<TValue>, TKind> = {
     [TAG_TYPE]: true,
 
-    // Kind is a compile-time marker only, not used at runtime
-    // Set to null because we don't track signal kinds at runtime
-    kind: null as unknown as TKind,
-
     // Store plugins (readonly, cannot be modified after creation)
     use: use || [],
 
@@ -405,6 +401,14 @@ export function tag<TValue, TKind extends SignalKind = "any">(
           signal.dispose();
         }
       }
+    },
+
+    map<TResult>(mapper: (signal: any) => TResult): TResult[] {
+      const results: TResult[] = [];
+      for (const signal of signals) {
+        results.push(mapper(signal));
+      }
+      return results;
     },
 
     get size(): number {
