@@ -1,7 +1,6 @@
 import { useLayoutEffect, useState } from "react";
 import { ContextDispatcher, withDispatcher } from "../contextDispatcher";
 import { AnySignal, Loadable } from "../types";
-import { useRerender } from "./useRerender";
 import { emitter } from "../utils/emitter";
 
 /**
@@ -109,11 +108,11 @@ class RxController implements ContextDispatcher {
  * ```
  */
 export function useRx<T>(fn: () => T): T {
-  // Stable rerender function from useRerender hook
-  const rerender = useRerender();
+  // use basic rerender to optimize speed and memory usage
+  const rerender = useState({})[1];
 
   // Controller persists across renders, created once on mount
-  const [controller] = useState(() => new RxController(rerender));
+  const [controller] = useState(() => new RxController(() => rerender({})));
 
   // Clear tracked signals at start of each render
   // This ensures we only subscribe to signals accessed in THIS render
@@ -124,12 +123,13 @@ export function useRx<T>(fn: () => T): T {
   useLayoutEffect(() => {
     // Create cleanup emitter to collect unsubscribe functions
     const onCleanup = emitter();
+    const rerenderFn = () => rerender({});
 
     // Subscribe to each tracked signal
     // signal.on(rerender) returns an unsubscribe function
     // onCleanup.on() stores it for cleanup
     controller.signals.forEach((signal) => {
-      onCleanup.on(signal.on(rerender));
+      onCleanup.on(signal.on(rerenderFn));
     });
 
     // Cleanup: unsubscribe from all signals when component unmounts

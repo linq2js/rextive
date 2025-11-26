@@ -690,36 +690,55 @@ return <div>{user.name}</div>; // Only using 'user'
 // ✅ Rextive: Intelligent lazy tracking
 import { rx, wait } from "rextive/react";
 
-{rx(() => {
-  const userData = wait(user());
-  return <div>{userData.name}</div>;
-  // Only accessed 'user', so only subscribed to 'user' signal
-  // Changes to posts/comments won't trigger re-renders!
-})}
+{
+  rx(() => {
+    // Use wait() when you know the value is a signal or promise
+    const userData = wait(user());
+    return <div>{userData.name}</div>;
+    // Only accessed 'user', so only subscribed to 'user' signal
+    // Changes to posts/comments won't trigger re-renders!
+  });
+}
+
+// wait() also supports multiple signals/promises at once
+{
+  rx(() => {
+    const [userData, postsData] = wait([user(), posts()]);
+    return (
+      <div>
+        {userData.name}: {postsData.length} posts
+      </div>
+    );
+  });
+}
 ```
 
 <details>
 <summary>📖 <strong>How Lazy Tracking Works</strong></summary>
 
 ```tsx
-{rx(() => {
-  // Rextive tracks which signals you access inside this function
+{
+  rx(() => {
+    // Rextive tracks which signals you access inside this function
 
-  const userData = wait(user()); // ✅ Accessed: subscribed to 'user'
-  // posts() not called              ✅ Not subscribed to 'posts'
-  // comments() not called           ✅ Not subscribed to 'comments'
+    const userData = wait(user()); // ✅ Accessed: subscribed to 'user'
+    // posts() not called              ✅ Not subscribed to 'posts'
+    // comments() not called           ✅ Not subscribed to 'comments'
 
-  return <div>{userData.name}</div>;
-})}
+    return <div>{userData.name}</div>;
+  });
+}
 
 // Later, if you conditionally access 'posts':
-{rx(() => {
-  const userData = wait(user());
-  if (userData.isPremium) {
-    return <PostsList posts={wait(posts())} />; // Now subscribed to 'posts' too!
-  }
-  return <div>{userData.name}</div>;
-})}
+{
+  rx(() => {
+    const userData = wait(user());
+    if (userData.isPremium) {
+      return <PostsList posts={wait(posts())} />; // Now subscribed to 'posts' too!
+    }
+    return <div>{userData.name}</div>;
+  });
+}
 ```
 
 **Benefits:**
@@ -748,18 +767,22 @@ if (error) return <div>Error: {error.message}</div>;
 return <div>User: {data.name}</div>;
 
 // ✅ Rextive Option 1: Use wait() for Suspense (throws if loading)
-{rx(() => {
-  const userData = wait(user()); // Throws for Suspense
-  return <div>User: {userData.name}</div>;
-})}
+{
+  rx(() => {
+    const userData = wait(user()); // Throws for Suspense
+    return <div>User: {userData.name}</div>;
+  });
+}
 
 // ✅ Rextive Option 2: Use loadable() for manual loading states
-{rx(() => {
-  const state = loadable(user());
-  if (state.loading) return <div>Loading...</div>;
-  if (state.error) return <div>Error!</div>;
-  return <div>User: {state.value.name}</div>;
-})}
+{
+  rx(() => {
+    const state = loadable(user); // Pass signal directly, no need to invoke
+    if (state.loading) return <div>Loading...</div>;
+    if (state.error) return <div>Error!</div>;
+    return <div>User: {state.value.name}</div>;
+  });
+}
 ```
 
 <details>
@@ -779,11 +802,13 @@ const user = signal(async () => fetchUser());
 const count = signal(0);
 
 // Use both the SAME way with rx() and automatic tracking!
-{rx(() => (
-  <div>
-    {wait(user()).name} has count: {count()}
-  </div>
-))}
+{
+  rx(() => (
+    <div>
+      {wait(user()).name} has count: {count()}
+    </div>
+  ));
+}
 ```
 
 **Choose Your Style:**
@@ -797,7 +822,7 @@ function UserProfile() {
 // Style 2: Manual control (when you need custom loading UI)
 function UserProfile() {
   return rx(() => {
-    const state = loadable(user());
+    const state = loadable(user);
     if (state.loading) return <Spinner />;
     return <div>{state.value.name}</div>;
   });
@@ -806,8 +831,8 @@ function UserProfile() {
 // Style 3: Mix both approaches in one component
 function UserProfile() {
   return rx(() => {
-    const userState = loadable(user());
-    
+    const userState = loadable(user);
+
     // Show custom loading for user
     if (userState.loading) return <UserSkeleton />;
 
@@ -848,13 +873,15 @@ const doubled = count.to((x) => x * 2); // Computed (sync)
 const user = signal(async () => fetchUser()); // Async state
 
 // Use them ALL the same way with rx() and auto-tracking!
-{rx(() => (
-  <div>
-    <p>Count: {count()}</p>
-    <p>Doubled: {doubled()}</p>
-    <p>User: {wait(user()).name}</p>
-  </div>
-))}
+{
+  rx(() => (
+    <div>
+      <p>Count: {count()}</p>
+      <p>Doubled: {doubled()}</p>
+      <p>User: {wait(user()).name}</p>
+    </div>
+  ));
+}
 ```
 
 <details>
@@ -1177,8 +1204,8 @@ import { loadable } from "rextive";
 
 function ProfileManual() {
   return rx(() => {
-    const state = loadable(user());
-    
+    const state = loadable(user);
+
     if (state.loading) {
       return <div>Loading user...</div>;
     }
@@ -1487,7 +1514,14 @@ Build a reusable query pattern similar to React Query:
 > **💡 Key Pattern:** Use `rx(() => ...)` with `wait()` for Suspense or `loadable()` for manual loading states.
 
 ```tsx
-import { signal, disposable, rx, useScope, wait, loadable } from "rextive/react";
+import {
+  signal,
+  disposable,
+  rx,
+  useScope,
+  wait,
+  loadable,
+} from "rextive/react";
 
 // Reusable query factory
 function createQuery(endpoint, options = {}) {
@@ -1556,7 +1590,7 @@ function UserProfile({ userId }) {
       {/* Use loadable() for manual loading states */}
       {rx(() => {
         const state = loadable(userQuery.result());
-        
+
         // Handle loading
         if (state.loading) {
           return <div>Loading user...</div>;
@@ -1565,9 +1599,7 @@ function UserProfile({ userId }) {
         // Handle error
         if (state.error) {
           return (
-            <div style={{ color: "red" }}>
-              Error: {state.error.message}
-            </div>
+            <div style={{ color: "red" }}>Error: {state.error.message}</div>
           );
         }
 
@@ -1678,7 +1710,14 @@ Build a registration form with both **sync** and **async** validation (e.g., che
 > **💡 Key Pattern:** Use `rx(() => ...)` with `loadable()` to handle async validation states. The `safe()` method ensures async work is cancelled if the field value changes.
 
 ```tsx
-import { signal, disposable, rx, useScope, wait, loadable } from "rextive/react";
+import {
+  signal,
+  disposable,
+  rx,
+  useScope,
+  wait,
+  loadable,
+} from "rextive/react";
 
 function RegistrationForm() {
   const scope = useScope(() => {
@@ -1748,7 +1787,7 @@ function RegistrationForm() {
   }) =>
     rx(() => {
       const fieldValue = field();
-      const validationState = loadable(validation());
+      const validationState = loadable(validation);
 
       return (
         <div style={{ marginBottom: "1rem" }}>
@@ -1783,10 +1822,18 @@ function RegistrationForm() {
       <h2>Register</h2>
 
       {/* Sync validation field */}
-      <Field label="Name" field={scope.fields.name} validation={scope.errors.name} />
+      <Field
+        label="Name"
+        field={scope.fields.name}
+        validation={scope.errors.name}
+      />
 
       {/* Async validation field */}
-      <Field label="Username" field={scope.fields.username} validation={scope.errors.username} />
+      <Field
+        label="Username"
+        field={scope.fields.username}
+        validation={scope.errors.username}
+      />
 
       <button type="submit">Register</button>
     </form>
@@ -1800,7 +1847,7 @@ function RegistrationForm() {
 - **🔄 Sync validation** - Instant feedback for name field
 - **⏳ Async validation** - Username availability check with loading state
 - **🚫 Auto-cancellation** - `safe()` cancels pending checks when user types
-- **📊 Loading states** - Access via `loadable(validation()).loading`
+- **📊 Loading states** - Access via `loadable(validation).loading`
 - **✨ Simple API** - Use `state.value` or `state.error` for results
 
 <details>
@@ -1818,7 +1865,7 @@ errors.username (async computation begins)
   → await safe(wait.delay(500))  // Simulate API call
 ↓
 // 3. UI shows loading state via loadable()
-const state = loadable(validation());
+const state = loadable(validation);
 state.loading === true
   → Show "Checking availability..."
 ↓
@@ -2517,7 +2564,311 @@ mutableTag.forEach((s) => {
 
 ---
 
-### Pattern 3: Generic Functions with `AnySignal`
+### Pattern 3: Plugins - Extend Signal Behavior
+
+Plugins let you extend signal behavior with reusable logic. A plugin is a function that receives a signal and optionally returns a cleanup function.
+
+```tsx
+import { signal } from "rextive";
+import type { Plugin } from "rextive";
+
+// Define a plugin
+const logger: Plugin<number> = (sig) => {
+  const name = sig.displayName || "unnamed";
+  console.log(`[${name}] created: ${sig()}`);
+
+  // Return cleanup function (optional)
+  return sig.on(() => {
+    console.log(`[${name}] changed: ${sig()}`);
+  });
+};
+
+// Use the plugin with `use` option
+const count = signal(0, { name: "count", use: [logger] });
+// Logs: "[count] created: 0"
+
+count.set(5);
+// Logs: "[count] changed: 5"
+
+count.dispose();
+// Cleanup runs automatically
+```
+
+#### Real-World Plugin Examples
+
+**1. Logger Plugin - Track signal changes:**
+
+```tsx
+const logger: Plugin<any> = (sig) => {
+  const name = sig.displayName || "unnamed";
+  console.log(`[${name}] created:`, sig());
+
+  return sig.on(() => {
+    console.log(`[${name}] changed:`, sig());
+  });
+};
+
+const user = signal({ name: "Alice" }, { name: "user", use: [logger] });
+// Logs: "[user] created: { name: 'Alice' }"
+
+user.set({ name: "Bob" });
+// Logs: "[user] changed: { name: 'Bob' }"
+```
+
+**2. Persister Plugin - Auto-save to localStorage:**
+
+```tsx
+const persister =
+  (key: string): Plugin<any, "mutable"> =>
+  (sig) => {
+    // Load from storage on creation
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      sig.set(JSON.parse(stored));
+    }
+
+    // Save on every change
+    return sig.on(() => {
+      localStorage.setItem(key, JSON.stringify(sig()));
+    });
+  };
+
+// Auto-persists theme preference
+const theme = signal("dark", { use: [persister("theme")] });
+theme.set("light"); // Automatically saved to localStorage
+
+// On next page load, theme is restored from localStorage
+```
+
+**3. Validator Plugin - Validate on change:**
+
+```tsx
+const validator =
+  (validate: (v: string) => string | null): Plugin<string, "mutable"> =>
+  (sig) => {
+    return sig.on(() => {
+      const error = validate(sig());
+      if (error) {
+        console.warn(`Validation error: ${error}`);
+      }
+    });
+  };
+
+const email = signal("", {
+  use: [validator((v) => (v.includes("@") ? null : "Invalid email"))],
+});
+
+email.set("invalid");
+// Warns: "Validation error: Invalid email"
+
+email.set("valid@example.com");
+// No warning
+```
+
+**4. Devtools Plugin - Register for debugging:**
+
+```tsx
+const devtoolsRegistry = new Map<string, any>();
+
+const devtools: Plugin<any> = (sig) => {
+  const name = sig.displayName || `signal_${devtoolsRegistry.size}`;
+  devtoolsRegistry.set(name, sig);
+
+  return () => {
+    devtoolsRegistry.delete(name);
+  };
+};
+
+const count = signal(0, { name: "count", use: [devtools] });
+// devtoolsRegistry now has "count" -> signal
+
+count.dispose();
+// devtoolsRegistry no longer has "count"
+```
+
+#### Combining Multiple Plugins
+
+```tsx
+const count = signal(0, {
+  name: "count",
+  use: [logger, devtools, tracker], // Plugins run in order
+});
+
+// All plugins are applied and cleaned up together
+count.dispose();
+```
+
+#### Type-Safe Plugins
+
+Plugins can be typed for specific signal kinds:
+
+```tsx
+import type { Plugin } from "rextive";
+
+// Works with any signal
+const anyPlugin: Plugin<number> = (sig) => {
+  console.log(sig());
+};
+
+// Only works with mutable signals (has .set() method)
+const mutablePlugin: Plugin<number, "mutable"> = (sig) => {
+  sig.set(100); // ✅ TypeScript knows sig has .set()
+};
+
+// Only works with computed signals (has .pause()/.resume())
+const computedPlugin: Plugin<number, "computed"> = (sig) => {
+  sig.pause(); // ✅ TypeScript knows sig has .pause()
+  setTimeout(() => sig.resume(), 1000);
+};
+```
+
+#### Tags vs Plugins: Key Differences
+
+Both tags and plugins use the `use` option, but they serve different purposes:
+
+| Feature        | Tag                                       | Plugin                             |
+| -------------- | ----------------------------------------- | ---------------------------------- |
+| **Purpose**    | Group and manage signals                  | Extend signal behavior             |
+| **Execution**  | Registers signal + runs callbacks         | Runs once on creation              |
+| **Lifecycle**  | `onAdd`, `onDelete`, `onChange` callbacks | Returns cleanup function           |
+| **Collection** | Maintains a `Set` of signals              | No signal collection               |
+| **Iteration**  | Can iterate with `forEach`, `size`        | Cannot iterate                     |
+| **Cleanup**    | Auto-removes signal on dispose            | Cleanup function called on dispose |
+
+**Tags - For Signal Management:**
+
+```tsx
+import { tag, signal } from "rextive";
+
+// Tags manage collections of signals with lifecycle callbacks
+const formTag = tag<string>({
+  name: "formFields",
+
+  // Called when signal is added to this tag
+  onAdd: (sig, tag) => {
+    console.log(`Field added: ${sig.displayName}, total: ${tag.size}`);
+  },
+
+  // Called when signal is removed (disposed)
+  onDelete: (sig, tag) => {
+    console.log(`Field removed: ${sig.displayName}, remaining: ${tag.size}`);
+  },
+
+  // Called on any change (add or delete)
+  onChange: (type, sig, tag) => {
+    console.log(`Change: ${type}, size: ${tag.size}`);
+  },
+});
+
+// Add signals to tag
+const name = signal("", { name: "name", use: [formTag] });
+const email = signal("", { name: "email", use: [formTag] });
+// Logs: "Field added: name, total: 1"
+// Logs: "Field added: email, total: 2"
+
+// Tag can iterate over all signals
+formTag.forEach((sig) => sig.reset()); // Reset all form fields
+
+// When signal is disposed, onDelete is called
+name.dispose();
+// Logs: "Field removed: name, remaining: 1"
+```
+
+**Plugins - For Signal Behavior:**
+
+```tsx
+import { signal } from "rextive";
+import type { Plugin } from "rextive";
+
+// Plugins extend behavior - run once, return cleanup
+const logger: Plugin<any> = (sig) => {
+  console.log(`Signal created: ${sig.displayName}`);
+
+  // Subscribe to changes
+  const unsubscribe = sig.on(() => {
+    console.log(`Signal changed: ${sig()}`);
+  });
+
+  // Return cleanup (called on dispose)
+  return unsubscribe;
+};
+
+const count = signal(0, { name: "count", use: [logger] });
+// Logs: "Signal created: count"
+
+count.set(5);
+// Logs: "Signal changed: 5"
+
+count.dispose();
+// Cleanup runs - unsubscribes from changes
+```
+
+**Combining Tags and Plugins:**
+
+```tsx
+// Tags can include plugins that apply to all tagged signals
+const trackedFormTag = tag<string>({
+  name: "trackedForm",
+
+  // Tag's own plugins - applied to every signal using this tag
+  use: [logger, validator],
+
+  // Tag lifecycle callbacks
+  onAdd: (sig) => analytics.track("field_added", { name: sig.displayName }),
+  onDelete: (sig) =>
+    analytics.track("field_removed", { name: sig.displayName }),
+});
+
+// Signal gets: tag membership + logger plugin + validator plugin
+const field = signal("", { use: [trackedFormTag] });
+```
+
+**When to Use Each:**
+
+| Use Case                            | Use Tag             | Use Plugin   |
+| ----------------------------------- | ------------------- | ------------ |
+| Reset all form fields               | ✅                  | ❌           |
+| Log signal changes                  | ❌                  | ✅           |
+| Count signals in a group            | ✅                  | ❌           |
+| Auto-save to localStorage           | ❌                  | ✅           |
+| Batch operations on related signals | ✅                  | ❌           |
+| Add validation behavior             | ❌                  | ✅           |
+| Track signal creation/disposal      | ✅ (onAdd/onDelete) | ✅ (cleanup) |
+| Enforce max number of signals       | ✅ (maxSize option) | ❌           |
+
+<details>
+<summary>📖 <strong>Plugin Best Practices</strong></summary>
+
+**Do:**
+
+- ✅ Return cleanup functions to prevent memory leaks
+- ✅ Use `sig.displayName` for better debugging
+- ✅ Keep plugins focused on a single responsibility
+- ✅ Use type parameters for type-safe plugins
+
+**Don't:**
+
+- ❌ Perform expensive operations synchronously
+- ❌ Modify signal state in ways that cause infinite loops
+- ❌ Forget to clean up subscriptions
+
+**Plugin Signature:**
+
+```tsx
+type Plugin<TValue, TKind extends SignalKind = "any"> = (
+  signal: SignalOf<TValue, TKind>
+) => (() => void) | void;
+```
+
+- Receives the signal instance
+- Optionally returns a cleanup function
+- Cleanup runs when signal is disposed
+
+</details>
+
+---
+
+### Pattern 4: Generic Functions with `AnySignal`
 
 When writing utility functions that work with **both** mutable and computed signals, use the `AnySignal<T>` type:
 
@@ -2555,8 +2906,8 @@ logSignalChanges(doubled, "Doubled");
 ```tsx
 function syncSignals<T>(source: AnySignal<T>, target: AnySignal<T>) {
   source.on((value) => {
-    // Type narrow to check if target is mutable
-    if ("set" in target) {
+    // Use signal.is() to check if target is mutable
+    if (signal.is(target, "mutable")) {
       // TypeScript knows target is MutableSignal here
       target.set(value); // ✅ .set() available
     } else {
@@ -2639,7 +2990,7 @@ function refreshIfStale<T>(s: AnySignal<T>, maxAge: number) {
 - ❌ When you specifically need `.pause()` - use `ComputedSignal<T>` instead
 - ❌ When you need the base interface only - use `Signal<T>` instead
 
-### Pattern 4: Fine-Grained Lifecycle Control
+### Pattern 5: Fine-Grained Lifecycle Control
 
 Get precise control over component lifecycle phases:
 
@@ -4065,27 +4416,39 @@ const firstName = signal("John");
 const lastName = signal("Doe");
 
 // Auto-tracks all signal() calls inside the function
-{rx(() => <span>{firstName()} {lastName()}</span>)}
+{
+  rx(() => (
+    <span>
+      {firstName()} {lastName()}
+    </span>
+  ));
+}
 
 // Use wait() for async signals (throws for Suspense)
 const user = signal(async () => fetchUser());
-{rx(() => {
-  const userData = wait(user());
-  return <div>{userData.name}</div>;
-})}
+{
+  rx(() => {
+    const userData = wait(user());
+    return <div>{userData.name}</div>;
+  });
+}
 
 // Use loadable() for manual loading states
-{rx(() => {
-  const state = loadable(user());
-  if (state.loading) return <Spinner />;
-  if (state.error) return <Error error={state.error} />;
-  return <div>{state.value.name}</div>;
-})}
+{
+  rx(() => {
+    const state = loadable(user);
+    if (state.loading) return <Spinner />;
+    if (state.error) return <Error error={state.error} />;
+    return <div>{state.value.name}</div>;
+  });
+}
 
 // Conditional tracking - only subscribes to signals accessed
 const showDetails = signal(false);
 const details = signal({ bio: "..." });
-{rx(() => showDetails() ? details().bio : "Hidden")}
+{
+  rx(() => (showDetails() ? details().bio : "Hidden"));
+}
 // ↑ Only subscribes to 'details' when showDetails() is true
 ```
 
@@ -4296,7 +4659,7 @@ function Component() {
 function Component() {
   // ❌ NOT tracked - signal accessed outside reactive context
   const value = count();
-  
+
   // ✅ Tracked - signal accessed inside rx()
   return rx(() => <div>{count()}</div>);
 }
@@ -4397,9 +4760,16 @@ provider<TContext, TValue>({
 
 ### `wait()` - Promise Utilities
 
-Utilities for working with promises and async signals:
+Utilities for working with promises and async signals.
 
-#### Basic: Wait for signals
+**Two Overload Modes:**
+
+- **Without callback** → Suspense-style: throws if pending/rejected, returns resolved value synchronously
+- **With callback** → Promise-style: returns a `Promise` that resolves with the callback result
+
+#### Without callback (Suspense-style)
+
+Throws a promise if pending, throws error if rejected. Use inside React components with Suspense boundaries:
 
 ```tsx
 import { wait } from "rextive";
@@ -4407,20 +4777,41 @@ import { wait } from "rextive";
 const user = signal(async () => fetchUser());
 const posts = signal(async () => fetchPosts());
 
-// Suspense-style (throws if pending/rejected)
+// Single signal - throws if not resolved
+const userData = wait(user);
+console.log(userData.name);
+
+// Multiple signals - throws if any not resolved
 const [userData, postsData] = wait([user, posts]);
 console.log(userData.name, postsData.length);
 
-// Promise-style with callback
+// Record of signals
+const { user: userData, posts: postsData } = wait({ user, posts });
+```
+
+#### With callback (Promise-style)
+
+Returns a `Promise` that resolves with the callback result. Use in async functions:
+
+```tsx
+import { wait } from "rextive";
+
+const user = signal(async () => fetchUser());
+const posts = signal(async () => fetchPosts());
+
+// Single signal
+const name = await wait(user, (userData) => userData.name);
+
+// Multiple signals
 await wait([user, posts], (userData, postsData) => {
   console.log(userData.name, postsData.length);
 });
 
-// With error handling
+// With error handling (third argument)
 const result = await wait(
   [user, posts],
-  (userData, postsData) => ({ userData, postsData }), // Success
-  (error) => ({ userData: null, postsData: [] }) // Error
+  (userData, postsData) => ({ userData, postsData }), // Success callback
+  (error) => ({ userData: null, postsData: [] }) // Error callback
 );
 ```
 
@@ -4984,10 +5375,12 @@ const { user, posts, comments } = useStore((state) => ({
 // ✅ Rextive - Lazy tracking
 import { rx, wait } from "rextive/react";
 
-{rx(() => {
-  const userData = wait(user());
-  return <div>{userData.name}</div>; // Only user subscribed!
-})}
+{
+  rx(() => {
+    const userData = wait(user());
+    return <div>{userData.name}</div>; // Only user subscribed!
+  });
+}
 ```
 
 ### vs React Query
@@ -5020,10 +5413,12 @@ const [comments] = useAtom(commentsAtom); // Subscribed even if unused
 // ✅ Rextive - Lazy tracking
 import { rx, wait } from "rextive/react";
 
-{rx(() => {
-  const userData = wait(user());
-  return <div>{userData.name}</div>; // Only user subscribed!
-})}
+{
+  rx(() => {
+    const userData = wait(user());
+    return <div>{userData.name}</div>; // Only user subscribed!
+  });
+}
 ```
 
 ### vs Redux Toolkit
@@ -5165,49 +5560,6 @@ Advanced topics and guides:
 - 📘 [API Reference](./docs/API_REFERENCE.md) - Complete API documentation
 - 📘 [Service Pattern](./docs/SERVICE_PATTERN.md) - Building scalable applications
 - 📘 [Architecture](./docs/ARCHITECTURE.md) - Internal design and concepts
-
----
-
-## 🆕 What's New
-
-### Unified `use` Option
-
-The `tags` option has been merged into the `use` option. Now both plugins and tags are passed through the same unified `use` array:
-
-```tsx
-// Before (deprecated):
-const count = signal(0, { tags: [formTag], use: [logger] });
-
-// After (current):
-const count = signal(0, { use: [formTag, logger] });
-```
-
-This simplifies the API and allows tags to have their own plugins that are automatically applied to signals.
-
-### `signal.on()` - Multi-Signal Subscription
-
-New namespace function to subscribe to multiple signals with pause/resume control:
-
-```tsx
-const control = signal.on([count, name, enabled], (trigger) => {
-  console.log("Changed:", trigger());
-});
-
-control.pause(); // Stop receiving updates
-control.resume(); // Resume updates
-control.dispose(); // Cleanup
-```
-
-### Type System Improvements
-
-Recent updates bring enhanced type safety and better developer experience:
-
-- **`AnySignal<T>` type** - Write generic functions that work with all signal types
-- **Improved `when()` typing** - Callbacks now receive exact signal types (MutableSignal or ComputedSignal)
-- **Enhanced tag type safety** - Tag kinds with compile-time checking via brand properties
-- **SignalKind includes "any"** - General tags use `"any"` to accept both mutable and computed signals with proper cross-kind type checking
-
-See the [Type System Improvements Guide](./docs/TYPE_IMPROVEMENTS.md) for details and examples.
 
 ---
 

@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { act, Suspense } from "react";
 import { rx } from "./rx";
 import { signal } from "../signal";
@@ -376,6 +376,172 @@ describe("rx", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Outer - Updated Inner")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Overload 4: Component with reactive props - rx(Component, props)", () => {
+    it("should render HTML element with signal props", async () => {
+      const content = signal("Hello");
+
+      const TestComponent = () => (
+        <div data-testid="container">{rx("span", { children: content })}</div>
+      );
+
+      render(<TestComponent />);
+      expect(screen.getByText("Hello")).toBeInTheDocument();
+
+      act(() => {
+        content.set("World");
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("World")).toBeInTheDocument();
+      });
+    });
+
+    it("should render HTML element with mixed signal and static props", async () => {
+      const dynamicClass = signal("active");
+
+      const TestComponent = () => (
+        <div>
+          {rx("span", {
+            className: dynamicClass,
+            "data-testid": "target",
+            children: "Content",
+          })}
+        </div>
+      );
+
+      render(<TestComponent />);
+      expect(screen.getByTestId("target")).toHaveClass("active");
+
+      act(() => {
+        dynamicClass.set("inactive");
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("target")).toHaveClass("inactive");
+      });
+    });
+
+    it("should render custom component with signal props", async () => {
+      const count = signal(0);
+
+      const Counter = ({ value }: { value: number }) => (
+        <span data-testid="counter">{value}</span>
+      );
+
+      const TestComponent = () => <div>{rx(Counter, { value: count })}</div>;
+
+      render(<TestComponent />);
+      expect(screen.getByTestId("counter")).toHaveTextContent("0");
+
+      act(() => {
+        count.set(42);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("counter")).toHaveTextContent("42");
+      });
+    });
+
+    it("should handle multiple signal props", async () => {
+      const firstName = signal("John");
+      const lastName = signal("Doe");
+
+      const FullName = ({ first, last }: { first: string; last: string }) => (
+        <span data-testid="fullname">
+          {first} {last}
+        </span>
+      );
+
+      const TestComponent = () => (
+        <div>{rx(FullName, { first: firstName, last: lastName })}</div>
+      );
+
+      render(<TestComponent />);
+      expect(screen.getByTestId("fullname")).toHaveTextContent("John Doe");
+
+      act(() => {
+        firstName.set("Jane");
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fullname")).toHaveTextContent("Jane Doe");
+      });
+
+      act(() => {
+        lastName.set("Smith");
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fullname")).toHaveTextContent("Jane Smith");
+      });
+    });
+
+    it("should handle static callback props alongside signal props", async () => {
+      const count = signal(0);
+      const handleClick = vi.fn();
+
+      const Button = ({
+        onClick,
+        children,
+      }: {
+        onClick: () => void;
+        children: number;
+      }) => (
+        <button data-testid="btn" onClick={onClick}>
+          {children}
+        </button>
+      );
+
+      const TestComponent = () => (
+        <div>{rx(Button, { onClick: handleClick, children: count })}</div>
+      );
+
+      render(<TestComponent />);
+      expect(screen.getByTestId("btn")).toHaveTextContent("0");
+
+      fireEvent.click(screen.getByTestId("btn"));
+      expect(handleClick).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        count.set(5);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("btn")).toHaveTextContent("5");
+      });
+    });
+
+    it("should handle async signal props with Suspense", async () => {
+      let resolvePromise: (value: string) => void;
+      const asyncValue = signal(
+        new Promise<string>((resolve) => {
+          resolvePromise = resolve;
+        })
+      );
+
+      const Display = ({ text }: { text: string }) => (
+        <span data-testid="display">{text}</span>
+      );
+
+      const TestComponent = () => (
+        <Suspense fallback={<div data-testid="loading">Loading...</div>}>
+          {rx(Display, { text: asyncValue })}
+        </Suspense>
+      );
+
+      render(<TestComponent />);
+      expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+      await act(async () => {
+        resolvePromise!("Loaded!");
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("display")).toHaveTextContent("Loaded!");
       });
     });
   });

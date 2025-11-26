@@ -535,19 +535,81 @@ describe("disposable", () => {
       expect(services.withoutDispose).toBe(withoutDispose);
     });
 
-    it("should not overwrite dispose property from input object", () => {
+    it("should use explicit dispose property when provided (respectDispose)", () => {
       const customDispose = vi.fn();
+      const authDispose = vi.fn();
 
       const services = disposable({
-        auth: { dispose: vi.fn() },
-        dispose: customDispose, // This should be ignored
+        auth: { dispose: authDispose },
+        dispose: customDispose, // This should be used instead of iterating
       });
 
-      // dispose should be our unified dispose, not the custom one
       services.dispose();
 
-      expect(customDispose).not.toHaveBeenCalled();
-      expect(services.auth.dispose).toHaveBeenCalledOnce();
+      // Should call the explicit dispose, not iterate over services
+      expect(customDispose).toHaveBeenCalledOnce();
+      expect(authDispose).not.toHaveBeenCalled();
+    });
+
+    it("should use dispose array when provided (respectDispose with array)", () => {
+      const signal1Dispose = vi.fn();
+      const signal2Dispose = vi.fn();
+      const signal3Dispose = vi.fn();
+
+      const signal1 = { dispose: signal1Dispose };
+      const signal2 = { dispose: signal2Dispose };
+      const signal3 = { dispose: signal3Dispose };
+
+      const services = disposable({
+        signal1,
+        signal2,
+        signal3,
+        // Only dispose signal1 and signal2, not signal3
+        dispose: [signal1, signal2],
+      });
+
+      services.dispose();
+
+      // Should only dispose items in the dispose array
+      expect(signal1Dispose).toHaveBeenCalledOnce();
+      expect(signal2Dispose).toHaveBeenCalledOnce();
+      expect(signal3Dispose).not.toHaveBeenCalled();
+    });
+
+    it("should skip lifecycle callbacks when respectDispose is used", () => {
+      const onBefore = vi.fn();
+      const onAfter = vi.fn();
+      const customDispose = vi.fn();
+
+      const services = disposable(
+        {
+          auth: { dispose: vi.fn() },
+          dispose: customDispose,
+        },
+        { onBefore, onAfter }
+      );
+
+      services.dispose();
+
+      // Lifecycle callbacks are skipped when respectDispose is used
+      expect(onBefore).not.toHaveBeenCalled();
+      expect(onAfter).not.toHaveBeenCalled();
+      expect(customDispose).toHaveBeenCalledOnce();
+    });
+
+    it("should handle nested dispose object (respectDispose)", () => {
+      const innerDispose = vi.fn();
+      const outerAuthDispose = vi.fn();
+
+      const services = disposable({
+        auth: { dispose: outerAuthDispose },
+        dispose: { dispose: innerDispose },
+      });
+
+      services.dispose();
+
+      expect(innerDispose).toHaveBeenCalledOnce();
+      expect(outerAuthDispose).not.toHaveBeenCalled();
     });
 
     it("should call lifecycle callbacks with object shape", () => {

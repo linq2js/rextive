@@ -1,4 +1,4 @@
-import { Disposable, UnionToIntersection } from "./types";
+import { Disposable, ExDisposable, UnionToIntersection } from "./types";
 
 /**
  * Error thrown when one or more services fail to dispose.
@@ -125,6 +125,7 @@ export function disposable<
   // Create combined service
   const combined: any = {};
   const seenProperties = new Set<string>();
+  let respectDispose: ExDisposable["dispose"];
 
   if (isArray) {
     // Array shape: Merge all properties from all services
@@ -152,6 +153,9 @@ export function disposable<
       if (key === "dispose") continue; // Skip dispose, we'll create our own
       combined[key] = service;
     }
+    if (disposables.dispose) {
+      respectDispose = disposables.dispose;
+    }
   }
 
   // Create unified dispose method
@@ -162,6 +166,20 @@ export function disposable<
     }
 
     disposed = true;
+
+    if (respectDispose) {
+      // Handle dispose being a function, array, or object with dispose
+      if (typeof respectDispose === "function") {
+        respectDispose();
+      } else if (Array.isArray(respectDispose)) {
+        for (const item of respectDispose) {
+          tryDispose(item);
+        }
+      } else {
+        tryDispose(respectDispose);
+      }
+      return;
+    }
 
     // Call onBefore
     onBefore?.();

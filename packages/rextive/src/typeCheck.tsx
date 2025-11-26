@@ -11,6 +11,7 @@
  */
 
 import type { ReactNode } from "react";
+import * as React from "react";
 import { rx } from "./react/rx";
 import { signal } from "./signal";
 import { tag } from "./tag";
@@ -96,21 +97,6 @@ declare const signalNumberAwaitable: Signal<Promise<number> | Loadable<number>>;
 declare const signalStringAwaitable: Signal<Promise<string> | Loadable<string>>;
 
 // -----------------------------------------------------------------------------
-// Basic signal instances
-// -----------------------------------------------------------------------------
-
-const count = signal(0);
-
-const user = signal({ id: 1, name: "Alice", email: "alice@example.com" });
-const postIds = signal([1, 2, 3]);
-const posts = signal([
-  { id: 1, title: "Post 1" },
-  { id: 2, title: "Post 2" },
-]);
-
-// .map() and .scan() methods removed - use select/scan operators from rextive/op instead
-
-// -----------------------------------------------------------------------------
 // Loadable instances
 // -----------------------------------------------------------------------------
 
@@ -149,58 +135,6 @@ const transformedUser = wait(userSignal, (user) => {
     return user.value.name;
   }
   return "";
-});
-
-// -----------------------------------------------------------------------------
-// React/rx instances
-// -----------------------------------------------------------------------------
-
-const name = signal("John");
-
-// Overload 1: rx(signal) - Single signal
-const singleNumber = rx(count);
-const singleString = rx(name);
-const singleObject = rx(user);
-const singleArray = rx(postIds);
-
-// Overload 2: rx(signal, selector) - Single signal with selector
-const singleWithSelector = rx(user, "name");
-const singleWithSelectorFn = rx(user, (u) => u.name.toUpperCase());
-const singleWithSelectorComputed = rx(count, (c) => c * 2);
-
-// Overload 3: rx(fn) - Reactive function
-const reactiveFn = rx(() => (
-  <div>
-    Count: {count()} Name: {name()}
-  </div>
-));
-
-const reactiveFnWithOptions = rx(() => (
-  <div>
-    {count()} + {name()}
-  </div>
-));
-
-const conditionalTracking = rx(() => {
-  if (count() > 10) {
-    return <div>High: {name()}</div>;
-  }
-  return <div>Low: {count()}</div>;
-});
-
-const complexReactive = rx(() => {
-  const currentUser = user();
-  const currentPosts = posts;
-  return (
-    <div>
-      <h1>{currentUser.name}</h1>
-      <ul>
-        {currentPosts().map((post) => (
-          <li key={post.id}>{post.title}</li>
-        ))}
-      </ul>
-    </div>
-  );
 });
 
 // =============================================================================
@@ -1051,50 +985,121 @@ function integrationTests() {
 // =============================================================================
 
 function rxTests() {
+  // Create local signals for testing
+  const count = signal(0);
+  const name = signal("John");
+  const user = signal({ id: 1, name: "Alice", email: "alice@example.com" });
+  const postIds = signal([1, 2, 3]);
+  const posts = signal([
+    { id: 1, title: "Post 1" },
+    { id: 2, title: "Post 2" },
+  ]);
+
   // ---------------------------------------------------------------------------
   // Overload 1: rx(signal) - Single signal shorthand
   // ---------------------------------------------------------------------------
 
-  // Number signal
+  const singleNumber = rx(count);
+  const singleString = rx(name);
+  const singleObject = rx(user);
+  const singleArray = rx(postIds);
+
   expectType<ReactNode>(singleNumber);
-
-  // String signal
   expectType<ReactNode>(singleString);
-
-  // Object signal - should render the object value
   expectType<ReactNode>(singleObject);
-
-  // Array signal
   expectType<ReactNode>(singleArray);
 
   // ---------------------------------------------------------------------------
   // Overload 2: rx(signal, selector) - Single signal with selector
   // ---------------------------------------------------------------------------
 
-  // Property access
+  const singleWithSelector = rx(user, "name");
+  const singleWithSelectorFn = rx(user, (u) => u.name.toUpperCase());
+  const singleWithSelectorComputed = rx(count, (c) => c * 2);
+
   expectType<ReactNode>(singleWithSelector);
-
-  // Selector function
   expectType<ReactNode>(singleWithSelectorFn);
-
-  // Computed selector
   expectType<ReactNode>(singleWithSelectorComputed);
 
   // ---------------------------------------------------------------------------
   // Overload 3: rx(fn) - Reactive function with automatic tracking
   // ---------------------------------------------------------------------------
 
-  // Basic reactive function
+  const reactiveFn = rx(() => (
+    <div>
+      Count: {count()} Name: {name()}
+    </div>
+  ));
+
+  const reactiveFnWithOptions = rx(() => (
+    <div>
+      {count()} + {name()}
+    </div>
+  ));
+
+  const conditionalTracking = rx(() => {
+    if (count() > 10) {
+      return <div>High: {name()}</div>;
+    }
+    return <div>Low: {count()}</div>;
+  });
+
+  const complexReactive = rx(() => {
+    const currentUser = user();
+    const currentPosts = posts;
+    return (
+      <div>
+        <h1>{currentUser.name}</h1>
+        <ul>
+          {currentPosts().map((post) => (
+            <li key={post.id}>{post.title}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  });
+
   expectType<ReactNode>(reactiveFn);
-
-  // With watch option
   expectType<ReactNode>(reactiveFnWithOptions);
-
-  // Conditional tracking
   expectType<ReactNode>(conditionalTracking);
-
-  // Complex reactive rendering
   expectType<ReactNode>(complexReactive);
+
+  // ---------------------------------------------------------------------------
+  // Overload 4: rx(Component, props) - Reactive component props
+  // ---------------------------------------------------------------------------
+
+  // Note: The current types expect actual prop types, not signals.
+  // Signals are unwrapped at runtime but TypeScript doesn't model this.
+  const Counter = ({ value, label }: { value: number; label: string }) => (
+    <div>
+      {label}: {value}
+    </div>
+  );
+
+  // Using static props (what the types support)
+  const rxWithComponent = rx(Counter, { value: 42, label: "Count" });
+  const rxWithHtmlElement = rx("div", {
+    children: "Hello",
+    className: "counter",
+  });
+  const rxWithSpan = rx("span", { children: "World", id: "greeting" });
+
+  // Note: Passing signals as props works at runtime but requires type assertion
+  // because the overload type expects actual prop types, not Signal<PropType>
+  const rxWithSignalProps = rx(Counter, {
+    value: count as unknown as number,
+    label: "Count",
+  });
+  const rxWithHtmlSignalProps = rx("div", {
+    children: count as unknown as React.ReactNode,
+    className: "counter",
+  });
+
+  expectType<ReactNode>(rxWithComponent);
+  expectType<ReactNode>(rxWithHtmlElement);
+  expectType<ReactNode>(rxWithSpan);
+  expectType<ReactNode>(rxWithSignalProps);
+  expectType<ReactNode>(rxWithHtmlSignalProps);
 }
 
 // =============================================================================

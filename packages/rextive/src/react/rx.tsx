@@ -1,4 +1,4 @@
-import { memo, ReactElement, ReactNode } from "react";
+import React, { memo, ReactElement, ReactNode } from "react";
 import { Signal, ResolveAwaitable } from "../types";
 import { useRx } from "./useRx";
 import { is } from "../is";
@@ -8,7 +8,7 @@ import { isPromiseLike } from "../utils/isPromiseLike";
 /**
  * rx - Reactive rendering for signals with automatic tracking
  *
- * ## Three overloads:
+ * ## Four overloads:
  *
  * 1. **Single signal**: `rx(signal)`
  *    - Renders the signal's value directly
@@ -23,6 +23,11 @@ import { isPromiseLike } from "../utils/isPromiseLike";
  *    - Runs function with automatic signal tracking via `useRx`
  *    - Any `signal()` calls inside `fn` are automatically tracked
  *    - Re-renders when any tracked signal changes
+ *
+ * 4. **Component with reactive props**: `rx(Component, props)`
+ *    - Renders a component with signal props
+ *    - Signal values in props are automatically tracked
+ *    - Re-renders when any signal prop changes
  *
  * ## Automatic Signal Tracking
  *
@@ -47,6 +52,7 @@ import { isPromiseLike } from "../utils/isPromiseLike";
  * ```tsx
  * <div>{rx(count)}</div>
  * {rx(() => <input value={signal()} />)}
+ * {rx("input", { value: countSignal })}
  * ```
  *
  * @example Single signal
@@ -69,6 +75,18 @@ import { isPromiseLike } from "../utils/isPromiseLike";
  *
  * // Both signals are automatically tracked
  * {rx(() => <span>{firstName()} {lastName()}</span>)}
+ * ```
+ *
+ * @example Component with reactive props
+ * ```tsx
+ * const count = signal(0);
+ * const theme = signal("dark");
+ *
+ * // HTML element with signal props
+ * {rx("div", { className: theme, children: count })}
+ *
+ * // Custom component with signal props
+ * {rx(MyComponent, { count: countSignal, theme: themeSignal })}
  * ```
  *
  * @example Async signal with Suspense
@@ -125,6 +143,34 @@ export function rx<T>(
 // Overload 3: Reactive function - automatic signal tracking
 export function rx<T>(fn: () => T): ReactNode;
 
+// Overload 4: Component with reactive props
+/**
+ * Render a component with reactive props. Signal values in props are
+ * automatically tracked and unwrapped.
+ *
+ * @example
+ * ```tsx
+ * const count = signal(0);
+ * const theme = signal("dark");
+ *
+ * // HTML element
+ * rx("div", { className: theme, children: count })
+ *
+ * // Custom component
+ * rx(MyButton, { onClick: handleClick, disabled: isLoading })
+ * ```
+ */
+export function rx<
+  T extends keyof JSX.IntrinsicElements | React.ComponentType<any>
+>(
+  component: T,
+  props: T extends keyof JSX.IntrinsicElements
+    ? JSX.IntrinsicElements[T]
+    : T extends React.ComponentType<infer P>
+    ? P
+    : {}
+): ReactNode;
+
 // Implementation
 export function rx(...args: any[]): ReactElement {
   const first = args[0];
@@ -149,16 +195,45 @@ export function rx(...args: any[]): ReactElement {
     return <Rx fn={() => tryWait(signal())} />;
   }
 
-  // Overload 3: rx(fn)
-  if (typeof first === "function") {
+  // Overload 3: rx(fn) - function with no second argument
+  if (typeof first === "function" && args[1] === undefined) {
     const fn = first as () => ReactNode;
     return <Rx fn={fn} />;
   }
 
+  // Overload 4: rx(Component, props)
+  if (
+    (typeof first === "function" ||
+      typeof first === "string" ||
+      typeof first === "object") &&
+    typeof args[1] === "object"
+  ) {
+    const Component = first;
+    const props = args[1] || {};
+    const signalProps: Record<string, Signal<any>> = {};
+    const normalProps: Record<string, any> = {};
+    for (const [key, value] of Object.entries(props)) {
+      if (is(value)) {
+        signalProps[key] = value;
+      } else {
+        normalProps[key] = value;
+      }
+    }
+
+    return (
+      <Rx
+        fn={() => {
+          const resolvedProps = { ...normalProps, ...wait(signalProps) };
+          return <Component {...resolvedProps} />;
+        }}
+      />
+    );
+  }
+
   // Invalid arguments
   throw new Error(
-    "rx() expects a signal, or a function. " +
-      "Usage: rx(signal), rx(signal, selector), or rx(fn)"
+    "rx() expects a signal, function, or component. " +
+      "Usage: rx(signal), rx(signal, selector), rx(fn), or rx(Component, props)"
   );
 }
 
