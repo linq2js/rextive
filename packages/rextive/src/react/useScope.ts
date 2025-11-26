@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ExDisposable, Signal } from "../types";
+import { ExDisposable } from "../types";
 import { tryDispose } from "../disposable";
 
 import {
@@ -145,21 +145,21 @@ export function useScope<TTarget>(
 export function useScope<TScope>(
   create: () => ExDisposable & TScope,
   options?: UseScopeOptions<TScope>
-): TScope extends Signal<any> ? TScope : Omit<TScope, "dispose">;
+): TScope;
 
 // Overload 4: Factory mode with args (args become watch dependencies)
 export function useScope<TScope, TArgs extends any[]>(
   create: (...args: TArgs) => ExDisposable & TScope,
   args: TArgs,
   options?: Omit<UseScopeOptions<TScope>, "watch">
-): TScope extends Signal<any> ? TScope : Omit<TScope, "dispose">;
+): TScope;
 
 // Implementation
 export function useScope<TScope>(
   createOrCallbacks: (() => ExDisposable & TScope) | LifecycleCallbacks<any>,
   argsOrOptions?: any[] | UseScopeOptions<TScope>,
   optionsIfArgs?: Omit<UseScopeOptions<TScope>, "watch">
-): Omit<TScope, "dispose"> | (() => LifecyclePhase) {
+): TScope | (() => LifecyclePhase) {
   // Detect which mode based on first argument
   const isLifecycleMode = typeof createOrCallbacks !== "function";
 

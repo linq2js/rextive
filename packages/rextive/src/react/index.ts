@@ -11,9 +11,15 @@
  *
  * const count = signal(0);
  *
+ * // Simple signal display
  * function Counter() {
- *   return rx({ count }, (awaited) => (
- *     <div>{awaited.count}</div>
+ *   return <div>{rx(count)}</div>;
+ * }
+ *
+ * // Reactive function with auto-tracking
+ * function FullCounter() {
+ *   return rx(() => (
+ *     <div>Count: {count()}</div>
  *   ));
  * }
  * ```
@@ -30,7 +36,7 @@ export * from "../index";
 // =============================================================================
 
 // Re-export React-specific types
-export type { RxOptions, RerenderOptions, RerenderFunction } from "./types";
+export type { RerenderOptions, RerenderFunction } from "./types";
 
 // Re-export lifecycle types for useScope
 export type {
@@ -45,6 +51,6 @@ export type { UseScopeOptions } from "./useScope";
 // Export React components and hooks
 export { rx } from "./rx";
 export { useScope } from "./useScope";
-export { useWatch } from "./useWatch";
 export { useRerender } from "./useRerender";
+export { useRx } from "./useRx";
 export * from "./provider";

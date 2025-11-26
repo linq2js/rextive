@@ -156,209 +156,51 @@ const transformedUser = wait(userSignal, (user) => {
 // -----------------------------------------------------------------------------
 
 const name = signal("John");
-const loading = signal(Promise.resolve("Hello"));
 
-const staticWithWatch = rx(() => <div>Count: {5}</div>, {
-  watch: [5],
-});
-
-const staticWithMultiWatch = rx(
-  () => {
-    const x = 10;
-    const y = 20;
-    return (
-      <div>
-        {x} + {y}
-      </div>
-    );
-  },
-  {
-    watch: [10, 20],
-  }
-);
-
+// Overload 1: rx(signal) - Single signal
 const singleNumber = rx(count);
 const singleString = rx(name);
 const singleObject = rx(user);
 const singleArray = rx(postIds);
 
-const singleWithWatch = rx(count, {
-  watch: [5],
+// Overload 2: rx(signal, selector) - Single signal with selector
+const singleWithSelector = rx(user, "name");
+const singleWithSelectorFn = rx(user, (u) => u.name.toUpperCase());
+const singleWithSelectorComputed = rx(count, (c) => c * 2);
+
+// Overload 3: rx(fn) - Reactive function
+const reactiveFn = rx(() => (
+  <div>
+    Count: {count()} Name: {name()}
+  </div>
+));
+
+const reactiveFnWithOptions = rx(() => (
+  <div>
+    {count()} + {name()}
+  </div>
+));
+
+const conditionalTracking = rx(() => {
+  if (count() > 10) {
+    return <div>High: {name()}</div>;
+  }
+  return <div>Low: {count()}</div>;
 });
 
-const multi1 = rx({ count, name }, (value) => {
-  expectType<{ count: number; name: string }>(value);
+const complexReactive = rx(() => {
+  const currentUser = user();
+  const currentPosts = posts;
   return (
     <div>
-      {value.count}: {value.name}
+      <h1>{currentUser.name}</h1>
+      <ul>
+        {currentPosts().map((post) => (
+          <li key={post.id}>{post.title}</li>
+        ))}
+      </ul>
     </div>
   );
-});
-
-const multi2 = rx({ user }, (value) => {
-  expectType<{ user: { id: number; name: string; email: string } }>(value);
-  return (
-    <div>
-      <h1>{value.user.name}</h1>
-      <p>{value.user.email}</p>
-    </div>
-  );
-});
-
-const multi3 = rx({ posts }, (value) => {
-  expectType<{ posts: Array<{ id: number; title: string }> }>(value);
-  return (
-    <ul>
-      {value.posts.map((post) => (
-        <li key={post.id}>{post.title}</li>
-      ))}
-    </ul>
-  );
-});
-
-const withLoadable1 = rx({ count }, (_, loadable) => {
-  expectType<{ count: Loadable<number> }>(loadable);
-
-  if (loadable.count.status === "loading") {
-    return <div>Loading...</div>;
-  }
-
-  if (loadable.count.status === "error") {
-    return <div>Error: {String(loadable.count.error)}</div>;
-  }
-
-  return <div>Count: {loadable.count.value}</div>;
-});
-
-const withLoadable2 = rx({ loading }, (_, loadable) => {
-  expectType<{
-    loading: Loadable<string>;
-  }>(loadable);
-
-  if (loadable.loading.loading) {
-    return <div>Loading...</div>;
-  }
-
-  return <div>{loadable.loading.value}</div>;
-});
-
-const withBoth = rx({ count, name }, (value, loadable) => {
-  expectType<{ count: number; name: string }>(value);
-  expectType<{
-    count: Loadable<number>;
-    name: Loadable<string>;
-  }>(loadable);
-
-  // Use loadable for conditional rendering
-  if (loadable.name.loading) {
-    return <div>Loading name...</div>;
-  }
-
-  // Use value for direct access (will suspend if needed)
-  return (
-    <div>
-      Count: {value.count}, Name: {value.name}
-    </div>
-  );
-});
-
-const withWatch1 = rx(
-  { count, name },
-  (value) => (
-    <div>
-      {value.count}: {value.name}
-    </div>
-  ),
-  {
-    watch: [],
-  }
-);
-
-const withWatch2 = rx({ count }, (value) => <div>{value.count}</div>, {
-  watch: ["some", "deps"],
-});
-
-const complex1 = rx(
-  {
-    count,
-    name,
-    user,
-    posts,
-  },
-  (value) => {
-    expectType<{
-      count: number;
-      name: string;
-      user: { id: number; name: string; email: string };
-      posts: Array<{ id: number; title: string }>;
-    }>(value);
-
-    return (
-      <div>
-        <h1>{value.user.name}</h1>
-        <p>Count: {value.count}</p>
-        <p>Name: {value.name}</p>
-        <ul>
-          {value.posts.map((post) => (
-            <li key={post.id}>{post.title}</li>
-          ))}
-        </ul>
-      </div>
-    );
-  }
-);
-
-const complex2 = rx({ user, posts }, (value) => {
-  const renderPosts = () =>
-    value.posts.map((post) => <li key={post.id}>{post.title}</li>);
-
-  return (
-    <div>
-      <header>
-        <h1>{value.user.name}</h1>
-      </header>
-      <main>
-        <ul>{renderPosts()}</ul>
-      </main>
-    </div>
-  );
-});
-
-const conditional1 = rx({ count, name }, (value) => {
-  if (value.count > 10) {
-    return <div>High: {value.name}</div>;
-  }
-  return <div>Low: {value.name}</div>;
-});
-
-const conditional2 = rx({ user }, (value, loadable) => {
-  if (loadable.user.status === "loading") {
-    return <div>Loading user...</div>;
-  }
-
-  if (loadable.user.status === "error") {
-    return <div>Error loading user</div>;
-  }
-
-  // Safe to use value here since we checked loadable
-  return <div>Welcome, {value.user.name}!</div>;
-});
-
-const earlyReturn = rx({ count }, (value, loadable) => {
-  if (loadable.count.loading) return <div>Loading...</div>;
-  if (loadable.count.status === "error") return <div>Error</div>;
-
-  return <div>{value.count}</div>;
-});
-
-const emptySignals = rx({}, (value) => {
-  expectType<{}>(value);
-  return <div>No signals</div>;
-});
-
-const singleInObject = rx({ count }, (value) => {
-  expectType<{ count: number }>(value);
-  return <div>{value.count}</div>;
 });
 
 // =============================================================================
@@ -1210,17 +1052,7 @@ function integrationTests() {
 
 function rxTests() {
   // ---------------------------------------------------------------------------
-  // Overload 1: rx(render, options) - Static with options
-  // ---------------------------------------------------------------------------
-
-  // Static with watch dependencies
-  expectType<ReactNode>(staticWithWatch);
-
-  // Static with multiple watch deps
-  expectType<ReactNode>(staticWithMultiWatch);
-
-  // ---------------------------------------------------------------------------
-  // Overload 2: rx(signal) - Single signal shorthand
+  // Overload 1: rx(signal) - Single signal shorthand
   // ---------------------------------------------------------------------------
 
   // Number signal
@@ -1236,76 +1068,33 @@ function rxTests() {
   expectType<ReactNode>(singleArray);
 
   // ---------------------------------------------------------------------------
-  // Overload 2: rx(signal, options) - Single signal with options
+  // Overload 2: rx(signal, selector) - Single signal with selector
   // ---------------------------------------------------------------------------
 
-  // Single signal with watch
-  expectType<ReactNode>(singleWithWatch);
+  // Property access
+  expectType<ReactNode>(singleWithSelector);
+
+  // Selector function
+  expectType<ReactNode>(singleWithSelectorFn);
+
+  // Computed selector
+  expectType<ReactNode>(singleWithSelectorComputed);
 
   // ---------------------------------------------------------------------------
-  // Overload 3: rx(signals, render) - Multiple signals with value access
+  // Overload 3: rx(fn) - Reactive function with automatic tracking
   // ---------------------------------------------------------------------------
 
-  // Simple value access
-  expectType<ReactNode>(multi1);
-
-  // Value with object signal
-  expectType<ReactNode>(multi2);
-
-  // Value with array signal
-  expectType<ReactNode>(multi3);
-
-  // ---------------------------------------------------------------------------
-  // Overload 3: rx(signals, render) - Using loadable for manual control
-  // ---------------------------------------------------------------------------
-
-  // Loadable access for loading states
-  expectType<ReactNode>(withLoadable1);
-
-  // Loadable with promise signal
-  expectType<ReactNode>(withLoadable2);
-
-  // Using both value and loadable
-  expectType<ReactNode>(withBoth);
-
-  // ---------------------------------------------------------------------------
-  // Overload 3: rx(signals, render, options) - With watch dependencies
-  // ---------------------------------------------------------------------------
+  // Basic reactive function
+  expectType<ReactNode>(reactiveFn);
 
   // With watch option
-  expectType<ReactNode>(withWatch1);
+  expectType<ReactNode>(reactiveFnWithOptions);
 
-  // With multiple watch deps
-  expectType<ReactNode>(withWatch2);
+  // Conditional tracking
+  expectType<ReactNode>(conditionalTracking);
 
-  // ---------------------------------------------------------------------------
-  // Complex scenarios
-  // ---------------------------------------------------------------------------
-
-  // Multiple signals of different types
-  expectType<ReactNode>(complex1);
-
-  // Nested JSX
-  expectType<ReactNode>(complex2);
-
-  // Conditional rendering with value
-  expectType<ReactNode>(conditional1);
-
-  // Conditional rendering with loadable
-  expectType<ReactNode>(conditional2);
-
-  // Early return patterns
-  expectType<ReactNode>(earlyReturn);
-
-  // ---------------------------------------------------------------------------
-  // Edge cases
-  // ---------------------------------------------------------------------------
-
-  // Empty signals object
-  expectType<ReactNode>(emptySignals);
-
-  // Single signal in signals object
-  expectType<ReactNode>(singleInObject);
+  // Complex reactive rendering
+  expectType<ReactNode>(complexReactive);
 }
 
 // =============================================================================

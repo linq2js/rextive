@@ -34,8 +34,6 @@ import {
   TAG_TYPE,
   SignalOf,
   UseList,
-  MUTABLE_TAG_BRAND,
-  COMPUTED_TAG_BRAND,
 } from "./types";
 import { is } from "./is";
 
@@ -331,13 +329,6 @@ export function tag<TValue, TKind extends SignalKind = "any">(
 
   const tagInstance: Tag<NoInfer<TValue>, TKind> = {
     [TAG_TYPE]: true,
-
-    // Brand for TKind discrimination using unique symbols
-    __brand: null as any as TKind extends "mutable"
-      ? typeof MUTABLE_TAG_BRAND
-      : TKind extends "computed"
-      ? typeof COMPUTED_TAG_BRAND
-      : typeof MUTABLE_TAG_BRAND | typeof COMPUTED_TAG_BRAND,
 
     // Kind is a compile-time marker only, not used at runtime
     // Set to null because we don't track signal kinds at runtime

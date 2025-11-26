@@ -1,10 +1,9 @@
-
+import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import { act, useState, Suspense } from "react";
+import { act, Suspense } from "react";
 import { rx } from "./rx";
 import { signal } from "../signal";
-import { ErrorBoundary } from "react-error-boundary";
 import "@testing-library/jest-dom/vitest";
 
 describe("rx", () => {
@@ -12,232 +11,10 @@ describe("rx", () => {
     vi.clearAllMocks();
   });
 
-  describe("Overload 1: Component with reactive props", () => {
-    it("should render intrinsic element with static props", () => {
-      const TestComponent = () => {
-        return rx("div", {
-          "data-testid": "static",
-          children: "Static content",
-        });
-      };
-
-      render(<TestComponent />);
-      expect(screen.getByTestId("static")).toHaveTextContent("Static content");
-    });
-
-    it("should render intrinsic element with signal props", async () => {
-      const content = signal("Dynamic content");
-      const TestComponent = () => {
-        return rx("div", {
-          "data-testid": "dynamic",
-          children: content,
-        });
-      };
-
-      render(<TestComponent />);
-      expect(screen.getByTestId("dynamic")).toHaveTextContent(
-        "Dynamic content"
-      );
-
-      act(() => {
-        content.set("Updated content");
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("dynamic")).toHaveTextContent(
-          "Updated content"
-        );
-      });
-    });
-
-    it("should render with mixed static and signal props", async () => {
-      const className = signal("dynamic-class");
-      const TestComponent = () => {
-        return rx("div", {
-          "data-testid": "mixed",
-          className: className,
-          id: "static-id",
-          children: "Content",
-        });
-      };
-
-      render(<TestComponent />);
-      const element = screen.getByTestId("mixed");
-      expect(element).toHaveClass("dynamic-class");
-      expect(element).toHaveAttribute("id", "static-id");
-
-      act(() => {
-        className.set("updated-class");
-      });
-
-      await waitFor(() => {
-        expect(element).toHaveClass("updated-class");
-      });
-    });
-
-    it("should render custom component with signal props", async () => {
-      const UserCard = ({ name, age }: { name: string; age: number }) => (
-        <div data-testid="user-card">
-          {name} - {age}
-        </div>
-      );
-
-      const name = signal("Alice");
-      const age = signal(25);
-
-      const TestComponent = () => {
-        return rx(UserCard, { name, age });
-      };
-
-      render(<TestComponent />);
-      expect(screen.getByTestId("user-card")).toHaveTextContent("Alice - 25");
-
-      act(() => {
-        name.set("Bob");
-        age.set(30);
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("user-card")).toHaveTextContent("Bob - 30");
-      });
-    });
-
-    it("should update when only one signal prop changes", async () => {
-      const title = signal("Hello");
-      const className = signal("class-1");
-
-      const TestComponent = () => {
-        return rx("div", {
-          "data-testid": "multi",
-          title: title,
-          className: className,
-          children: "Content",
-        });
-      };
-
-      render(<TestComponent />);
-      const element = screen.getByTestId("multi");
-      expect(element).toHaveAttribute("title", "Hello");
-      expect(element).toHaveClass("class-1");
-
-      act(() => {
-        title.set("World");
-      });
-
-      await waitFor(() => {
-        expect(element).toHaveAttribute("title", "World");
-      });
-
-      act(() => {
-        className.set("class-2");
-      });
-
-      await waitFor(() => {
-        expect(element).toHaveClass("class-2");
-      });
-    });
-
-    it("should handle component with only static props", () => {
-      const SimpleDiv = ({ text, id }: { text: string; id: string }) => (
-        <div data-testid={id}>{text}</div>
-      );
-
-      const TestComponent = () => {
-        return rx(SimpleDiv, { text: "Static", id: "test-id" });
-      };
-
-      render(<TestComponent />);
-      expect(screen.getByTestId("test-id")).toHaveTextContent("Static");
-    });
-
-    it("should handle async signal props with Suspense", async () => {
-      const asyncName = signal(Promise.resolve("Async Alice"));
-
-      const TestComponent = () => {
-        return (
-          <Suspense fallback={<div data-testid="loading">Loading...</div>}>
-            {rx("div", {
-              "data-testid": "async",
-              children: asyncName,
-            })}
-          </Suspense>
-        );
-      };
-
-      render(<TestComponent />);
-      expect(screen.getByTestId("loading")).toBeInTheDocument();
-
-      await waitFor(() => {
-        expect(screen.getByTestId("async")).toHaveTextContent("Async Alice");
-      });
-    });
-
-    it("should not re-render when parent re-renders if signals unchanged", async () => {
-      const count = signal(1);
-      let renderCount = 0;
-
-      const Counter = ({ value }: { value: number }) => {
-        renderCount++;
-        return <div data-testid="counter">{value}</div>;
-      };
-
-      const TestComponent = ({ key }: { key: number }) => {; void key
-        return rx(Counter, { value: count });
-      };
-
-      const { rerender } = render(<TestComponent key={1} />);
-      expect(screen.getByTestId("counter")).toHaveTextContent("1");
-      const initialRenderCount = renderCount;
-
-      // Force parent re-render with different key
-      rerender(<TestComponent key={2} />);
-
-      // Give some time for any potential re-render
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // renderCount should increase due to parent re-render
-      // but the signal didn't change
-      expect(screen.getByTestId("counter")).toHaveTextContent("1");
-    });
-
-    it("should handle event handler props", async () => {
-      const text = signal("Click me");
-      let clicked = false;
-
-      const TestComponent = () => {
-        return rx("button", {
-          "data-testid": "btn",
-          children: text,
-          onClick: () => {
-            clicked = true;
-          },
-        });
-      };
-
-      render(<TestComponent />);
-      const button = screen.getByTestId("btn");
-      expect(button).toHaveTextContent("Click me");
-
-      act(() => {
-        button.click();
-      });
-
-      expect(clicked).toBe(true);
-
-      act(() => {
-        text.set("Clicked!");
-      });
-
-      await waitFor(() => {
-        expect(button).toHaveTextContent("Clicked!");
-      });
-    });
-  });
-
-  describe("Overload 2: Single signal", () => {
+  describe("Overload 1: Single signal - rx(signal)", () => {
     it("should render sync signal value directly", () => {
       const count = signal(42);
-      const TestComponent = () => rx(count);
+      const TestComponent = () => <div>{rx(count)}</div>;
 
       render(<TestComponent />);
       expect(screen.getByText("42")).toBeInTheDocument();
@@ -245,7 +22,7 @@ describe("rx", () => {
 
     it("should update when signal changes", async () => {
       const count = signal(1);
-      const TestComponent = () => rx(count);
+      const TestComponent = () => <div>{rx(count)}</div>;
 
       render(<TestComponent />);
       expect(screen.getByText("1")).toBeInTheDocument();
@@ -263,7 +40,7 @@ describe("rx", () => {
       const asyncValue = signal(Promise.resolve(100));
       const TestComponent = () => (
         <Suspense fallback={<div data-testid="loading">Loading...</div>}>
-          {rx(asyncValue)}
+          <div>{rx(asyncValue)}</div>
         </Suspense>
       );
 
@@ -277,7 +54,7 @@ describe("rx", () => {
 
     it("should render string values", () => {
       const message = signal("Hello World");
-      const TestComponent = () => rx(message);
+      const TestComponent = () => <div>{rx(message)}</div>;
 
       render(<TestComponent />);
       expect(screen.getByText("Hello World")).toBeInTheDocument();
@@ -285,7 +62,7 @@ describe("rx", () => {
 
     it("should render JSX elements", () => {
       const content = signal(<span data-testid="jsx">JSX Content</span>);
-      const TestComponent = () => rx(content);
+      const TestComponent = () => <div>{rx(content)}</div>;
 
       render(<TestComponent />);
       expect(screen.getByTestId("jsx")).toHaveTextContent("JSX Content");
@@ -300,585 +77,250 @@ describe("rx", () => {
       render(<TestComponent />);
       expect(screen.getByTestId("container")).toBeEmptyDOMElement();
     });
+  });
 
-    it("should respect watch options", () => {
-      const count = signal(1);
-      let innerRenderCount = 0;
+  describe("Overload 2: Single signal with selector - rx(signal, selector)", () => {
+    it("should render specific property of signal value", () => {
+      const user = signal({ name: "Alice", age: 30 });
+      const TestComponent = () => <div>{rx(user, "name")}</div>;
 
-      const TestComponent = ({ dep }: { dep: number }) => {
-        // Track parent renders, but we care about inner rx renders
-        return rx(count, { watch: [dep] });
-      };
-
-      const { rerender } = render(<TestComponent dep={1} />);
-      expect(screen.getByText("1")).toBeInTheDocument();
-      innerRenderCount++;
-
-      // Change watch dep - should trigger new render
-      rerender(<TestComponent dep={2} />);
-      expect(screen.getByText("1")).toBeInTheDocument();
-      innerRenderCount++;
-
-      // Change signal value
-      act(() => {
-        count.set(42);
-      });
-      expect(screen.getByText("42")).toBeInTheDocument();
-
-      // Don't change watch dep - rx should still respond to signal changes
-      rerender(<TestComponent dep={2} />);
-      expect(screen.getByText("42")).toBeInTheDocument();
+      render(<TestComponent />);
+      expect(screen.getByText("Alice")).toBeInTheDocument();
     });
 
-    describe("Property access (rx(signal, prop))", () => {
-      it("should render specific property of signal value", () => {
-        const user = signal({ name: "Alice", age: 30 });
-        const TestComponent = () => rx(user, "name");
+    it("should update when property value changes", async () => {
+      const user = signal({ name: "Alice", age: 30 });
+      const TestComponent = () => <div>{rx(user, "name")}</div>;
 
-        render(<TestComponent />);
-        expect(screen.getByText("Alice")).toBeInTheDocument();
+      render(<TestComponent />);
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+
+      act(() => {
+        user.set({ name: "Bob", age: 35 });
       });
 
-      it("should update when property value changes", async () => {
-        const user = signal({ name: "Alice", age: 30 });
-        const TestComponent = () => rx(user, "name");
-
-        render(<TestComponent />);
-        expect(screen.getByText("Alice")).toBeInTheDocument();
-
-        act(() => {
-          user.set({ name: "Bob", age: 35 });
-        });
-
-        await waitFor(() => {
-          expect(screen.getByText("Bob")).toBeInTheDocument();
-        });
-      });
-
-      it("should work with properties from awaited values", async () => {
-        const data = signal(Promise.resolve({ title: "Hello World", count: 42 }));
-        const TestComponent = () => (
-          <Suspense fallback={<div data-testid="loading">Loading...</div>}>
-            {rx(data, "title")}
-          </Suspense>
-        );
-
-        render(<TestComponent />);
-        expect(screen.getByTestId("loading")).toBeInTheDocument();
-
-        await waitFor(() => {
-          expect(screen.getByText("Hello World")).toBeInTheDocument();
-        });
-      });
-
-      it("should respect options parameter", () => {
-        const user = signal({ name: "Alice", age: 30 });
-        const TestComponent = ({ dep }: { dep: number }) => {
-          return rx(user, "name", { watch: [dep] });
-        };
-
-        const { rerender } = render(<TestComponent dep={1} />);
-        expect(screen.getByText("Alice")).toBeInTheDocument();
-
-        // Change watch dep - should work
-        rerender(<TestComponent dep={2} />);
-        expect(screen.getByText("Alice")).toBeInTheDocument();
-
-        // Change signal value
-        act(() => {
-          user.set({ name: "Bob", age: 35 });
-        });
+      await waitFor(() => {
         expect(screen.getByText("Bob")).toBeInTheDocument();
       });
+    });
 
-      it("should handle undefined properties gracefully", () => {
-        const data = signal<{ value?: string }>({});
-        const TestComponent = () => (
-          <div data-testid="container">{rx(data, "value")}</div>
-        );
+    it("should work with selector function", () => {
+      const user = signal({ name: "Alice", age: 30 });
+      const TestComponent = () => (
+        <div>{rx(user, (u) => u.name.toUpperCase())}</div>
+      );
 
-        render(<TestComponent />);
-        expect(screen.getByTestId("container")).toBeEmptyDOMElement();
+      render(<TestComponent />);
+      expect(screen.getByText("ALICE")).toBeInTheDocument();
+    });
+
+    it("should update when selector function result changes", async () => {
+      const count = signal(5);
+      const TestComponent = () => <div>{rx(count, (c) => c * 2)}</div>;
+
+      render(<TestComponent />);
+      expect(screen.getByText("10")).toBeInTheDocument();
+
+      act(() => {
+        count.set(10);
       });
+
+      await waitFor(() => {
+        expect(screen.getByText("20")).toBeInTheDocument();
+      });
+    });
+
+    it("should work with properties from awaited values", async () => {
+      const data = signal(Promise.resolve({ title: "Hello World", count: 42 }));
+      const TestComponent = () => (
+        <Suspense fallback={<div data-testid="loading">Loading...</div>}>
+          <div>{rx(data, "title")}</div>
+        </Suspense>
+      );
+
+      render(<TestComponent />);
+      expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+      await waitFor(() => {
+        expect(screen.getByText("Hello World")).toBeInTheDocument();
+      });
+    });
+
+    it("should handle undefined properties gracefully", () => {
+      const data = signal<{ value?: string }>({});
+      const TestComponent = () => (
+        <div data-testid="container">{rx(data, "value")}</div>
+      );
+
+      render(<TestComponent />);
+      expect(screen.getByTestId("container")).toBeEmptyDOMElement();
     });
   });
 
-  describe("Overload 3: Reactive with signals", () => {
-    it("should render with resolved promise values", async () => {
-      const promise = Promise.resolve(42);
-      const count = signal(promise);
-      const TestComponent = () => {
-        return (
-          <Suspense fallback={<div data-testid="loading">Loading...</div>}>
-            {rx({ count }, (awaited) => (
-              <div data-testid="value">{awaited.count}</div>
-            ))}
-          </Suspense>
-        );
-      };
+  describe("Overload 3: Reactive function - rx(fn)", () => {
+    it("should render result of function", () => {
+      const TestComponent = () => <div>{rx(() => "Hello World")}</div>;
 
       render(<TestComponent />);
+      expect(screen.getByText("Hello World")).toBeInTheDocument();
+    });
+
+    it("should track signals accessed in function", async () => {
+      const count = signal(42);
+      const TestComponent = () => <div>{rx(() => `Count: ${count()}`)}</div>;
+
+      render(<TestComponent />);
+      expect(screen.getByText("Count: 42")).toBeInTheDocument();
+
+      act(() => {
+        count.set(100);
+      });
+
       await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("42");
+        expect(screen.getByText("Count: 100")).toBeInTheDocument();
       });
     });
 
-    it("should re-render when signal changes", async () => {
-      const promise1 = Promise.resolve(0);
-      const promise2 = Promise.resolve(1);
-      const count = signal(promise1);
-      const TestComponent = () => {
-        return (
-          <Suspense fallback={<div>Loading...</div>}>
-            {rx({ count }, (awaited) => (
-              <div data-testid="value">{awaited.count}</div>
-            ))}
-          </Suspense>
-        );
-      };
+    it("should track multiple signals", async () => {
+      const firstName = signal("John");
+      const lastName = signal("Doe");
+      const TestComponent = () => (
+        <div>{rx(() => `${firstName()} ${lastName()}`)}</div>
+      );
 
       render(<TestComponent />);
+      expect(screen.getByText("John Doe")).toBeInTheDocument();
+
+      act(() => {
+        firstName.set("Jane");
+      });
+
       await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("0");
+        expect(screen.getByText("Jane Doe")).toBeInTheDocument();
       });
 
       act(() => {
-        count.set(promise2);
+        lastName.set("Smith");
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("1");
+        expect(screen.getByText("Jane Smith")).toBeInTheDocument();
       });
     });
 
-    it("should handle multiple signals", async () => {
-      const a = signal(Promise.resolve(1));
-      const b = signal(Promise.resolve(2));
-      const TestComponent = () => {
-        return (
-          <Suspense fallback={<div>Loading...</div>}>
-            {rx({ a, b }, (awaited) => (
-              <div data-testid="sum">{awaited.a + awaited.b}</div>
-            ))}
-          </Suspense>
-        );
-      };
+    it("should render JSX from function", async () => {
+      const user = signal({ name: "Alice", age: 30 });
+      const TestComponent = () => (
+        <div>
+          {rx(() => (
+            <span data-testid="user">
+              {user().name} ({user().age})
+            </span>
+          ))}
+        </div>
+      );
 
       render(<TestComponent />);
-      await waitFor(() => {
-        expect(screen.getByTestId("sum")).toHaveTextContent("3");
-      });
+      expect(screen.getByTestId("user")).toHaveTextContent("Alice (30)");
 
       act(() => {
-        a.set(Promise.resolve(10));
+        user.set({ name: "Bob", age: 25 });
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId("sum")).toHaveTextContent("12");
+        expect(screen.getByTestId("user")).toHaveTextContent("Bob (25)");
       });
     });
 
     it("should only track accessed signals (lazy tracking)", async () => {
-      const tracked = signal(Promise.resolve(1));
-      const untracked = signal(Promise.resolve(100));
-      let trackedSubscriptions = 0;
-      let untrackedSubscriptions = 0;
+      const tracked = signal(1);
+      const untracked = signal(100);
+      let renderCount = 0;
 
-      // Track subscription counts
-      const originalTrackedOn = tracked.on.bind(tracked);
-      tracked.on = vi.fn((listener) => {
-        trackedSubscriptions++;
-        return originalTrackedOn(listener);
-      });
-
-      const originalUntrackedOn = untracked.on.bind(untracked);
-      untracked.on = vi.fn((listener) => {
-        untrackedSubscriptions++;
-        return originalUntrackedOn(listener);
-      });
-
-      const TestComponent = () => {
-        return (
-          <Suspense fallback={<div>Loading...</div>}>
-            {rx({ tracked, untracked }, (awaited) => (
-              <div data-testid="value">{awaited.tracked}</div>
-            ))}
-          </Suspense>
-        );
-      };
+      const TestComponent = () => (
+        <div>
+          {rx(() => {
+            renderCount++;
+            return `Tracked: ${tracked()}`;
+          })}
+        </div>
+      );
 
       render(<TestComponent />);
-      await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("1");
-      });
+      expect(screen.getByText("Tracked: 1")).toBeInTheDocument();
+      const initialCount = renderCount;
 
-      // Only tracked signal should have subscription
-      expect(trackedSubscriptions).toBeGreaterThan(0);
-      expect(untrackedSubscriptions).toBe(0);
-
-      // Changing untracked should not cause re-render
+      // Changing untracked should NOT cause re-render
       act(() => {
-        untracked.set(Promise.resolve(200));
+        untracked.set(200);
       });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
-      expect(screen.getByTestId("value")).toHaveTextContent("1");
+      expect(renderCount).toBe(initialCount);
 
       // Changing tracked should cause re-render
       act(() => {
-        tracked.set(Promise.resolve(2));
+        tracked.set(2);
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("2");
+        expect(screen.getByText("Tracked: 2")).toBeInTheDocument();
       });
     });
 
     it("should handle conditional signal access", async () => {
-      const a = signal(Promise.resolve(1));
-      const b = signal(Promise.resolve(2));
-      const flag = signal(Promise.resolve(true));
-      let aSubscriptions = 0;
-      let bSubscriptions = 0;
+      const showDetails = signal(false);
+      const details = signal({ bio: "Developer" });
+      let accessedDetails = false;
 
-      const originalAOn = a.on.bind(a);
-      a.on = vi.fn((listener) => {
-        aSubscriptions++;
-        return originalAOn(listener);
-      });
-
-      const originalBOn = b.on.bind(b);
-      b.on = vi.fn((listener) => {
-        bSubscriptions++;
-        return originalBOn(listener);
-      });
-
-      const TestComponent = () => {
-        return (
-          <Suspense fallback={<div>Loading...</div>}>
-            {rx({ a, b, flag }, (awaited) => (
-              <div data-testid="value">
-                {awaited.flag ? awaited.a : awaited.b}
-              </div>
-            ))}
-          </Suspense>
-        );
-      };
+      const TestComponent = () => (
+        <div>
+          {rx(() => {
+            if (showDetails()) {
+              accessedDetails = true;
+              return details().bio;
+            }
+            return "Hidden";
+          })}
+        </div>
+      );
 
       render(<TestComponent />);
-      await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("1");
-      });
+      expect(screen.getByText("Hidden")).toBeInTheDocument();
+      expect(accessedDetails).toBe(false);
 
-      // Initially only a should be tracked
-      expect(aSubscriptions).toBeGreaterThan(0);
-      expect(bSubscriptions).toBe(0);
-
-      // Change flag to access b
+      // Change showDetails to true
       act(() => {
-        flag.set(Promise.resolve(false));
+        showDetails.set(true);
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("2");
+        expect(screen.getByText("Developer")).toBeInTheDocument();
       });
-
-      // Now b should be tracked
-      expect(bSubscriptions).toBeGreaterThan(0);
+      expect(accessedDetails).toBe(true);
     });
 
-    it("should handle watch array for render function memoization", async () => {
-      const count = signal(Promise.resolve(0));
-      let renderCallCount = 0;
-
-      const TestComponent = ({ extra }: { extra: number }) => {
-        return rx(
-          { count },
-          (awaited) => {
-            renderCallCount++;
-            return (
-              <div data-testid="value">
-                {awaited.count} - {extra}
-              </div>
-            );
-          },
-          { watch: [extra] }
-        );
-      };
-
-      const { rerender } = render(
-        <Suspense fallback={<div>Loading...</div>}>
-          <TestComponent extra={1} />
-        </Suspense>
-      );
-      await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("0 - 1");
-      });
-      const initialCalls = renderCallCount;
-
-      // Change signal (should re-render)
-      act(() => {
-        count.set(Promise.resolve(1));
-      });
-
-      // Change extra (should recreate render function and re-render)
-      rerender(
-        <Suspense fallback={<div>Loading...</div>}>
-          <TestComponent extra={2} />
-        </Suspense>
-      );
-
-      await waitFor(() => {
-        expect(renderCallCount).toBeGreaterThan(initialCalls);
-      });
-    });
-  });
-
-  describe("Awaited pattern (Suspense)", () => {
-    it("should throw promise for loading state", async () => {
-      const promise = new Promise<number>((resolve) => {
-        setTimeout(() => resolve(42), 100);
-      });
-      const data = signal(promise);
-
-      const TestComponent = () => {
-        return (
-          <Suspense fallback={<div data-testid="loading">Loading...</div>}>
-            {rx({ data }, (awaited) => (
-              <div data-testid="value">{awaited.data}</div>
-            ))}
-          </Suspense>
-        );
-      };
+    it("should handle rapid signal updates", async () => {
+      const count = signal(0);
+      const TestComponent = () => <div>{rx(() => `Count: ${count()}`)}</div>;
 
       render(<TestComponent />);
-      expect(screen.getByTestId("loading")).toBeInTheDocument();
-
-      await waitFor(
-        () => {
-          expect(screen.getByTestId("value")).toHaveTextContent("42");
-        },
-        { timeout: 200 }
-      );
-    });
-
-    it("should throw error for rejected promise", async () => {
-      const error = new Error("Test error");
-      const promise = Promise.reject(error);
-      // Suppress unhandled rejection warning
-      promise.catch(() => {});
-      const data = signal(promise);
-
-      // Suppress console.error for this test
-      const originalError = console.error;
-      console.error = vi.fn();
-
-      const TestComponent = () => {
-        return (
-          <ErrorBoundary
-            fallbackRender={() => <div data-testid="error-boundary">Error</div>}
-          >
-            <Suspense fallback={<div>Loading...</div>}>
-              {rx({ data }, (awaited) => (
-                <div data-testid="value">{awaited.data}</div>
-              ))}
-            </Suspense>
-          </ErrorBoundary>
-        );
-      };
-
-      // Error should be thrown (would be caught by ErrorBoundary in real app)
-      render(<TestComponent />);
-
-      await waitFor(
-        () => {
-          expect(screen.getByTestId("error-boundary")).toBeInTheDocument();
-        },
-        { timeout: 200 }
-      );
-
-      // Restore console.error
-      console.error = originalError;
-    });
-
-    it("should return resolved value for resolved promise", async () => {
-      const data = signal(Promise.resolve(42));
-
-      const TestComponent = () => {
-        return (
-          <Suspense fallback={<div>Loading...</div>}>
-            {rx({ data }, (awaited) => (
-              <div data-testid="value">{awaited.data}</div>
-            ))}
-          </Suspense>
-        );
-      };
-
-      render(<TestComponent />);
-      await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("42");
-      });
-    });
-  });
-
-  describe("Loadable pattern (manual handling)", () => {
-    it("should return loadable object for loading state", async () => {
-      const promise = new Promise<number>((resolve) => {
-        setTimeout(() => resolve(42), 50);
-      });
-      const data = signal(promise);
-
-      const TestComponent = () => {
-        return rx({ data }, (_awaited, loadable) => {
-          const dataLoadable = loadable.data;
-          if (dataLoadable.status === "loading") {
-            return <div data-testid="loading">Loading...</div>;
-          }
-          return <div data-testid="value">{dataLoadable.value}</div>;
-        });
-      };
-
-      render(<TestComponent />);
-      // Initially loading
-      expect(screen.getByTestId("loading")).toBeInTheDocument();
-
-      // Wait for promise to resolve
-      await waitFor(
-        () => {
-          expect(screen.getByTestId("value")).toHaveTextContent("42");
-        },
-        { timeout: 100 }
-      );
-    });
-
-    it("should return loadable object for error state", async () => {
-      const error = new Error("Test error");
-      const promise = Promise.reject(error);
-      const data = signal(promise);
-
-      const TestComponent = () => {
-        return rx({ data }, (_awaited, loadable) => {
-          const dataLoadable = loadable.data;
-          if (dataLoadable.status === "error") {
-            const errorMessage =
-              dataLoadable.error instanceof Error
-                ? dataLoadable.error.message
-                : String(dataLoadable.error);
-            return <div data-testid="error">{errorMessage}</div>;
-          }
-          if (dataLoadable.status === "loading") {
-            return <div data-testid="loading">Loading...</div>;
-          }
-          return <div data-testid="value">{dataLoadable.value}</div>;
-        });
-      };
-
-      render(<TestComponent />);
-      // Initially loading
-      expect(screen.getByTestId("loading")).toBeInTheDocument();
-
-      // Wait for promise to reject
-      await waitFor(
-        () => {
-          expect(screen.getByTestId("error")).toHaveTextContent("Test error");
-        },
-        { timeout: 200 }
-      );
-    });
-
-    it("should return loadable object for success state", async () => {
-      const promise = new Promise<number>((resolve) => {
-        setTimeout(() => resolve(42), 10);
-      });
-      const data = signal(promise);
-
-      const TestComponent = () => {
-        return rx({ data }, (_awaited, loadable) => {
-          const dataLoadable = loadable.data;
-          if (dataLoadable.status === "success") {
-            return <div data-testid="value">{dataLoadable.value}</div>;
-          }
-          if (dataLoadable.status === "loading") {
-            return <div data-testid="loading">Loading...</div>;
-          }
-          return <div>Other</div>;
-        });
-      };
-
-      render(<TestComponent />);
-      // Initially might be loading
-      await waitFor(
-        () => {
-          expect(screen.getByTestId("value")).toHaveTextContent("42");
-        },
-        { timeout: 200 }
-      );
-    });
-  });
-
-  describe("Edge cases", () => {
-    it("should handle empty signals object", () => {
-      const TestComponent = () => {
-        return rx({}, () => <div data-testid="empty">Empty</div>);
-      };
-
-      render(<TestComponent />);
-      expect(screen.getByTestId("empty")).toBeInTheDocument();
-    });
-
-    it("should handle undefined/null values in signals", async () => {
-      // Use PromiseLike for null/undefined since getLoadable expects PromiseLike
-      const value = signal(Promise.resolve<number | null>(null));
-
-      const TestComponent = () => {
-        return (
-          <Suspense fallback={<div>Loading...</div>}>
-            {rx({ value }, (awaited) => (
-              <div data-testid="value">
-                {awaited.value === null ? "null" : String(awaited.value)}
-              </div>
-            ))}
-          </Suspense>
-        );
-      };
-
-      render(<TestComponent />);
-      await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("null");
-      });
-    });
-
-    it("should handle rapid signal changes", async () => {
-      const count = signal(Promise.resolve(0));
-      const TestComponent = () => {
-        return (
-          <Suspense fallback={<div>Loading...</div>}>
-            {rx({ count }, (awaited) => (
-              <div data-testid="value">{awaited.count}</div>
-            ))}
-          </Suspense>
-        );
-      };
-
-      render(<TestComponent />);
-      await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("0");
-      });
+      expect(screen.getByText("Count: 0")).toBeInTheDocument();
 
       // Rapid changes
       act(() => {
-        count.set(Promise.resolve(1));
-        count.set(Promise.resolve(2));
-        count.set(Promise.resolve(3));
+        count.set(1);
+        count.set(2);
+        count.set(3);
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("3");
+        expect(screen.getByText("Count: 3")).toBeInTheDocument();
       });
     });
 
     it("should cleanup subscriptions on unmount", async () => {
-      const count = signal(Promise.resolve(0));
+      const count = signal(0);
       let subscriptionCount = 0;
 
       const originalOn = count.on.bind(count);
@@ -891,15 +333,7 @@ describe("rx", () => {
         };
       });
 
-      const TestComponent = () => {
-        return (
-          <Suspense fallback={<div>Loading...</div>}>
-            {rx({ count }, (awaited) => (
-              <div data-testid="value">{awaited.count}</div>
-            ))}
-          </Suspense>
-        );
-      };
+      const TestComponent = () => <div>{rx(() => count())}</div>;
 
       const { unmount } = render(<TestComponent />);
       await waitFor(() => {
@@ -907,111 +341,41 @@ describe("rx", () => {
       });
 
       unmount();
-      // Subscription should be cleaned up
       expect(subscriptionCount).toBe(0);
-    });
-
-    it("should handle signals object reference changes", async () => {
-      const count1 = signal(Promise.resolve(1));
-      const count2 = signal(Promise.resolve(2));
-
-      const TestComponent = ({ useFirst }: { useFirst: boolean }) => {
-        return (
-          <Suspense fallback={<div>Loading...</div>}>
-            {rx(useFirst ? { count: count1 } : { count: count2 }, (awaited) => (
-              <div data-testid="value">{awaited.count}</div>
-            ))}
-          </Suspense>
-        );
-      };
-
-      const { rerender } = render(<TestComponent useFirst={true} />);
-      await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("1");
-      });
-
-      // Change signals object reference
-      rerender(<TestComponent useFirst={false} />);
-      await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("2");
-      });
     });
   });
 
-  describe("Integration with React state", () => {
-    it("should work with useState via signal", async () => {
-      const TestComponent = () => {
-        const [value, setValue] = useState(0);
-        const valueSignal = signal(value);
-
-        // Update signal when state changes
-        if (valueSignal() !== value) {
-          valueSignal.set(value);
-        }
-
-        return (
-          <div>
-            {rx("div", {
-              "data-testid": "value",
-              children: valueSignal,
-            })}
-            <button data-testid="button" onClick={() => setValue(value + 1)}>
-              Increment
-            </button>
-          </div>
-        );
-      };
-
-      render(<TestComponent />);
-      expect(screen.getByTestId("value")).toHaveTextContent("0");
-
-      act(() => {
-        screen.getByTestId("button").click();
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("value")).toHaveTextContent("1");
-      });
+  describe("Edge cases", () => {
+    it("should throw error for invalid arguments", () => {
+      expect(() => {
+        // @ts-expect-error - intentionally passing invalid argument
+        rx(123);
+      }).toThrow();
     });
 
-    it("should combine signals from props and component state", async () => {
-      const externalSignal = signal("External");
+    it("should handle nested rx calls", async () => {
+      const outer = signal("Outer");
+      const inner = signal("Inner");
 
-      const TestComponent = () => {
-        const [internalValue, setInternalValue] = useState("Internal");
-        const internalSignal = signal(internalValue);
-
-        if (internalSignal() !== internalValue) {
-          internalSignal.set(internalValue);
-        }
-
-        return (
-          <div>
-            {rx("div", {
-              "data-testid": "combined",
-              children: `${externalSignal()} - ${internalSignal()}`,
-              title: externalSignal,
-            })}
-            <button
-              data-testid="internal-btn"
-              onClick={() => setInternalValue("Updated")}
-            >
-              Update Internal
-            </button>
-          </div>
-        );
-      };
+      const TestComponent = () => (
+        <div>
+          {rx(() => (
+            <span>
+              {outer()} - {rx(inner)}
+            </span>
+          ))}
+        </div>
+      );
 
       render(<TestComponent />);
-      const element = screen.getByTestId("combined");
-      expect(element).toHaveAttribute("title", "External");
+      expect(screen.getByText("Outer - Inner")).toBeInTheDocument();
 
       act(() => {
-        externalSignal.set("Changed");
+        inner.set("Updated Inner");
       });
 
       await waitFor(() => {
-        expect(element).toHaveAttribute("title", "Changed");
+        expect(screen.getByText("Outer - Updated Inner")).toBeInTheDocument();
       });
     });
   });

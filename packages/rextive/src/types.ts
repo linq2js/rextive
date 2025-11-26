@@ -757,17 +757,6 @@ export type Plugin<TValue, TKind extends SignalKind = "any"> = (
 export type Tag<TValue, TKind extends SignalKind = "any"> = {
   [TAG_TYPE]: true;
 
-  /**
-   * Brand property to make Tag invariant in TKind using unique symbols.
-   * This prevents cross-kind tag assignment at compile time.
-   * @internal
-   */
-  readonly __brand: TKind extends "mutable"
-    ? typeof MUTABLE_TAG_BRAND
-    : TKind extends "computed"
-    ? typeof COMPUTED_TAG_BRAND
-    : typeof MUTABLE_TAG_BRAND | typeof COMPUTED_TAG_BRAND;
-
   kind: TKind;
 
   /**

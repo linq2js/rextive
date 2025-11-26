@@ -7,7 +7,10 @@ import {
   type ErrorLoadable,
   type Loadable,
   SignalContext,
+  Signal,
 } from "../types";
+import { getCurrent } from "../contextDispatcher";
+import { is } from "../is";
 
 // Re-export types
 export { LOADABLE_TYPE };
@@ -46,12 +49,19 @@ export type {
 export function loadable<TValue>(
   value: TValue,
   context?: SignalContext
-): TValue extends Loadable<any>
+): TValue extends Signal<infer T>
+  ? Loadable<Awaited<T>>
+  : TValue extends Loadable<any>
   ? TValue
   : TValue extends PromiseLike<infer T>
   ? Loadable<T>
   : Loadable<TValue> {
+  if (is(value)) {
+    value = (value as Signal<any>)();
+  }
   const l = toLoadableImpl(value) as any;
+
+  getCurrent().trackLoadable(l);
 
   if (context && l.status === "loading") {
     l.promise.finally(context.refresh);

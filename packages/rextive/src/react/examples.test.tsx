@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { rx } from "./rx";
 import { disposable } from "../disposable";
 import { signal } from "../signal";
 import { wait } from "../wait";
+import { loadable } from "../utils/loadable";
 import { useScope } from "./useScope";
+import { rx } from "./rx";
 import { MutableSignal, Signal } from "../types";
 
 describe("examples", () => {
@@ -59,39 +60,44 @@ describe("examples", () => {
     };
 
     /**
-     * Reusable field renderer that handles both sync and async validation
+     * Reusable field component that handles both sync and async validation
      *
-     * @param key - Field identifier for test IDs
-     * @param field - Mutable signal for field value
-     * @param validation - Signal that computes validation errors (sync or async)
-     * @param isAsyncValidation - Whether this field uses async validation
-     *
-     * Key pattern: Uses rx() with two parameters:
-     * - First param (values): Awaited/unwrapped values of signals
-     * - Second param (loadables): Access to loading/error/success states for async signals
+     * Key pattern: Uses rx(() => ...) with loadable() for:
+     * - Reading signal values directly with field()
+     * - Access to loading/error/success states via loadable()
      */
-    const renderField = (
-      key: string,
-      field: MutableSignal<string>,
-      validation: Signal<void | string | Promise<string | void>>
-    ) =>
-      rx({ field, validation }, (awaited, loadables) => (
-        <>
-          <input
-            data-testid={`${key}-field`}
-            type="text"
-            value={awaited.field}
-            onChange={(e) => field.set(e.currentTarget.value)}
-          />
-          {loadables.validation.loading ? (
-            <div data-testid={`${key}-loading`}>Checking...</div>
-          ) : loadables.validation.value || loadables.validation.error ? (
-            <div data-testid={`${key}-error`}>
-              {String(loadables.validation.value || loadables.validation.error)}
-            </div>
-          ) : null}
-        </>
-      ));
+    const Field = ({
+      testKey,
+      field,
+      validation,
+    }: {
+      testKey: string;
+      field: MutableSignal<string>;
+      validation: Signal<void | string | Promise<string | void>>;
+    }) => {
+      return rx(() => {
+        const fieldValue = field();
+        const validationState = loadable(validation());
+
+        return (
+          <>
+            <input
+              data-testid={`${testKey}-field`}
+              type="text"
+              value={fieldValue}
+              onChange={(e) => field.set(e.currentTarget.value)}
+            />
+            {validationState.loading ? (
+              <div data-testid={`${testKey}-loading`}>Checking...</div>
+            ) : validationState.value || validationState.error ? (
+              <div data-testid={`${testKey}-error`}>
+                {String(validationState.value || validationState.error)}
+              </div>
+            ) : null}
+          </>
+        );
+      });
+    };
 
     // Form component using useScope for automatic cleanup
     const Form = () => {
@@ -100,9 +106,13 @@ describe("examples", () => {
       return (
         <>
           {/* Sync validation field */}
-          {renderField("name", fields.name, errors.name)}
+          <Field testKey="name" field={fields.name} validation={errors.name} />
           {/* Async validation field */}
-          {renderField("username", fields.username, errors.username)}
+          <Field
+            testKey="username"
+            field={fields.username}
+            validation={errors.username}
+          />
         </>
       );
     };

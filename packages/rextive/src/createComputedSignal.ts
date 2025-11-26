@@ -15,6 +15,7 @@ import { resolveEquals } from "./utils/resolveEquals";
 import { pipeSignals } from "./utils/pipeSignals";
 import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
+import { getCurrent } from "./contextDispatcher";
 
 /**
  * Create a computed signal (with dependencies)
@@ -172,6 +173,7 @@ export function createComputedSignal(
   };
 
   const get = () => {
+    getCurrent().trackSignal(instance);
     // Allow reading last value/error even after disposal
     // Only recompute if not disposed and no current value
     if (!current && !disposed) {

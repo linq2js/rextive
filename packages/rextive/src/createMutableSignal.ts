@@ -46,6 +46,7 @@ import { pipeSignals } from "./utils/pipeSignals";
 import { createComputedSignal } from "./createComputedSignal";
 import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
+import { getCurrent } from "./contextDispatcher";
 
 /**
  * Create a mutable signal instance
@@ -313,6 +314,7 @@ export function createMutableSignal(
    * - The call signature of the signal: signal()
    */
   const get = () => {
+    getCurrent().trackSignal(instance);
     // Lazy evaluation: compute on first access
     // Allow reading last value even after disposal (but don't recompute)
     if (!current && !disposed) {

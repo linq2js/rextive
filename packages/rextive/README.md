@@ -688,36 +688,38 @@ return <div>{user.name}</div>; // Only using 'user'
 
 ```tsx
 // ✅ Rextive: Intelligent lazy tracking
-import { rx } from "rextive/react";
+import { rx, wait } from "rextive/react";
 
-rx({ user, posts, comments }, (value) => {
-  return <div>{value.user.name}</div>;
-  // Only accessed value.user, so only subscribed to 'user' signal
+{rx(() => {
+  const userData = wait(user());
+  return <div>{userData.name}</div>;
+  // Only accessed 'user', so only subscribed to 'user' signal
   // Changes to posts/comments won't trigger re-renders!
-});
+})}
 ```
 
 <details>
 <summary>📖 <strong>How Lazy Tracking Works</strong></summary>
 
 ```tsx
-rx({ user, posts, comments }, (value) => {
+{rx(() => {
   // Rextive tracks which signals you access inside this function
 
-  const userName = value.user.name; // ✅ Accessed: subscribed to 'user'
-  // value.posts not accessed              ✅ Not subscribed to 'posts'
-  // value.comments not accessed           ✅ Not subscribed to 'comments'
+  const userData = wait(user()); // ✅ Accessed: subscribed to 'user'
+  // posts() not called              ✅ Not subscribed to 'posts'
+  // comments() not called           ✅ Not subscribed to 'comments'
 
-  return <div>{userName}</div>;
-});
+  return <div>{userData.name}</div>;
+})}
 
 // Later, if you conditionally access 'posts':
-rx({ user, posts, comments }, (value) => {
-  if (value.user.isPremium) {
-    return <PostsList posts={value.posts} />; // Now subscribed to 'posts' too!
+{rx(() => {
+  const userData = wait(user());
+  if (userData.isPremium) {
+    return <PostsList posts={wait(posts())} />; // Now subscribed to 'posts' too!
   }
-  return <div>{value.user.name}</div>;
-});
+  return <div>{userData.name}</div>;
+})}
 ```
 
 **Benefits:**
@@ -735,7 +737,7 @@ rx({ user, posts, comments }, (value) => {
 Unlike Apollo, React Query, or other data fetching libraries, **you don't need to explicitly destructure or manage** `loading`, `error`, and `data` states. Rextive handles async states transparently - access them however you need:
 
 ```tsx
-import { signal, rx, useWatch } from "rextive/react";
+import { signal, rx, wait, loadable } from "rextive/react";
 
 const user = signal(async () => fetchUser());
 
@@ -745,20 +747,19 @@ if (loading) return <div>Loading...</div>;
 if (error) return <div>Error: {error.message}</div>;
 return <div>User: {data.name}</div>;
 
-// ✅ Rextive Option 1: Just use the awaited value (throws to Suspense)
-rx(user, (awaited) => <div>User: {awaited.name}</div>);
+// ✅ Rextive Option 1: Use wait() for Suspense (throws if loading)
+{rx(() => {
+  const userData = wait(user()); // Throws for Suspense
+  return <div>User: {userData.name}</div>;
+})}
 
-// ✅ Rextive Option 2: Access loadable state when you need it
-rx({ user }, (_, loadables) => {
-  if (loadables.user.status === "loading") return <div>Loading...</div>;
-  if (loadables.user.status === "error") return <div>Error!</div>;
-  return <div>User: {loadables.user.value.name}</div>;
-});
-
-// ✅ Rextive Option 3: Mix and match as needed
-const [awaited, loadables] = useWatch({ user, posts });
-// Access awaited value: awaited.user.name
-// Or loadable state: loadables.user.status
+// ✅ Rextive Option 2: Use loadable() for manual loading states
+{rx(() => {
+  const state = loadable(user());
+  if (state.loading) return <div>Loading...</div>;
+  if (state.error) return <div>Error!</div>;
+  return <div>User: {state.value.name}</div>;
+})}
 ```
 
 <details>
@@ -777,12 +778,12 @@ const [awaited, loadables] = useWatch({ user, posts });
 const user = signal(async () => fetchUser());
 const count = signal(0);
 
-// Use both the SAME way - no special handling needed!
-rx({ user, count }, (value) => (
+// Use both the SAME way with rx() and automatic tracking!
+{rx(() => (
   <div>
-    {value.user.name} has count: {value.count}
+    {wait(user()).name} has count: {count()}
   </div>
-));
+))}
 ```
 
 **Choose Your Style:**
@@ -790,33 +791,36 @@ rx({ user, count }, (value) => (
 ```tsx
 // Style 1: Let Suspense handle it (cleanest for happy path)
 function UserProfile() {
-  return rx(user, (value) => <div>{value.name}</div>);
+  return rx(() => <div>{wait(user()).name}</div>);
 }
 
 // Style 2: Manual control (when you need custom loading UI)
 function UserProfile() {
-  return rx({ user }, (_, loadables) => {
-    if (loadables.user.status === "loading") return <Spinner />;
-    return <div>{loadables.user.value.name}</div>;
+  return rx(() => {
+    const state = loadable(user());
+    if (state.loading) return <Spinner />;
+    return <div>{state.value.name}</div>;
   });
 }
 
 // Style 3: Mix both approaches in one component
 function UserProfile() {
-  const [awaited, loadables] = useWatch({ user, posts });
+  return rx(() => {
+    const userState = loadable(user());
+    
+    // Show custom loading for user
+    if (userState.loading) return <UserSkeleton />;
 
-  // Show custom loading for user
-  if (loadables.user.status === "loading") return <UserSkeleton />;
-
-  // But use Suspense for posts (just access awaited.posts)
-  return (
-    <div>
-      <h1>{awaited.user.name}</h1>
-      <Suspense fallback={<div>Loading posts...</div>}>
-        <PostsList posts={awaited.posts} />
-      </Suspense>
-    </div>
-  );
+    // Use Suspense for posts
+    return (
+      <div>
+        <h1>{userState.value.name}</h1>
+        <Suspense fallback={<div>Loading posts...</div>}>
+          <PostsList posts={wait(posts())} />
+        </Suspense>
+      </div>
+    );
+  });
 }
 ```
 
@@ -843,14 +847,14 @@ const count = signal(0); // Sync state
 const doubled = count.to((x) => x * 2); // Computed (sync)
 const user = signal(async () => fetchUser()); // Async state
 
-// Use them ALL the same way!
-rx({ count, doubled, user }, (value) => (
+// Use them ALL the same way with rx() and auto-tracking!
+{rx(() => (
   <div>
-    <p>Count: {value.count}</p>
-    <p>Doubled: {value.doubled}</p>
-    <p>User: {value.user.name}</p>
+    <p>Count: {count()}</p>
+    <p>Doubled: {doubled()}</p>
+    <p>User: {wait(user()).name}</p>
   </div>
-));
+))}
 ```
 
 <details>
@@ -867,7 +871,8 @@ const count = signal(0);
 const doubled = count.to((x) => x * 2);
 const user = signal(async () => fetchUser());
 
-// All work with rx(), wait(), useWatch(), etc.
+// All work with rx() and automatic signal tracking!
+// Use wait() to unwrap async values, loadable() for loading states
 ```
 
 **Benefits:**
@@ -1165,26 +1170,27 @@ userId.set(3); // Cancels fetch for user 2, starts fetch for user 3
 <details>
 <summary>📖 <strong>Using with Manual Loading States</strong></summary>
 
-Instead of Suspense, you can handle loading/error states manually:
+Instead of Suspense, you can handle loading/error states manually using `loadable()`:
 
 ```tsx
+import { loadable } from "rextive";
+
 function ProfileManual() {
-  return rx({ user }, (awaited, loadables) => {
-    // loadables.user contains status info
-    if (loadables.user.status === "loading") {
+  return rx(() => {
+    const state = loadable(user());
+    
+    if (state.loading) {
       return <div>Loading user...</div>;
     }
 
-    if (loadables.user.status === "error") {
-      return <div>Error: {loadables.user.error.message}</div>;
+    if (state.error) {
+      return <div>Error: {state.error.message}</div>;
     }
 
-    // loadables.user.status === "success"
-    const userData = loadables.user.value;
     return (
       <div>
-        <h3>{userData.name}</h3>
-        <p>Email: {userData.email}</p>
+        <h3>{state.value.name}</h3>
+        <p>Email: {state.value.email}</p>
       </div>
     );
   });
@@ -1193,9 +1199,10 @@ function ProfileManual() {
 
 **Loadable states:**
 
-- `{ status: "loading" }` - Promise is pending
-- `{ status: "success", value: T }` - Promise resolved
-- `{ status: "error", error: Error }` - Promise rejected
+- `state.loading` - `true` if Promise is pending
+- `state.value` - The resolved value when successful
+- `state.error` - The error object if Promise rejected
+- `state.status` - `"loading"` | `"success"` | `"error"`
 
 </details>
 
@@ -1477,10 +1484,10 @@ function GoodComponent() {
 
 Build a reusable query pattern similar to React Query:
 
-> **💡 Key Pattern:** When using `rx()` with async signals, pass an object `rx({ result }, ...)` to manually handle loading/error states via `loadable`. Passing a single signal `rx(result, ...)` will await the value and throw to Suspense if loading.
+> **💡 Key Pattern:** Use `rx(() => ...)` with `wait()` for Suspense or `loadable()` for manual loading states.
 
 ```tsx
-import { signal, disposable, rx, useScope } from "rextive/react";
+import { signal, disposable, rx, useScope, wait, loadable } from "rextive/react";
 
 // Reusable query factory
 function createQuery(endpoint, options = {}) {
@@ -1546,24 +1553,26 @@ function UserProfile({ userId }) {
       <button onClick={() => userQuery.refetch()}>Refresh</button>
       <button onClick={handleManualFetch}>Manual Fetch</button>
 
-      {/* rx(signals, render) provides loadables parameter (2nd parameter) with loading/error states for all input signals */}
-      {rx(userQuery, (_, loadables) => {
+      {/* Use loadable() for manual loading states */}
+      {rx(() => {
+        const state = loadable(userQuery.result());
+        
         // Handle loading
-        if (loadables.result.status === "loading") {
+        if (state.loading) {
           return <div>Loading user...</div>;
         }
 
         // Handle error
-        if (loadables.result.status === "error") {
+        if (state.error) {
           return (
             <div style={{ color: "red" }}>
-              Error: {loadables.result.error.message}
+              Error: {state.error.message}
             </div>
           );
         }
 
         // Handle no data
-        const user = loadables.result.value;
+        const user = state.value;
         if (!user) {
           return <div>No user selected</div>;
         }
@@ -1587,11 +1596,12 @@ export const userQuery = createQuery("/api/user");
 function AnotherComponent() {
   return (
     <div>
-      {/* Consume the same global query */}
-      {rx(userQuery, (_, loadables) => {
-        if (loadables.result.status === "loading") return <div>Loading...</div>;
-        if (loadables.result.status === "error") return <div>Error!</div>;
-        return <div>User: {loadables.result.value?.name}</div>;
+      {/* Consume the same global query with loadable() */}
+      {rx(() => {
+        const state = loadable(userQuery.result());
+        if (state.loading) return <div>Loading...</div>;
+        if (state.error) return <div>Error!</div>;
+        return <div>User: {state.value?.name}</div>;
       })}
 
       {/* Trigger query for a specific user */}
@@ -1637,18 +1647,18 @@ const userQuery = useScope(() => createQuery("/api/user"), {
   update: [(q) => q.query({ id: userId }), userId],
 });
 
-// 6. At UI layer, access loadable state via rx()
-// ⚠️ Important: Pass the query object to avoid Suspense and access loadable
-rx(userQuery, (_, loadable) => {
-  // loadable.result.status: "loading" | "success" | "error"
-  // loadable.result.error: Error object if status === "error"
-  // loadable.result.value: the resolved promise value
+// 6. At UI layer, use loadable() for loading states
+rx(() => {
+  const state = loadable(userQuery.result());
+  // state.loading: true if Promise is pending
+  // state.error: Error object if rejected
+  // state.value: the resolved promise value
 });
 
-// Alternative: Use single signal to throw to Suspense
-rx(userQuery.result, (value) => {
-  // This awaits the signal - throws to Suspense if loading
-  // Use this when you want Suspense boundaries to handle loading
+// Alternative: Use wait() to throw to Suspense
+rx(() => {
+  const user = wait(userQuery.result()); // Throws if loading
+  return <div>{user.name}</div>;
 });
 ```
 
@@ -1665,10 +1675,10 @@ rx(userQuery.result, (value) => {
 
 Build a registration form with both **sync** and **async** validation (e.g., checking username availability):
 
-> **💡 Key Pattern:** This example demonstrates how to handle async validation with loading states using `loadables` parameter in `rx()`. The `safe()` method ensures async work is cancelled if the field value changes.
+> **💡 Key Pattern:** Use `rx(() => ...)` with `loadable()` to handle async validation states. The `safe()` method ensures async work is cancelled if the field value changes.
 
 ```tsx
-import { signal, disposable, rx, useScope, wait } from "rextive/react";
+import { signal, disposable, rx, useScope, wait, loadable } from "rextive/react";
 
 function RegistrationForm() {
   const scope = useScope(() => {
@@ -1717,67 +1727,66 @@ function RegistrationForm() {
   });
 
   /**
-   * Mental Model & Design:
+   * Rendering with loadable():
    *
-   * rx({ signals }, (awaited, loadables) => JSX) provides two parameters:
-   * 1. `awaited`: Resolved values of all input signals (Promise → value, non-Promise → as-is)
-   * 2. `loadables`: Loading/error states for each signal with structure:
-   *    - loadables.signalName.loading: boolean (true while Promise is pending)
-   *    - loadables.signalName.value: resolved value (for Promises) or the value itself
-   *    - loadables.signalName.error: rejected reason (only for failed Promises)
-   *    - loadables.signalName.status: "loading" | "error" | "success"
+   * Use loadable() to get loading/error/value state from promises:
+   * - state.loading: true while Promise is pending
+   * - state.value: resolved value (for Promises) or the value itself
+   * - state.error: rejected reason (only for failed Promises)
    *
-   * Design Choice:
-   * - Use `loadables` to handle async states WITHOUT triggering React Suspense
-   * - Uniform handling: sync and async validation use the same rendering logic
-   * - For sync values: loadables.value immediately contains the value, loading is false
-   * - For async Promises: loadables tracks loading→success/error lifecycle
-   *
-   * This pattern allows graceful loading states and error handling in the UI.
+   * This allows graceful loading states and error handling in the UI.
    */
-  // Reusable field renderer using the loadables pattern
-  const renderField = (
-    key: string,
-    field: MutableSignal<string>,
-    validation: Signal<void | string | Promise<string | void>>
-  ) =>
-    rx({ field, validation }, (awaited, loadables) => (
-      <div style={{ marginBottom: "1rem" }}>
-        <label>
-          {key.charAt(0).toUpperCase() + key.slice(1)}:
-          <input
-            type="text"
-            value={awaited.field}
-            onChange={(e) => field.set(e.target.value)}
-          />
-        </label>
+  // Reusable field component using loadable()
+  const Field = ({
+    label,
+    field,
+    validation,
+  }: {
+    label: string;
+    field: MutableSignal<string>;
+    validation: Signal<void | string | Promise<string | void>>;
+  }) =>
+    rx(() => {
+      const fieldValue = field();
+      const validationState = loadable(validation());
 
-        {/* Show loading state (only visible for async validation) */}
-        {loadables.validation.loading && (
-          <div style={{ color: "blue", fontSize: "0.9em" }}>
-            Checking availability...
-          </div>
-        )}
+      return (
+        <div style={{ marginBottom: "1rem" }}>
+          <label>
+            {label}:
+            <input
+              type="text"
+              value={fieldValue}
+              onChange={(e) => field.set(e.target.value)}
+            />
+          </label>
 
-        {/* Show error message (works for both sync and async).
-          Loadable.value is resolved value of the promise. Loadable.error is rejected reason of the promise */}
-        {(loadables.validation.value || loadables.validation.error) && (
-          <div style={{ color: "red", fontSize: "0.9em" }}>
-            {String(loadables.validation.value || loadables.validation.error)}
-          </div>
-        )}
-      </div>
-    ));
+          {/* Show loading state (only visible for async validation) */}
+          {validationState.loading && (
+            <div style={{ color: "blue", fontSize: "0.9em" }}>
+              Checking availability...
+            </div>
+          )}
+
+          {/* Show error message (works for both sync and async) */}
+          {(validationState.value || validationState.error) && (
+            <div style={{ color: "red", fontSize: "0.9em" }}>
+              {String(validationState.value || validationState.error)}
+            </div>
+          )}
+        </div>
+      );
+    });
 
   return (
     <form>
       <h2>Register</h2>
 
       {/* Sync validation field */}
-      {renderField("name", scope.fields.name, scope.errors.name)}
+      <Field label="Name" field={scope.fields.name} validation={scope.errors.name} />
 
       {/* Async validation field */}
-      {renderField("username", scope.fields.username, scope.errors.username)}
+      <Field label="Username" field={scope.fields.username} validation={scope.errors.username} />
 
       <button type="submit">Register</button>
     </form>
@@ -1787,12 +1796,12 @@ function RegistrationForm() {
 
 **Key Features:**
 
-- **🎯 Unified approach** - Always treat validation as loadable (works for both sync and async)
+- **🎯 Unified approach** - Use `loadable()` for both sync and async validation
 - **🔄 Sync validation** - Instant feedback for name field
 - **⏳ Async validation** - Username availability check with loading state
 - **🚫 Auto-cancellation** - `safe()` cancels pending checks when user types
-- **📊 Loading states** - Access via `loadables.validation.loading`
-- **✨ Simple API** - Use `loadables.validation.value` or `loadables.validation.error` for results
+- **📊 Loading states** - Access via `loadable(validation()).loading`
+- **✨ Simple API** - Use `state.value` or `state.error` for results
 
 <details>
 <summary>📖 <strong>How Async Validation Works</strong></summary>
@@ -1808,8 +1817,9 @@ errors.username (async computation begins)
   → Check if empty: No
   → await safe(wait.delay(500))  // Simulate API call
 ↓
-// 3. UI shows loading state via loadables
-{loadables.validation.loading}
+// 3. UI shows loading state via loadable()
+const state = loadable(validation());
+state.loading === true
   → Show "Checking availability..."
 ↓
 // 4. If user types again during validation
@@ -1822,17 +1832,17 @@ errors.username (new async computation)
   → Check database: "admin" exists
   → Return "Username already taken"
 ↓
-// 7. UI shows error via loadables
-{loadables.validation.value}
+// 7. UI shows error via loadable()
+state.value === "Username already taken"
   → Show "Username already taken"
 ```
 
 **Key Patterns:**
 
 - **`safe()` for cancellation** - Async work is cancelled if field value changes
-- **`loadables.validation.loading`** - Check if validation is in progress
-- **`loadables.validation.value`** - Access validation result (works for sync and async)
-- **`loadables.validation.error`** - Access any error that occurred
+- **`loadable(value).loading`** - Check if validation is in progress
+- **`loadable(value).value`** - Access validation result (works for sync and async)
+- **`loadable(value).error`** - Access any error that occurred
 - **No race conditions** - Previous validations are automatically cancelled
 
 </details>
@@ -1916,41 +1926,41 @@ function SearchBox() {
           )
       )}
 
-      {/* Results with loading state - using loadables.results.loading instead of separate isSearching signal */}
-      {rx(
-        { results: scope.results, searchInput: scope.searchInput },
-        (awaited, loadables) => {
-          // Check if results Promise is pending
-          if (loadables.results.status === "loading") {
-            return <div>Searching...</div>;
-          }
+      {/* Results with loading state using loadable() */}
+      {rx(() => {
+        const searchValue = scope.searchInput();
+        const resultsState = loadable(scope.results());
 
-          if (loadables.results.status === "error") {
-            return (
-              <div style={{ color: "red" }}>
-                Error: {loadables.results.error.message}
-              </div>
-            );
-          }
+        // Check if results Promise is pending
+        if (resultsState.loading) {
+          return <div>Searching...</div>;
+        }
 
-          const items = loadables.results.value;
-
-          if (items.length === 0 && awaited.searchInput.trim().length >= 2) {
-            return <div>No results found</div>;
-          }
-
+        if (resultsState.error) {
           return (
-            <ul>
-              {items.map((item) => (
-                <li key={item.id}>
-                  <strong>{item.name}</strong>
-                  <p>{item.description}</p>
-                </li>
-              ))}
-            </ul>
+            <div style={{ color: "red" }}>
+              Error: {resultsState.error.message}
+            </div>
           );
         }
-      )}
+
+        const items = resultsState.value;
+
+        if (items.length === 0 && searchValue.trim().length >= 2) {
+          return <div>No results found</div>;
+        }
+
+        return (
+          <ul>
+            {items.map((item) => (
+              <li key={item.id}>
+                <strong>{item.name}</strong>
+                <p>{item.description}</p>
+              </li>
+            ))}
+          </ul>
+        );
+      })}
     </div>
   );
 }
@@ -2819,7 +2829,7 @@ function ChildComponent() {
 Here's what `provider()` does under the hood:
 
 ```tsx
-import { signal, rx, useScope, useWatch, Signal } from "rextive/react";
+import { signal, rx, useScope, Signal } from "rextive/react";
 import { createContext, useContext, useLayoutEffect } from "react";
 
 type ThemeValue = "dark" | "light";
@@ -2881,21 +2891,21 @@ function ChildComponent(props: { showTheme: boolean }) {
   );
 }
 
-// Alternative: Using useWatch for conditional tracking
+// Alternative: Using rx() with conditional tracking
 function SmartComponent(props: { showTheme: boolean }) {
   const theme = useTheme();
 
-  // Use lazy tracking with useWatch
-  const [tracked] = useWatch({ theme });
+  // Use rx() for automatic tracking
+  return rx(() => {
+    if (!props.showTheme) {
+      // ✅ Theme signal NOT tracked here (we didn't call theme())
+      return <div>Nothing</div>;
+    }
 
-  if (!props.showTheme) {
-    // ✅ Theme signal NOT tracked here (we didn't access tracked.theme)
-    return <div>Nothing</div>;
-  }
-
-  // ✅ Theme signal is tracked ONLY when this branch executes
-  // Only re-renders when showTheme is true AND theme changes
-  return <div>Theme: {tracked.theme}</div>;
+    // ✅ Theme signal is tracked ONLY when this branch executes
+    // Only re-renders when showTheme is true AND theme changes
+    return <div>Theme: {theme()}</div>;
+  });
 }
 
 // Usage
@@ -2959,7 +2969,8 @@ import {
   disposable,
   provider,
   rx,
-  useWatch,
+  wait,
+  loadable,
   Signal,
 } from "rextive/react";
 
@@ -3022,23 +3033,23 @@ function UserProfile() {
   );
 }
 
-// Another consumer - conditional tracking
+// Another consumer - conditional tracking with rx()
 function Sidebar(props: { showUserInfo: boolean }) {
   const { user, isAuthenticated } = useSession();
 
-  const [tracked] = useWatch({ user, isAuthenticated });
-
   // ✅ This component only re-renders when:
   // - props.showUserInfo changes, OR
-  // - showUserInfo is true AND isAuthenticated changes
+  // - showUserInfo is true AND isAuthenticated changes (due to conditional access)
 
   return (
     <div>
       <nav>{/* Navigation items */}</nav>
 
-      {props.showUserInfo && tracked.isAuthenticated && (
-        <div>Welcome, {tracked.user?.name}</div>
-      )}
+      {rx(() => {
+        if (!props.showUserInfo) return null;
+        if (!isAuthenticated()) return null;
+        return <div>Welcome, {user()?.name}</div>;
+      })}
     </div>
   );
 }
@@ -3063,7 +3074,7 @@ function App() {
 
 3. **Full control over updates** - The `update` function lets you decide how to sync with prop changes
 
-4. **Use lazy tracking** - Access signals through `rx()` or `useWatch()` for automatic optimization
+4. **Use lazy tracking** - Access signals through `rx(() => ...)` for automatic optimization
 
 5. **No manual optimization needed** - No `useMemo`, `useCallback`, or `React.memo` required
 
@@ -4001,82 +4012,81 @@ const obj = {
 Import from `rextive/react` for React-specific features:
 
 ```tsx
-import { signal, rx, useScope, useWatch, wait } from "rextive/react";
+import { signal, rx, useScope, wait, loadable } from "rextive/react";
 ```
 
 ### `rx()` - Reactive Rendering
 
-The most flexible way to render reactive values in React:
+Render reactive values in React with automatic signal tracking. Three overloads:
 
-#### Pattern 1: Render a single signal
+#### Overload 1: Single signal - `rx(signal)`
+
+Renders the signal's value directly:
 
 ```tsx
 const count = signal(0);
+const name = signal("Alice");
 
-// Simple render
-<div>{rx(count)}</div>
-// Renders: <div>0</div>
+<div>{rx(count)}</div>     // Renders: 0
+<div>{rx(name)}</div>      // Renders: Alice
 
-// With transform function
-<div>{rx(count, (value) => `Count: ${value}`)}</div>
-// Renders: <div>Count: 0</div>
+// Async signals throw for Suspense
+const user = signal(async () => fetchUser());
+<Suspense fallback={<Spinner />}>
+  <div>{rx(user)}</div>    // Renders user object after loading
+</Suspense>
 ```
 
-#### Pattern 2: Reactive props on HTML elements
+#### Overload 2: Signal with selector - `rx(signal, selector)`
 
-```tsx
-const className = signal("active");
-const count = signal(0);
-
-rx("div", {
-  className: className, // Signal prop (reactive)
-  children: count, // Signal prop (reactive)
-  id: "counter", // Static prop
-  onClick: () => count.set((x) => x + 1),
-});
-```
-
-#### Pattern 3: Reactive props on custom components
+Extracts a property or transforms the value:
 
 ```tsx
 const user = signal({ name: "Alice", age: 30 });
-const theme = signal("dark");
 
-rx(UserCard, {
-  user: user, // Signal prop (reactive)
-  theme: theme, // Signal prop (reactive)
-  onEdit: handleEdit, // Static prop
-});
+// Property key selector
+<div>{rx(user, "name")}</div>                    // Renders: Alice
+
+// Function selector
+<div>{rx(user, u => u.name.toUpperCase())}</div> // Renders: ALICE
+<div>{rx(user, u => `${u.name} (${u.age})`)}</div> // Renders: Alice (30)
+
+// Async signals - selector receives resolved value
+const asyncUser = signal(async () => fetchUser());
+<div>{rx(asyncUser, "name")}</div>  // Suspense, then renders name
 ```
 
-#### Pattern 4: Multiple signals with render function
+#### Overload 3: Reactive function - `rx(fn)`
+
+Runs a function with automatic signal tracking:
 
 ```tsx
+const firstName = signal("John");
+const lastName = signal("Doe");
+
+// Auto-tracks all signal() calls inside the function
+{rx(() => <span>{firstName()} {lastName()}</span>)}
+
+// Use wait() for async signals (throws for Suspense)
 const user = signal(async () => fetchUser());
-const posts = signal(async () => fetchPosts());
+{rx(() => {
+  const userData = wait(user());
+  return <div>{userData.name}</div>;
+})}
 
-rx({ user, posts }, (awaited, loadables) => {
-  // awaited: unwrapped values (throws if promise pending/rejected)
-  // loadables: status info for each signal
+// Use loadable() for manual loading states
+{rx(() => {
+  const state = loadable(user());
+  if (state.loading) return <Spinner />;
+  if (state.error) return <Error error={state.error} />;
+  return <div>{state.value.name}</div>;
+})}
 
-  if (loadables.user.status === "loading") {
-    return <div>Loading user...</div>;
-  }
-
-  if (loadables.user.status === "error") {
-    return <div>Error: {loadables.user.error.message}</div>;
-  }
-
-  return (
-    <div>
-      <h1>{awaited.user.name}</h1>
-      {loadables.posts.status === "loading" && <Spinner />}
-      {loadables.posts.status === "success" && (
-        <PostList posts={loadables.posts.value} />
-      )}
-    </div>
-  );
-});
+// Conditional tracking - only subscribes to signals accessed
+const showDetails = signal(false);
+const details = signal({ bio: "..." });
+{rx(() => showDetails() ? details().bio : "Hidden")}
+// ↑ Only subscribes to 'details' when showDetails() is true
 ```
 
 <details>
@@ -4087,17 +4097,9 @@ rx({ user, posts }, (awaited, loadables) => {
 <input value={rx(signal)} />
 <div className={rx(theme)} />
 
-// ✅ CORRECT - Use one of these patterns:
-
-// Option 1: Use rx with element type
-{rx("input", { value: signal })}
-
-// Option 2: Use render function
-{rx({ signal }, (value) => <input value={value.signal} />)}
-
-// Option 3: Use useWatch hook
-const [value] = useWatch({ signal });
-<input value={value.signal} />
+// ✅ CORRECT - Use rx() with a function:
+{rx(() => <input value={signal()} />)}
+{rx(() => <div className={theme()} />)}
 ```
 
 **Why?** `rx()` returns a React component. When used in attributes, it's evaluated once and won't update reactively. You must render the entire element with `rx()` or use hooks.
@@ -4258,54 +4260,47 @@ function UserAnalytics({ user }) {
 
 ---
 
-### `useWatch()` - Subscribe to Signals
+### `useRx()` - Reactive Rendering Hook
 
-React hook for subscribing to signals with lazy tracking:
+Low-level hook for automatic signal tracking. Usually you'll use `rx()` instead, but `useRx()` is available for advanced use cases:
 
 ```tsx
-import { useWatch } from "rextive/react";
+import { useRx } from "rextive/react";
 
 function Component() {
-  const user = signal(async () => fetchUser());
-  const posts = signal(async () => fetchPosts());
+  // Automatically tracks any signals accessed inside the function
+  const value = useRx(() => {
+    const userData = wait(user()); // Tracks 'user' signal
+    const postList = wait(posts()); // Tracks 'posts' signal
+    return { userData, postList };
+  });
 
-  const [awaited, loadables] = useWatch({ user, posts });
-
-  // Option 1: Use with React Suspense
-  return (
-    <Suspense fallback={<Loading />}>
-      <div>
-        <h1>{awaited.user.name}</h1>
-        <p>Posts: {awaited.posts.length}</p>
-      </div>
-    </Suspense>
-  );
-
-  // Option 2: Manual loading states
-  if (loadables.user.status === "loading") {
-    return <Spinner />;
-  }
-
-  if (loadables.user.status === "error") {
-    return <Error message={loadables.user.error.message} />;
-  }
-
-  // loadables.user.status === "success"
   return (
     <div>
-      <h1>{loadables.user.value.name}</h1>
+      <h1>{value.userData.name}</h1>
+      <p>Posts: {value.postList.length}</p>
     </div>
   );
 }
 ```
 
-**Loadable states:**
+**Key features:**
 
-- `{ status: "loading" }` - Promise pending
-- `{ status: "success", value: T }` - Promise resolved
-- `{ status: "error", error: Error }` - Promise rejected
+- **Automatic tracking** - Any `signal()` calls inside the function are tracked
+- **Lazy tracking** - Only signals actually accessed are subscribed to
+- **Conditional tracking** - Signals in conditional branches are only tracked when executed
 
-**Lazy tracking:** Only signals actually accessed in the render are subscribed to.
+**⚠️ Important caveat:** Signal calls OUTSIDE `useRx()` or `rx()` are NOT tracked:
+
+```tsx
+function Component() {
+  // ❌ NOT tracked - signal accessed outside reactive context
+  const value = count();
+  
+  // ✅ Tracked - signal accessed inside rx()
+  return rx(() => <div>{count()}</div>);
+}
+```
 
 ---
 
@@ -4987,11 +4982,12 @@ const { user, posts, comments } = useStore((state) => ({
 }));
 
 // ✅ Rextive - Lazy tracking
-import { rx } from "rextive/react";
+import { rx, wait } from "rextive/react";
 
-rx({ user, posts, comments }, (value) => {
-  return <div>{value.user.name}</div>; // Only user subscribed!
-});
+{rx(() => {
+  const userData = wait(user());
+  return <div>{userData.name}</div>; // Only user subscribed!
+})}
 ```
 
 ### vs React Query
@@ -5022,11 +5018,12 @@ const [posts] = useAtom(postsAtom); // Subscribed even if unused
 const [comments] = useAtom(commentsAtom); // Subscribed even if unused
 
 // ✅ Rextive - Lazy tracking
-import { rx } from "rextive/react";
+import { rx, wait } from "rextive/react";
 
-rx({ user, posts, comments }, (value) => {
-  return <div>{value.user.name}</div>; // Only user subscribed!
-});
+{rx(() => {
+  const userData = wait(user());
+  return <div>{userData.name}</div>; // Only user subscribed!
+})}
 ```
 
 ### vs Redux Toolkit
@@ -5130,9 +5127,9 @@ rextive/immer     # Immer integration
 
 **React (`rextive/react`):**
 
-- `rx` - Reactive rendering (4 patterns)
+- `rx` - Reactive rendering with automatic signal tracking
+- `useRx` - Low-level hook for signal tracking (used by `rx`)
 - `useScope` - Component-scoped signals & lifecycle control (3 modes)
-- `useWatch` - Subscribe with lazy tracking
 - `provider` - Create signal-based React Context
 - All core features re-exported
 
