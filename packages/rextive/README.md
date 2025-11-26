@@ -1238,7 +1238,7 @@ function ProfileManual() {
 Combine automatic cancellation with timeouts and manual control:
 
 ```tsx
-import { signal, wait } from "rextive";
+import { signal, wait, producer } from "rextive";
 
 const userId = signal(1);
 
@@ -2443,16 +2443,21 @@ const resetForm = () => {
   formTag.forEach((s) => s.reset());
 };
 
-// Or iterate and do custom operations
+// Or use map() to collect results
+const getAllValues = () => {
+  return formTag.map((s) => s.get()); // Returns array of all values
+};
+
+// Validate all and collect errors
 const validateAll = () => {
-  let isValid = true;
-  formTag.forEach((s) => {
+  const errors = formTag.map((s) => {
     const value = s();
     if (!value || value === false) {
-      isValid = false;
+      return `${s.displayName || "Field"} is required`;
     }
+    return null;
   });
-  return isValid;
+  return errors.filter(Boolean);
 };
 
 // Get count of signals with this tag
@@ -2532,20 +2537,23 @@ const sessionId = signal("", { use: [userTag] }); // Not persisted
 // Reset user data
 userTag.forEach((s) => s.reset());
 
-// Save persistable data
+// Collect all values using map()
+const values = persistTag.map((s) => s()); // Returns array of values
+
+// Save persistable data using map()
 const saveData = () => {
-  const data = {};
-  persistTag.forEach((s) => {
-    data[s.name] = s(); // Assuming signals have names
-  });
+  const data = persistTag.map((s) => ({
+    name: s.displayName,
+    value: s(),
+  }));
   localStorage.setItem("data", JSON.stringify(data));
 };
 
 // Debug: Log all user-related signals
-console.log("User signals:");
-userTag.forEach((s) => {
-  console.log(`  ${s.name || "unnamed"}: ${s()}`);
-});
+console.log(
+  "User signals:",
+  userTag.map((s) => `${s.displayName}: ${s()}`)
+);
 
 // Type-safe tag operations
 const mutableTag = tag<number, "mutable">();
@@ -2556,7 +2564,21 @@ const count2 = signal(5, { use: [mutableTag] });
 mutableTag.forEach((s) => {
   s.set((x) => x + 1); // ✅ Safe - all are MutableSignal
 });
+
+// Collect incremented values
+const newValues = mutableTag.map((s) => {
+  s.set((x) => x + 1);
+  return s();
+}); // [1, 6]
 ```
+
+**Tag methods:**
+
+| Method        | Description                                 |
+| ------------- | ------------------------------------------- |
+| `forEach(fn)` | Iterate over all signals                    |
+| `map(fn)`     | Transform each signal, return results array |
+| `size`        | Number of signals in the tag                |
 
 **Use cases:**
 
@@ -2566,6 +2588,7 @@ mutableTag.forEach((s) => {
 - ✅ Debugging (inspect related state)
 - ✅ Performance (batch operations)
 - ✅ Type safety (group signals by kind)
+- ✅ Collecting values (`map()`)
 
 </details>
 
@@ -3560,6 +3583,7 @@ Quick reference for all Rextive APIs.
 | `disposable(...items)`    | Combine disposables into one          |
 | `compose(...fns)`         | Compose functions (right-to-left)     |
 | `awaited(...selectors)`   | Transform async/sync values uniformly |
+| `producer(factory)`       | Lazy factory for instance management  |
 | `is(value)`               | Check if any Signal                   |
 | `is(value, "mutable")`    | Check if MutableSignal                |
 | `is(value, "computed")`   | Check if ComputedSignal               |
@@ -3579,6 +3603,7 @@ Quick reference for all Rextive APIs.
 | `Disposable`        | Object with `.dispose()`          |
 | `Tag<T, K>`         | Signal grouping tag               |
 | `Plugin<T, K>`      | Signal plugin function            |
+| `Producer<T>`       | Lazy instance factory             |
 
 ---
 
@@ -4527,6 +4552,101 @@ const obj = {
 - ✅ **Type-safe** - Returns same type with added `dispose()`
 - ✅ **Flexible** - Works with any object shape
 - ✅ **React integration** - Works with `useScope` for auto-cleanup
+
+---
+
+#### `producer(factory)`
+
+Creates a lazy factory that produces and manages a single instance at a time. Perfect for managing resources like AbortControllers, WebSocket connections, or any disposable objects.
+
+```tsx
+import { producer } from "rextive";
+
+// Create a producer for AbortControllers
+const abortProducer = producer(() => new AbortController());
+
+// Get or create current instance (lazy initialization)
+const controller = abortProducer.current();
+fetch("/api/data", { signal: controller.signal });
+
+// Create new instance (disposes previous if it has .dispose())
+const newController = abortProducer.next();
+
+// Check if instance exists without creating
+if (abortProducer.has()) {
+  const existing = abortProducer.peek(); // Get without creating
+}
+
+// Cleanup when done
+abortProducer.dispose(); // Disposes current instance, sets to undefined
+```
+
+**With disposable resources:**
+
+```tsx
+class Connection implements Disposable {
+  constructor(public url: string) {
+    console.log("Connected to", url);
+  }
+  dispose() {
+    console.log("Disconnected from", this.url);
+  }
+}
+
+const connProducer = producer(() => new Connection("ws://localhost"));
+
+connProducer.current(); // "Connected to ws://localhost"
+connProducer.next(); // "Disconnected...", then "Connected to ws://localhost"
+connProducer.dispose(); // "Disconnected..."
+```
+
+**Real-world example: Request cancellation in computed signals:**
+
+```tsx
+const searchTerm = signal("");
+
+// Fresh AbortController for each computation
+const manualController = producer(() => new AbortController());
+
+const searchResults = signal({ searchTerm }, async ({ deps, abortSignal }) => {
+  if (!deps.searchTerm) return [];
+
+  // Get fresh controller for this computation
+  const controller = manualController.next();
+
+  const combinedSignal = AbortSignal.any([
+    abortSignal, // Auto: when searchTerm changes
+    controller.signal, // Manual: cancel via manualController.current().abort()
+    AbortSignal.timeout(10000), // Timeout: after 10 seconds
+  ]);
+
+  const res = await fetch(`/search?q=${deps.searchTerm}`, {
+    signal: combinedSignal,
+  });
+  return res.json();
+});
+
+// Cancel current search manually
+manualController.current().abort();
+// Next computation gets a fresh AbortController automatically
+```
+
+**Methods:**
+
+| Method      | Description                                         |
+| ----------- | --------------------------------------------------- |
+| `current()` | Get current instance, create if none exists (lazy)  |
+| `next()`    | Dispose current (if any), create and return new one |
+| `dispose()` | Dispose current (if any), set to undefined          |
+| `has()`     | Check if instance exists without creating           |
+| `peek()`    | Get current instance or undefined without creating  |
+
+**Benefits:**
+
+- ✅ **Lazy initialization** - Factory only called when needed
+- ✅ **Automatic disposal** - Uses `tryDispose()` for cleanup
+- ✅ **Fresh instances** - `next()` creates new instance each time
+- ✅ **Resource management** - Perfect for AbortControllers, connections, etc.
 
 ---
 
@@ -5782,12 +5902,13 @@ rextive/immer     # Immer integration
 - `signal` / `$` - Reactive state primitive
 - `signal.batch` - Batch updates
 - `signal.persist` - Persistence utilities
-- `signal.tag` - Group signals with tags
+- `signal.tag` - Group signals with tags (with `forEach`, `map`, `size`)
 - `signal.on` - Subscribe to multiple signals with pause/resume control
 - `wait` - Promise utilities (`wait.any`, `wait.race`, `wait.settled`, `wait.timeout`, `wait.delay`)
 - `awaited` - Transform async/sync values uniformly
 - `compose` - Function composition utility
 - `disposable` - Automatic cleanup for objects
+- `producer` - Lazy factory for instance management (AbortControllers, connections, etc.)
 
 **React (`rextive/react`):**
 
