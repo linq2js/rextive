@@ -662,7 +662,7 @@ export type SignalKind = "mutable" | "computed" | "any";
  * Helper type to get the signal type based on kind
  */
 export type SignalOf<T, K extends SignalKind> = K extends "any"
-  ? MutableSignal<T> | ComputedSignal<T>
+  ? AnySignal<T>
   : K extends "mutable"
   ? MutableSignal<T>
   : K extends "computed"
