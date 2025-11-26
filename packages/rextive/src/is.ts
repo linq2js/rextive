@@ -1,12 +1,14 @@
 import {
-  Signal,
-  MutableSignal,
-  ComputedSignal,
-  Accessor,
-  Observable,
+  type Signal,
+  type MutableSignal,
+  type ComputedSignal,
+  type Accessor,
+  type Observable,
+  type Tag,
+  type SignalKind,
+  SIGNAL_TYPE,
+  TAG_TYPE,
 } from "./types";
-
-export const SIGNAL_TYPE = Symbol("SIGNAL_TYPE");
 
 /**
  * Type guard that checks whether a value is a Signal, Accessor, or Observable.
@@ -57,6 +59,10 @@ export function is<T = any>(
   value: unknown,
   type: "observable"
 ): value is Observable;
+export function is<T = any, K extends SignalKind = SignalKind>(
+  value: unknown,
+  type: "tag"
+): value is Tag<T, K>;
 export function is<T = any>(
   value: unknown,
   type: "accessor"
@@ -71,13 +77,22 @@ export function is<T = any>(
 ): value is ComputedSignal<T>;
 export function is<T = any>(
   value: unknown,
-  type?: "mutable" | "computed" | "observable" | "accessor"
+  type?: "mutable" | "computed" | "observable" | "accessor" | "tag"
 ): value is Signal<T> | MutableSignal<T> | ComputedSignal<T> {
   if (type === "observable") {
     return typeof value === "object" && value !== null && "on" in value;
   }
   if (type === "accessor") {
     return typeof value === "function" && "on" in value;
+  }
+
+  if (type === "tag") {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      TAG_TYPE in value &&
+      value[TAG_TYPE] === true
+    );
   }
 
   const isAnySignal =
@@ -105,3 +120,4 @@ export function is<T = any>(
 
   return false;
 }
+export { SIGNAL_TYPE };

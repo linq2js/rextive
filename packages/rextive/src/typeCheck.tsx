@@ -13,6 +13,7 @@
 import type { ReactNode } from "react";
 import { rx } from "./react/rx";
 import { signal } from "./signal";
+import { tag } from "./tag";
 import { loadable } from "./utils/loadable";
 import { wait, type Awaitable, type AwaitedFromAwaitable } from "./wait";
 import { awaited } from "./awaited";
@@ -28,7 +29,11 @@ import type {
   LoadingLoadable,
   SuccessLoadable,
   ErrorLoadable,
+  Plugin,
+  Tag,
 } from "./types";
+
+declare function define<T>(): T;
 
 // =============================================================================
 // Utility to assert inferred types at compile time
@@ -690,7 +695,8 @@ function loadableTests() {
   const norm4 = loadable({ id: 1, name: "Alice" });
   const norm5 = loadable(null);
   const norm6 = loadable(undefined);
-  const testLoadable: Loadable<number> = successNumber as any;
+  const testLoadable: Loadable<number> =
+    successNumber as unknown as Loadable<number>;
 
   // -----------------------------------------------------------------------------
   // loadable.loading(promise) - LoadingLoadable
@@ -2003,6 +2009,335 @@ function composeTests() {
 }
 
 // =============================================================================
+// PLUGIN AND USE OPTION TYPE CHECKS
+// =============================================================================
+
+function pluginTests() {
+  // -----------------------------------------------------------------------------
+  // Plugin type definitions
+  // -----------------------------------------------------------------------------
+
+  // Plugin for any signal kind (default)
+  const anyPlugin: Plugin<number> = (signal) => {
+    expectType<Signal<number>>(signal);
+    expectType<number>(signal());
+    return () => {};
+  };
+
+  // Plugin for mutable signals only
+  const mutablePlugin: Plugin<number, "mutable"> = (signal) => {
+    expectType<MutableSignal<number>>(signal);
+    expectType<number>(signal());
+    expectType<(value: number) => void>(signal.set);
+    signal.set(100);
+    return () => {};
+  };
+
+  // Plugin for computed signals only
+  const computedPlugin: Plugin<number, "computed"> = (signal) => {
+    expectType<ComputedSignal<number>>(signal);
+    expectType<number>(signal());
+    expectType<() => void>(signal.pause);
+    expectType<() => void>(signal.resume);
+    expectType<() => boolean>(signal.paused);
+    return () => {};
+  };
+
+  // Plugin without cleanup
+  const noCleanupPlugin: Plugin<string> = (signal) => {
+    expectType<Signal<string>>(signal);
+    expectType<string>(signal());
+    // No return value
+  };
+
+  // Plugin with cleanup (used in tests)
+  const withCleanupPlugin: Plugin<string> = (signal) => {
+    const unsubscribe = signal.on(() => {});
+    return unsubscribe;
+  };
+  void withCleanupPlugin; // Mark as used
+
+  // Generic plugin
+  function createLogger<T>(): Plugin<T> {
+    return (signal) => {
+      expectType<Signal<T>>(signal);
+      console.log(signal());
+      return signal.on(() => console.log(signal()));
+    };
+  }
+
+  // Generic mutable plugin
+  function createPersister<T>(_key: string): Plugin<T, "mutable"> {
+    return (signal) => {
+      expectType<MutableSignal<T>>(signal);
+      signal.set({} as T);
+      return () => {};
+    };
+  }
+  void createPersister; // Mark as used
+
+  // -----------------------------------------------------------------------------
+  // Signal with use option - Mutable signals
+  // -----------------------------------------------------------------------------
+
+  // Mutable signal with any plugin
+  const mutableWithAny = signal(0, { use: [anyPlugin] });
+  expectType<MutableSignal<number>>(mutableWithAny);
+
+  // Mutable signal with mutable plugin
+  const mutableWithMutable = signal(0, { use: [mutablePlugin] });
+  expectType<MutableSignal<number>>(mutableWithMutable);
+
+  // Mutable signal with computed plugin - Type error expected
+  // @ts-expect-error - Cannot use computed plugin on mutable signal
+  const mutableWithComputed = signal(0, { use: [computedPlugin] });
+
+  // Mutable signal with multiple plugins
+  const mutableWithMultiple = signal(0, {
+    use: [anyPlugin, mutablePlugin],
+  });
+  expectType<MutableSignal<number>>(mutableWithMultiple);
+
+  // Mutable signal with generic plugins
+  const mutableWithGeneric = signal("test", {
+    use: [createLogger<string>()],
+  });
+  expectType<MutableSignal<string>>(mutableWithGeneric);
+
+  // -----------------------------------------------------------------------------
+  // Signal with use option - Computed signals
+  // -----------------------------------------------------------------------------
+
+  const dep = signal(5);
+
+  // Computed signal with any plugin
+  const computedWithAny = signal({ dep }, ({ deps }) => deps.dep * 2, {
+    use: [anyPlugin],
+  });
+  expectType<ComputedSignal<number>>(computedWithAny);
+
+  // Computed signal with computed plugin
+  const computedWithComputed = signal({ dep }, ({ deps }) => deps.dep * 2, {
+    use: [computedPlugin],
+  });
+  expectType<ComputedSignal<number>>(computedWithComputed);
+
+  // Computed signal with mutable plugin - Type error expected
+  // @ts-expect-error - Cannot use mutable plugin on computed signal
+  const computedWithMutable = signal({ dep }, ({ deps }) => deps.dep * 2, {
+    use: [mutablePlugin],
+  });
+
+  // Computed signal with multiple plugins
+  const computedWithMultiple = signal({ dep }, ({ deps }) => deps.dep * 2, {
+    use: [anyPlugin, computedPlugin],
+  });
+  expectType<ComputedSignal<number>>(computedWithMultiple);
+
+  // -----------------------------------------------------------------------------
+  // Tag with use option
+  // -----------------------------------------------------------------------------
+
+  // Tag with plugins (using any-kind plugins)
+  const tagWithPlugins = tag<number>({ use: [anyPlugin] });
+  expectType<Tag<number>>(tagWithPlugins);
+  expectType<ReadonlyArray<Plugin<number> | Tag<number>>>(tagWithPlugins.use);
+
+  // Tag with nested tags
+  const nestedTag1 = tag<number>({ use: [anyPlugin] });
+  const nestedTag2 = tag<number>({ use: [nestedTag1, anyPlugin] });
+  expectType<Tag<number>>(nestedTag2);
+  expectType<ReadonlyArray<Plugin<number> | Tag<number>>>(nestedTag2.use);
+
+  // Tag with mixed plugins and tags
+  const mixedTag = tag<number>({
+    use: [anyPlugin, nestedTag1],
+  });
+  expectType<Tag<number>>(mixedTag);
+
+  // Empty tag
+  const emptyTag = tag<number>({ use: [] });
+  expectType<Tag<number>>(emptyTag);
+  expectType<ReadonlyArray<Plugin<number> | Tag<number>>>(emptyTag.use);
+
+  // Tag without use option
+  const simpleTag = tag<number>();
+  expectType<Tag<number>>(simpleTag);
+  expectType<ReadonlyArray<Plugin<number> | Tag<number>>>(simpleTag.use);
+
+  // -----------------------------------------------------------------------------
+  // Signal with tag use option
+  // -----------------------------------------------------------------------------
+
+  // Mutable signal with tag
+  const tagForMutable = tag<number>({ use: [mutablePlugin] });
+  const sigWithTag = signal(0, { use: [tagForMutable] });
+  expectType<MutableSignal<number>>(sigWithTag);
+
+  // Computed signal with tag
+  const tagForComputed = tag<number>({ use: [computedPlugin] });
+  const computedWithTag = signal({ dep }, ({ deps }) => deps.dep * 2, {
+    use: [tagForComputed],
+  });
+  expectType<ComputedSignal<number>>(computedWithTag);
+
+  // Signal with mixed plugins and tags
+  const mixedUse = signal(0, {
+    use: [anyPlugin, tagForMutable, mutablePlugin],
+  });
+  expectType<MutableSignal<number>>(mixedUse);
+
+  // -----------------------------------------------------------------------------
+  // Complex plugin scenarios
+  // -----------------------------------------------------------------------------
+
+  // Plugin with complex return type
+  type CleanupFn = () => void;
+  const complexPlugin: Plugin<number> = (signal): CleanupFn => {
+    const unsub1 = signal.on(() => {});
+    const unsub2 = signal.on(() => {});
+    return () => {
+      unsub1();
+      unsub2();
+    };
+  };
+
+  const sigWithComplex = signal(0, { use: [complexPlugin] });
+  expectType<MutableSignal<number>>(sigWithComplex);
+
+  // Plugin with object value
+  interface User {
+    id: number;
+    name: string;
+  }
+
+  const userPlugin: Plugin<User> = (signal) => {
+    expectType<Signal<User>>(signal);
+    const user = signal();
+    expectType<User>(user);
+    expectType<number>(user.id);
+    expectType<string>(user.name);
+  };
+
+  const userSignal = signal<User>(
+    { id: 1, name: "Alice" },
+    {
+      use: [userPlugin],
+    }
+  );
+  expectType<MutableSignal<User>>(userSignal);
+
+  // Plugin with array value
+  const arrayPlugin: Plugin<number[]> = (signal) => {
+    expectType<Signal<number[]>>(signal);
+    const arr = signal();
+    expectType<number[]>(arr);
+    expectType<number>(arr[0]);
+  };
+
+  const arraySignal = signal([1, 2, 3], { use: [arrayPlugin] });
+  expectType<MutableSignal<number[]>>(arraySignal);
+
+  // Plugin with promise value
+  const promisePlugin: Plugin<Promise<string>> = (signal) => {
+    expectType<Signal<Promise<string>>>(signal);
+    const promise = signal();
+    expectType<Promise<string>>(promise);
+  };
+
+  const promiseSignal = signal(Promise.resolve("test"), {
+    use: [promisePlugin],
+  });
+  expectType<MutableSignal<Promise<string>>>(promiseSignal);
+
+  // Plugin with union type
+  const unionPlugin: Plugin<string | number> = (signal) => {
+    expectType<Signal<string | number>>(signal);
+    const value = signal();
+    expectType<string | number>(value);
+  };
+
+  const unionSignal = signal<string | number>(0, { use: [unionPlugin] });
+  expectType<MutableSignal<string | number>>(unionSignal);
+
+  // -----------------------------------------------------------------------------
+  // Plugin kind inference
+  // -----------------------------------------------------------------------------
+
+  // "any" kind accepts both mutable and computed
+  const anyKindTag = tag<number, "any">({ use: [anyPlugin] });
+  expectType<Tag<number, "any">>(anyKindTag);
+
+  // "mutable" kind only for mutable signals
+  const mutableKindTag = tag<number, "mutable">({
+    use: [mutablePlugin as any],
+  });
+  expectType<Tag<number, "mutable">>(mutableKindTag);
+
+  // "computed" kind only for computed signals
+  const computedKindTag = tag<number, "computed">({
+    use: [computedPlugin as any],
+  });
+  expectType<Tag<number, "computed">>(computedKindTag);
+
+  // Use tag with appropriate signal kind
+  const mutableSigWithKindTag = signal(0, { use: [mutableKindTag] });
+  expectType<MutableSignal<number>>(mutableSigWithKindTag);
+
+  const computedSigWithKindTag = signal({ dep }, ({ deps }) => deps.dep * 2, {
+    use: [computedKindTag],
+  });
+  expectType<ComputedSignal<number>>(computedSigWithKindTag);
+
+  // -----------------------------------------------------------------------------
+  // Deeply nested tag hierarchies
+  // -----------------------------------------------------------------------------
+
+  const level3Tag = tag<number>({ use: [anyPlugin] });
+  const level2Tag = tag<number>({ use: [level3Tag, anyPlugin] });
+  const level1Tag = tag<number>({ use: [level2Tag] });
+
+  expectType<Tag<number>>(level1Tag);
+  expectType<ReadonlyArray<Plugin<number> | Tag<number>>>(level1Tag.use);
+
+  const deepSignal = signal(0, { use: [level1Tag] });
+  expectType<MutableSignal<number>>(deepSignal);
+
+  // -----------------------------------------------------------------------------
+  // Edge cases
+  // -----------------------------------------------------------------------------
+
+  // Empty use array
+  const emptyUse = signal(0, { use: [] });
+  expectType<MutableSignal<number>>(emptyUse);
+
+  // Single plugin
+  const singlePlugin = signal(0, { use: [anyPlugin] });
+  expectType<MutableSignal<number>>(singlePlugin);
+
+  // Signal without use option
+  const noUse = signal(0);
+  expectType<MutableSignal<number>>(noUse);
+
+  // Plugin returning void explicitly
+  const voidPlugin: Plugin<number> = (): void => {
+    // No return
+  };
+  const sigWithVoid = signal(0, { use: [voidPlugin] });
+  expectType<MutableSignal<number>>(sigWithVoid);
+
+  // Plugin returning undefined explicitly
+  const undefinedPlugin: Plugin<number> = (): undefined => {
+    return undefined;
+  };
+  const sigWithUndefined = signal(0, { use: [undefinedPlugin] });
+  expectType<MutableSignal<number>>(sigWithUndefined);
+
+  const myPlugin = define<Plugin<number, "mutable">>();
+  const myTag = tag<number, "any">({ use: [mutablePlugin] });
+}
+
+// =============================================================================
 // Export test functions to avoid unused warnings
 // (These are never actually called - this file is for type checking only)
 // =============================================================================
@@ -2018,4 +2353,5 @@ export {
   awaitedTests,
   contextUseTests,
   composeTests,
+  pluginTests,
 };

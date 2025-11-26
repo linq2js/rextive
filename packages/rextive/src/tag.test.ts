@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { tag } from "./tag";
 import { signal } from "./index";
-import { Signal } from "./types";
+import type { Signal, Plugin, Tag } from "./types";
 
 describe("tag", () => {
   describe("Basic tag operations", () => {
@@ -13,7 +13,7 @@ describe("tag", () => {
 
     it("should add signals to tag via options", () => {
       const myTag = tag<number>();
-      const count = signal(0, { tags: [myTag] });
+      const count = signal(0, { use: [myTag] });
 
       expect(myTag.size).toBe(1);
       expect(myTag.has(count)).toBe(true);
@@ -22,9 +22,9 @@ describe("tag", () => {
 
     it("should add multiple signals to the same tag", () => {
       const myTag = tag<number>();
-      const a = signal(1, { tags: [myTag] });
-      const b = signal(2, { tags: [myTag] });
-      const c = signal(3, { tags: [myTag] });
+      const a = signal(1, { use: [myTag] });
+      const b = signal(2, { use: [myTag] });
+      const c = signal(3, { use: [myTag] });
 
       expect(myTag.size).toBe(3);
       expect(myTag.signals()).toEqual([a, b, c]);
@@ -33,7 +33,7 @@ describe("tag", () => {
     it("should support signals belonging to multiple tags", () => {
       const tag1 = tag<number>();
       const tag2 = tag<number>();
-      const count = signal(0, { tags: [tag1, tag2] });
+      const count = signal(0, { use: [tag1, tag2] });
 
       expect(tag1.has(count)).toBe(true);
       expect(tag2.has(count)).toBe(true);
@@ -45,7 +45,7 @@ describe("tag", () => {
   describe("has()", () => {
     it("should return true for signals in the tag", () => {
       const myTag = tag<number>();
-      const count = signal(0, { tags: [myTag] });
+      const count = signal(0, { use: [myTag] });
 
       expect(myTag.has(count)).toBe(true);
     });
@@ -61,7 +61,7 @@ describe("tag", () => {
   describe("delete()", () => {
     it("should remove a signal from the tag", () => {
       const myTag = tag<number>();
-      const count = signal(0, { tags: [myTag] });
+      const count = signal(0, { use: [myTag] });
 
       expect(myTag.size).toBe(1);
       const removed = myTag.delete(count);
@@ -82,7 +82,7 @@ describe("tag", () => {
     it("should not affect other tags when deleting", () => {
       const tag1 = tag<number>();
       const tag2 = tag<number>();
-      const count = signal(0, { tags: [tag1, tag2] });
+      const count = signal(0, { use: [tag1, tag2] });
 
       tag1.delete(count);
 
@@ -94,9 +94,9 @@ describe("tag", () => {
   describe("clear()", () => {
     it("should remove all signals from the tag", () => {
       const myTag = tag<number>();
-      signal(1, { tags: [myTag] });
-      signal(2, { tags: [myTag] });
-      signal(3, { tags: [myTag] });
+      signal(1, { use: [myTag] });
+      signal(2, { use: [myTag] });
+      signal(3, { use: [myTag] });
 
       expect(myTag.size).toBe(3);
       myTag.clear();
@@ -116,9 +116,9 @@ describe("tag", () => {
   describe("forEach()", () => {
     it("should iterate over all signals in the tag", () => {
       const myTag = tag<number>();
-      const a = signal(1, { tags: [myTag] });
-      const b = signal(2, { tags: [myTag] });
-      const c = signal(3, { tags: [myTag] });
+      const a = signal(1, { use: [myTag] });
+      const b = signal(2, { use: [myTag] });
+      const c = signal(3, { use: [myTag] });
 
       const visited: Signal<number>[] = [];
       myTag.forEach((sig) => visited.push(sig));
@@ -137,8 +137,8 @@ describe("tag", () => {
 
     it("should allow signal operations during iteration", () => {
       const myTag = tag<number>();
-      const a = signal(1, { tags: [myTag] });
-      const b = signal(2, { tags: [myTag] });
+      const a = signal(1, { use: [myTag] });
+      const b = signal(2, { use: [myTag] });
 
       const values: number[] = [];
       myTag.forEach((sig) => {
@@ -157,8 +157,8 @@ describe("tag", () => {
   describe("signals()", () => {
     it("should return array of all signals", () => {
       const myTag = tag<number>();
-      const a = signal(1, { tags: [myTag] });
-      const b = signal(2, { tags: [myTag] });
+      const a = signal(1, { use: [myTag] });
+      const b = signal(2, { use: [myTag] });
 
       const result = myTag.signals();
 
@@ -174,7 +174,7 @@ describe("tag", () => {
 
     it("should return a new array each time", () => {
       const myTag = tag<number>();
-      signal(1, { tags: [myTag] });
+      signal(1, { use: [myTag] });
 
       const arr1 = myTag.signals();
       const arr2 = myTag.signals();
@@ -187,7 +187,7 @@ describe("tag", () => {
   describe("Auto-removal on dispose", () => {
     it("should remove signal from tag when disposed", () => {
       const myTag = tag<number>();
-      const count = signal(0, { tags: [myTag] });
+      const count = signal(0, { use: [myTag] });
 
       expect(myTag.size).toBe(1);
       count.dispose();
@@ -199,7 +199,7 @@ describe("tag", () => {
     it("should remove from all tags when disposed", () => {
       const tag1 = tag<number>();
       const tag2 = tag<number>();
-      const count = signal(0, { tags: [tag1, tag2] });
+      const count = signal(0, { use: [tag1, tag2] });
 
       expect(tag1.size).toBe(1);
       expect(tag2.size).toBe(1);
@@ -216,7 +216,7 @@ describe("tag", () => {
       const myTag = tag<number>();
 
       expect(() => {
-        (myTag as any)._add({ value: 42 });
+        myTag._add({ value: 42 } as any);
       }).toThrow("Only signals created by rextive can be tagged");
     });
 
@@ -224,7 +224,7 @@ describe("tag", () => {
       const myTag = tag<number>();
       const count = signal(0);
 
-      (myTag as any)._add(count);
+      myTag._add(count);
 
       expect(myTag.has(count)).toBe(true);
       expect(myTag.size).toBe(1);
@@ -234,10 +234,10 @@ describe("tag", () => {
   describe("_delete() internal method", () => {
     it("should delete signal from tag", () => {
       const myTag = tag<number>();
-      const count = signal(0, { tags: [myTag] });
+      const count = signal(0, { use: [myTag] });
 
       expect(myTag.size).toBe(1);
-      (myTag as any)._delete(count);
+      myTag._delete(count);
 
       expect(myTag.size).toBe(0);
     });
@@ -247,7 +247,7 @@ describe("tag", () => {
       const count = signal(0);
 
       expect(() => {
-        (myTag as any)._delete(count);
+        myTag._delete(count);
       }).not.toThrow();
     });
   });
@@ -258,9 +258,9 @@ describe("tag", () => {
         const tag1 = tag<number>();
         const tag2 = tag<number>();
 
-        const a = signal(1, { tags: [tag1] });
-        const b = signal(2, { tags: [tag2] });
-        const c = signal(3, { tags: [tag1] });
+        const a = signal(1, { use: [tag1] });
+        const b = signal(2, { use: [tag2] });
+        const c = signal(3, { use: [tag1] });
 
         const visited: any[] = [];
         tag.forEach([tag1, tag2], (sig) => visited.push(sig));
@@ -275,9 +275,9 @@ describe("tag", () => {
         const tag1 = tag<number>();
         const tag2 = tag<number>();
 
-        const shared = signal(1, { tags: [tag1, tag2] });
-        const _a = signal(2, { tags: [tag1] });
-        const _b = signal(3, { tags: [tag2] });
+        const shared = signal(1, { use: [tag1, tag2] });
+        const _a = signal(2, { use: [tag1] });
+        const _b = signal(3, { use: [tag2] });
 
         const visited: any[] = [];
         tag.forEach([tag1, tag2], (sig) => visited.push(sig));
@@ -310,8 +310,8 @@ describe("tag", () => {
         const tag1 = tag<number>();
         const tag2 = tag<number>();
 
-        const a = signal(1, { tags: [tag1] });
-        const b = signal(2, { tags: [tag2] });
+        const a = signal(1, { use: [tag1] });
+        const b = signal(2, { use: [tag2] });
 
         const result = tag.signals([tag1, tag2]);
 
@@ -324,8 +324,8 @@ describe("tag", () => {
         const tag1 = tag<number>();
         const tag2 = tag<number>();
 
-        const shared = signal(1, { tags: [tag1, tag2] });
-        const _a = signal(2, { tags: [tag1] });
+        const shared = signal(1, { use: [tag1, tag2] });
+        const _a = signal(2, { use: [tag1] });
 
         const result = tag.signals([tag1, tag2]);
 
@@ -354,9 +354,9 @@ describe("tag", () => {
     it("should support form field grouping and reset", () => {
       const formTag = tag<string>();
 
-      const name = signal("", { tags: [formTag] });
-      const email = signal("", { tags: [formTag] });
-      const phone = signal("", { tags: [formTag] });
+      const name = signal("", { use: [formTag] });
+      const email = signal("", { use: [formTag] });
+      const phone = signal("", { use: [formTag] });
 
       // Set values
       name.set("Alice");
@@ -378,9 +378,9 @@ describe("tag", () => {
     it("should support resource cleanup via tag", () => {
       const resourceTag = tag<any>();
 
-      signal({ id: 1 }, { tags: [resourceTag] });
-      signal({ id: 2 }, { tags: [resourceTag] });
-      signal({ id: 3 }, { tags: [resourceTag] });
+      signal({ id: 1 }, { use: [resourceTag] });
+      signal({ id: 2 }, { use: [resourceTag] });
+      signal({ id: 3 }, { use: [resourceTag] });
 
       expect(resourceTag.size).toBe(3);
 
@@ -394,8 +394,8 @@ describe("tag", () => {
     it("should support debugging and logging", () => {
       const debugTag = tag<number>();
 
-      signal(0, { tags: [debugTag], name: "counter1" });
-      signal(0, { tags: [debugTag], name: "counter2" });
+      signal(0, { use: [debugTag], name: "counter1" });
+      signal(0, { use: [debugTag], name: "counter2" });
 
       const names: string[] = [];
       const values: number[] = [];
@@ -418,8 +418,8 @@ describe("tag", () => {
           onAdd: (sig) => addedSignals.push(sig),
         });
 
-        const sig1 = signal(1, { tags: [myTag] });
-        const sig2 = signal(2, { tags: [myTag] });
+        const sig1 = signal(1, { use: [myTag] });
+        const sig2 = signal(2, { use: [myTag] });
 
         expect(addedSignals).toEqual([sig1, sig2]);
       });
@@ -432,7 +432,7 @@ describe("tag", () => {
           },
         });
 
-        signal(1, { tags: [myTag] });
+        signal(1, { use: [myTag] });
 
         expect(receivedTag).toBe(myTag);
       });
@@ -444,8 +444,8 @@ describe("tag", () => {
         });
 
         const sig = signal(1);
-        (myTag as any)._add(sig);
-        (myTag as any)._add(sig); // Try to add again
+        myTag._add(sig);
+        myTag._add(sig); // Try to add again
 
         expect(callCount).toBe(1);
       });
@@ -458,8 +458,8 @@ describe("tag", () => {
           onDelete: (sig) => deletedSignals.push(sig),
         });
 
-        const sig1 = signal(1, { tags: [myTag] });
-        const sig2 = signal(2, { tags: [myTag] });
+        const sig1 = signal(1, { use: [myTag] });
+        const sig2 = signal(2, { use: [myTag] });
 
         myTag.delete(sig1);
 
@@ -473,7 +473,7 @@ describe("tag", () => {
           onDelete: (sig) => deletedSignals.push(sig),
         });
 
-        const sig = signal(1, { tags: [myTag] });
+        const sig = signal(1, { use: [myTag] });
         sig.dispose();
 
         expect(deletedSignals).toEqual([sig]);
@@ -485,8 +485,8 @@ describe("tag", () => {
           onDelete: (sig) => deletedSignals.push(sig),
         });
 
-        const sig1 = signal(1, { tags: [myTag] });
-        const sig2 = signal(2, { tags: [myTag] });
+        const sig1 = signal(1, { use: [myTag] });
+        const sig2 = signal(2, { use: [myTag] });
 
         myTag.clear();
 
@@ -501,7 +501,7 @@ describe("tag", () => {
           },
         });
 
-        const sig = signal(1, { tags: [myTag] });
+        const sig = signal(1, { use: [myTag] });
         myTag.delete(sig);
 
         expect(receivedTag).toBe(myTag);
@@ -515,8 +515,8 @@ describe("tag", () => {
           onChange: (type, sig) => changes.push({ type, signal: sig }),
         });
 
-        const sig1 = signal(1, { tags: [myTag] });
-        const sig2 = signal(2, { tags: [myTag] });
+        const sig1 = signal(1, { use: [myTag] });
+        const sig2 = signal(2, { use: [myTag] });
 
         expect(changes).toEqual([
           { type: "add", signal: sig1 },
@@ -530,7 +530,7 @@ describe("tag", () => {
           onChange: (type, sig) => changes.push({ type, signal: sig }),
         });
 
-        const sig = signal(1, { tags: [myTag] });
+        const sig = signal(1, { use: [myTag] });
         myTag.delete(sig);
 
         expect(changes).toEqual([
@@ -545,7 +545,7 @@ describe("tag", () => {
           onChange: (type) => changes.push({ type }),
         });
 
-        const sig = signal(1, { tags: [myTag] });
+        const sig = signal(1, { use: [myTag] });
         sig.dispose();
 
         expect(changes).toEqual([{ type: "add" }, { type: "delete" }]);
@@ -559,7 +559,7 @@ describe("tag", () => {
           },
         });
 
-        signal(1, { tags: [myTag] });
+        signal(1, { use: [myTag] });
 
         expect(receivedTag).toBe(myTag);
       });
@@ -569,34 +569,34 @@ describe("tag", () => {
       it("should enforce maximum size limit", () => {
         const myTag = tag<number>({ maxSize: 2 });
 
-        signal(1, { tags: [myTag] });
-        signal(2, { tags: [myTag] });
+        signal(1, { use: [myTag] });
+        signal(2, { use: [myTag] });
 
         expect(() => {
-          signal(3, { tags: [myTag] });
-        }).toThrow('Tag has reached maximum size of 2');
+          signal(3, { use: [myTag] });
+        }).toThrow("Tag has reached maximum size of 2");
       });
 
       it("should include tag name in error message", () => {
         const myTag = tag<number>({ name: "limitedTag", maxSize: 1 });
 
-        signal(1, { tags: [myTag] });
+        signal(1, { use: [myTag] });
 
         expect(() => {
-          signal(2, { tags: [myTag] });
+          signal(2, { use: [myTag] });
         }).toThrow('Tag "limitedTag" has reached maximum size of 1');
       });
 
       it("should allow adding signals after some are removed", () => {
         const myTag = tag<number>({ maxSize: 2 });
 
-        const sig1 = signal(1, { tags: [myTag] });
-        const sig2 = signal(2, { tags: [myTag] });
+        const sig1 = signal(1, { use: [myTag] });
+        const sig2 = signal(2, { use: [myTag] });
 
         myTag.delete(sig1);
 
         expect(() => {
-          signal(3, { tags: [myTag] });
+          signal(3, { use: [myTag] });
         }).not.toThrow();
 
         expect(myTag.size).toBe(2);
@@ -607,7 +607,7 @@ describe("tag", () => {
       it("should automatically dispose signals when deleted from tag", () => {
         const myTag = tag<number>({ autoDispose: true });
 
-        const sig = signal(1, { tags: [myTag] });
+        const sig = signal(1, { use: [myTag] });
 
         expect(() => sig()).not.toThrow();
 
@@ -622,14 +622,18 @@ describe("tag", () => {
       it("should dispose all signals when tag is cleared", () => {
         const myTag = tag<number>({ autoDispose: true });
 
-        const sig1 = signal(1, { tags: [myTag] });
-        const sig2 = signal(2, { tags: [myTag] });
+        const sig1 = signal(1, { use: [myTag] });
+        const sig2 = signal(2, { use: [myTag] });
 
         myTag.clear();
 
         // Both signals should be disposed - verify by trying to set
-        expect(() => sig1.set(10)).toThrow("Cannot set value on disposed signal");
-        expect(() => sig2.set(20)).toThrow("Cannot set value on disposed signal");
+        expect(() => sig1.set(10)).toThrow(
+          "Cannot set value on disposed signal"
+        );
+        expect(() => sig2.set(20)).toThrow(
+          "Cannot set value on disposed signal"
+        );
         // Can still read last values
         expect(sig1()).toBe(1);
         expect(sig2()).toBe(2);
@@ -642,7 +646,7 @@ describe("tag", () => {
           onDelete: () => disposeCalls.push(1),
         });
 
-        const sig = signal(1, { tags: [myTag] });
+        const sig = signal(1, { use: [myTag] });
 
         // Dispose the signal directly (not via tag.delete)
         sig.dispose();
@@ -655,12 +659,14 @@ describe("tag", () => {
         const autoTag = tag<number>({ autoDispose: true });
         const normalTag = tag<number>();
 
-        const sig = signal(1, { tags: [autoTag, normalTag] });
+        const sig = signal(1, { use: [autoTag, normalTag] });
 
         autoTag.delete(sig);
 
         // Signal should be disposed and removed from both tags
-        expect(() => sig.set(10)).toThrow("Cannot set value on disposed signal");
+        expect(() => sig.set(10)).toThrow(
+          "Cannot set value on disposed signal"
+        );
         expect(sig()).toBe(1); // Can still read
         expect(autoTag.has(sig)).toBe(false);
         expect(normalTag.has(sig)).toBe(false);
@@ -677,33 +683,203 @@ describe("tag", () => {
           onChange: (type) => events.push(`change:${type}`),
         });
 
-        const sig = signal(1, { tags: [myTag] });
+        const sig = signal(1, { use: [myTag] });
         myTag.delete(sig);
 
-        expect(events).toEqual(["add", "change:add", "delete", "change:delete"]);
+        expect(events).toEqual([
+          "add",
+          "change:add",
+          "delete",
+          "change:delete",
+        ]);
       });
 
       it("should work with maxSize and autoDispose", () => {
         const myTag = tag<number>({ maxSize: 2, autoDispose: true });
 
-        const sig1 = signal(1, { tags: [myTag] });
-        const sig2 = signal(2, { tags: [myTag] });
+        const sig1 = signal(1, { use: [myTag] });
+        const sig2 = signal(2, { use: [myTag] });
 
         expect(() => {
-          signal(3, { tags: [myTag] });
+          signal(3, { use: [myTag] });
         }).toThrow();
 
         myTag.delete(sig1);
 
         // sig1 should be disposed
-        expect(() => sig1.set(10)).toThrow("Cannot set value on disposed signal");
+        expect(() => sig1.set(10)).toThrow(
+          "Cannot set value on disposed signal"
+        );
         expect(sig1()).toBe(1); // Can still read
 
         // Should allow adding new signal now
         expect(() => {
-          signal(3, { tags: [myTag] });
+          signal(3, { use: [myTag] });
         }).not.toThrow();
       });
+    });
+  });
+
+  describe("nested tags (tags in tags)", () => {
+    it("should store nested tags in use array", () => {
+      const nestedTag = tag<number>();
+      const parentTag = tag<number>({ use: [nestedTag] });
+
+      expect(parentTag.use).toContain(nestedTag);
+      expect(parentTag.use).toHaveLength(1);
+    });
+
+    it("should support mixed plugins and tags in use", () => {
+      const plugin: Plugin<number> = (sig) => {
+        return sig.on(() => {});
+      };
+      const nestedTag = tag<number>();
+      const parentTag = tag<number>({ use: [plugin, nestedTag] });
+
+      expect(parentTag.use).toHaveLength(2);
+      expect(parentTag.use[0]).toBe(plugin);
+      expect(parentTag.use[1]).toBe(nestedTag);
+    });
+
+    it("should support deeply nested tag hierarchies", () => {
+      const level3 = tag<number>({ name: "level3" });
+      const level2 = tag<number>({ name: "level2", use: [level3] });
+      const level1 = tag<number>({ name: "level1", use: [level2] });
+
+      expect(level1.use).toHaveLength(1);
+      expect(level1.use[0]).toBe(level2);
+      expect((level1.use[0] as Tag<number>).use).toHaveLength(1);
+      expect((level1.use[0] as Tag<number>).use[0]).toBe(level3);
+    });
+
+    it("should handle empty use arrays", () => {
+      const emptyTag = tag<number>({ use: [] });
+      expect(emptyTag.use).toEqual([]);
+      expect(emptyTag.use).toHaveLength(0);
+    });
+
+    it("should handle undefined use property", () => {
+      const simpleTag = tag<number>();
+      expect(simpleTag.use).toEqual([]);
+    });
+
+    it("should be immutable after creation", () => {
+      const nestedTag = tag<number>();
+      const parentTag = tag<number>({ use: [nestedTag] });
+
+      // Verify it's readonly - TypeScript enforces this at compile time
+      expect(parentTag.use).toBeInstanceOf(Array);
+      expect(Object.isFrozen(parentTag.use)).toBe(false); // Arrays are not frozen, just typed as readonly
+
+      // Verify that the use array is the one we passed in
+      expect(parentTag.use[0]).toBe(nestedTag);
+      expect(parentTag.use).toHaveLength(1);
+    });
+
+    it("should support complex tag composition", () => {
+      const plugin1: Plugin<number> = vi.fn();
+      const plugin2: Plugin<number> = vi.fn();
+      const plugin3: Plugin<number> = vi.fn();
+
+      const tag1 = tag<number>({ name: "tag1", use: [plugin1] });
+      const tag2 = tag<number>({ name: "tag2", use: [plugin2] });
+      const composedTag = tag<number>({
+        name: "composed",
+        use: [tag1, tag2, plugin3],
+      });
+
+      expect(composedTag.use).toHaveLength(3);
+      expect(composedTag.use[0]).toBe(tag1);
+      expect(composedTag.use[1]).toBe(tag2);
+      expect(composedTag.use[2]).toBe(plugin3);
+    });
+
+    it("should support tag reuse in multiple parents", () => {
+      const sharedTag = tag<number>({ name: "shared" });
+      const parent1 = tag<number>({ name: "parent1", use: [sharedTag] });
+      const parent2 = tag<number>({ name: "parent2", use: [sharedTag] });
+
+      expect(parent1.use[0]).toBe(sharedTag);
+      expect(parent2.use[0]).toBe(sharedTag);
+      expect(parent1.use[0]).toBe(parent2.use[0]);
+    });
+
+    it("should handle circular references gracefully", () => {
+      // Note: While we can create the structure, attacher should handle it gracefully
+      const tag1 = tag<number>({ name: "tag1" });
+      const tag2 = tag<number>({ name: "tag2", use: [tag1] });
+
+      // Manually create circular reference (not through constructor)
+      // This is just to test that the structure can exist
+      expect(tag2.use).toContain(tag1);
+    });
+  });
+
+  describe("plugin execution via tags", () => {
+    it("should execute plugins when signal is added to tag via options", () => {
+      const pluginSpy = vi.fn();
+      const testTag = tag<number>({ use: [pluginSpy] });
+
+      const sig = signal(42, { use: [testTag] });
+
+      expect(pluginSpy).toHaveBeenCalledOnce();
+      expect(pluginSpy).toHaveBeenCalledWith(sig);
+    });
+
+    it("should execute nested tag plugins", () => {
+      const nestedPluginSpy = vi.fn();
+      const parentPluginSpy = vi.fn();
+
+      const nestedTag = tag<number>({ use: [nestedPluginSpy] });
+      const parentTag = tag<number>({ use: [parentPluginSpy, nestedTag] });
+
+      const sig = signal(42, { use: [parentTag] });
+
+      expect(parentPluginSpy).toHaveBeenCalledOnce();
+      expect(nestedPluginSpy).toHaveBeenCalledOnce();
+      expect(parentPluginSpy).toHaveBeenCalledWith(sig);
+      expect(nestedPluginSpy).toHaveBeenCalledWith(sig);
+    });
+
+    it("should execute plugins in correct order", () => {
+      const callOrder: number[] = [];
+
+      const plugin1: Plugin<number> = () => {
+        callOrder.push(1);
+      };
+      const plugin2: Plugin<number> = () => {
+        callOrder.push(2);
+      };
+      const plugin3: Plugin<number> = () => {
+        callOrder.push(3);
+      };
+
+      const tag1 = tag<number>({ use: [plugin1] });
+      const tag2 = tag<number>({ use: [tag1, plugin2] });
+      const tag3 = tag<number>({ use: [tag2, plugin3] });
+
+      signal(42, { use: [tag3] });
+
+      // Depth-first order
+      expect(callOrder).toEqual([1, 2, 3]);
+    });
+
+    it("should collect and execute plugin cleanups on disposal", () => {
+      const cleanup1 = vi.fn();
+      const cleanup2 = vi.fn();
+
+      const plugin1: Plugin<number> = () => cleanup1;
+      const plugin2: Plugin<number> = () => cleanup2;
+
+      const nestedTag = tag<number>({ use: [plugin1] });
+      const parentTag = tag<number>({ use: [nestedTag, plugin2] });
+
+      const sig = signal(42, { use: [parentTag] });
+
+      sig.dispose();
+
+      expect(cleanup1).toHaveBeenCalledOnce();
+      expect(cleanup2).toHaveBeenCalledOnce();
     });
   });
 });

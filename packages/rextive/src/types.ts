@@ -1,3 +1,6 @@
+export const SIGNAL_TYPE = Symbol("SIGNAL_TYPE");
+export const TAG_TYPE = Symbol("TAG_TYPE");
+
 /**
  * Function type for use with proxies.
  */
@@ -583,6 +586,162 @@ export type ComputedSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
 export type SignalMap = Record<string, Signal<any>>;
 
 /**
+ * Signal kind discriminator
+ */
+export type SignalKind = "any" | "mutable" | "computed";
+
+/**
+ * Helper type to get the signal type based on kind
+ */
+export type SignalOf<T, K extends SignalKind> = K extends "any"
+  ? MutableSignal<T> | ComputedSignal<T>
+  : K extends "mutable"
+  ? MutableSignal<T>
+  : K extends "computed"
+  ? ComputedSignal<T>
+  : Signal<T>;
+
+/**
+ * Plugin function type for extending signal behavior.
+ *
+ * A plugin is a function that receives a signal instance and can:
+ * - Subscribe to signal changes
+ * - Add side effects
+ * - Track signal lifecycle
+ * - Optionally return a cleanup function
+ *
+ * Plugins are executed once when the signal is created (or when added to a tag).
+ * They are NOT re-run on signal changes - use signal.on() inside the plugin for that.
+ *
+ * @template TValue - The signal's value type
+ * @template TKind - The signal kind ("mutable" | "computed")
+ * @param signal - The signal instance to enhance
+ * @returns Optional cleanup function to run when signal is disposed
+ *
+ * @example Simple logger plugin
+ * ```ts
+ * const logger: Plugin<number> = (signal) => {
+ *   console.log('Signal created:', signal.displayName);
+ *   return signal.on(() => {
+ *     console.log('Value changed:', signal());
+ *   });
+ * };
+ *
+ * const count = signal(0, { use: [logger] });
+ * ```
+ *
+ * @example Persistence plugin
+ * ```ts
+ * const persister = (key: string): Plugin<any, "mutable"> => (signal) => {
+ *   // Load from storage
+ *   const stored = localStorage.getItem(key);
+ *   if (stored) signal.set(JSON.parse(stored));
+ *
+ *   // Save on change
+ *   return signal.on(() => {
+ *     localStorage.setItem(key, JSON.stringify(signal()));
+ *   });
+ * };
+ *
+ * const settings = signal({}, { use: [persister('settings')] });
+ * ```
+ *
+ * @example Type-safe plugin for mutable signals only
+ * ```ts
+ * const validator: Plugin<string, "mutable"> = (signal) => {
+ *   return signal.on(() => {
+ *     const value = signal();
+ *     if (value.length > 100) {
+ *       signal.set(value.slice(0, 100)); // Only works on MutableSignal
+ *     }
+ *   });
+ * };
+ * ```
+ */
+export type Plugin<TValue, TKind extends SignalKind = SignalKind> = (
+  signal: SignalOf<TValue, TKind>
+) => (() => void) | void;
+
+/**
+ * A tag for grouping signals together.
+ *
+ * Tags allow you to perform batch operations on multiple signals,
+ * such as resetting form fields or disposing resources.
+ *
+ * Signals are automatically added to tags during signal creation via the `tags` option.
+ * Signals are automatically removed from tags when disposed.
+ *
+ * @template TValue - The type of values held by signals in this tag
+ * @template TKind - The signal kind ("mutable" | "computed" | both)
+ */
+export type Tag<TValue, TKind extends SignalKind = "any"> = {
+  [TAG_TYPE]: true;
+  kind: TKind;
+
+  /**
+   * Plugins attached to this tag.
+   * These plugins are automatically applied to any signal added to this tag.
+   */
+  readonly use: ReadonlyArray<Plugin<TValue, TKind> | Tag<TValue, TKind>>;
+
+  /**
+   * Iterates over all signals in this tag.
+   *
+   * @param fn - Function to call for each signal
+   */
+  forEach(fn: (signal: SignalOf<TValue, TKind>) => void): void;
+
+  /**
+   * Returns all signals in this tag as an array.
+   *
+   * @returns Array of signals
+   */
+  signals(): readonly SignalOf<TValue, TKind>[];
+
+  /**
+   * Checks if a signal is in this tag.
+   *
+   * @param signal - Signal to check
+   * @returns True if signal is in tag
+   */
+  has(signal: Signal<TValue>): boolean;
+
+  /**
+   * Removes a signal from this tag.
+   *
+   * @param signal - Signal to remove
+   * @returns True if signal was in tag and removed
+   */
+  delete(signal: SignalOf<TValue, TKind>): boolean;
+
+  /**
+   * Removes all signals from this tag.
+   */
+  clear(): void;
+
+  /**
+   * Number of signals in this tag.
+   */
+  readonly size: number;
+
+  /**
+   * Internal method to add a signal to this tag.
+   * Called automatically by signal() when tags option is provided.
+   *
+   * @internal
+   */
+  _add(signal: SignalOf<TValue, TKind>): void;
+
+  /**
+   * Internal method to delete a signal from this tag.
+   * Called automatically when signal is disposed.
+   *
+   * @internal
+   */
+  _delete(signal: SignalOf<TValue, TKind>): void;
+};
+
+/**
  * Base context for signal computation functions
  */
 export interface SignalContext {
@@ -812,6 +971,45 @@ export type ComputedSignalContext<TDependencies extends SignalMap = {}> =
     deps: ResolvedValueMap<TDependencies, "value">;
   };
 
+export type SignalExtraOptions<
+  TValue,
+  TKind extends SignalKind = SignalKind
+> = {
+  /**
+   * Plugins to extend this signal's behavior.
+   *
+   * Plugins are functions that receive the signal instance and can:
+   * - Subscribe to changes
+   * - Add side effects
+   * - Track lifecycle
+   * - Return optional cleanup functions
+   *
+   * Plugins run once when the signal is created and when added to tags.
+   *
+   * @example
+   * ```ts
+   * const logger: Plugin<number> = (signal) => {
+   *   return signal.on(() => console.log('Value:', signal()));
+   * };
+   *
+   * const count = signal(0, { use: [logger] });
+   * ```
+   */
+  use?: UseList<TValue, TKind>;
+};
+
+export type UseList<TValue, TKind extends SignalKind> = ReadonlyArray<
+  TKind extends "any"
+    ?
+        | Plugin<TValue, "any" | "mutable" | "computed">
+        | Tag<TValue, "any" | "mutable" | "computed">
+    : Plugin<TValue, TKind> | Tag<TValue, TKind>
+>;
+
+export type UseItem<TValue, TKind extends SignalKind> =
+  | Plugin<TValue, TKind>
+  | Tag<TValue, TKind>;
+
 /**
  * Options for signal creation
  */
@@ -867,6 +1065,24 @@ export type SignalOptions<T> = {
    * ```
    */
   lazy?: boolean;
+
+  /**
+   * Tags to add this signal to.
+   *
+   * Signals are automatically added to specified tags during creation.
+   * When a signal is disposed, it is automatically removed from all tags.
+   *
+   * **Note:** The `tags` property is defined separately in each signal function signature
+   * with the appropriate kind constraint (mutable or computed).
+   *
+   * @example
+   * ```ts
+   * const formFields = tag<string>();
+   * const name = signal('', { tags: [formFields] });
+   * ```
+   */
+  // Note: tags property is defined in signal function signatures, not here
+  // This is to ensure proper type constraints for mutable vs computed signals
 };
 
 export type ResolveValueType = "awaited" | "loadable" | "value";

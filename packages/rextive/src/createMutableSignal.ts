@@ -6,15 +6,16 @@ import {
   SignalMap,
   SignalOptions,
   HydrateStatus,
+  SIGNAL_TYPE,
+  UseList,
 } from "./types";
 import { scheduleNotification } from "./batch";
-import { SIGNAL_TYPE } from "./is";
 import { FallbackError } from "./common";
 import { resolveEquals } from "./utils/resolveEquals";
 import { pipeSignals } from "./utils/pipeSignals";
 import { createComputedSignal } from "./createComputedSignal";
 import { createSignalContext } from "./createSignalContext";
-import { Tag } from "./tag";
+import { attacher } from "./attacher";
 
 /**
  * Create a mutable signal (no dependencies)
@@ -40,9 +41,9 @@ export function createMutableSignal(
     fallback,
     onChange: onChangeCallbacks,
     onError: onErrorCallbacks,
-    tags,
     lazy = true,
-  } = options as SignalOptions<any> & { tags?: readonly Tag<any, "mutable">[] };
+    use = [],
+  } = options as SignalOptions<any> & { use?: UseList<any, "mutable"> };
 
   // Resolve equals option to actual function (handles string shortcuts)
   const equals = resolveEquals(equalsOption) || Object.is;
@@ -67,25 +68,24 @@ export function createMutableSignal(
   let hasBeenModified = false; // Track if signal has been modified (for hydrate)
   let refreshScheduled = false; // Track if refresh is scheduled (for batching)
   let whenUnsubscribers: VoidFunction[] = []; // Store when() subscriptions separately
+  const onDispose = emitter<void>();
 
   const isDisposed = () => disposed;
 
   const dispose = () => {
     if (disposed) return;
     context?.dispose();
+    onCleanup.emitAndClear();
+    onDispose.emitAndClear();
+    context?.dispose();
     disposed = true;
     context = undefined;
-
-    if (tags && tags.length > 0 && instanceRef) {
-      tags.forEach((tag) => (tag as any)._delete(instanceRef));
-    }
 
     // Cleanup when() subscriptions
     whenUnsubscribers.forEach((unsub) => unsub());
     whenUnsubscribers = [];
 
     onChange.clear();
-    onCleanup.emitAndClear();
   };
 
   const recompute = () => {
@@ -303,9 +303,7 @@ export function createMutableSignal(
 
   instanceRef = instance as unknown as MutableSignal<any>;
 
-  if (tags && tags.length > 0) {
-    tags.forEach((tag) => (tag as any)._add(instanceRef!));
-  }
+  attacher(instanceRef, onDispose).attach(use);
 
   if (!lazy) {
     instance.get();

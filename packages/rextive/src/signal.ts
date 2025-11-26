@@ -5,12 +5,12 @@ import {
   ComputedSignalContext,
   SignalMap,
   SignalOptions,
+  SignalExtraOptions,
 } from "./types";
 import { createMutableSignal } from "./createMutableSignal";
 import { createComputedSignal } from "./createComputedSignal";
 import { createSignalContext } from "./createSignalContext";
 import { EqualsStrategy } from "./utils/resolveEquals";
-import { Tag } from "./tag";
 
 // Re-export constants for backward compatibility
 export { DISPOSED_MESSAGE, FallbackError } from "./common";
@@ -66,7 +66,8 @@ function createSignalWithEquals<TValue>(
  */
 function createMutableSignalWithOptions<TValue>(
   value: TValue | ((context: SignalContext) => TValue),
-  options?: SignalOptions<TValue>
+  options?: SignalOptions<TValue> &
+    SignalExtraOptions<TValue, "mutable" | "any">
 ): MutableSignal<TValue> {
   const isLazy = typeof value === "function";
   return createMutableSignal(
@@ -107,7 +108,8 @@ function createComputedSignalWithOptions<
 >(
   dependencies: TDependencies,
   compute: (context: ComputedSignalContext<TDependencies>) => TValue,
-  options?: SignalOptions<TValue>
+  options?: SignalOptions<TValue> &
+    NoInfer<SignalExtraOptions<TValue, "computed" | "any">>
 ): ComputedSignal<TValue> {
   return createComputedSignal(
     dependencies,
@@ -154,7 +156,8 @@ export function signal<TValue>(
  */
 export function signal<TValue>(
   value: TValue | ((context: SignalContext) => TValue),
-  options?: SignalOptions<TValue> & { tags?: readonly Tag<TValue, "mutable">[] }
+  options?: SignalOptions<TValue> &
+    SignalExtraOptions<TValue, "mutable" | "any">
 ): MutableSignal<TValue>;
 
 /**
@@ -177,7 +180,7 @@ export function signal<TValue>(
 export function signal<TValue, TDependencies extends SignalMap>(
   dependencies: TDependencies,
   compute: (context: ComputedSignalContext<NoInfer<TDependencies>>) => TValue,
-  equals: "strict" | "shallow" | "deep"
+  equals: EqualsStrategy
 ): ComputedSignal<TValue>;
 /**
  * Create computed signal from dependencies with options
@@ -189,9 +192,8 @@ export function signal<TValue, TDependencies extends SignalMap>(
 export function signal<TValue, TDependencies extends SignalMap>(
   dependencies: TDependencies,
   compute: (context: ComputedSignalContext<NoInfer<TDependencies>>) => TValue,
-  options?: SignalOptions<TValue> & {
-    tags?: readonly Tag<TValue, "computed">[];
-  }
+  options?: SignalOptions<TValue> &
+    SignalExtraOptions<TValue, "computed" | "any">
 ): ComputedSignal<TValue>;
 export function signal(...args: any[]): any {
   // Overload 1: signal() - no arguments
@@ -215,10 +217,7 @@ export function signal(...args: any[]): any {
   // Overload 4: Mutable signal with equals string shortcut
   // signal(value, 'shallow' | 'deep' | 'strict')
   if (typeof second === "string") {
-    return createSignalWithEquals(
-      first,
-      second as "strict" | "shallow" | "deep"
-    );
+    return createSignalWithEquals(first, second as EqualsStrategy);
   }
 
   // Overload 5: Mutable signal with options (or no second arg)

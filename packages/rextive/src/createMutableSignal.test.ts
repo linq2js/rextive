@@ -24,7 +24,7 @@ describe("createMutableSignal", () => {
       const myTag = tag<number>();
 
       const sig = signal(1, {
-        tags: [myTag],
+        use: [myTag],
       });
 
       // Should be tracked by tag
@@ -36,7 +36,7 @@ describe("createMutableSignal", () => {
       const myTag = tag<number>();
 
       const sig = signal(1, {
-        tags: [myTag],
+        use: [myTag],
       });
 
       expect(myTag.has(sig)).toBe(true);
@@ -53,7 +53,7 @@ describe("createMutableSignal", () => {
       const tag2 = tag<number>();
 
       const sig = signal(1, {
-        tags: [tag1, tag2],
+        use: [tag1, tag2],
       });
 
       expect(tag1.has(sig)).toBe(true);
@@ -95,4 +95,3 @@ describe("createMutableSignal", () => {
     });
   });
 });
-

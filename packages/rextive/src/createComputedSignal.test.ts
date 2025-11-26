@@ -74,7 +74,7 @@ describe("createComputedSignal", () => {
       const source = signal(1);
 
       const computed = signal({ source }, ({ deps }) => deps.source * 2, {
-        tags: [myTag],
+        use: [myTag],
       });
 
       expect(computed()).toBe(2);
@@ -95,7 +95,7 @@ describe("createComputedSignal", () => {
       const source = signal(1);
 
       const computed = signal({ source }, ({ deps }) => deps.source * 2, {
-        tags: [myTag],
+        use: [myTag],
       });
 
       expect(myTag.has(computed)).toBe(true);
@@ -114,7 +114,7 @@ describe("createComputedSignal", () => {
       const source = signal(1);
 
       const computed = signal({ source }, ({ deps }) => deps.source * 2, {
-        tags: [tag1, tag2],
+        use: [tag1, tag2],
       });
 
       expect(tag1.has(computed)).toBe(true);
@@ -177,4 +177,3 @@ describe("createComputedSignal", () => {
     });
   });
 });
-

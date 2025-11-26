@@ -6,6 +6,7 @@ import {
   SignalMap,
   SignalOptions,
   HydrateStatus,
+  UseList,
 } from "./types";
 import { scheduleNotification } from "./batch";
 import { SIGNAL_TYPE } from "./is";
@@ -13,7 +14,8 @@ import { FallbackError } from "./common";
 import { resolveEquals } from "./utils/resolveEquals";
 import { pipeSignals } from "./utils/pipeSignals";
 import { createSignalContext } from "./createSignalContext";
-import { Tag } from "./tag";
+import { Tag } from "./types";
+import { attacher } from "./attacher";
 
 /**
  * Create a computed signal (with dependencies)
@@ -42,10 +44,10 @@ export function createComputedSignal(
     fallback,
     onChange: onChangeCallbacks,
     onError: onErrorCallbacks,
-    tags,
     lazy = true,
+    use = [],
   } = options as SignalOptions<any> & {
-    tags?: readonly Tag<any, "computed">[];
+    use?: UseList<any, "computed">;
   };
 
   // Resolve equals option to actual function (handles string shortcuts)
@@ -72,25 +74,22 @@ export function createComputedSignal(
   let hasComputed = false; // Track if signal has been computed (for hydrate)
   let refreshScheduled = false; // Track if refresh is scheduled (for batching)
   let whenUnsubscribers: VoidFunction[] = []; // Store when() subscriptions separately
+  const onDispose = emitter<void>();
 
   const isDisposed = () => disposed;
 
   const dispose = () => {
     if (disposed) return;
     context?.dispose();
+    onChange.clear();
+    onCleanup.emitAndClear();
+    onDispose.emitAndClear();
     disposed = true;
     context = undefined;
-
-    if (tags && tags.length > 0 && instanceRef) {
-      tags.forEach((tag) => (tag as any)._delete(instanceRef));
-    }
 
     // Cleanup when() subscriptions
     whenUnsubscribers.forEach((unsub) => unsub());
     whenUnsubscribers = [];
-
-    onChange.clear();
-    onCleanup.emitAndClear();
   };
 
   const recompute = () => {
@@ -315,9 +314,7 @@ export function createComputedSignal(
 
   instanceRef = instance as unknown as ComputedSignal<any>;
 
-  if (tags && tags.length > 0) {
-    tags.forEach((tag) => (tag as any)._add(instanceRef!));
-  }
+  attacher(instanceRef, onDispose).attach(use);
 
   if (!lazy) {
     try {

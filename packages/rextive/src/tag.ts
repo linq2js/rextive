@@ -27,15 +27,22 @@
  * @module tag
  */
 
-import type { Signal } from "./types";
+import {
+  type Signal,
+  type Tag,
+  type SignalKind,
+  TAG_TYPE,
+  SignalOf,
+  UseList,
+} from "./types";
 import { is } from "./is";
 
 /**
  * Configuration options for creating a tag.
  *
- * @template T - The type of values held by signals in this tag
+ * @template TValue - The type of values held by signals in this tag
  */
-export type TagOptions<T> = {
+export type TagOptions<TValue, TKind extends SignalKind = "any"> = {
   /**
    * Debug name for this tag.
    * Useful for debugging and logging.
@@ -87,7 +94,7 @@ export type TagOptions<T> = {
    * });
    * ```
    */
-  onAdd?: (signal: Signal<T>, tag: Tag<T>) => void;
+  onAdd?: (signal: SignalOf<TValue, TKind>, tag: Tag<TValue, TKind>) => void;
 
   /**
    * Callback invoked when a signal is removed from this tag.
@@ -123,7 +130,7 @@ export type TagOptions<T> = {
    * });
    * ```
    */
-  onDelete?: (signal: Signal<T>, tag: Tag<T>) => void;
+  onDelete?: (signal: SignalOf<TValue, TKind>, tag: Tag<TValue, TKind>) => void;
 
   /**
    * Callback invoked whenever the tag's signals change (add or remove).
@@ -157,7 +164,11 @@ export type TagOptions<T> = {
    * });
    * ```
    */
-  onChange?: (type: "add" | "delete", signal: Signal<T>, tag: Tag<T>) => void;
+  onChange?: (
+    type: "add" | "delete",
+    signal: SignalOf<TValue, TKind>,
+    tag: Tag<TValue, TKind>
+  ) => void;
 
   /**
    * If true, automatically dispose signals when they are removed from this tag.
@@ -188,75 +199,74 @@ export type TagOptions<T> = {
    * ```
    */
   autoDispose?: boolean;
-};
 
-export type SignalKind = "mutable" | "computed";
-
-/**
- * A tag for grouping signals together.
- *
- * Tags allow you to perform batch operations on multiple signals,
- * such as resetting form fields or disposing resources.
- *
- * @template TValue - The type of values held by signals in this tag
- */
-export type Tag<TValue, TKind extends SignalKind = SignalKind> = {
-  kind: TKind;
   /**
-   * Iterates over all signals in this tag.
+   * Plugins to automatically apply to all signals added to this tag.
    *
-   * @param fn - Function to call for each signal
-   */
-  forEach(fn: (signal: Signal<TValue>) => void): void;
-
-  /**
-   * Returns all signals in this tag as an array.
+   * When a signal is added to a tag (via `tags` option during creation),
+   * all plugins from the tag are automatically executed on that signal.
    *
-   * @returns Array of signals
-   */
-  signals(): Signal<TValue>[];
-
-  /**
-   * Checks if a signal is in this tag.
+   * This enables shared behavior across groups of signals without
+   * manually applying plugins to each signal.
    *
-   * @param signal - Signal to check
-   * @returns True if signal is in tag
-   */
-  has(signal: Signal<TValue>): boolean;
-
-  /**
-   * Removes a signal from this tag.
+   * **Note:** Plugins are executed ONCE when the signal is added to the tag,
+   * not on every signal change. Use `signal.on()` inside plugins for reactive behavior.
    *
-   * @param signal - Signal to remove
-   * @returns True if signal was in tag and removed
-   */
-  delete(signal: Signal<TValue>): boolean;
-
-  /**
-   * Removes all signals from this tag.
-   */
-  clear(): void;
-
-  /**
-   * Number of signals in this tag.
-   */
-  readonly size: number;
-
-  /**
-   * Internal method to add a signal to this tag.
-   * Called automatically by signal() when tags option is provided.
+   * @example Logging all signals in a tag
+   * ```ts
+   * const logger: Plugin<any> = (signal) => {
+   *   console.log('Signal added:', signal.displayName);
+   *   return signal.on(() => {
+   *     console.log(`[${signal.displayName}]:`, signal());
+   *   });
+   * };
    *
-   * @internal
-   */
-  _add(signal: Signal<TValue>): void;
-
-  /**
-   * Internal method to delete a signal from this tag.
-   * Called automatically when signal is disposed.
+   * const debugTag = tag({ use: [logger] });
+   * const count = signal(0, { name: 'count', tags: [debugTag] });
+   * // Logs: "Signal added: count"
+   * // Later: "count: 0", "count: 1", etc.
+   * ```
    *
-   * @internal
+   * @example Persistence for tagged signals
+   * ```ts
+   * const persister: Plugin<any, "mutable"> = (signal) => {
+   *   const key = signal.displayName || 'unnamed';
+   *   const stored = localStorage.getItem(key);
+   *   if (stored) signal.set(JSON.parse(stored));
+   *   return signal.on(() => {
+   *     localStorage.setItem(key, JSON.stringify(signal()));
+   *   });
+   * };
+   *
+   * const persistedTag = tag({ use: [persister] });
+   * const settings = signal({}, {
+   *   name: 'settings',
+   *   tags: [persistedTag]
+   * }); // Automatically persisted
+   * ```
+   *
+   * @example Combining plugins from signal and tag
+   * ```ts
+   * const validator: Plugin<string> = (signal) => {
+   *   return signal.on(() => {
+   *     if (signal().length > 100) throw new Error('Too long');
+   *   });
+   * };
+   *
+   * const tracker: Plugin<any> = (signal) => {
+   *   console.log('Tracking:', signal.displayName);
+   * };
+   *
+   * const validatedTag = tag({ use: [validator] });
+   *
+   * const input = signal('', {
+   *   use: [tracker],           // Signal's own plugin
+   *   tags: [validatedTag]      // Tag's plugin applied too
+   * });
+   * // Both tracker and validator plugins are active
+   * ```
    */
-  _delete(signal: Signal<TValue>): void;
+  use?: UseList<TValue, TKind | "any">;
 };
 
 /**
@@ -307,31 +317,37 @@ export type UnionOfTagTypes<T extends readonly Tag<any>[]> =
  * });
  * ```
  */
-export function tag<TValue, TKind extends SignalKind = SignalKind>(
-  options: TagOptions<NoInfer<TValue>> = {}
+export function tag<TValue, TKind extends SignalKind = "any">(
+  options: TagOptions<NoInfer<TValue>, TKind> = {}
 ): Tag<TValue, TKind> {
   // Internal storage for signals in this tag
   // Using Set for O(1) lookups, additions, and deletions
-  const signals = new Set<Signal<TValue>>();
-  const { name, maxSize, onAdd, onDelete, onChange, autoDispose } = options;
+  const signals = new Set<SignalOf<TValue, TKind>>();
+  const { name, maxSize, onAdd, onDelete, onChange, autoDispose, use } =
+    options;
 
-  const tagInstance: Tag<TValue, TKind> = {
+  const tagInstance: Tag<NoInfer<TValue>, TKind> = {
+    [TAG_TYPE]: true,
     // Kind is a compile-time marker only, not used at runtime
     // Set to null because we don't track signal kinds at runtime
     kind: null as unknown as TKind,
-    forEach(fn: (signal: Signal<TValue>) => void): void {
+
+    // Store plugins (readonly, cannot be modified after creation)
+    use: (use as any) || [],
+
+    forEach(fn: (signal: SignalOf<TValue, TKind>) => void): void {
       signals.forEach(fn);
     },
 
-    signals(): Signal<TValue>[] {
+    signals(): readonly SignalOf<TValue, TKind>[] {
       return Array.from(signals);
     },
 
-    has(signal: Signal<TValue>): boolean {
+    has(signal: SignalOf<TValue, TKind>): boolean {
       return signals.has(signal);
     },
 
-    delete(signal: Signal<TValue>): boolean {
+    delete(signal: SignalOf<TValue, TKind>): boolean {
       // Check if signal exists before attempting deletion
       const existed = signals.has(signal);
 
@@ -393,7 +409,7 @@ export function tag<TValue, TKind extends SignalKind = SignalKind>(
       return signals.size;
     },
 
-    _add(signal: Signal<TValue>): void {
+    _add(signal: SignalOf<TValue, TKind>): void {
       // Internal method called by signal() during creation
       // Not meant to be called directly by users
 
@@ -428,7 +444,7 @@ export function tag<TValue, TKind extends SignalKind = SignalKind>(
       onChange?.("add", signal, tagInstance);
     },
 
-    _delete(signal: Signal<TValue>): void {
+    _delete(signal: SignalOf<TValue, TKind>): void {
       // Internal method called by signal.dispose()
       // This is the automatic cleanup path when a signal is disposed
 
@@ -451,7 +467,7 @@ export function tag<TValue, TKind extends SignalKind = SignalKind>(
     },
   };
 
-  return tagInstance;
+  return tagInstance as Tag<TValue, TKind>;
 }
 
 /**
