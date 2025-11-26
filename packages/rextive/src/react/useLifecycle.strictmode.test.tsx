@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
-import React, { StrictMode } from "react";
+import { StrictMode } from "react";
 import { useLifecycle } from "./useLifecycle";
 import "@testing-library/jest-dom/vitest";
 

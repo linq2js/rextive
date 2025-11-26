@@ -1,0 +1,1941 @@
+---
+alwaysApply: true
+---
+
+# Rextive Framework Rules - Complete Guide
+
+This comprehensive guide covers every aspect of the Rextive reactive state management library.
+
+## 🎯 Core Philosophy
+
+Rextive is a **signal-based reactive state management** library with **explicit dependencies**:
+
+- **One unified primitive**: `signal()` for all reactive needs (state, computed, async)
+- **Explicit dependencies**: Dependencies are always declared, never auto-tracked
+- **Framework agnostic**: Works in vanilla JS, React, or any environment
+- **Lazy tracking**: Only subscribes to signals that are actually accessed
+- **Unified sync/async**: Same API handles both synchronous and asynchronous values
+
+---
+
+## 📦 API Deep Dive
+
+### 1. `signal()` - Complete Overload Reference
+
+The `signal()` function has **6 overloads** - 3 for mutable signals, 3 for computed signals.
+
+#### Overload 1: Empty Signal
+
+```tsx
+const user = signal<User>();
+```
+
+**When to use:**
+
+- Optional values that start undefined
+- Lazy initialization patterns
+- Signals that receive values later
+
+**Type behavior:**
+
+- `user.get()` returns `User | undefined`
+- `user.set()` requires `User` (not undefined)
+- `user.set(undefined)` is a **type error**
+
+**Example:**
+
+```tsx
+const selectedUser = signal<User>();
+
+// Later...
+selectedUser.set({ id: 1, name: "Alice" }); // ✅
+// selectedUser.set(undefined); // ❌ Type error
+
+// Reading
+const current = selectedUser(); // User | undefined
+if (current) {
+  console.log(current.name); // Safe
+}
+```
+
+---
+
+#### Overload 2a: Mutable Signal with Initial Value
+
+```tsx
+const count = signal(0);
+const user = signal({ name: "Alice" });
+```
+
+**When to use:**
+
+- Simple state management
+- Values that have clear initial state
+- Most common use case
+
+**Features:**
+
+- Type is inferred from initial value
+- Uses strict equality (Object.is) by default
+- Can pass lazy initializer function
+
+**Lazy initialization:**
+
+```tsx
+// Expensive computation only runs once when signal is created
+const data = signal(() => {
+  console.log("Computing initial value...");
+  return expensiveComputation();
+});
+```
+
+---
+
+#### Overload 2b: Mutable Signal with Equality String Shortcut
+
+```tsx
+const user = signal({ name: "John" }, "shallow");
+const data = signal(complexObj, "deep");
+const count = signal(0, "strict");
+```
+
+**When to use:**
+
+- Objects/arrays that change by reference
+- Need custom comparison without full options object
+- Performance optimization for large data structures
+
+**Equality strategies:**
+
+- `"strict"` - Object.is (default) - compares references
+- `"shallow"` - Compares object keys/array elements one level deep
+- `"deep"` - Deep comparison using lodash isEqual
+
+**⚠️ Important:** Custom equality functions NOT allowed as second arg (use options form)
+
+**Examples:**
+
+```tsx
+// Shallow: Prevents re-render if object content is same
+const user = signal({ name: "John", age: 30 }, "shallow");
+user.set({ name: "John", age: 30 }); // No update - same content
+user.set({ name: "Jane", age: 25 }); // Updates - different content
+
+// Deep: For nested objects
+const config = signal({ theme: { color: "blue" } }, "deep");
+config.set({ theme: { color: "blue" } }); // No update - deeply equal
+
+// For custom equality, use options form:
+const value = signal(0, {
+  equals: (a, b) => Math.abs(a - b) < 0.01, // Threshold comparison
+});
+```
+
+---
+
+#### Overload 2c: Mutable Signal with Options
+
+```tsx
+const count = signal(0, {
+  equals: (a, b) => a === b,
+  name: "counter",
+  onChange: (value) => console.log("Changed:", value),
+  onError: (error) => console.error("Error:", error),
+  fallback: (error) => 0,
+  lazy: false,
+});
+```
+
+**When to use:**
+
+- Need multiple configuration options
+- Custom equality function
+- Side effects on change
+- Error handling
+- Debugging with names
+
+**All options:**
+
+```tsx
+interface SignalOptions<T> {
+  // Equality comparison
+  equals?: "strict" | "shallow" | "deep" | ((a: T, b: T) => boolean);
+
+  // Debugging
+  name?: string; // For dev tools and debugging
+
+  // Error handling
+  fallback?: (error: unknown) => T; // Return fallback value on error
+  onError?: (error: unknown) => void; // Handle errors
+
+  // Side effects
+  onChange?: (value: T) => void; // Called after value changes
+
+  // Performance
+  lazy?: boolean; // Delay computation until first access (default: true)
+
+  // Advanced
+  tags?: readonly Tag<T>[]; // For plugins/extensions
+}
+```
+
+**Advanced example:**
+
+```tsx
+const apiData = signal<Data[]>([], {
+  name: "apiData",
+  equals: "deep", // Deep compare arrays
+  onChange: (data) => {
+    // Side effect: persist to cache
+    localStorage.setItem("cache", JSON.stringify(data));
+  },
+  onError: (error) => {
+    // Log errors
+    analytics.track("data-fetch-error", { error });
+  },
+  fallback: (error) => {
+    // Return cached data on error
+    const cached = localStorage.getItem("cache");
+    return cached ? JSON.parse(cached) : [];
+  },
+});
+```
+
+---
+
+#### Overload 3a: Computed Signal (Basic)
+
+```tsx
+const count = signal(0);
+const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+```
+
+**When to use:**
+
+- Derive state from other signals
+- Automatic recalculation when dependencies change
+- Most common computed pattern
+
+**Key rules:**
+
+- ✅ Always declare dependencies explicitly in first argument
+- ✅ Access dependencies via `deps` parameter
+- ❌ Never try to auto-track: `signal(() => count() * 2)` won't work
+
+**Multiple dependencies:**
+
+```tsx
+const firstName = signal("John");
+const lastName = signal("Doe");
+const email = signal("john@example.com");
+
+const fullName = signal(
+  { firstName, lastName },
+  ({ deps }) => `${deps.firstName} ${deps.lastName}`
+);
+
+const userProfile = signal({ firstName, lastName, email }, ({ deps }) => ({
+  name: `${deps.firstName} ${deps.lastName}`,
+  email: deps.email,
+  initials: deps.firstName[0] + deps.lastName[0],
+}));
+```
+
+**Async computed:**
+
+```tsx
+const userId = signal(1);
+const userData = signal({ userId }, async ({ deps, abortSignal }) => {
+  const res = await fetch(`/users/${deps.userId}`, {
+    signal: abortSignal, // Auto-cancels when userId changes
+  });
+  return res.json();
+});
+```
+
+---
+
+#### Overload 3b: Computed Signal with Equality Shortcut
+
+```tsx
+const fullName = signal(
+  { firstName, lastName },
+  ({ deps }) => ({ full: `${deps.firstName} ${deps.lastName}` }),
+  "shallow"
+);
+```
+
+**When to use:**
+
+- Computed signals that return objects/arrays
+- Need custom equality without full options
+- Performance optimization
+
+**⚠️ Important:** Custom equality functions NOT allowed as third arg (use options form)
+
+**Examples:**
+
+```tsx
+// Shallow equality for object results
+const userObj = signal(
+  { firstName, lastName, age },
+  ({ deps }) => ({
+    name: `${deps.firstName} ${deps.lastName}`,
+    age: deps.age,
+  }),
+  "shallow" // Compares object properties
+);
+
+// Deep equality for nested results
+const config = signal(
+  { theme, settings },
+  ({ deps }) => ({
+    theme: { ...deps.theme },
+    settings: { ...deps.settings },
+  }),
+  "deep"
+);
+
+// For custom equals, use options form:
+const result = signal(
+  { a, b },
+  ({ deps }) => ({ sum: deps.a + deps.b }),
+  { equals: (x, y) => x.sum === y.sum } // Only compare sum property
+);
+```
+
+---
+
+#### Overload 3c: Computed Signal with Options
+
+```tsx
+const doubled = signal({ count }, ({ deps }) => deps.count * 2, {
+  name: "doubled",
+  equals: (a, b) => a === b,
+  fallback: (error) => 0,
+  onChange: (value) => console.log("Computed:", value),
+  lazy: false, // Compute immediately
+});
+```
+
+**When to use:**
+
+- Need multiple configuration options
+- Error handling in computed signals
+- Side effects on computed changes
+- Debugging complex computations
+
+**Context parameter:**
+
+```tsx
+interface ComputedSignalContext<TDeps> {
+  deps: TDeps; // Dependency values
+  abortSignal?: AbortSignal; // For cancellable async operations
+}
+```
+
+**Advanced async computed:**
+
+```tsx
+const searchTerm = signal("");
+const searchResults = signal(
+  { searchTerm },
+  async ({ deps, abortSignal }) => {
+    if (!deps.searchTerm) return [];
+
+    try {
+      const res = await fetch(`/search?q=${deps.searchTerm}`, {
+        signal: abortSignal, // Cancels previous request
+      });
+      return res.json();
+    } catch (error) {
+      if (error.name === "AbortError") {
+        // Request was cancelled, ignore
+        return [];
+      }
+      throw error;
+    }
+  },
+  {
+    name: "searchResults",
+    fallback: () => [], // Return empty array on error
+    onChange: (results) => {
+      analytics.track("search-results", { count: results.length });
+    },
+  }
+);
+```
+
+---
+
+### 2. Signal Instance Methods
+
+All signals have these methods:
+
+#### `.set()` - Update Value (Mutable Only)
+
+```tsx
+// Direct value
+count.set(5);
+
+// Updater function
+count.set((prev) => prev + 1);
+```
+
+**When to use updater function:**
+
+- Need current value to compute next value
+- Avoid race conditions
+- Functional updates
+
+**Examples:**
+
+```tsx
+// Toggle boolean
+const enabled = signal(false);
+enabled.set((prev) => !prev);
+
+// Update object immutably
+const user = signal({ name: "John", age: 30 });
+user.set((prev) => ({ ...prev, age: prev.age + 1 }));
+
+// Update array
+const items = signal([1, 2, 3]);
+items.set((prev) => [...prev, 4]);
+items.set((prev) => prev.filter((x) => x !== 2));
+```
+
+---
+
+#### `.get()` or `signal()` - Read Value
+
+```tsx
+const value = count.get();
+const value = count(); // Shorthand
+```
+
+**⚠️ Important:** Reading a signal DOES NOT subscribe to changes!
+
+```tsx
+// This won't re-run when count changes:
+const doubled = count() * 2; // ❌ Static snapshot
+
+// Use computed signal instead:
+const doubled = signal({ count }, ({ deps }) => deps.count * 2); // ✅
+```
+
+---
+
+#### `.on()` - Subscribe to Changes
+
+```tsx
+const unsubscribe = count.on(() => {
+  console.log("Count changed to:", count());
+});
+
+// Later: cleanup
+unsubscribe();
+```
+
+**Pattern: Effect-like behavior**
+
+```tsx
+const count = signal(0);
+const name = signal("Alice");
+
+// Run side effect when count changes
+count.on(() => {
+  document.title = `Count: ${count()}`;
+});
+
+// Multiple signals
+const cleanup = [
+  count.on(() => console.log("Count:", count())),
+  name.on(() => console.log("Name:", name())),
+];
+
+// Cleanup all
+cleanup.forEach((fn) => fn());
+```
+
+---
+
+#### `.reset()` - Reset to Initial Value (Mutable Only)
+
+```tsx
+const count = signal(0);
+count.set(10);
+count.reset(); // Back to 0
+```
+
+**Use cases:**
+
+- Form reset
+- Restore defaults
+- Clear temporary state
+
+---
+
+#### `.map()` - Transform Signal Value
+
+```tsx
+const count = signal(5);
+const doubled = count.map((x) => x * 2); // Always 10
+const formatted = count.map((x) => `Count: ${x}`);
+```
+
+**Shorthand for:**
+
+```tsx
+const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+```
+
+**With equality:**
+
+```tsx
+const obj = count.map((x) => ({ value: x }), "shallow");
+```
+
+---
+
+#### `.scan()` - Accumulate Values
+
+```tsx
+const count = signal(0);
+const total = count.scan((acc, curr) => acc + curr, 0);
+
+count.set(5); // total = 5
+count.set(3); // total = 8
+count.set(2); // total = 10
+```
+
+**Use cases:**
+
+- Running totals
+- History/undo
+- Aggregating events
+
+**Examples:**
+
+```tsx
+// Count updates
+const updates = signal(0);
+const updateCount = updates.scan((acc) => acc + 1, 0);
+
+// Collect history
+const value = signal(0);
+const history = value.scan((acc, curr) => [...acc, curr], [] as number[]);
+
+// Max value seen
+const maxSeen = value.scan((max, curr) => Math.max(max, curr), -Infinity);
+```
+
+---
+
+#### `.dispose()` - Clean Up Signal
+
+```tsx
+count.dispose();
+```
+
+**⚠️ Critical:** Always dispose signals you create to prevent memory leaks!
+
+**Pattern: Service cleanup**
+
+```tsx
+class MyService implements Disposable {
+  count = signal(0);
+  doubled = signal({ count: this.count }, ({ deps }) => deps.count * 2);
+
+  dispose() {
+    this.count.dispose();
+    this.doubled.dispose();
+  }
+}
+```
+
+---
+
+#### `.pause()` / `.resume()` / `.paused()` - Control Computed (Computed Only)
+
+```tsx
+const computed = signal({ count }, ({ deps }) => deps.count * 2);
+
+computed.pause(); // Stop recomputing
+count.set(10); // computed doesn't update
+
+computed.paused(); // true
+
+computed.resume(); // Resume recomputing (recalculates now)
+```
+
+**Use cases:**
+
+- Temporarily suspend expensive computations
+- Batch multiple dependency changes
+- Performance optimization
+
+---
+
+### 3. `rx()` - Complete Overload Reference
+
+The `rx()` function has **4 overloads** for different rendering patterns.
+
+#### Overload 1: Component with Reactive Props
+
+```tsx
+rx(Component, { prop1: signal1, prop2: "static" });
+rx("div", { children: count, className: "counter" });
+```
+
+**When to use:**
+
+- Mix signal and static props
+- Use existing components with signals
+- Convenient inline rendering
+
+**How it works:**
+
+- Signal props are automatically tracked
+- Static props pass through unchanged
+- Component re-renders when signal props change
+
+**Examples:**
+
+```tsx
+// Native elements
+const count = signal(42);
+rx("div", {
+  children: count,
+  className: "counter",
+  style: { color: "blue" },
+});
+
+// Custom components
+const user = signal({ name: "Alice" });
+rx(UserCard, {
+  user: user, // Signal prop - reactive
+  theme: "dark", // Static prop
+  onEdit: handleEdit, // Static callback
+});
+
+// Multiple signals
+rx(Dashboard, {
+  user: userSignal,
+  posts: postsSignal,
+  settings: settingsSignal,
+  loading: false, // Static
+});
+```
+
+**⚠️ IMPORTANT WARNING:**
+
+❌ **NEVER use `rx()` directly in element attributes!**
+
+```tsx
+// ❌ WRONG - Won't be reactive!
+<input value={rx(signal)} />
+<div className={rx(theme)} />
+```
+
+✅ **CORRECT - Use one of these instead:**
+
+```tsx
+// Option 1: Wrap entire element
+{
+  rx({ signal }, (v) => <input value={v.signal} />);
+}
+
+// Option 2: Use component form (Overload 1)
+{
+  rx("input", { value: signal });
+}
+
+// Option 3: Hoist signal outside render
+const MyInput = () => rx("input", { value: signal });
+```
+
+**Why?** `rx()` returns a component that subscribes. In attributes, it's evaluated once and won't re-subscribe.
+
+**⚠️ PERFORMANCE NOTE: Multiple `rx()` Calls**
+
+If your component contains **many `rx()` calls** (3+), consider using `useWatch()` instead for better performance:
+
+```tsx
+// ❌ LESS OPTIMAL: Many rx() calls create many subscriptions
+function Dashboard() {
+  return (
+    <div>
+      <h1>{rx(title)}</h1>
+      <p>{rx(description)}</p>
+      <span>{rx(count)}</span>
+      <span>{rx(status)}</span>
+      <div>{rx(userData, "name")}</div>
+      {/* ... many more rx() calls */}
+    </div>
+  );
+}
+
+// ✅ BETTER: Single useWatch subscription
+function Dashboard() {
+  const [awaited] = useWatch({ title, description, count, status, userData });
+
+  return (
+    <div>
+      <h1>{awaited.title}</h1>
+      <p>{awaited.description}</p>
+      <span>{awaited.count}</span>
+      <span>{awaited.status}</span>
+      <div>{awaited.userData.name}</div>
+    </div>
+  );
+}
+```
+
+**Why?**
+
+- Each `rx()` creates a separate component with its own subscription
+- `useWatch()` creates a single subscription for all signals
+- Component re-renders once when any tracked signal changes
+- More efficient for components with many reactive values
+
+**When to use `rx()` vs `useWatch()`:**
+
+- Use `rx()`: 1-2 signals, complex rendering logic, or async signals
+- Use `useWatch()`: 3+ signals, simple display, or performance-critical components
+
+---
+
+#### Overload 2a: Single Signal (Simple Display)
+
+```tsx
+const count = signal(42);
+rx(count); // Renders: 42
+```
+
+**When to use:**
+
+- Display single signal value
+- Simplest reactive rendering
+- No transformation needed
+
+**Equivalent to:**
+
+```tsx
+rx({ value: signal }, (v) => v.value);
+```
+
+**Examples:**
+
+```tsx
+// Display primitive
+const count = signal(42);
+return <div>Count: {rx(count)}</div>;
+
+// Display string
+const name = signal("Alice");
+return <h1>{rx(name)}</h1>;
+
+// Display computed
+const fullName = signal(
+  { first, last },
+  ({ deps }) => `${deps.first} ${deps.last}`
+);
+return <p>{rx(fullName)}</p>;
+```
+
+---
+
+#### Overload 2b: Single Signal with Property/Selector
+
+```tsx
+const user = signal({ name: "Alice", age: 30 });
+
+// Property access
+rx(user, "name"); // Renders: "Alice"
+
+// Selector function
+rx(user, (u) => u.age + 5); // Renders: 35
+```
+
+**When to use:**
+
+- Extract specific property
+- Transform single signal value
+- Avoid creating intermediate computed signal
+
+**Examples:**
+
+```tsx
+// Property string
+const user = signal({ name: "Alice", email: "alice@example.com" });
+rx(user, "name"); // "Alice"
+rx(user, "email"); // "alice@example.com"
+
+// Nested property
+const data = signal({ user: { profile: { name: "Bob" } } });
+rx(data, (d) => d.user.profile.name);
+
+// Computed property
+rx(user, (u) => `${u.name} (${u.email})`);
+rx(user, (u) => u.name.toUpperCase());
+
+// With options
+rx(user, "name", { watch: [locale] }); // Re-render when locale changes
+```
+
+---
+
+#### Overload 3: Multiple Signals with Render Function
+
+```tsx
+rx({ user, posts }, (awaited, loadables) => {
+  return <div>{awaited.user.name}</div>;
+});
+```
+
+**When to use:**
+
+- Multiple signals
+- Complex rendering logic
+- Manual loading states
+- Most powerful and common pattern
+
+**Two access modes:**
+
+**Mode 1: Suspense (awaited)**
+
+```tsx
+rx({ user, posts }, (awaited) => {
+  // Throws promise if loading
+  // awaited.user and awaited.posts are resolved values
+  return (
+    <div>
+      <h1>{awaited.user.name}</h1>
+      <PostList posts={awaited.posts} />
+    </div>
+  );
+});
+```
+
+**Mode 2: Manual Loading States (loadables)**
+
+```tsx
+rx({ user, posts }, (awaited, loadables) => {
+  if (loadables.user.status === "loading") {
+    return <Spinner />;
+  }
+
+  if (loadables.user.status === "error") {
+    return <Error error={loadables.user.error} />;
+  }
+
+  // loadables.user.status === 'success'
+  return <div>{loadables.user.value.name}</div>;
+});
+```
+
+**Lazy tracking:**
+
+```tsx
+// Only subscribes to signals you actually access!
+rx({ user, posts, comments, likes }, (awaited) => {
+  // Only accesses user - only subscribes to user
+  return <div>{awaited.user.name}</div>;
+});
+
+// ❌ Bad: Accessing all upfront
+rx({ user, posts, comments }, (awaited) => {
+  const u = awaited.user; // Subscribes
+  const p = awaited.posts; // Subscribes (unnecessary!)
+  const c = awaited.comments; // Subscribes (unnecessary!)
+  return <div>{u.name}</div>; // Only uses user
+});
+```
+
+**Conditional access:**
+
+```tsx
+rx({ user, settings }, (awaited) => {
+  if (!awaited.user.isAdmin) {
+    return <div>Access denied</div>;
+  }
+
+  // Only accesses settings if user is admin
+  return <AdminPanel settings={awaited.settings} />;
+});
+```
+
+**With watch option:**
+
+```tsx
+// Memoize render function with watch dependencies
+rx(
+  { user, posts },
+  (awaited) => {
+    return <div>{formatUser(awaited.user, locale)}</div>;
+  },
+  {
+    watch: [locale], // Re-create render when locale changes
+  }
+);
+```
+
+**Complete loading pattern:**
+
+```tsx
+rx({ data }, (awaited, loadables) => {
+  const { status, value, error, promise } = loadables.data;
+
+  switch (status) {
+    case "loading":
+      return <Spinner />;
+
+    case "error":
+      return (
+        <ErrorBoundary error={error}>
+          <button onClick={() => promise.retry()}>Retry</button>
+        </ErrorBoundary>
+      );
+
+    case "success":
+      return <DataView data={value} />;
+  }
+});
+```
+
+---
+
+### 4. `useScope()` - Complete Overload Reference
+
+The `useScope()` hook has **3 overloads** for different use cases.
+
+#### Overload 1: Component Lifecycle Tracking
+
+```tsx
+const getPhase = useScope({
+  init: () => console.log("Before first render"),
+  mount: () => console.log("After first paint"),
+  render: () => console.log("Every render"),
+  cleanup: () => console.log("React cleanup"),
+  dispose: () => console.log("True unmount"),
+});
+
+const phase = getPhase(); // "render" | "mount" | "cleanup" | "disposed"
+```
+
+**When to use:**
+
+- Track component lifecycle phases
+- Run effects at specific times
+- Distinguish mount vs unmount (StrictMode-aware)
+
+**Lifecycle order:**
+
+1. **init** - Before first render (construction phase)
+2. **render** - Every render call
+3. **mount** - After first DOM paint
+4. **cleanup** - React cleanup (before re-mount in StrictMode)
+5. **dispose** - True unmount (after StrictMode re-mount)
+
+**StrictMode behavior:**
+
+```
+1. init
+2. render
+3. mount
+4. cleanup (StrictMode unmount)
+5. init (StrictMode re-mount)
+6. render
+7. mount
+... (normal lifecycle)
+8. cleanup
+9. dispose (true unmount)
+```
+
+**Use cases:**
+
+```tsx
+// Analytics tracking
+useScope({
+  mount: () => analytics.track("page-view"),
+  dispose: () => analytics.track("page-leave"),
+});
+
+// WebSocket connection
+useScope({
+  mount: () => {
+    socket.connect();
+  },
+  dispose: () => {
+    socket.disconnect();
+  },
+});
+
+// Performance monitoring
+useScope({
+  init: () => performance.mark("component-init"),
+  mount: () => {
+    performance.mark("component-mounted");
+    performance.measure("mount-time", "component-init", "component-mounted");
+  },
+});
+```
+
+---
+
+#### Overload 2: Object Lifecycle Tracking
+
+```tsx
+const user = { id: 1, name: "Alice" };
+
+const getPhase = useScope({
+  for: user,
+  init: (u) => console.log("User activated:", u),
+  mount: (u) => startTracking(u),
+  render: (u) => updateTracking(u),
+  cleanup: (u) => pauseTracking(u),
+  dispose: (u) => stopTracking(u),
+});
+```
+
+**When to use:**
+
+- Track lifecycle of specific objects
+- React to object reference changes
+- Different lifecycle per object
+
+**How it works:**
+
+- When `user` reference changes, old lifecycle completes (dispose)
+- New lifecycle starts (init → mount) for new reference
+
+**Example: User session tracking**
+
+```tsx
+function UserSession({ user }: { user: User }) {
+  useScope({
+    for: user,
+    init: (u) => {
+      console.log("Session started for:", u.name);
+      sessionStorage.setItem("current-user", u.id);
+    },
+    mount: (u) => {
+      // Start activity tracking
+      activityTracker.start(u.id);
+    },
+    dispose: (u) => {
+      console.log("Session ended for:", u.name);
+      activityTracker.stop(u.id);
+      sessionStorage.removeItem("current-user");
+    },
+  });
+
+  return <div>Active: {user.name}</div>;
+}
+```
+
+---
+
+#### Overload 3: Factory Mode (Most Common)
+
+```tsx
+const { count, doubled } = useScope(() => {
+  const count = signal(0);
+  const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+
+  return {
+    count,
+    doubled,
+    dispose: [count, doubled], // Explicit disposal
+  };
+});
+```
+
+**When to use:**
+
+- Create component-scoped signals
+- Automatic cleanup on unmount
+- Most common useScope pattern
+
+**Key features:**
+
+- Factory runs once per mount
+- Returns stable object reference
+- Auto-disposes on unmount
+- `dispose` property controls what gets cleaned up
+
+**Disposal patterns:**
+
+```tsx
+// Array: List of disposables
+useScope(() => ({
+  signal1: signal(0),
+  signal2: signal(1),
+  dispose: [signal1, signal2],
+}));
+
+// Single disposable
+useScope(() => ({
+  signal: signal(0),
+  dispose: signal,
+}));
+
+// Function: Custom cleanup
+useScope(() => ({
+  subscription: api.subscribe(),
+  dispose: () => {
+    subscription.unsubscribe();
+    console.log("Cleaned up");
+  },
+}));
+
+// Method: dispose() method
+useScope(() => ({
+  service: new MyService(),
+  dispose() {
+    this.service.dispose();
+  },
+}));
+```
+
+**With watch - recreate when deps change:**
+
+```tsx
+const { userData } = useScope(
+  () => ({
+    userData: signal(async () => fetchUser(userId)),
+    dispose: [userData],
+  }),
+  { watch: [userId] } // Recreate when userId changes
+);
+```
+
+**With lifecycle callbacks:**
+
+```tsx
+const { store } = useScope(() => new TodoStore(), {
+  init: (store) => {
+    console.log("Store created");
+  },
+  mount: (store) => {
+    store.connect();
+    store.loadInitialData();
+  },
+  cleanup: (store) => {
+    store.disconnect();
+  },
+  dispose: (store) => {
+    store.destroy();
+    console.log("Store destroyed");
+  },
+});
+```
+
+**⚠️ Critical: Always include dispose property!**
+
+```tsx
+// ❌ BAD - Memory leak!
+useScope(() => ({
+  signal: signal(0),
+  // Missing dispose!
+}));
+
+// ✅ GOOD
+useScope(() => ({
+  signal: signal(0),
+  dispose: [signal],
+}));
+```
+
+**Non-disposable helpers:**
+
+```tsx
+// Helpers are NOT disposed
+useScope(() => ({
+  count: signal(0),
+  increment: () => count.set((x) => x + 1), // Function - not disposed
+  reset: () => count.reset(), // Function - not disposed
+  dispose: [count], // Only count is disposed
+}));
+```
+
+---
+
+### 5. `wait` Namespace - Complete Reference
+
+#### `wait()` / `wait.all()` - Wait for All
+
+**Suspense mode (sync):**
+
+```tsx
+// Single
+const value = wait(promise);
+
+// Tuple
+const [a, b, c] = wait([p1, p2, p3]);
+
+// Record
+const { user, posts } = wait({ user: userPromise, posts: postsPromise });
+```
+
+**Promise mode (async):**
+
+```tsx
+// Single
+await wait(promise, (value) => {
+  console.log("Resolved:", value);
+  return processValue(value);
+});
+
+// Tuple
+await wait([p1, p2, p3], (a, b, c) => {
+  return combineResults(a, b, c);
+});
+
+// Record
+await wait({ user, posts }, (values) => {
+  return { user: values.user, posts: values.posts };
+});
+```
+
+**With error handling:**
+
+```tsx
+await wait(
+  promise,
+  (value) => value * 2,
+  (error) => {
+    console.error("Failed:", error);
+    return 0; // Fallback
+  }
+);
+```
+
+---
+
+#### `wait.any()` - First to Resolve
+
+```tsx
+// Returns [value, key] tuple
+const [value, key] = wait.any({ slow, medium, fast });
+// value: result from fastest promise
+// key: which promise resolved first ("slow" | "medium" | "fast")
+```
+
+**Use cases:**
+
+- Race multiple data sources
+- Fallback to cache
+- Fastest server wins
+
+```tsx
+const [data, source] = wait.any({
+  api: fetch("/api/data"),
+  cache: Promise.resolve(getCachedData()),
+  backup: fetch("/backup/data"),
+});
+
+console.log("Got data from:", source);
+```
+
+---
+
+#### `wait.race()` - First to Settle
+
+```tsx
+// First to resolve OR reject
+const [value, key] = wait.race({ p1, p2, p3 });
+```
+
+**Difference from `wait.any()`:**
+
+- `any()`: First to **resolve** (ignores rejections until all fail)
+- `race()`: First to **settle** (resolve or reject)
+
+---
+
+#### `wait.settled()` - All Settled (Never Throws)
+
+```tsx
+// Suspense mode
+const results = wait.settled([p1, p2, p3]);
+// results: PromiseSettledResult[]
+
+// Promise mode
+await wait.settled([p1, p2, p3], (results) => {
+  results.forEach((r) => {
+    if (r.status === "fulfilled") {
+      console.log("Success:", r.value);
+    } else {
+      console.log("Failed:", r.reason);
+    }
+  });
+});
+```
+
+**Use cases:**
+
+- Process all results even if some fail
+- Partial success scenarios
+- Batch operations with error tolerance
+
+```tsx
+const results = await wait.settled(
+  {
+    user: fetchUser(),
+    posts: fetchPosts(),
+    comments: fetchComments(),
+  },
+  (settled) => {
+    return {
+      user: settled.user.status === "fulfilled" ? settled.user.value : null,
+      posts: settled.posts.status === "fulfilled" ? settled.posts.value : [],
+      comments:
+        settled.comments.status === "fulfilled" ? settled.comments.value : [],
+    };
+  }
+);
+```
+
+---
+
+#### `wait.timeout()` - With Timeout
+
+```tsx
+// Rejects if not resolved in time
+const data = await wait.timeout(fetchData(), 5000); // 5 second timeout
+
+// Multiple promises
+const [a, b] = await wait.timeout([p1, p2], 3000);
+```
+
+---
+
+#### `wait.delay()` - Simple Delay
+
+```tsx
+await wait.delay(1000); // Wait 1 second
+
+// With callback
+await wait.delay(1000, () => {
+  console.log("Delay finished");
+  return "done";
+});
+```
+
+---
+
+### 6. `loadable` Namespace - Complete Reference
+
+#### `loadable()` - Normalize to Loadable
+
+```tsx
+loadable(42); // SuccessLoadable<number>
+loadable(Promise.resolve(42)); // LoadingLoadable<number>
+loadable(existingLoadable); // Returns as-is (idempotent)
+```
+
+---
+
+#### `loadable.loading()` / `loadable.success()` / `loadable.error()`
+
+```tsx
+// Create loading state
+const loading = loadable.loading(fetchData());
+
+// Create success state
+const success = loadable.success({ id: 1, name: "Alice" });
+
+// Create error state
+const error = loadable.error(new Error("Failed"));
+```
+
+---
+
+#### `loadable.is()` - Type Guard
+
+```tsx
+if (loadable.is(value)) {
+  switch (value.status) {
+    case "loading":
+      console.log("Loading...");
+      break;
+    case "success":
+      console.log("Data:", value.value);
+      break;
+    case "error":
+      console.log("Error:", value.error);
+      break;
+  }
+}
+```
+
+---
+
+## 🎨 Advanced Patterns
+
+### Pattern 1: Query with Automatic Refetch
+
+```tsx
+function createQuery<T>(fetcher: () => Promise<T>) {
+  const refreshTrigger = signal(0);
+
+  const result = signal({ refreshTrigger }, async ({ deps, abortSignal }) => {
+    // deps.refreshTrigger ensures this runs when triggered
+    return await fetcher();
+  });
+
+  return {
+    result,
+    refresh: () => refreshTrigger.set((x) => x + 1),
+    dispose: [refreshTrigger, result],
+  };
+}
+
+// Usage
+const userQuery = createQuery(() => fetch("/api/user").then((r) => r.json()));
+userQuery.refresh(); // Trigger refetch
+```
+
+---
+
+### Pattern 2: Optimistic Updates
+
+```tsx
+class TodoService implements Disposable {
+  todos = signal<Todo[]>([]);
+
+  async addTodo(title: string) {
+    // Optimistic update
+    const tempId = Date.now();
+    const optimistic = { id: tempId, title, completed: false };
+    this.todos.set((prev) => [...prev, optimistic]);
+
+    try {
+      // Real API call
+      const real = await api.post("/todos", { title });
+
+      // Replace optimistic with real
+      this.todos.set((prev) => prev.map((t) => (t.id === tempId ? real : t)));
+    } catch (error) {
+      // Rollback on error
+      this.todos.set((prev) => prev.filter((t) => t.id !== tempId));
+      throw error;
+    }
+  }
+
+  dispose() {
+    this.todos.dispose();
+  }
+}
+```
+
+---
+
+### Pattern 3: Derived Collections with Filtering
+
+```tsx
+const items = signal<Item[]>([]);
+const searchTerm = signal("");
+const category = signal<string | null>(null);
+const sortBy = signal<"name" | "date">("name");
+
+const filteredAndSorted = signal(
+  { items, searchTerm, category, sortBy },
+  ({ deps }) => {
+    let result = deps.items;
+
+    // Filter by search
+    if (deps.searchTerm) {
+      const term = deps.searchTerm.toLowerCase();
+      result = result.filter((item) => item.name.toLowerCase().includes(term));
+    }
+
+    // Filter by category
+    if (deps.category) {
+      result = result.filter((item) => item.category === deps.category);
+    }
+
+    // Sort
+    result = [...result].sort((a, b) => {
+      if (deps.sortBy === "name") {
+        return a.name.localeCompare(b.name);
+      }
+      return a.date - b.date;
+    });
+
+    return result;
+  }
+);
+```
+
+---
+
+### Pattern 4: Pagination
+
+```tsx
+function createPagination<T>(itemsPerPage: number) {
+  const items = signal<T[]>([]);
+  const currentPage = signal(1);
+
+  const totalPages = signal({ items }, ({ deps }) =>
+    Math.ceil(deps.items.length / itemsPerPage)
+  );
+
+  const currentItems = signal({ items, currentPage }, ({ deps }) => {
+    const start = (deps.currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return deps.items.slice(start, end);
+  });
+
+  return {
+    items,
+    currentPage,
+    totalPages,
+    currentItems,
+    nextPage: () => currentPage.set((p) => Math.min(p + 1, totalPages())),
+    prevPage: () => currentPage.set((p) => Math.max(p - 1, 1)),
+    goToPage: (page: number) => currentPage.set(page),
+    dispose: [items, currentPage, totalPages, currentItems],
+  };
+}
+```
+
+---
+
+### Pattern 5: Form Validation
+
+```tsx
+function createFormField<T>(
+  initial: T,
+  validators: Array<(value: T) => string | null>
+) {
+  const value = signal(initial);
+  const touched = signal(false);
+
+  const errors = signal({ value }, ({ deps }) => {
+    return validators.map((fn) => fn(deps.value)).filter(Boolean);
+  });
+
+  const isValid = signal({ errors }, ({ deps }) => deps.errors.length === 0);
+
+  const showErrors = signal(
+    { touched, errors },
+    ({ deps }) => deps.touched && deps.errors.length > 0
+  );
+
+  return {
+    value,
+    errors,
+    isValid,
+    showErrors,
+    touch: () => touched.set(true),
+    reset: () => {
+      value.reset();
+      touched.set(false);
+    },
+    dispose: [value, touched, errors, isValid, showErrors],
+  };
+}
+
+// Usage
+const email = createFormField("", [
+  (v) => (!v ? "Email required" : null),
+  (v) => (!v.includes("@") ? "Invalid email" : null),
+]);
+```
+
+---
+
+### Pattern 6: Debounced Signal
+
+```tsx
+function createDebouncedSignal<T>(initial: T, delay: number) {
+  const immediate = signal(initial);
+  const debounced = signal(initial);
+
+  let timeoutId: any;
+
+  immediate.on(() => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      debounced.set(immediate());
+    }, delay);
+  });
+
+  return {
+    immediate, // Updates instantly
+    debounced, // Updates after delay
+    dispose() {
+      clearTimeout(timeoutId);
+      immediate.dispose();
+      debounced.dispose();
+    },
+  };
+}
+
+// Usage
+const search = createDebouncedSignal("", 300);
+search.immediate.set("hello"); // Updates immediately
+// search.debounced updates 300ms later
+```
+
+---
+
+### Pattern 7: Infinite Scroll / Load More
+
+```tsx
+function createInfiniteList<T>(fetchPage: (page: number) => Promise<T[]>) {
+  const pages = signal<T[][]>([]);
+  const currentPage = signal(0);
+  const hasMore = signal(true);
+  const isLoading = signal(false);
+
+  const allItems = signal({ pages }, ({ deps }) => deps.pages.flat());
+
+  const loadMore = async () => {
+    if (isLoading() || !hasMore()) return;
+
+    isLoading.set(true);
+    try {
+      const nextPage = currentPage() + 1;
+      const items = await fetchPage(nextPage);
+
+      if (items.length === 0) {
+        hasMore.set(false);
+      } else {
+        pages.set((prev) => [...prev, items]);
+        currentPage.set(nextPage);
+      }
+    } finally {
+      isLoading.set(false);
+    }
+  };
+
+  return {
+    items: allItems,
+    hasMore,
+    isLoading,
+    loadMore,
+    reset: () => {
+      pages.set([]);
+      currentPage.set(0);
+      hasMore.set(true);
+    },
+    dispose: [pages, currentPage, hasMore, isLoading, allItems],
+  };
+}
+```
+
+---
+
+### Pattern 8: Undo/Redo
+
+```tsx
+function createUndoable<T>(initial: T) {
+  const history = signal<T[]>([initial]);
+  const index = signal(0);
+
+  const current = signal(
+    { history, index },
+    ({ deps }) => deps.history[deps.index]
+  );
+
+  const canUndo = signal({ index }, ({ deps }) => deps.index > 0);
+
+  const canRedo = signal(
+    { index, history },
+    ({ deps }) => deps.index < deps.history.length - 1
+  );
+
+  return {
+    current,
+    canUndo,
+    canRedo,
+    set: (value: T) => {
+      const idx = index();
+      history.set((prev) => [...prev.slice(0, idx + 1), value]);
+      index.set(idx + 1);
+    },
+    undo: () => {
+      if (canUndo()) index.set((i) => i - 1);
+    },
+    redo: () => {
+      if (canRedo()) index.set((i) => i + 1);
+    },
+    dispose: [history, index, current, canUndo, canRedo],
+  };
+}
+```
+
+---
+
+### Pattern 9: Local Storage Persistence
+
+```tsx
+function createPersistedSignal<T>(
+  key: string,
+  initial: T,
+  storage = localStorage
+) {
+  // Load from storage
+  const stored = storage.getItem(key);
+  const initialValue = stored ? JSON.parse(stored) : initial;
+
+  const signal = signal(initialValue);
+
+  // Save on change
+  signal.on(() => {
+    try {
+      storage.setItem(key, JSON.stringify(signal()));
+    } catch (error) {
+      console.error("Failed to persist:", error);
+    }
+  });
+
+  return signal;
+}
+
+// Usage
+const theme = createPersistedSignal("theme", "light");
+const settings = createPersistedSignal("settings", { notifications: true });
+```
+
+---
+
+### Pattern 10: Computed with Async Dependencies
+
+```tsx
+const userId = signal(1);
+const userData = signal({ userId }, async ({ deps, abortSignal }) => {
+  const res = await fetch(`/users/${deps.userId}`, { signal: abortSignal });
+  return res.json();
+});
+
+// Computed from async signal
+const userName = signal({ userData }, ({ deps }) => {
+  // This runs after userData resolves
+  return deps.userData.name;
+});
+
+// Multiple async dependencies
+const fullProfile = signal(
+  { userData, userPosts: postsSignal },
+  async ({ deps }) => {
+    // Both must resolve before this runs
+    return {
+      ...deps.userData,
+      posts: deps.userPosts,
+    };
+  }
+);
+```
+
+---
+
+## 🚨 Critical Rules
+
+### ✅ Always Do These
+
+1. **Declare dependencies explicitly**
+
+```tsx
+// ✅ GOOD
+signal({ a, b }, ({ deps }) => deps.a + deps.b);
+
+// ❌ BAD - won't work!
+signal(() => a() + b());
+```
+
+2. **Use `abortSignal` for queries**
+
+```tsx
+// ✅ GOOD - Cancels previous request
+signal({ searchTerm }, async ({ deps, abortSignal }) => {
+  return fetch(`/search?q=${deps.searchTerm}`, { signal: abortSignal });
+});
+```
+
+3. **Implement `Disposable` for services**
+
+```tsx
+class MyService implements Disposable {
+  data = signal([]);
+  dispose() {
+    this.data.dispose();
+  }
+}
+```
+
+4. **Use `useScope()` for component signals**
+
+```tsx
+const { count } = useScope(() => ({
+  count: signal(0),
+  dispose: [count],
+}));
+```
+
+5. **Include `dispose` in useScope**
+
+```tsx
+useScope(() => ({
+  signal: signal(0),
+  dispose: [signal], // Critical!
+}));
+```
+
+### ❌ Never Do These
+
+1. **Never try auto-tracking**
+
+```tsx
+// ❌ Won't work
+const doubled = signal(() => count() * 2);
+```
+
+2. **Never pass Promises directly**
+
+```tsx
+// ❌ Wrong
+const data = signal(Promise.resolve(42));
+
+// ✅ Correct
+const data = signal(async () => 42);
+```
+
+3. **Never use `abortSignal` for mutations**
+
+```tsx
+// ❌ Bad - mutations should complete
+signal({ payload }, async ({ deps, abortSignal }) => {
+  return fetch("/api", { method: "POST", signal: abortSignal });
+});
+
+// ✅ Good
+signal({ payload }, async ({ deps }) => {
+  return fetch("/api", { method: "POST" });
+});
+```
+
+4. **Never dispose injected dependencies**
+
+```tsx
+class TodoService {
+  constructor(private api: ApiService) {}
+
+  dispose() {
+    // ❌ Don't dispose what you don't own
+    // this.api.dispose();
+  }
+}
+```
+
+5. **Never create signals in render**
+
+```tsx
+function Component() {
+  // ❌ Bad
+  const count = signal(0);
+
+  // ✅ Good
+  const { count } = useScope(() => ({
+    count: signal(0),
+    dispose: [count],
+  }));
+}
+```
+
+6. **Never use `rx()` in attributes**
+
+```tsx
+// ❌ Bad
+<input value={rx(signal)} />;
+
+// ✅ Good
+{
+  rx("input", { value: signal });
+}
+```
+
+---
+
+## 📚 Complete API Reference
+
+### Signal Methods
+
+- `signal()` - Empty signal
+- `signal(value)` - With initial value
+- `signal(value, equals)` - With equality strategy
+- `signal(value, options)` - With full options
+- `signal(deps, compute)` - Computed signal
+- `signal(deps, compute, equals)` - Computed with equality
+- `signal(deps, compute, options)` - Computed with options
+- `.set(value)` - Update (mutable only)
+- `.get()` or `()` - Read value
+- `.on(listener)` - Subscribe
+- `.dispose()` - Cleanup
+- `.reset()` - Reset to initial (mutable only)
+- `.map(fn)` - Transform
+- `.scan(fn, initial)` - Accumulate
+- `.pause()` / `.resume()` / `.paused()` - Control (computed only)
+
+### Wait Methods
+
+- `wait()` / `wait.all()` - Wait for all
+- `wait.any()` - First to resolve
+- `wait.race()` - First to settle
+- `wait.settled()` - All settled (never throws)
+- `wait.timeout()` - With timeout
+- `wait.delay()` - Simple delay
+
+### Loadable Methods
+
+- `loadable()` - Normalize to loadable
+- `loadable.loading()` - Create loading state
+- `loadable.success()` - Create success state
+- `loadable.error()` - Create error state
+- `loadable.is()` - Type guard
+- `loadable.get()` - Get from promise
+- `loadable.set()` - Set for promise
+
+### React Hooks
+
+- `rx()` - Reactive rendering (4 overloads)
+- `useScope()` - Lifecycle & scoped state (3 overloads)
+- `useWatch()` - Subscribe to signals (prefer over multiple `rx()` calls)
+- `useRerender()` - Manual rerender
+
+### Utilities
+
+- `batch()` - Batch updates
+- `disposable()` - Combine disposables
+- `is()` - Check if observable
+- `isSignal()` - Check if signal
+- `emitter()` - Create event emitter
+- `tryDispose()` - Safe disposal
+
+---
+
+## Summary
+
+**Core Principles:**
+
+1. ✅ **Explicit dependencies** - Always declare what signals depend on
+2. ✅ **Lazy tracking** - Only subscribe to what you access
+3. ✅ **Explicit disposal** - Control cleanup with dispose arrays
+4. ✅ **Service pattern** - Organize code with service classes/factories
+5. ✅ **Unified API** - One `signal()` function for everything
+6. ❌ **No auto-tracking** - Dependencies must be explicit
+7. ❌ **No magic** - Clear, predictable behavior
+
+**Remember:**
+
+- Services implement `Disposable`
+- Use `useScope()` for component-scoped state
+- Use `rx()` for reactive rendering (1-2 signals)
+- Use `useWatch()` for components with many signals (3+)
+- Use `abortSignal` for queries, not mutations
+- Always include `dispose` property in useScope
+- Import from `rextive/react` in React apps

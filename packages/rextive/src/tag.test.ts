@@ -276,8 +276,8 @@ describe("tag", () => {
         const tag2 = tag<number>();
 
         const shared = signal(1, { use: [tag1, tag2] });
-        const _a = signal(2, { use: [tag1] });
-        const _b = signal(3, { use: [tag2] });
+        const _a = signal(2, { use: [tag1] });; void _a
+        const _b = signal(3, { use: [tag2] });; void _b
 
         const visited: any[] = [];
         tag.forEach([tag1, tag2], (sig) => visited.push(sig));
@@ -325,7 +325,7 @@ describe("tag", () => {
         const tag2 = tag<number>();
 
         const shared = signal(1, { use: [tag1, tag2] });
-        const _a = signal(2, { use: [tag1] });
+        const _a = signal(2, { use: [tag1] });; void _a
 
         const result = tag.signals([tag1, tag2]);
 
@@ -427,7 +427,7 @@ describe("tag", () => {
       it("should pass tag instance to onAdd", () => {
         let receivedTag: any = null;
         const myTag = tag<number>({
-          onAdd: (sig, t) => {
+          onAdd: (sig, t) => {; void sig
             receivedTag = t;
           },
         });
@@ -496,7 +496,7 @@ describe("tag", () => {
       it("should pass tag instance to onDelete", () => {
         let receivedTag: any = null;
         const myTag = tag<number>({
-          onDelete: (sig, t) => {
+          onDelete: (sig, t) => {; void sig
             receivedTag = t;
           },
         });
@@ -554,7 +554,7 @@ describe("tag", () => {
       it("should pass tag instance to onChange", () => {
         let receivedTag: any = null;
         const myTag = tag<number>({
-          onChange: (type, sig, t) => {
+          onChange: (type, sig, t) => {; void type; void sig
             receivedTag = t;
           },
         });
@@ -591,7 +591,7 @@ describe("tag", () => {
         const myTag = tag<number>({ maxSize: 2 });
 
         const sig1 = signal(1, { use: [myTag] });
-        const sig2 = signal(2, { use: [myTag] });
+        const sig2 = signal(2, { use: [myTag] });; void sig2
 
         myTag.delete(sig1);
 

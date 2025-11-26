@@ -7,6 +7,9 @@ export type {
   PersistSignalsResult,
 } from "./persistSignals";
 
+// Re-export signal.on types
+export type { SignalOnControl } from "./signal.on";
+
 // Re-export LOADABLE_TYPE constant
 export { LOADABLE_TYPE } from "./types";
 
@@ -16,6 +19,7 @@ import { is } from "./is";
 import { persistSignals as persistSignalsImpl } from "./persistSignals";
 import { batch as batchImpl } from "./batch";
 import { tag as tagImpl } from "./tag";
+import { signalOn } from "./signal.on";
 
 // Augment signal with utility methods
 export const signal = Object.assign(signalBase, {
@@ -23,6 +27,7 @@ export const signal = Object.assign(signalBase, {
   persist: persistSignalsImpl,
   batch: batchImpl,
   tag: tagImpl,
+  on: signalOn,
 });
 
 export const $ = signal;
@@ -42,6 +47,7 @@ export { dev } from "./utils/dev";
 export { wait, type Awaitable } from "./wait";
 export { awaited } from "./awaited";
 export { AbortedComputationError } from "./createSignalContext";
+export { FallbackError } from "./common";
 
 // Disposable utilities
 export { disposable, DisposalAggregateError } from "./disposable";

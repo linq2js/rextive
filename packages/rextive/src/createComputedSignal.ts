@@ -14,7 +14,6 @@ import { FallbackError } from "./common";
 import { resolveEquals } from "./utils/resolveEquals";
 import { pipeSignals } from "./utils/pipeSignals";
 import { createSignalContext } from "./createSignalContext";
-import { Tag } from "./types";
 import { attacher } from "./attacher";
 
 /**

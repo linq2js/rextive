@@ -1,4 +1,4 @@
-import React from "react";
+
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { act, useState, Suspense } from "react";
@@ -181,7 +181,7 @@ describe("rx", () => {
         return <div data-testid="counter">{value}</div>;
       };
 
-      const TestComponent = ({ key }: { key: number }) => {
+      const TestComponent = ({ key }: { key: number }) => {; void key
         return rx(Counter, { value: count });
       };
 

@@ -22,14 +22,14 @@ describe("signal.refresh() and signal.stale()", () => {
       s.refresh();
       await Promise.resolve();
       const value2 = s();
-      
+
       expect(computeFn).toHaveBeenCalledTimes(2);
       expect(value1).not.toBe(value2);
     });
 
     it("should be a no-op for mutable signals with direct value", () => {
       const s = signal(42);
-      
+
       expect(s()).toBe(42);
       s.refresh();
       expect(s()).toBe(42);
@@ -54,7 +54,7 @@ describe("signal.refresh() and signal.stale()", () => {
       const fetchFn = vi.fn(async () => {
         return "data-" + Math.random();
       });
-      
+
       const s = signal(fetchFn);
 
       const promise1 = s();
@@ -89,19 +89,19 @@ describe("signal.refresh() and signal.stale()", () => {
 
       // Start first computation
       const promise1 = s();
-      
+
       // Refresh before first completes
       vi.advanceTimersByTime(50);
       s.refresh();
-      
+
       // First computation should be aborted
       await expect(promise1).rejects.toThrow("Aborted");
-      
+
       // Second computation should complete
       vi.advanceTimersByTime(100);
       const promise2 = s();
       await expect(promise2).resolves.toBe("data");
-      
+
       // Only one computation completed
       expect(resolveCount).toBe(1);
     });
@@ -109,18 +109,18 @@ describe("signal.refresh() and signal.stale()", () => {
     it("should throw error if signal is disposed", () => {
       const s = signal(() => 42);
       s.dispose();
-      
+
       expect(() => s.refresh()).toThrow("Cannot refresh disposed signal");
     });
 
     it("should notify listeners after refresh", async () => {
       const listener = vi.fn();
       const s = signal(() => Math.random());
-      
+
       s(); // Initial access
       s.on(listener);
       expect(listener).toHaveBeenCalledTimes(0);
-      
+
       s.refresh();
       // Wait for microtask queue to flush
       await Promise.resolve();
@@ -131,17 +131,17 @@ describe("signal.refresh() and signal.stale()", () => {
       const computeFn = vi.fn(() => Math.random());
       const listener = vi.fn();
       const s = signal(computeFn);
-      
+
       s(); // Initial computation
       s.on(listener);
       expect(computeFn).toHaveBeenCalledTimes(1);
       expect(listener).toHaveBeenCalledTimes(0);
-      
+
       // Multiple refresh calls
       s.refresh();
       s.refresh();
       s.refresh();
-      
+
       // Should only recompute once (batched)
       await Promise.resolve();
       expect(computeFn).toHaveBeenCalledTimes(2);
@@ -169,7 +169,7 @@ describe("signal.refresh() and signal.stale()", () => {
 
     it("should be a no-op for mutable signals with direct value", () => {
       const s = signal(42);
-      
+
       expect(s()).toBe(42);
       s.stale();
       expect(s()).toBe(42);
@@ -178,14 +178,14 @@ describe("signal.refresh() and signal.stale()", () => {
     it("should not notify listeners until accessed", () => {
       const listener = vi.fn();
       const s = signal(() => Math.random());
-      
+
       s(); // Initial access
       s.on(listener);
-      
+
       // Mark as stale
       s.stale();
       expect(listener).toHaveBeenCalledTimes(0);
-      
+
       // Access triggers recomputation and notification
       s();
       expect(listener).toHaveBeenCalledTimes(1);
@@ -228,7 +228,7 @@ describe("signal.refresh() and signal.stale()", () => {
     it("should throw error if signal is disposed", () => {
       const s = signal(() => 42);
       s.dispose();
-      
+
       expect(() => s.stale()).toThrow("Cannot mark disposed signal as stale");
     });
   });
@@ -280,14 +280,14 @@ describe("signal.refresh() and signal.stale()", () => {
       });
 
       s(); // Start first computation
-      
+
       // Trigger recomputation (aborts previous)
       vi.advanceTimersByTime(60);
       s.refresh();
-      
+
       // The scheduled refresh from aborted computation should be no-op
       vi.advanceTimersByTime(100);
-      
+
       // Should not crash
       expect(s()).toBeTruthy();
     });
@@ -296,13 +296,13 @@ describe("signal.refresh() and signal.stale()", () => {
       let attempt = 0;
       const s = signal(async (context: any) => {
         attempt++;
-        
+
         // Retry logic with exponential backoff
         if (attempt < 3) {
           const delay = Math.pow(2, attempt - 1) * 1000;
           setTimeout(() => context.refresh(), delay);
         }
-        
+
         return `attempt-${attempt}`;
       });
 
@@ -361,7 +361,7 @@ describe("signal.refresh() and signal.stale()", () => {
 
       // TTL expires (marked as stale)
       vi.advanceTimersByTime(3000);
-      
+
       // Next access triggers recomputation
       expect(s()).toBe("data-2");
       expect(computeCount).toBe(2);
@@ -375,14 +375,14 @@ describe("signal.refresh() and signal.stale()", () => {
       });
 
       s(); // Initial computation
-      
+
       // Trigger recomputation (aborts previous)
       vi.advanceTimersByTime(50);
       s.refresh();
-      
+
       // The scheduled stale from aborted computation should be no-op
       vi.advanceTimersByTime(100);
-      
+
       // Should not crash
       expect(s()).toBeTruthy();
     });
@@ -398,12 +398,12 @@ describe("signal.refresh() and signal.stale()", () => {
 
       // Mark as stale (lazy)
       s.stale();
-      
+
       // But refresh immediately (eager)
       s.refresh();
       await Promise.resolve();
       expect(computeFn).toHaveBeenCalledTimes(2);
-      
+
       // Access after refresh doesn't recompute again
       s();
       expect(computeFn).toHaveBeenCalledTimes(2);
@@ -417,10 +417,10 @@ describe("signal.refresh() and signal.stale()", () => {
       s.refresh(); // Recompute immediately
       await Promise.resolve();
       expect(computeFn).toHaveBeenCalledTimes(2);
-      
+
       s.stale(); // Mark as stale
       expect(computeFn).toHaveBeenCalledTimes(2);
-      
+
       s(); // Recompute on access
       expect(computeFn).toHaveBeenCalledTimes(3);
     });
@@ -436,32 +436,32 @@ describe("signal.refresh() and signal.stale()", () => {
       const liveData = signal(async (context: any) => {
         fetchCount++;
         const data = `poll-${fetchCount}`;
-        
+
         // Schedule next poll
         if (isPolling) {
           timerId = setTimeout(() => context.refresh(), pollInterval);
         }
-        
+
         return data;
       });
 
       // Start polling
       expect(await liveData()).toBe("poll-1");
-      
+
       // Poll 1
       vi.advanceTimersByTime(1000);
       await Promise.resolve(); // Flush microtask for refresh
       expect(await liveData()).toBe("poll-2");
-      
+
       // Poll 2
       vi.advanceTimersByTime(1000);
       await Promise.resolve(); // Flush microtask for refresh
       expect(await liveData()).toBe("poll-3");
-      
+
       // Stop polling by clearing the timer
       isPolling = false;
       clearTimeout(timerId);
-      
+
       // No more polls
       vi.advanceTimersByTime(5000);
       await Promise.resolve();
@@ -475,14 +475,14 @@ describe("signal.refresh() and signal.stale()", () => {
       const fetchUser = signal((context: any) => {
         fetchCount++;
         const userId = 1;
-        
+
         if (cache.has(userId)) {
           return cache.get(userId);
         }
-        
+
         const user = { id: userId, name: `User-${fetchCount}` };
         cache.set(userId, user);
-        
+
         return user;
       });
 
@@ -507,4 +507,3 @@ describe("signal.refresh() and signal.stale()", () => {
     });
   });
 });
-

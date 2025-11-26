@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { signal } from "./signal";
 import { tag } from "./tag";
-import type { Plugin, MutableSignal, ComputedSignal } from "./types";
+import type { Plugin } from "./types";
 
 describe("Plugin System", () => {
   describe("basic plugin functionality", () => {
@@ -102,7 +102,7 @@ describe("Plugin System", () => {
         });
       };
 
-      const sig = signal(0, { use: [plugin] });
+      const sig = signal<number>(0, { use: [plugin] });
 
       sig.set(10);
       sig.set(20);
@@ -118,7 +118,7 @@ describe("Plugin System", () => {
         });
       };
 
-      const sig = signal(0, { use: [plugin] });
+      const sig = signal<number>(0, { use: [plugin] });
 
       sig.set(10);
       sig.dispose();
@@ -175,7 +175,7 @@ describe("Plugin System", () => {
           });
         };
 
-        const sig = signal(0, { name: "count", use: [logger] });
+        const sig = signal<number>(0, { name: "count", use: [logger] });
 
         expect(logs).toEqual(["[count] created: 0"]);
 
@@ -236,7 +236,7 @@ describe("Plugin System", () => {
           });
         };
 
-        const sig = signal("test", { use: [validator] });
+        const sig = signal<string>("test", { use: [validator] });
 
         sig.set("short");
         expect(errors).toEqual([]);
@@ -269,7 +269,7 @@ describe("Plugin System", () => {
           });
         };
 
-        const sig = signal(0, { use: [tracker] });
+        const sig = signal<number>(0, { use: [tracker] });
 
         expect(events).toHaveLength(1);
         expect(events[0].type).toBe("created");
@@ -298,6 +298,7 @@ describe("Plugin System", () => {
 
         const sig1 = signal(0, { name: "count", use: [devtools] });
         const sig2 = signal("test", { name: "text", use: [devtools] });
+        void sig2; // Used via side effects
 
         expect(devtoolsRegistry.size).toBe(2);
         expect(devtoolsRegistry.has("count")).toBe(true);
@@ -326,7 +327,7 @@ describe("Plugin System", () => {
         });
       };
 
-      const sig = signal(0, { use: [logger, counter] });
+      const sig = signal<number>(0, { use: [logger, counter] });
 
       sig.set(1);
       sig.set(2);
@@ -351,7 +352,7 @@ describe("Plugin System", () => {
         });
       };
 
-      const sig = signal(0, { use: [metadataInit, changeCounter] });
+      const sig = signal<number>(0, { use: [metadataInit, changeCounter] });
 
       sig.set(1);
       sig.set(2);
@@ -456,7 +457,7 @@ describe("Plugin System", () => {
         });
       };
 
-      const sig = signal(5, { use: [plugin] });
+      const sig = signal<number>(5, { use: [plugin] });
 
       expect(sig()).toBe(10);
 
@@ -499,7 +500,7 @@ describe("Plugin System", () => {
     });
 
     it("should work with any-kind plugin", () => {
-      const anyPlugin: Plugin<number, "any"> = (sig) => {
+      const anyPlugin: Plugin<number> = (sig) => {
         expect(sig()).toBeTypeOf("number");
       };
 
@@ -517,7 +518,7 @@ describe("Plugin System", () => {
       const simplePlugin: Plugin<number> = () => {};
 
       const start = performance.now();
-      const sig = signal(0, { use: [simplePlugin] });
+      const sig = signal<number>(0, { use: [simplePlugin] });
 
       for (let i = 0; i < 1000; i++) {
         sig.set(i);

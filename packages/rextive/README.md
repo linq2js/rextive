@@ -2395,6 +2395,60 @@ const validateAll = () => {
 console.log(`Form has ${formTag.size} fields`);
 ```
 
+#### Type-Safe Tags with Signal Kinds
+
+Tags can be typed to accept specific signal kinds for better type safety:
+
+```tsx
+import { signal, tag } from "rextive";
+import type { Tag } from "rextive";
+
+// Default: General tag - accepts both mutable and computed signals
+const mixedTag = tag<number>(); // Tag<number, "mutable" | "computed">
+
+// Mutable-only tag - semantic constraint for writable state
+const stateTag: Tag<number, "mutable"> = tag<number, "mutable">();
+
+// Computed-only tag - semantic constraint for derived values
+const viewTag: Tag<number, "computed"> = tag<number, "computed">();
+
+// Usage
+const count = signal(0, { tags: [stateTag] }); // ✅ Mutable signal with mutable tag
+const doubled = signal({ count }, ({ deps }) => deps.count * 2, {
+  tags: [viewTag], // ✅ Computed signal with computed tag
+});
+
+// Both can use mixed tag
+const all = signal(0, { tags: [mixedTag] }); // ✅ Accepts any signal
+```
+
+**⚠️ Known Limitation:**
+
+Due to TypeScript's structural typing, cross-kind tag assignment may not produce compile-time errors in all contexts:
+
+```tsx
+const computedTag = tag<number, "computed">();
+
+// ⚠️ This doesn't error (but is logically wrong)
+const mutableSig = signal(0, { tags: [computedTag] });
+
+// Runtime: The signal IS added to the tag, but violates semantic contract
+```
+
+**Best Practice:**
+
+```tsx
+// ✅ Recommended: Use general tags by default
+const counters = tag<number>(); // Accepts both kinds
+
+// ✅ Use specific kinds only when you have strong semantic reasons
+const writableState = tag<AppState, "mutable">(); // Only for state we modify
+const readonlyViews = tag<string, "computed">(); // Only for derived values
+
+// ⚠️ Be aware: TypeScript can't always prevent cross-kind usage
+// Use code reviews and linting to catch logical errors
+```
+
 <details>
 <summary>📖 <strong>Real-World Tag Usage</strong></summary>
 
@@ -2424,6 +2478,16 @@ console.log("User signals:");
 userTag.forEach((s) => {
   console.log(`  ${s.name || "unnamed"}: ${s()}`);
 });
+
+// Type-safe tag operations
+const mutableTag = tag<number, "mutable">();
+const count1 = signal(0, { tags: [mutableTag] });
+const count2 = signal(5, { tags: [mutableTag] });
+
+// All signals in this tag are guaranteed to be mutable
+mutableTag.forEach((s) => {
+  s.set((x) => x + 1); // ✅ Safe - all are MutableSignal
+});
 ```
 
 **Use cases:**
@@ -2433,12 +2497,135 @@ userTag.forEach((s) => {
 - ✅ Persistence (save specific signals)
 - ✅ Debugging (inspect related state)
 - ✅ Performance (batch operations)
+- ✅ Type safety (group signals by kind)
 
 </details>
 
 ---
 
-### Pattern 3: Fine-Grained Lifecycle Control
+### Pattern 3: Generic Functions with `AnySignal`
+
+When writing utility functions that work with **both** mutable and computed signals, use the `AnySignal<T>` type:
+
+```tsx
+import { signal, AnySignal } from "rextive";
+
+// ✅ Generic function that accepts any signal type
+function logSignalChanges<T>(s: AnySignal<T>, label: string) {
+  // Common methods work on both types
+  s.on((value) => {
+    console.log(`[${label}] changed to:`, value);
+  });
+
+  s.when(someOtherSignal, (current) => {
+    console.log(`[${label}] triggered by dependency`);
+    current.refresh(); // ✅ Available on both types
+  });
+
+  return () => {
+    s.dispose(); // ✅ Available on both types
+  };
+}
+
+// Works with mutable signals
+const count = signal(0);
+logSignalChanges(count, "Counter");
+
+// Works with computed signals
+const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+logSignalChanges(doubled, "Doubled");
+```
+
+**Type Narrowing for Mutable-Specific Operations:**
+
+```tsx
+function syncSignals<T>(source: AnySignal<T>, target: AnySignal<T>) {
+  source.on((value) => {
+    // Type narrow to check if target is mutable
+    if ("set" in target) {
+      // TypeScript knows target is MutableSignal here
+      target.set(value); // ✅ .set() available
+    } else {
+      console.log("Target is computed (read-only)");
+    }
+  });
+}
+
+// Usage
+const source = signal(0);
+const mutableTarget = signal(0);
+const computedTarget = signal({ source }, ({ deps }) => deps.source * 2);
+
+syncSignals(source, mutableTarget); // Sets value on change
+syncSignals(source, computedTarget); // Logs "read-only" message
+```
+
+**Use Cases:**
+
+```tsx
+// Use Case 1: Signal registry/manager
+class SignalRegistry {
+  private signals = new Map<string, AnySignal<any>>();
+
+  register<T>(name: string, signal: AnySignal<T>) {
+    this.signals.set(name, signal);
+    signal.on(() => {
+      console.log(`Signal "${name}" changed`);
+    });
+  }
+
+  dispose(name: string) {
+    const signal = this.signals.get(name);
+    if (signal) {
+      signal.dispose(); // ✅ Works for all signal types
+      this.signals.delete(name);
+    }
+  }
+}
+
+// Use Case 2: Dependency tracker
+function trackDependencies(signals: AnySignal<any>[]) {
+  const tracker = signal<Record<string, any>>({});
+
+  signals.forEach((s, i) => {
+    s.on((value) => {
+      tracker.set((prev) => ({
+        ...prev,
+        [`signal_${i}`]: value,
+      }));
+    });
+  });
+
+  return tracker;
+}
+
+// Use Case 3: Conditional refresh
+function refreshIfStale<T>(s: AnySignal<T>, maxAge: number) {
+  const lastRefresh = Date.now();
+
+  s.when(someEvent, (current) => {
+    const age = Date.now() - lastRefresh;
+    if (age > maxAge) {
+      current.refresh(); // ✅ Works for both types
+    }
+  });
+}
+```
+
+**Why Use `AnySignal`?**
+
+- ✅ **Write once, use everywhere** - Functions work with all signal types
+- ✅ **Type-safe** - Full TypeScript inference for common methods
+- ✅ **Type narrowing** - Check for mutable-specific operations when needed
+- ✅ **Flexible APIs** - Accept any signal type in libraries/utilities
+
+**When NOT to Use `AnySignal`:**
+
+- ❌ When you specifically need `.set()` - use `MutableSignal<T>` instead
+- ❌ When you specifically need `.pause()` - use `ComputedSignal<T>` instead
+- ❌ When you need the base interface only - use `Signal<T>` instead
+
+### Pattern 4: Fine-Grained Lifecycle Control
 
 Get precise control over component lifecycle phases:
 
@@ -3133,6 +3320,26 @@ results.when([filter, sortBy], (current) => {
 });
 ```
 
+**💡 Type-Safe Callbacks:**
+
+The callback receives the **exact signal type** (not just the base `Signal`), giving you access to type-specific methods:
+
+```tsx
+// For MutableSignal: callback receives MutableSignal - can use .set()
+const count = signal(0);
+count.when(trigger, (current) => {
+  current.set(100); // ✅ .set() available on MutableSignal
+});
+
+// For ComputedSignal: callback receives ComputedSignal - can use .refresh(), .stale()
+const userData = signal(async () => fetchUser());
+userData.when(userId, (current) => {
+  current.refresh(); // ✅ .refresh() available on ComputedSignal
+  current.stale(); // ✅ .stale() available on ComputedSignal
+  // current.set() // ❌ Not available - ComputedSignal is read-only
+});
+```
+
 **Key Patterns:**
 
 ```tsx
@@ -3155,17 +3362,17 @@ searchResults
     current.stale(); // Lazy for sort changes
   });
 
-// Pattern 3: Coordinated updates
+// Pattern 3: Coordinated updates with MutableSignal
 const masterState = signal("idle");
 const replica1 = signal("idle");
 const replica2 = signal("idle");
 
 replica1.when(masterState, (current, trigger) => {
-  current.set(trigger()); // Sync with master
+  current.set(trigger()); // ✅ .set() available - current is MutableSignal
 });
 
 replica2.when(masterState, (current, trigger) => {
-  current.set(trigger());
+  current.set(trigger()); // ✅ .set() available
 });
 
 // Pattern 4: Detect which trigger fired
@@ -3173,7 +3380,7 @@ const log = signal<string[]>([]);
 
 log.when([signal1, signal2], (current, trigger) => {
   const name = trigger.displayName || "unknown";
-  current.set((prev) => [...prev, `Changed: ${name}`]);
+  current.set((prev) => [...prev, `Changed: ${name}`]); // ✅ Type-safe
 });
 ```
 
@@ -3181,8 +3388,9 @@ log.when([signal1, signal2], (current, trigger) => {
 
 - Returns the signal for method chaining
 - Automatically unsubscribes when signal is disposed
-- Callback receives `(currentSignal, triggerSignal)`
+- Callback receives `(currentSignal, triggerSignal)` with **exact types**
 - Works with both mutable and computed signals
+- Full TypeScript inference for signal-specific methods
 
 **When to use:**
 
@@ -3468,7 +3676,79 @@ formTag.forEach((s) => s.reset()); // Reset all
 console.log(`Tag has ${formTag.size} signals`); // Count
 ```
 
+**With signal kinds:**
+
+```tsx
+import { tag } from "rextive";
+import type { Tag } from "rextive";
+
+// Default: accepts both mutable and computed
+const mixedTag = tag<number>();
+
+// Mutable-only (semantic constraint)
+const mutableTag: Tag<number, "mutable"> = tag<number, "mutable">();
+
+// Computed-only (semantic constraint)
+const computedTag: Tag<number, "computed"> = tag<number, "computed">();
+```
+
 See [Pattern 2: Group Signals with Tags](#pattern-2-group-signals-with-tags) for more details.
+
+---
+
+### Type Utilities
+
+#### `AnySignal<T>`
+
+Union type representing any signal (mutable or computed) - perfect for generic functions:
+
+```tsx
+import { signal, AnySignal } from "rextive";
+
+// Generic function accepting any signal type
+function watchSignal<T>(s: AnySignal<T>) {
+  s.when(otherSignal, (current) => {
+    console.log("Changed:", current());
+    // current can be either MutableSignal or ComputedSignal
+  });
+}
+
+const count = signal(0);
+const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+
+watchSignal(count); // ✅ Works
+watchSignal(doubled); // ✅ Works
+```
+
+**Type narrowing for specific operations:**
+
+```tsx
+function doSomething<T>(s: AnySignal<T>) {
+  // Common operations work on both types
+  s.on(() => console.log("Changed"));
+  s.when(trigger, (current) => current.refresh());
+
+  // Type narrow for mutable-specific operations
+  if ("set" in s) {
+    s.set(newValue); // TypeScript knows this is MutableSignal
+  }
+}
+```
+
+**When to use:**
+
+- ✅ Generic utilities that work with all signal types
+- ✅ Signal registries/managers
+- ✅ Array of mixed signals
+- ✅ Functions that return different signal types
+
+**Difference from `Signal<T>`:**
+
+- `Signal<T>` - Base interface with minimal methods
+- `AnySignal<T>` - Union of `MutableSignal<T> | ComputedSignal<T>` with full method access
+- Use `AnySignal<T>` when you need access to `.when()`, `.refresh()`, etc.
+
+See [Pattern 3: Generic Functions with AnySignal](#pattern-3-generic-functions-with-anysignal) for comprehensive examples.
 
 ---
 
@@ -4819,13 +5099,39 @@ rextive/immer     # Immer integration
 
 ## 🎓 Learn More
 
+### Examples
+
 Check out the [examples folder](./examples) for more patterns:
 
-- 🎨 Service pattern
-- 🔧 Disposable shapes
+- 🎨 [Service pattern](./examples/service-pattern-example.tsx)
+- 🔧 [Disposable shapes](./examples/disposable-shapes-demo.ts)
 - 📝 Form management
 - 🔄 Polling and real-time data
-- 🎯 Advanced patterns
+- 🎯 [Type improvements](./examples/type-improvements-example.tsx) - NEW!
+
+### Documentation
+
+Advanced topics and guides:
+
+- 📘 [Type System Improvements](./docs/TYPE_IMPROVEMENTS.md) - AnySignal, improved when(), tag kinds
+- 📘 [API Reference](./docs/API_REFERENCE.md) - Complete API documentation
+- 📘 [Service Pattern](./docs/SERVICE_PATTERN.md) - Building scalable applications
+- 📘 [Architecture](./docs/ARCHITECTURE.md) - Internal design and concepts
+
+---
+
+## 🆕 What's New
+
+### Type System Improvements
+
+Recent updates bring enhanced type safety and better developer experience:
+
+- **`AnySignal<T>` type** - Write generic functions that work with all signal types
+- **Improved `when()` typing** - Callbacks now receive exact signal types (MutableSignal or ComputedSignal)
+- **Enhanced tag type safety** - Tag kinds with compile-time checking via brand properties
+- **Refined SignalKind** - Changed from `"any"` to union type for better TypeScript inference
+
+See the [Type System Improvements Guide](./docs/TYPE_IMPROVEMENTS.md) for details and examples.
 
 ---
 

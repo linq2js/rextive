@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { signal } from "./index";
-import { FallbackError } from "./signal";
 import { is } from "./is";
+import { FallbackError } from "./common";
 
 describe("signal", () => {
   describe("basic signal creation", () => {
@@ -246,21 +246,21 @@ describe("signal", () => {
       // String as second arg creates mutable signal with equals shortcut
       const count = signal(42, "strict");
       expect(count()).toBe(42);
-      
+
       // Should be mutable (has set method)
       expect(typeof count.set).toBe("function");
       count.set(100);
       expect(count()).toBe(100);
-      
+
       // For custom equals function, use options form
       const customCount = signal(42, { equals: (a, b) => a === b });
       expect(customCount()).toBe(42);
-      
+
       // Now create an actual computed signal to verify it still works
       const a = signal(10);
       const doubled = signal({ a }, ({ deps }) => deps.a * 2);
       expect(doubled()).toBe(20);
-      
+
       // Computed signal should NOT have set method
       expect((doubled as any).set).toBeUndefined();
     });
@@ -1272,7 +1272,10 @@ describe("signal", () => {
     });
 
     it("should support 'shallow' in options object", () => {
-      const obj = signal({ name: "John", age: 30 }, { equals: "shallow", name: "user" });
+      const obj = signal(
+        { name: "John", age: 30 },
+        { equals: "shallow", name: "user" }
+      );
       const listener = vi.fn();
       obj.on(listener);
 
@@ -1333,7 +1336,7 @@ describe("signal", () => {
 
     it("should work with signal(deps, fn, equals) - shallow string", () => {
       const count = signal(1);
-      
+
       const stats = signal(
         { count },
         ({ deps }) => ({ value: deps.count, extra: "constant" }),
@@ -1364,7 +1367,9 @@ describe("signal", () => {
       const result = signal(
         { a, b },
         ({ deps }) => ({ id: deps.a + deps.b, extra: Math.random() }),
-        (x, y) => x?.id === y?.id // Only compare id, ignore extra/random values
+        {
+          equals: (x, y) => x?.id === y?.id, // Only compare id, ignore extra/random values
+        }
       );
 
       const listener = vi.fn();
@@ -1384,7 +1389,7 @@ describe("signal", () => {
         a.set(3);
         b.set(1);
       });
-      
+
       expect(result().id).toBe(4); // id is still 4
       expect(listener).toHaveBeenCalledTimes(beforeBatch); // No new calls due to custom equals
     });

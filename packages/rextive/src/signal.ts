@@ -11,9 +11,10 @@ import { createMutableSignal } from "./createMutableSignal";
 import { createComputedSignal } from "./createComputedSignal";
 import { createSignalContext } from "./createSignalContext";
 import { EqualsStrategy } from "./utils/resolveEquals";
+import { signalOn } from "./signal.on";
 
-// Re-export constants for backward compatibility
-export { DISPOSED_MESSAGE, FallbackError } from "./common";
+// Re-export signal.on types
+export type { SignalOnControl } from "./signal.on";
 
 /**
  * Check if value looks like a dependencies object (for computed signals)
@@ -66,8 +67,7 @@ function createSignalWithEquals<TValue>(
  */
 function createMutableSignalWithOptions<TValue>(
   value: TValue | ((context: SignalContext) => TValue),
-  options?: SignalOptions<TValue> &
-    SignalExtraOptions<TValue, "mutable" | "any">
+  options?: SignalOptions<TValue> & SignalExtraOptions<TValue, "mutable">
 ): MutableSignal<TValue> {
   const isLazy = typeof value === "function";
   return createMutableSignal(
@@ -109,7 +109,7 @@ function createComputedSignalWithOptions<
   dependencies: TDependencies,
   compute: (context: ComputedSignalContext<TDependencies>) => TValue,
   options?: SignalOptions<TValue> &
-    NoInfer<SignalExtraOptions<TValue, "computed" | "any">>
+    NoInfer<SignalExtraOptions<TValue, "computed">>
 ): ComputedSignal<TValue> {
   return createComputedSignal(
     dependencies,
@@ -156,8 +156,7 @@ export function signal<TValue>(
  */
 export function signal<TValue>(
   value: TValue | ((context: SignalContext) => TValue),
-  options?: SignalOptions<TValue> &
-    SignalExtraOptions<TValue, "mutable" | "any">
+  options?: SignalOptions<TValue> & SignalExtraOptions<TValue, "mutable">
 ): MutableSignal<TValue>;
 
 /**
@@ -192,8 +191,7 @@ export function signal<TValue, TDependencies extends SignalMap>(
 export function signal<TValue, TDependencies extends SignalMap>(
   dependencies: TDependencies,
   compute: (context: ComputedSignalContext<NoInfer<TDependencies>>) => TValue,
-  options?: SignalOptions<TValue> &
-    SignalExtraOptions<TValue, "computed" | "any">
+  options?: SignalOptions<TValue> & SignalExtraOptions<TValue, "computed">
 ): ComputedSignal<TValue>;
 export function signal(...args: any[]): any {
   // Overload 1: signal() - no arguments
@@ -224,3 +222,6 @@ export function signal(...args: any[]): any {
   // signal(value, options?) or signal(value)
   return createMutableSignalWithOptions(first, second);
 }
+
+// Attach namespace methods to signal function
+signal.on = signalOn;

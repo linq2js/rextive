@@ -81,7 +81,7 @@ describe("attacher", () => {
         expect(sig.displayName).toBe("test");
       };
 
-      testSignal.displayName = "test" as any;
+      (testSignal as any).displayName = "test";
 
       const { attach } = attacher(testSignal, onDispose);
       attach([plugin]);
@@ -482,4 +482,3 @@ describe("attacher", () => {
     });
   });
 });
-

@@ -53,9 +53,20 @@ import { produce as produceImmer } from "immer";
  *   draft.posts.push({ id: 1, title: 'Hello' });
  * }));
  * ```
+ *
+ * @example Explicit type annotation (when inference fails)
+ * ```ts
+ * state.set(produce<MyType>(draft => {
+ *   draft.property = newValue;
+ * }));
+ * ```
  */
-export function produce<T>(updater: (draft: T) => void): (prev: T) => T {
+export function produce<T>(updater: (draft: T) => void): (prev: T) => T;
+export function produce(updater: (draft: any) => void): (prev: any) => any;
+export function produce<T = any>(
+  updater: (draft: T) => void
+): (prev: T) => T {
   return (prev: T): T => {
-    return produceImmer(prev, updater);
+    return produceImmer(prev, updater as any);
   };
 }

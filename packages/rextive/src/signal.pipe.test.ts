@@ -38,7 +38,7 @@ describe("signal.pipe()", () => {
 
   it("should work with scan operator from rextive/op", () => {
     const count = signal(1);
-    
+
     // Use scan operator from rextive/op
     const accumulate = scan((acc: number, curr: number) => acc + curr, 0);
 
@@ -117,9 +117,11 @@ describe("signal.pipe()", () => {
 
   it("should work with no operators (identity)", () => {
     const count = signal(5);
+    // @ts-expect-error - we want to test the case where no operators are provided
     const result = count.pipe();
 
     expect(result).toBe(count);
+    // @ts-expect-error - we want to test the case where no operators are provided
     expect(result()).toBe(5);
   });
 
@@ -157,16 +159,8 @@ describe("signal.pipe()", () => {
     };
 
     const result = count.pipe(
-      (s) =>
-        trackDispose(
-          select((x: number) => x * 2)(s),
-          intermediate1Spy
-        ),
-      (s) =>
-        trackDispose(
-          select((x: number) => x + 1)(s),
-          intermediate2Spy
-        ),
+      (s) => trackDispose(select((x: number) => x * 2)(s), intermediate1Spy),
+      (s) => trackDispose(select((x: number) => x + 1)(s), intermediate2Spy),
       (s) => select((x: number) => `Value: ${x}`)(s)
     );
 
@@ -182,11 +176,13 @@ describe("signal.pipe()", () => {
 
   it("should handle empty pipe (no intermediates to dispose)", () => {
     const count = signal(5);
+    // @ts-expect-error - we want to test the case where no operators are provided
     const result = count.pipe();
 
     expect(result).toBe(count);
 
     // Should not throw
+    // @ts-expect-error - we want to test the case where no operators are provided
     expect(() => result.dispose()).not.toThrow();
   });
 

@@ -2,6 +2,28 @@ export const SIGNAL_TYPE = Symbol("SIGNAL_TYPE");
 export const TAG_TYPE = Symbol("TAG_TYPE");
 
 /**
+ * Unique symbol brands for tag kind discrimination.
+ *
+ * These symbols make Tag<T, TKind> invariant in TKind, which helps prevent
+ * incorrect cross-kind tag assignments at compile time.
+ *
+ * Without these brands, TypeScript's structural typing would allow:
+ *   Tag<number, "mutable"> = Tag<number, "computed">  // Should error!
+ *
+ * With brands:
+ *   Tag<number, "mutable"> has __brand: typeof MUTABLE_TAG_BRAND
+ *   Tag<number, "computed"> has __brand: typeof COMPUTED_TAG_BRAND
+ *   These are incompatible → compile error ✓
+ *
+ * Note: Array literal contexts may still not catch all errors due to
+ * TypeScript limitations. See UseList<T, TKind> docs for details.
+ *
+ * @internal These are type-level only and never exist at runtime
+ */
+export declare const MUTABLE_TAG_BRAND: unique symbol;
+export declare const COMPUTED_TAG_BRAND: unique symbol;
+
+/**
  * Function type for use with proxies.
  */
 export type AnyFunc = (...args: any[]) => any;
@@ -442,73 +464,50 @@ export type Signal<TValue, TInit = TValue> = Observable &
      * ```
      */
     stale(): void;
-
-    /**
-     * Watch other signals and react when they change.
-     *
-     * Creates a reactive relationship where this signal can respond to changes
-     * in other signals. Common use cases include cross-signal synchronization,
-     * cache invalidation, and coordinated updates.
-     *
-     * - Automatically subscribes to target signals
-     * - Callback receives current signal and the trigger signal
-     * - Subscriptions are cleaned up when signal is disposed
-     * - Returns this signal for method chaining
-     *
-     * @param target - Single signal or array of signals to watch
-     * @param callback - Called when any target signal changes
-     * @returns This signal (for chaining)
-     *
-     * @example Watch single signal
-     * ```ts
-     * const userId = signal(1);
-     * const userData = signal(async () => fetchUser(userId()));
-     *
-     * // Refresh userData when userId changes
-     * userData.when(userId, (current) => {
-     *   current.refresh();
-     * });
-     * ```
-     *
-     * @example Watch multiple signals
-     * ```ts
-     * const filter = signal('');
-     * const sortBy = signal('name');
-     * const results = signal(async () => fetchResults());
-     *
-     * // Refresh results when filter or sortBy changes
-     * results.when([filter, sortBy], (current) => {
-     *   current.refresh();
-     * });
-     * ```
-     *
-     * @example Different actions for different triggers
-     * ```ts
-     * const cache = signal(async () => fetchData());
-     *
-     * cache
-     *   .when(userId, (current) => {
-     *     current.refresh(); // Immediate refresh
-     *   })
-     *   .when([filter, sortBy], (current) => {
-     *     current.stale(); // Lazy invalidation
-     *   });
-     * ```
-     *
-     * @example Access trigger signal
-     * ```ts
-     * const log = signal<string[]>([]);
-     *
-     * log.when([signal1, signal2], (current, trigger) => {
-     *   current.set(prev => [...prev, `Changed: ${trigger.displayName}`]);
-     * });
-     * ```
-     */
-    when<TOther extends Signal<any>>(
-      target: TOther | TOther[],
-      callback: (current: Signal<TValue, TInit>, trigger: TOther) => void
-    ): Signal<TValue, TInit>;
   };
+
+/**
+ * Type-safe when() method for signals.
+ *
+ * This helper type provides proper type inference for the when() method,
+ * ensuring the callback receives the exact signal type (MutableSignal or ComputedSignal)
+ * rather than the base Signal type.
+ *
+ * @template TCurrent - The exact signal type (MutableSignal<T> or ComputedSignal<T>)
+ * @param target - Single signal or readonly array of signals to watch
+ * @param callback - Called when any target signal changes
+ *   - `current`: The exact signal type with all its methods (set, refresh, stale, etc.)
+ *   - `trigger`: The signal that triggered the callback
+ * @returns The current signal (for method chaining)
+ *
+ * @example Type-safe callbacks
+ * ```ts
+ * // MutableSignal: callback receives MutableSignal
+ * const count = signal(0);
+ * count.when(trigger, (current) => {
+ *   current.set(100); // ✅ .set() available
+ * });
+ *
+ * // ComputedSignal: callback receives ComputedSignal
+ * const user = signal(async () => fetchUser());
+ * user.when(userId, (current) => {
+ *   current.refresh(); // ✅ .refresh() available
+ *   current.stale();   // ✅ .stale() available
+ *   // current.set()   // ❌ Not available - computed is read-only
+ * });
+ * ```
+ *
+ * @example Method chaining
+ * ```ts
+ * cache
+ *   .when(userId, (current) => current.refresh())
+ *   .when([filter, sort], (current) => current.stale());
+ * ```
+ */
+export type When<TCurrent> = <const TOther extends Signal<any>>(
+  target: TOther | readonly TOther[],
+  callback: (current: TCurrent, trigger: TOther) => void
+) => TCurrent;
 
 export type TryInjectDispose<T> = T extends object
   ? T & { dispose: VoidFunction }
@@ -554,6 +553,16 @@ export type MutableSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    * @param reducer - Function that receives current value (TValue | TInit) and returns new value (TValue)
    */
   set(reducer: (prev: NoInfer<TValue | TInit>) => TValue): void;
+
+  /**
+   * Watch other signals and react when they change.
+   * The callback receives this mutable signal, allowing you to call `.set()`.
+   *
+   * @param target - Single signal or array of signals to watch
+   * @param callback - Called when any target signal changes
+   * @returns This signal (for chaining)
+   */
+  when: When<MutableSignal<TValue, TInit>>;
 };
 
 /**
@@ -577,7 +586,64 @@ export type ComputedSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    * Check if the signal is currently paused
    */
   paused(): boolean;
+
+  /**
+   * Watch other signals and react when they change.
+   * The callback receives this computed signal, allowing you to call `.refresh()`, `.stale()`.
+   *
+   * @param target - Single signal or array of signals to watch
+   * @param callback - Called when any target signal changes
+   * @returns This signal (for chaining)
+   */
+  when: When<ComputedSignal<TValue, TInit>>;
 };
+
+/**
+ * Union type representing any signal (mutable or computed).
+ *
+ * Useful for generic functions that accept any signal type while still having
+ * access to common methods like `when()`, `on()`, `refresh()`, etc.
+ *
+ * Unlike the base `Signal<T>` type, `AnySignal<T>` includes both `MutableSignal<T>`
+ * and `ComputedSignal<T>`, which means TypeScript can infer methods that exist
+ * on both types (intersection of their APIs).
+ *
+ * @template TValue - The signal's value type
+ * @template TInit - The initial value type (defaults to TValue)
+ *
+ * @example Generic function accepting any signal
+ * ```ts
+ * function watchSignal<T>(s: AnySignal<T>) {
+ *   s.when(otherSignal, (current) => {
+ *     console.log('Changed:', current());
+ *     // current can be either MutableSignal or ComputedSignal
+ *   });
+ * }
+ *
+ * const count = signal(0);
+ * const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+ *
+ * watchSignal(count);    // ✅ Works
+ * watchSignal(doubled);  // ✅ Works
+ * ```
+ *
+ * @example Type narrowing for specific operations
+ * ```ts
+ * function doSomething<T>(s: AnySignal<T>) {
+ *   // Common operations work on both types
+ *   s.on(() => console.log('Changed'));
+ *   s.when(trigger, (current) => current.refresh());
+ *
+ *   // Type narrow for mutable-specific operations
+ *   if ('set' in s) {
+ *     s.set(newValue); // TypeScript knows this is MutableSignal
+ *   }
+ * }
+ * ```
+ */
+export type AnySignal<TValue, TInit = TValue> =
+  | MutableSignal<TValue, TInit>
+  | ComputedSignal<TValue, TInit>;
 
 /**
  * Map of signal names to signal instances
@@ -587,8 +653,10 @@ export type SignalMap = Record<string, Signal<any>>;
 
 /**
  * Signal kind discriminator
+ *
+ * Tags can accept union kinds (e.g., "mutable" | "computed") to work with both types
  */
-export type SignalKind = "any" | "mutable" | "computed";
+export type SignalKind = "mutable" | "computed";
 
 /**
  * Helper type to get the signal type based on kind
@@ -672,17 +740,41 @@ export type Plugin<TValue, TKind extends SignalKind = SignalKind> = (
  * Signals are automatically removed from tags when disposed.
  *
  * @template TValue - The type of values held by signals in this tag
- * @template TKind - The signal kind ("mutable" | "computed" | both)
+ * @template TKind - The signal kind: "mutable", "computed", or both (default: SignalKind)
+ *
+ * @example
+ * ```ts
+ * // Mixed tag (default) - accepts both mutable and computed signals
+ * const mixedTag = tag<number>();
+ *
+ * // Mutable-only tag
+ * const mutableTag = tag<number, "mutable">();
+ *
+ * // Computed-only tag
+ * const computedTag = tag<number, "computed">();
+ * ```
  */
-export type Tag<TValue, TKind extends SignalKind = "any"> = {
+export type Tag<TValue, TKind extends SignalKind = SignalKind> = {
   [TAG_TYPE]: true;
+
+  /**
+   * Brand property to make Tag invariant in TKind using unique symbols.
+   * This prevents cross-kind tag assignment at compile time.
+   * @internal
+   */
+  readonly __brand: TKind extends "mutable"
+    ? typeof MUTABLE_TAG_BRAND
+    : TKind extends "computed"
+    ? typeof COMPUTED_TAG_BRAND
+    : typeof MUTABLE_TAG_BRAND | typeof COMPUTED_TAG_BRAND;
+
   kind: TKind;
 
   /**
    * Plugins attached to this tag.
    * These plugins are automatically applied to any signal added to this tag.
    */
-  readonly use: ReadonlyArray<Plugin<TValue, TKind> | Tag<TValue, TKind>>;
+  readonly use: UseList<TValue, TKind>;
 
   /**
    * Iterates over all signals in this tag.
@@ -998,17 +1090,76 @@ export type SignalExtraOptions<
   use?: UseList<TValue, TKind>;
 };
 
+/**
+ * List of plugins and tags that can be used with signals of a given kind.
+ *
+ * ## Type Safety Rules
+ *
+ * - **Mutable signals/tags** (TKind = "mutable") accept:
+ *   - Mutable-specific plugins: `Plugin<T, "mutable">`
+ *   - General plugins: `Plugin<T, SignalKind>`
+ *   - Mutable-specific tags: `Tag<T, "mutable">`
+ *   - General tags: `Tag<T, SignalKind>`
+ *
+ * - **Computed signals/tags** (TKind = "computed") accept:
+ *   - Computed-specific plugins: `Plugin<T, "computed">`
+ *   - General plugins: `Plugin<T, SignalKind>`
+ *   - Computed-specific tags: `Tag<T, "computed">`
+ *   - General tags: `Tag<T, SignalKind>`
+ *
+ * - **Mixed signals/tags** (TKind = SignalKind) accept:
+ *   - Any general plugins: `Plugin<T, SignalKind>`
+ *   - Any general tags: `Tag<T, SignalKind>`
+ *
+ * ## Known Limitations
+ *
+ * Due to TypeScript's structural typing, cross-kind tag assignment in array contexts
+ * may not always produce compile-time errors. For example:
+ * ```ts
+ * const computedTag = tag<number, "computed">();
+ * const mutableSig = signal(0, { use: [computedTag] }); // ⚠️ No error, but logically wrong
+ * ```
+ *
+ * **Runtime behavior:** If a mutable signal is added to a computed-only tag, the runtime
+ * will NOT prevent this (tags don't track kinds at runtime). However, this is a logical
+ * error - the tag's semantic contract is violated.
+ *
+ * **Best practice:** Use general tags `tag<T>()` when you need to accept both kinds,
+ * and only use specific kinds `tag<T, "mutable">` or `tag<T, "computed">` when you have
+ * a strong semantic reason to restrict the tag's usage.
+ *
+ * @example
+ * ```ts
+ * // ✅ Recommended: Use general tags by default
+ * const allCounters = tag<number>();  // Accepts both mutable & computed signals
+ *
+ * // ✅ OK: Specific kind when semantically meaningful
+ * const mutableStores = tag<AppState, "mutable">();  // Only writable state
+ * const derivedViews = tag<string, "computed">();    // Only computed values
+ *
+ * // ⚠️ Caution: Cross-kind usage may not error at compile-time
+ * const computed = tag<number, "computed">();
+ * signal(0, { use: [computed] });  // Mutable signal with computed tag - no TS error!
+ * ```
+ */
 export type UseList<TValue, TKind extends SignalKind> = ReadonlyArray<
-  TKind extends "any"
+  // Use tuple trick to prevent distributive conditional types
+  // Checks if TKind is exactly "mutable" or "computed" (not a union)
+  [TKind] extends ["mutable"]
     ?
-        | Plugin<TValue, "any" | "mutable" | "computed">
-        | Tag<TValue, "any" | "mutable" | "computed">
-    : Plugin<TValue, TKind> | Tag<TValue, TKind>
+        | Plugin<TValue, "mutable">
+        | Plugin<TValue, SignalKind>
+        | Tag<TValue, "mutable">
+        | Tag<TValue, SignalKind>
+    : [TKind] extends ["computed"]
+    ?
+        | Plugin<TValue, "computed">
+        | Plugin<TValue, SignalKind>
+        | Tag<TValue, "computed">
+        | Tag<TValue, SignalKind>
+    : // TKind is SignalKind (union of both) - accept general plugins/tags only
+      Plugin<TValue, SignalKind> | Tag<TValue, SignalKind>
 >;
-
-export type UseItem<TValue, TKind extends SignalKind> =
-  | Plugin<TValue, TKind>
-  | Tag<TValue, TKind>;
 
 /**
  * Options for signal creation

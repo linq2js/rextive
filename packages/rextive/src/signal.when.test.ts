@@ -6,12 +6,12 @@ describe("signal.when()", () => {
     it("should debug subscription", () => {
       const trigger = signal(1);
       const listener = vi.fn();
-      
+
       // Direct subscription (should work)
       trigger.on(listener);
-      
+
       trigger.set(2);
-      
+
       expect(listener).toHaveBeenCalledTimes(1);
     });
 
@@ -50,7 +50,7 @@ describe("signal.when()", () => {
 
       // Trigger change
       trigger.set(2);
-      
+
       // Verify callback was called
       expect(callback).toHaveBeenCalledTimes(1);
 
@@ -128,7 +128,10 @@ describe("signal.when()", () => {
       expect(target()).toEqual(["Changed by: trigger1"]);
 
       trigger2.set(20);
-      expect(target()).toEqual(["Changed by: trigger1", "Changed by: trigger2"]);
+      expect(target()).toEqual([
+        "Changed by: trigger1",
+        "Changed by: trigger2",
+      ]);
     });
 
     it("should refresh on specific triggers", async () => {
@@ -156,18 +159,18 @@ describe("signal.when()", () => {
 
       // userId change: immediate refresh
       userId.set(2);
-      
+
       // Wait for refresh to complete
       await Promise.resolve();
-      
+
       expect(fetchCount).toHaveBeenCalledTimes(2);
 
       // filter change: no immediate refresh
       filter.set("test");
-      
+
       // Wait for any pending microtasks
       await Promise.resolve();
-      
+
       expect(fetchCount).toHaveBeenCalledTimes(2);
 
       // Access triggers fetch
@@ -182,9 +185,7 @@ describe("signal.when()", () => {
       const trigger2 = signal(2);
       const target = signal(0);
 
-      const result = target
-        .when(trigger1, () => {})
-        .when(trigger2, () => {});
+      const result = target.when(trigger1, () => {}).when(trigger2, () => {});
 
       expect(result).toBe(target);
     });
@@ -291,10 +292,10 @@ describe("signal.when()", () => {
 
       // Trigger external refresh
       trigger.set(1);
-      
+
       // Wait for refresh to complete
       await Promise.resolve();
-      
+
       expect(computeFn).toHaveBeenCalledTimes(3);
     });
   });
@@ -368,4 +369,3 @@ describe("signal.when()", () => {
     });
   });
 });
-

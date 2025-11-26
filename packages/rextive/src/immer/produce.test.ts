@@ -8,7 +8,7 @@ describe("produce", () => {
       const state = signal({ count: 0, name: "John" });
 
       state.set(
-        produce((draft) => {
+        produce<{ count: number; name: string }>((draft) => {
           draft.count = 1;
           draft.name = "Jane";
         })
@@ -18,12 +18,13 @@ describe("produce", () => {
     });
 
     it("should mutate nested objects", () => {
-      const state = signal({
+      type State = { user: { name: string; settings: { theme: string } } };
+      const state = signal<State>({
         user: { name: "John", settings: { theme: "dark" } },
       });
 
       state.set(
-        produce((draft) => {
+        produce<State>((draft) => {
           draft.user.settings.theme = "light";
         })
       );
@@ -38,7 +39,7 @@ describe("produce", () => {
       const state = signal(initial);
 
       state.set(
-        produce((draft) => {
+        produce<{ count: number }>((draft) => {
           draft.count = 1;
         })
       );
@@ -54,10 +55,11 @@ describe("produce", () => {
 
   describe("array mutations", () => {
     it("should push to array", () => {
-      const todos = signal([{ id: 1, text: "Learn React", done: false }]);
+      type Todo = { id: number; text: string; done: boolean };
+      const todos = signal<Todo[]>([{ id: 1, text: "Learn React", done: false }]);
 
       todos.set(
-        produce((draft) => {
+        produce<Todo[]>((draft) => {
           draft.push({ id: 2, text: "Learn Immer", done: false });
         })
       );
@@ -67,13 +69,14 @@ describe("produce", () => {
     });
 
     it("should mutate array item", () => {
-      const todos = signal([
+      type Todo = { id: number; text: string; done: boolean };
+      const todos = signal<Todo[]>([
         { id: 1, text: "Task 1", done: false },
         { id: 2, text: "Task 2", done: false },
       ]);
 
       todos.set(
-        produce((draft) => {
+        produce<Todo[]>((draft) => {
           draft[0].done = true;
         })
       );
@@ -83,10 +86,10 @@ describe("produce", () => {
     });
 
     it("should filter array", () => {
-      const numbers = signal([1, 2, 3, 4, 5]);
+      const numbers = signal<number[]>([1, 2, 3, 4, 5]);
 
       numbers.set(
-        produce((draft) => {
+        produce<number[]>((draft) => {
           // Remove odd numbers
           for (let i = draft.length - 1; i >= 0; i--) {
             if (draft[i] % 2 !== 0) {
@@ -101,10 +104,10 @@ describe("produce", () => {
 
     it("should maintain immutability for arrays", () => {
       const initial = [1, 2, 3];
-      const state = signal(initial);
+      const state = signal<number[]>(initial);
 
       state.set(
-        produce((draft) => {
+        produce<number[]>((draft) => {
           draft.push(4);
         })
       );
@@ -120,14 +123,19 @@ describe("produce", () => {
 
   describe("complex mutations", () => {
     it("should handle multiple nested mutations", () => {
-      const app = signal({
+      type AppState = {
+        user: { name: string; age: number };
+        posts: { id: number; title: string }[];
+        settings: { theme: string; notifications: boolean };
+      };
+      const app = signal<AppState>({
         user: { name: "John", age: 30 },
         posts: [{ id: 1, title: "Post 1" }],
         settings: { theme: "dark", notifications: true },
       });
 
       app.set(
-        produce((draft) => {
+        produce<AppState>((draft) => {
           draft.user.age = 31;
           draft.posts.push({ id: 2, title: "Post 2" });
           draft.settings.theme = "light";
@@ -141,10 +149,10 @@ describe("produce", () => {
     });
 
     it("should work with Map", () => {
-      const state = signal(new Map([["key1", "value1"]]));
+      const state = signal<Map<string, string>>(new Map([["key1", "value1"]]));
 
       state.set(
-        produce((draft) => {
+        produce<Map<string, string>>((draft) => {
           draft.set("key2", "value2");
         })
       );
@@ -153,10 +161,10 @@ describe("produce", () => {
     });
 
     it("should work with Set", () => {
-      const state = signal(new Set([1, 2, 3]));
+      const state = signal<Set<number>>(new Set([1, 2, 3]));
 
       state.set(
-        produce((draft) => {
+        produce<Set<number>>((draft) => {
           draft.add(4);
           draft.delete(1);
         })
@@ -172,7 +180,7 @@ describe("produce", () => {
       const state = signal({ count: 0 });
       const initial = state();
 
-      state.set(produce(() => {}));
+      state.set(produce<{ count: number }>(() => {}));
 
       // Should be the same reference since nothing changed
       expect(state()).toBe(initial);
@@ -182,7 +190,7 @@ describe("produce", () => {
       const state = signal<{ value?: number }>({ value: 1 });
 
       state.set(
-        produce((draft) => {
+        produce<{ value?: number }>((draft) => {
           delete draft.value;
         })
       );
@@ -194,7 +202,7 @@ describe("produce", () => {
       const state = signal<{ value: string | null }>({ value: "test" });
 
       state.set(
-        produce((draft) => {
+        produce<{ value: string | null }>((draft) => {
           draft.value = null;
         })
       );
@@ -213,7 +221,7 @@ describe("produce", () => {
       });
 
       state.set(
-        produce((draft) => {
+        produce<{ count: number }>((draft) => {
           draft.count = 1;
         })
       );
@@ -229,7 +237,7 @@ describe("produce", () => {
         callCount++;
       });
 
-      state.set(produce(() => {}));
+      state.set(produce<{ count: number }>(() => {}));
 
       expect(callCount).toBe(0);
     });
@@ -239,7 +247,7 @@ describe("produce", () => {
       const doubled = signal({ base }, ({ deps }) => deps.base.count * 2);
 
       base.set(
-        produce((draft) => {
+        produce<{ count: number }>((draft) => {
           draft.count = 5;
         })
       );

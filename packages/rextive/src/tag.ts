@@ -34,6 +34,8 @@ import {
   TAG_TYPE,
   SignalOf,
   UseList,
+  MUTABLE_TAG_BRAND,
+  COMPUTED_TAG_BRAND,
 } from "./types";
 import { is } from "./is";
 
@@ -41,8 +43,9 @@ import { is } from "./is";
  * Configuration options for creating a tag.
  *
  * @template TValue - The type of values held by signals in this tag
+ * @template TKind - The signal kind: "mutable", "computed", or both (default: SignalKind)
  */
-export type TagOptions<TValue, TKind extends SignalKind = "any"> = {
+export type TagOptions<TValue, TKind extends SignalKind = SignalKind> = {
   /**
    * Debug name for this tag.
    * Useful for debugging and logging.
@@ -266,7 +269,7 @@ export type TagOptions<TValue, TKind extends SignalKind = "any"> = {
    * // Both tracker and validator plugins are active
    * ```
    */
-  use?: UseList<TValue, TKind | "any">;
+  use?: UseList<TValue, TKind>;
 };
 
 /**
@@ -317,7 +320,7 @@ export type UnionOfTagTypes<T extends readonly Tag<any>[]> =
  * });
  * ```
  */
-export function tag<TValue, TKind extends SignalKind = "any">(
+export function tag<TValue, TKind extends SignalKind = SignalKind>(
   options: TagOptions<NoInfer<TValue>, TKind> = {}
 ): Tag<TValue, TKind> {
   // Internal storage for signals in this tag
@@ -328,12 +331,20 @@ export function tag<TValue, TKind extends SignalKind = "any">(
 
   const tagInstance: Tag<NoInfer<TValue>, TKind> = {
     [TAG_TYPE]: true,
+
+    // Brand for TKind discrimination using unique symbols
+    __brand: null as any as TKind extends "mutable"
+      ? typeof MUTABLE_TAG_BRAND
+      : TKind extends "computed"
+      ? typeof COMPUTED_TAG_BRAND
+      : typeof MUTABLE_TAG_BRAND | typeof COMPUTED_TAG_BRAND,
+
     // Kind is a compile-time marker only, not used at runtime
     // Set to null because we don't track signal kinds at runtime
     kind: null as unknown as TKind,
 
     // Store plugins (readonly, cannot be modified after creation)
-    use: (use as any) || [],
+    use: use || [],
 
     forEach(fn: (signal: SignalOf<TValue, TKind>) => void): void {
       signals.forEach(fn);
