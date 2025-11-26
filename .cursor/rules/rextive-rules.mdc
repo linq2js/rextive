@@ -579,134 +579,9 @@ computed.resume(); // Resume recomputing (recalculates now)
 
 ### 3. `rx()` - Complete Overload Reference
 
-The `rx()` function has **4 overloads** for different rendering patterns.
+The `rx()` function has **4 overloads** for reactive rendering in React.
 
-#### Overload 1: Component with Reactive Props
-
-```tsx
-rx(Component, { prop1: signal1, prop2: "static" });
-rx("div", { children: count, className: "counter" });
-```
-
-**When to use:**
-
-- Mix signal and static props
-- Use existing components with signals
-- Convenient inline rendering
-
-**How it works:**
-
-- Signal props are automatically tracked
-- Static props pass through unchanged
-- Component re-renders when signal props change
-
-**Examples:**
-
-```tsx
-// Native elements
-const count = signal(42);
-rx("div", {
-  children: count,
-  className: "counter",
-  style: { color: "blue" },
-});
-
-// Custom components
-const user = signal({ name: "Alice" });
-rx(UserCard, {
-  user: user, // Signal prop - reactive
-  theme: "dark", // Static prop
-  onEdit: handleEdit, // Static callback
-});
-
-// Multiple signals
-rx(Dashboard, {
-  user: userSignal,
-  posts: postsSignal,
-  settings: settingsSignal,
-  loading: false, // Static
-});
-```
-
-**⚠️ IMPORTANT WARNING:**
-
-❌ **NEVER use `rx()` directly in element attributes!**
-
-```tsx
-// ❌ WRONG - Won't be reactive!
-<input value={rx(signal)} />
-<div className={rx(theme)} />
-```
-
-✅ **CORRECT - Use one of these instead:**
-
-```tsx
-// Option 1: Wrap entire element
-{
-  rx({ signal }, (v) => <input value={v.signal} />);
-}
-
-// Option 2: Use component form (Overload 1)
-{
-  rx("input", { value: signal });
-}
-
-// Option 3: Hoist signal outside render
-const MyInput = () => rx("input", { value: signal });
-```
-
-**Why?** `rx()` returns a component that subscribes. In attributes, it's evaluated once and won't re-subscribe.
-
-**⚠️ PERFORMANCE NOTE: Multiple `rx()` Calls**
-
-If your component contains **many `rx()` calls** (3+), consider using `useWatch()` instead for better performance:
-
-```tsx
-// ❌ LESS OPTIMAL: Many rx() calls create many subscriptions
-function Dashboard() {
-  return (
-    <div>
-      <h1>{rx(title)}</h1>
-      <p>{rx(description)}</p>
-      <span>{rx(count)}</span>
-      <span>{rx(status)}</span>
-      <div>{rx(userData, "name")}</div>
-      {/* ... many more rx() calls */}
-    </div>
-  );
-}
-
-// ✅ BETTER: Single useWatch subscription
-function Dashboard() {
-  const [awaited] = useWatch({ title, description, count, status, userData });
-
-  return (
-    <div>
-      <h1>{awaited.title}</h1>
-      <p>{awaited.description}</p>
-      <span>{awaited.count}</span>
-      <span>{awaited.status}</span>
-      <div>{awaited.userData.name}</div>
-    </div>
-  );
-}
-```
-
-**Why?**
-
-- Each `rx()` creates a separate component with its own subscription
-- `useWatch()` creates a single subscription for all signals
-- Component re-renders once when any tracked signal changes
-- More efficient for components with many reactive values
-
-**When to use `rx()` vs `useWatch()`:**
-
-- Use `rx()`: 1-2 signals, complex rendering logic, or async signals
-- Use `useWatch()`: 3+ signals, simple display, or performance-critical components
-
----
-
-#### Overload 2a: Single Signal (Simple Display)
+#### Overload 1: Single Signal (Simple Display)
 
 ```tsx
 const count = signal(42);
@@ -718,12 +593,6 @@ rx(count); // Renders: 42
 - Display single signal value
 - Simplest reactive rendering
 - No transformation needed
-
-**Equivalent to:**
-
-```tsx
-rx({ value: signal }, (v) => v.value);
-```
 
 **Examples:**
 
@@ -746,7 +615,7 @@ return <p>{rx(fullName)}</p>;
 
 ---
 
-#### Overload 2b: Single Signal with Property/Selector
+#### Overload 2: Single Signal with Property/Selector
 
 ```tsx
 const user = signal({ name: "Alice", age: 30 });
@@ -779,129 +648,170 @@ rx(data, (d) => d.user.profile.name);
 // Computed property
 rx(user, (u) => `${u.name} (${u.email})`);
 rx(user, (u) => u.name.toUpperCase());
-
-// With options
-rx(user, "name", { watch: [locale] }); // Re-render when locale changes
 ```
 
 ---
 
-#### Overload 3: Multiple Signals with Render Function
+#### Overload 3: Reactive Function (Auto-Tracking)
 
 ```tsx
-rx({ user, posts }, (awaited, loadables) => {
-  return <div>{awaited.user.name}</div>;
-});
+rx(() => <div>Count: {count()}</div>);
 ```
 
 **When to use:**
 
-- Multiple signals
+- Multiple signals in one render
 - Complex rendering logic
-- Manual loading states
-- Most powerful and common pattern
+- Auto-tracking of signal reads
 
-**Two access modes:**
+**How it works:**
 
-**Mode 1: Suspense (awaited)**
+- Signals accessed inside the function are automatically tracked
+- Re-renders when any tracked signal changes
+- Powered by `useRx` hook internally
+
+**Examples:**
 
 ```tsx
-rx({ user, posts }, (awaited) => {
-  // Throws promise if loading
-  // awaited.user and awaited.posts are resolved values
-  return (
-    <div>
-      <h1>{awaited.user.name}</h1>
-      <PostList posts={awaited.posts} />
-    </div>
-  );
+// Multiple signals - both auto-tracked
+const firstName = signal("John");
+const lastName = signal("Doe");
+
+{rx(() => <span>{firstName()} {lastName()}</span>)}
+
+// Conditional rendering
+const isLoggedIn = signal(false);
+const user = signal({ name: "Alice" });
+
+{rx(() => (
+  isLoggedIn() ? <div>Hello, {user().name}</div> : <Login />
+))}
+
+// With async signals - use wait() for Suspense
+const userData = signal(async () => fetchUser());
+
+{rx(() => {
+  const data = wait(userData()); // Throws for Suspense if loading
+  return <div>{data.name}</div>;
+})}
+
+// Manual loading state with loadable()
+{rx(() => {
+  const state = loadable(userData());
+  if (state.status === "loading") return <Spinner />;
+  if (state.status === "error") return <Error error={state.error} />;
+  return <div>{state.value.name}</div>;
+})}
+```
+
+---
+
+#### Overload 4: Component with Reactive Props
+
+```tsx
+rx(Component, { prop1: signal1, prop2: "static" });
+rx("div", { children: count, className: "counter" });
+```
+
+**When to use:**
+
+- Mix signal and static props
+- Use existing components with signals
+- Convenient inline rendering
+
+**How it works:**
+
+- Signal props are automatically tracked and unwrapped
+- Static props pass through unchanged
+- Component re-renders when signal props change
+
+**Examples:**
+
+```tsx
+// Native HTML elements
+const count = signal(42);
+const theme = signal("dark");
+
+rx("div", {
+  children: count,
+  className: theme,
+  style: { color: "blue" },
+});
+
+// Custom components
+const user = signal({ name: "Alice" });
+rx(UserCard, {
+  user: user, // Signal prop - reactive
+  theme: "dark", // Static prop
+  onEdit: handleEdit, // Static callback
+});
+
+// Multiple signal props
+rx(Dashboard, {
+  user: userSignal,
+  posts: postsSignal,
+  settings: settingsSignal,
+  loading: false, // Static
 });
 ```
 
-**Mode 2: Manual Loading States (loadables)**
+---
+
+#### ⚠️ Important `rx()` Warnings
+
+**❌ NEVER use `rx()` directly in element attributes!**
 
 ```tsx
-rx({ user, posts }, (awaited, loadables) => {
-  if (loadables.user.status === "loading") {
-    return <Spinner />;
-  }
-
-  if (loadables.user.status === "error") {
-    return <Error error={loadables.user.error} />;
-  }
-
-  // loadables.user.status === 'success'
-  return <div>{loadables.user.value.name}</div>;
-});
+// ❌ WRONG - Won't be reactive!
+<input value={rx(signal)} />
+<div className={rx(theme)} />
 ```
 
-**Lazy tracking:**
+**✅ CORRECT - Use one of these instead:**
 
 ```tsx
-// Only subscribes to signals you actually access!
-rx({ user, posts, comments, likes }, (awaited) => {
-  // Only accesses user - only subscribes to user
-  return <div>{awaited.user.name}</div>;
-});
+// Option 1: Wrap entire element with rx(fn)
+{rx(() => <input value={signal()} />)}
 
-// ❌ Bad: Accessing all upfront
-rx({ user, posts, comments }, (awaited) => {
-  const u = awaited.user; // Subscribes
-  const p = awaited.posts; // Subscribes (unnecessary!)
-  const c = awaited.comments; // Subscribes (unnecessary!)
-  return <div>{u.name}</div>; // Only uses user
-});
+// Option 2: Use component form rx(Component, props)
+{rx("input", { value: signal })}
 ```
 
-**Conditional access:**
+**Why?** `rx()` returns a component that subscribes. In attributes, it's evaluated once and won't re-subscribe.
+
+---
+
+#### Async Signal Handling in `rx()`
+
+For signals containing async values (Promises), use these patterns:
+
+**Suspense mode with `wait()`:**
 
 ```tsx
-rx({ user, settings }, (awaited) => {
-  if (!awaited.user.isAdmin) {
-    return <div>Access denied</div>;
-  }
+const userData = signal(async () => fetchUser());
 
-  // Only accesses settings if user is admin
-  return <AdminPanel settings={awaited.settings} />;
-});
+// Use inside rx(fn) - throws for Suspense boundary
+{rx(() => {
+  const data = wait(userData());
+  return <div>{data.name}</div>;
+})}
 ```
 
-**With watch option:**
+**Manual loading states with `loadable()`:**
 
 ```tsx
-// Memoize render function with watch dependencies
-rx(
-  { user, posts },
-  (awaited) => {
-    return <div>{formatUser(awaited.user, locale)}</div>;
-  },
-  {
-    watch: [locale], // Re-create render when locale changes
-  }
-);
-```
-
-**Complete loading pattern:**
-
-```tsx
-rx({ data }, (awaited, loadables) => {
-  const { status, value, error, promise } = loadables.data;
-
-  switch (status) {
+{rx(() => {
+  const state = loadable(userData());
+  
+  switch (state.status) {
     case "loading":
       return <Spinner />;
-
     case "error":
-      return (
-        <ErrorBoundary error={error}>
-          <button onClick={() => promise.retry()}>Retry</button>
-        </ErrorBoundary>
-      );
-
+      return <Error error={state.error} />;
     case "success":
-      return <DataView data={value} />;
+      return <div>{state.value.name}</div>;
   }
-});
+})}
 ```
 
 ---
@@ -1370,6 +1280,174 @@ if (loadable.is(value)) {
   }
 }
 ```
+
+---
+
+### 7. Plugins - Extend Signal Behavior
+
+Plugins let you extend signal behavior with reusable logic. A plugin is a function that receives a signal and optionally returns a cleanup function.
+
+```tsx
+import { signal } from "rextive";
+import type { Plugin } from "rextive";
+
+// Define a plugin
+const logger: Plugin<number> = (sig) => {
+  const name = sig.displayName || "unnamed";
+  console.log(`[${name}] created: ${sig()}`);
+
+  // Return cleanup function (optional)
+  return sig.on(() => {
+    console.log(`[${name}] changed: ${sig()}`);
+  });
+};
+
+// Use the plugin with `use` option
+const count = signal(0, { name: "count", use: [logger] });
+// Logs: "[count] created: 0"
+
+count.set(5);
+// Logs: "[count] changed: 5"
+
+count.dispose();
+// Cleanup runs automatically
+```
+
+#### Real-World Plugin Examples
+
+**Logger Plugin:**
+
+```tsx
+const logger: Plugin<any> = (sig) => {
+  const name = sig.displayName || "unnamed";
+  console.log(`[${name}] created:`, sig());
+
+  return sig.on(() => {
+    console.log(`[${name}] changed:`, sig());
+  });
+};
+```
+
+**Persister Plugin (localStorage):**
+
+```tsx
+const persister =
+  (key: string): Plugin<any, "mutable"> =>
+  (sig) => {
+    // Load from storage on creation
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      sig.set(JSON.parse(stored));
+    }
+
+    // Save on every change
+    return sig.on(() => {
+      localStorage.setItem(key, JSON.stringify(sig()));
+    });
+  };
+
+const theme = signal("dark", { use: [persister("theme")] });
+```
+
+**Validator Plugin:**
+
+```tsx
+const validator =
+  (validate: (v: string) => string | null): Plugin<string, "mutable"> =>
+  (sig) => {
+    return sig.on(() => {
+      const error = validate(sig());
+      if (error) console.warn(`Validation error: ${error}`);
+    });
+  };
+
+const email = signal("", {
+  use: [validator((v) => (v.includes("@") ? null : "Invalid email"))],
+});
+```
+
+#### Type-Safe Plugins
+
+```tsx
+// Works with any signal
+const anyPlugin: Plugin<number> = (sig) => { /* ... */ };
+
+// Only works with mutable signals (has .set())
+const mutablePlugin: Plugin<number, "mutable"> = (sig) => {
+  sig.set(100); // ✅ TypeScript knows sig has .set()
+};
+
+// Only works with computed signals (has .pause()/.resume())
+const computedPlugin: Plugin<number, "computed"> = (sig) => {
+  sig.pause(); // ✅ TypeScript knows sig has .pause()
+};
+```
+
+---
+
+### 8. Tags vs Plugins
+
+Both use the `use` option, but serve different purposes:
+
+| Feature        | Tag                               | Plugin                             |
+| -------------- | --------------------------------- | ---------------------------------- |
+| **Purpose**    | Group and manage signals          | Extend signal behavior             |
+| **Execution**  | Registers signal + runs callbacks | Runs once on creation              |
+| **Lifecycle**  | `onAdd`, `onDelete`, `onChange`   | Returns cleanup function           |
+| **Collection** | Maintains a `Set` of signals      | No signal collection               |
+| **Iteration**  | Can iterate with `forEach`        | Cannot iterate                     |
+
+**Tags - For Signal Management:**
+
+```tsx
+import { signal } from "rextive";
+
+// Create a tag with lifecycle callbacks
+const formTag = signal.tag<string>({
+  name: "formFields",
+  onAdd: (sig, tag) => {
+    console.log(`Field added: ${sig.displayName}, total: ${tag.size}`);
+  },
+  onDelete: (sig, tag) => {
+    console.log(`Field removed: ${sig.displayName}`);
+  },
+});
+
+// Add signals to tag
+const name = signal("", { name: "name", use: [formTag] });
+const email = signal("", { name: "email", use: [formTag] });
+
+// Tag can iterate over all signals
+formTag.forEach((sig) => sig.reset()); // Reset all form fields
+```
+
+**Plugins - For Signal Behavior:**
+
+```tsx
+// Plugins extend behavior - run once, return cleanup
+const logger: Plugin<any> = (sig) => {
+  console.log(`Signal created: ${sig.displayName}`);
+
+  const unsubscribe = sig.on(() => {
+    console.log(`Signal changed: ${sig()}`);
+  });
+
+  return unsubscribe; // Cleanup called on dispose
+};
+
+const count = signal(0, { name: "count", use: [logger] });
+```
+
+**When to Use Each:**
+
+| Scenario                        | Use          |
+| ------------------------------- | ------------ |
+| Reset all form fields at once   | Tag          |
+| Log every signal change         | Plugin       |
+| Track active API queries        | Tag          |
+| Auto-save to localStorage       | Plugin       |
+| Batch dispose related signals   | Tag          |
+| Add validation behavior         | Plugin       |
 
 ---
 
@@ -1904,8 +1982,7 @@ function Component() {
 
 - `rx()` - Reactive rendering (4 overloads)
 - `useScope()` - Lifecycle & scoped state (3 overloads)
-- `useWatch()` - Subscribe to signals (prefer over multiple `rx()` calls)
-- `useRerender()` - Manual rerender
+- `useRx()` - Subscribe to signals in render function
 
 ### Utilities
 
@@ -1934,8 +2011,9 @@ function Component() {
 
 - Services implement `Disposable`
 - Use `useScope()` for component-scoped state
-- Use `rx()` for reactive rendering (1-2 signals)
-- Use `useWatch()` for components with many signals (3+)
+- Use `rx()` for reactive rendering
+- Use `wait()` for Suspense-based async handling
+- Use `loadable()` for manual loading states
 - Use `abortSignal` for queries, not mutations
 - Always include `dispose` property in useScope
 - Import from `rextive/react` in React apps

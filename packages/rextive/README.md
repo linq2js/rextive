@@ -5364,6 +5364,8 @@ count.on(() => console.log("count changed"));
 
 ### vs Zustand
 
+**Lazy Tracking:**
+
 ```tsx
 // ❌ Zustand - Must select everything upfront
 const { user, posts, comments } = useStore((state) => ({
@@ -5382,6 +5384,101 @@ import { rx, wait } from "rextive/react";
   });
 }
 ```
+
+**Async State Management:**
+
+```tsx
+// ❌ Zustand - Manual async state management (lots of boilerplate!)
+const useUserStore = create((set, get) => ({
+  // Each async operation needs 3 states
+  user: null,
+  userLoading: false,
+  userError: null,
+
+  posts: [],
+  postsLoading: false,
+  postsError: null,
+
+  comments: [],
+  commentsLoading: false,
+  commentsError: null,
+
+  // Each fetch needs manual loading/error handling
+  fetchUser: async (id) => {
+    set({ userLoading: true, userError: null });
+    try {
+      const user = await api.getUser(id);
+      set({ user, userLoading: false });
+    } catch (error) {
+      set({ userError: error, userLoading: false });
+    }
+  },
+
+  fetchPosts: async (userId) => {
+    set({ postsLoading: true, postsError: null });
+    try {
+      const posts = await api.getPosts(userId);
+      set({ posts, postsLoading: false });
+    } catch (error) {
+      set({ postsError: error, postsLoading: false });
+    }
+  },
+
+  // ...repeat for every async operation 😩
+}));
+
+// Component
+function Profile({ userId }) {
+  const { user, userLoading, userError, fetchUser } = useUserStore();
+
+  useEffect(() => {
+    fetchUser(userId);
+  }, [userId]);
+
+  if (userLoading) return <Spinner />;
+  if (userError) return <Error error={userError} />;
+  return <div>{user?.name}</div>;
+}
+
+// ✅ Rextive - Async is built-in, zero boilerplate!
+import { signal, rx, loadable } from "rextive/react";
+
+const userId = signal(1);
+
+// Just declare what you want - loading/error handled automatically
+const user = signal({ userId }, async ({ deps, abortSignal }) => {
+  return api.getUser(deps.userId, { signal: abortSignal });
+});
+
+const posts = signal({ userId }, async ({ deps, abortSignal }) => {
+  return api.getPosts(deps.userId, { signal: abortSignal });
+});
+
+// Component - that's it!
+function Profile() {
+  return rx(() => {
+    const state = loadable(user);
+    if (state.loading) return <Spinner />;
+    if (state.error) return <Error error={state.error} />;
+    return <div>{state.value.name}</div>;
+  });
+}
+
+// Or use Suspense - even simpler!
+function ProfileWithSuspense() {
+  return rx(() => <div>{wait(user).name}</div>);
+}
+```
+
+**Key differences:**
+
+| Feature                     | Zustand                       | Rextive    |
+| --------------------------- | ----------------------------- | ---------- |
+| Async state per operation   | 3 fields (data/loading/error) | Built-in   |
+| Request cancellation        | Manual AbortController        | Automatic  |
+| Race conditions             | Must handle manually          | Impossible |
+| Dependency tracking         | Manual selectors              | Automatic  |
+| Code for 5 async operations | ~150 lines                    | ~15 lines  |
 
 ### vs React Query
 
