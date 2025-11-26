@@ -2368,11 +2368,11 @@ import { signal } from "rextive";
 // Create a tag to group form signals
 const formTag = signal.tag();
 
-// Create signals with the tag
-const name = signal("", { tags: [formTag] });
-const email = signal("", { tags: [formTag] });
-const message = signal("", { tags: [formTag] });
-const agreedToTerms = signal(false, { tags: [formTag] });
+// Create signals with the tag (use `use` option for both plugins and tags)
+const name = signal("", { use: [formTag] });
+const email = signal("", { use: [formTag] });
+const message = signal("", { use: [formTag] });
+const agreedToTerms = signal(false, { use: [formTag] });
 
 // Reset all form fields at once
 const resetForm = () => {
@@ -2413,13 +2413,13 @@ const stateTag: Tag<number, "mutable"> = tag<number, "mutable">();
 const viewTag: Tag<number, "computed"> = tag<number, "computed">();
 
 // Usage
-const count = signal(0, { tags: [stateTag] }); // ✅ Mutable signal with mutable tag
+const count = signal(0, { use: [stateTag] }); // ✅ Mutable signal with mutable tag
 const doubled = signal({ count }, ({ deps }) => deps.count * 2, {
-  tags: [viewTag], // ✅ Computed signal with computed tag
+  use: [viewTag], // ✅ Computed signal with computed tag
 });
 
 // Both can use mixed tag
-const all = signal(0, { tags: [mixedTag] }); // ✅ Accepts any signal
+const all = signal(0, { use: [mixedTag] }); // ✅ Accepts any signal
 ```
 
 **⚠️ Known Limitation:**
@@ -2430,7 +2430,7 @@ Due to TypeScript's structural typing, cross-kind tag assignment may not produce
 const computedTag = tag<number, "computed">();
 
 // ⚠️ This doesn't error (but is logically wrong)
-const mutableSig = signal(0, { tags: [computedTag] });
+const mutableSig = signal(0, { use: [computedTag] });
 
 // Runtime: The signal IS added to the tag, but violates semantic contract
 ```
@@ -2457,9 +2457,9 @@ const readonlyViews = tag<string, "computed">(); // Only for derived values
 const userTag = signal.tag();
 const persistTag = signal.tag();
 
-const userName = signal("", { tags: [userTag, persistTag] });
-const userEmail = signal("", { tags: [userTag, persistTag] });
-const sessionId = signal("", { tags: [userTag] }); // Not persisted
+const userName = signal("", { use: [userTag, persistTag] });
+const userEmail = signal("", { use: [userTag, persistTag] });
+const sessionId = signal("", { use: [userTag] }); // Not persisted
 
 // Reset user data
 userTag.forEach((s) => s.reset());
@@ -2481,8 +2481,8 @@ userTag.forEach((s) => {
 
 // Type-safe tag operations
 const mutableTag = tag<number, "mutable">();
-const count1 = signal(0, { tags: [mutableTag] });
-const count2 = signal(5, { tags: [mutableTag] });
+const count1 = signal(0, { use: [mutableTag] });
+const count2 = signal(5, { use: [mutableTag] });
 
 // All signals in this tag are guaranteed to be mutable
 mutableTag.forEach((s) => {
@@ -3425,7 +3425,7 @@ const user = signal(
       // Called on errors
       console.error("Error:", error);
     },
-    tags: [myTag], // Group with tags
+    use: [myTag, myPlugin], // Plugins and tags (unified `use` option)
   }
 );
 
@@ -3626,6 +3626,52 @@ See [Example 8: Batch Updates](#example-8-batch-updates-for-performance) for mor
 
 ---
 
+#### `signal.on(signals, callback)`
+
+Subscribe to multiple signals and call callback when any changes. Unlike computed signals, this does NOT evaluate signals at the beginning (effect-like behavior):
+
+```tsx
+import { signal } from "rextive";
+
+const count = signal(0);
+const name = signal("Alice");
+const enabled = signal(true);
+
+// Subscribe to multiple signals
+const control = signal.on([count, name, enabled], (trigger) => {
+  console.log("Changed:", trigger());
+});
+
+count.set(1); // Logs: "Changed: 1"
+name.set("Bob"); // Logs: "Changed: Bob"
+
+// Pause/resume subscription
+control.pause();
+count.set(2); // No log (paused)
+
+control.resume();
+count.set(3); // Logs: "Changed: 3"
+
+// Cleanup
+control.dispose();
+```
+
+**Returns `SignalOnControl`:**
+
+- `pause()` - Pause subscription (stop receiving updates)
+- `resume()` - Resume subscription
+- `paused()` - Check if currently paused
+- `dispose()` - Cleanup permanently
+
+**Use cases:**
+
+- ✅ React to changes from multiple sources
+- ✅ Debounced side effects
+- ✅ Coordination between signals
+- ✅ Pausable subscriptions
+
+---
+
 #### `signal.persist(signals, options)`
 
 Persist signals to storage with automatic sync:
@@ -3666,10 +3712,10 @@ Create a tag to group related signals:
 ```tsx
 const formTag = signal.tag();
 
-// Create signals with the tag
-const name = signal("", { tags: [formTag] });
-const email = signal("", { tags: [formTag] });
-const message = signal("", { tags: [formTag] });
+// Create signals with the tag (use `use` option for both plugins and tags)
+const name = signal("", { use: [formTag] });
+const email = signal("", { use: [formTag] });
+const message = signal("", { use: [formTag] });
 
 // Operate on all tagged signals
 formTag.forEach((s) => s.reset()); // Reset all
@@ -5071,7 +5117,8 @@ rextive/immer     # Immer integration
 - `signal` / `$` - Reactive state primitive
 - `signal.batch` - Batch updates
 - `signal.persist` - Persistence utilities
-- `signal.tag` - Group signals
+- `signal.tag` - Group signals with tags
+- `signal.on` - Subscribe to multiple signals with pause/resume control
 - `wait` - Promise utilities (`wait.any`, `wait.race`, `wait.settled`, `wait.timeout`, `wait.delay`)
 - `awaited` - Transform async/sync values uniformly
 - `compose` - Function composition utility
@@ -5121,6 +5168,34 @@ Advanced topics and guides:
 ---
 
 ## 🆕 What's New
+
+### Unified `use` Option
+
+The `tags` option has been merged into the `use` option. Now both plugins and tags are passed through the same unified `use` array:
+
+```tsx
+// Before (deprecated):
+const count = signal(0, { tags: [formTag], use: [logger] });
+
+// After (current):
+const count = signal(0, { use: [formTag, logger] });
+```
+
+This simplifies the API and allows tags to have their own plugins that are automatically applied to signals.
+
+### `signal.on()` - Multi-Signal Subscription
+
+New namespace function to subscribe to multiple signals with pause/resume control:
+
+```tsx
+const control = signal.on([count, name, enabled], (trigger) => {
+  console.log("Changed:", trigger());
+});
+
+control.pause(); // Stop receiving updates
+control.resume(); // Resume updates
+control.dispose(); // Cleanup
+```
 
 ### Type System Improvements
 
