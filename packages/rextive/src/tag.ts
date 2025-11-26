@@ -45,7 +45,7 @@ import { is } from "./is";
  * @template TValue - The type of values held by signals in this tag
  * @template TKind - The signal kind: "mutable", "computed", or both (default: SignalKind)
  */
-export type TagOptions<TValue, TKind extends SignalKind = SignalKind> = {
+export type TagOptions<TValue, TKind extends SignalKind = "any"> = {
   /**
    * Debug name for this tag.
    * Useful for debugging and logging.
@@ -320,7 +320,7 @@ export type UnionOfTagTypes<T extends readonly Tag<any>[]> =
  * });
  * ```
  */
-export function tag<TValue, TKind extends SignalKind = SignalKind>(
+export function tag<TValue, TKind extends SignalKind = "any">(
   options: TagOptions<NoInfer<TValue>, TKind> = {}
 ): Tag<TValue, TKind> {
   // Internal storage for signals in this tag

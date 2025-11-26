@@ -2404,7 +2404,7 @@ import { signal, tag } from "rextive";
 import type { Tag } from "rextive";
 
 // Default: General tag - accepts both mutable and computed signals
-const mixedTag = tag<number>(); // Tag<number, "mutable" | "computed">
+const mixedTag = tag<number>(); // Tag<number, "any">
 
 // Mutable-only tag - semantic constraint for writable state
 const stateTag: Tag<number, "mutable"> = tag<number, "mutable">();
@@ -2422,31 +2422,35 @@ const doubled = signal({ count }, ({ deps }) => deps.count * 2, {
 const all = signal(0, { use: [mixedTag] }); // ✅ Accepts any signal
 ```
 
-**⚠️ Known Limitation:**
+**✅ Type-Safe Cross-Kind Protection:**
 
-Due to TypeScript's structural typing, cross-kind tag assignment may not produce compile-time errors in all contexts:
+TypeScript now produces compile-time errors for cross-kind tag assignments:
 
 ```tsx
 const computedTag = tag<number, "computed">();
 
-// ⚠️ This doesn't error (but is logically wrong)
+// ❌ TypeScript Error: Computed tag cannot be used with mutable signal
 const mutableSig = signal(0, { use: [computedTag] });
 
-// Runtime: The signal IS added to the tag, but violates semantic contract
+// ✅ Correct: Use a general tag or mutable-specific tag
+const generalTag = tag<number>(); // Accepts any kind
+const mutableTag = tag<number, "mutable">();
+const mutableSig = signal(0, { use: [generalTag] }); // ✅ OK
+const mutableSig2 = signal(0, { use: [mutableTag] }); // ✅ OK
 ```
 
 **Best Practice:**
 
 ```tsx
 // ✅ Recommended: Use general tags by default
-const counters = tag<number>(); // Accepts both kinds
+const counters = tag<number>(); // Accepts both kinds (kind = "any")
 
 // ✅ Use specific kinds only when you have strong semantic reasons
 const writableState = tag<AppState, "mutable">(); // Only for state we modify
 const readonlyViews = tag<string, "computed">(); // Only for derived values
 
-// ⚠️ Be aware: TypeScript can't always prevent cross-kind usage
-// Use code reviews and linting to catch logical errors
+// ✅ TypeScript enforces kind constraints at compile time
+// Cross-kind mismatches will produce type errors
 ```
 
 <details>
@@ -5204,7 +5208,7 @@ Recent updates bring enhanced type safety and better developer experience:
 - **`AnySignal<T>` type** - Write generic functions that work with all signal types
 - **Improved `when()` typing** - Callbacks now receive exact signal types (MutableSignal or ComputedSignal)
 - **Enhanced tag type safety** - Tag kinds with compile-time checking via brand properties
-- **Refined SignalKind** - Changed from `"any"` to union type for better TypeScript inference
+- **SignalKind includes "any"** - General tags use `"any"` to accept both mutable and computed signals with proper cross-kind type checking
 
 See the [Type System Improvements Guide](./docs/TYPE_IMPROVEMENTS.md) for details and examples.
 

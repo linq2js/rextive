@@ -2145,13 +2145,23 @@ function pluginTests() {
   // Tag with plugins (using any-kind plugins)
   const tagWithPlugins = tag<number>({ use: [anyPlugin] });
   expectType<Tag<number>>(tagWithPlugins);
-  expectType<ReadonlyArray<Plugin<number> | Tag<number>>>(tagWithPlugins.use);
+  expectType<
+    ReadonlyArray<
+      | Plugin<number, "any" | "mutable" | "computed">
+      | Tag<number, "any" | "mutable" | "computed">
+    >
+  >(tagWithPlugins.use);
 
   // Tag with nested tags
   const nestedTag1 = tag<number>({ use: [anyPlugin] });
   const nestedTag2 = tag<number>({ use: [nestedTag1, anyPlugin] });
   expectType<Tag<number>>(nestedTag2);
-  expectType<ReadonlyArray<Plugin<number> | Tag<number>>>(nestedTag2.use);
+  expectType<
+    ReadonlyArray<
+      | Plugin<number, "any" | "mutable" | "computed">
+      | Tag<number, "any" | "mutable" | "computed">
+    >
+  >(nestedTag2.use);
 
   // Tag with mixed plugins and tags
   const mixedTag = tag<number>({
@@ -2162,12 +2172,22 @@ function pluginTests() {
   // Empty tag
   const emptyTag = tag<number>({ use: [] });
   expectType<Tag<number>>(emptyTag);
-  expectType<ReadonlyArray<Plugin<number> | Tag<number>>>(emptyTag.use);
+  expectType<
+    ReadonlyArray<
+      | Plugin<number, "any" | "mutable" | "computed">
+      | Tag<number, "any" | "mutable" | "computed">
+    >
+  >(emptyTag.use);
 
   // Tag without use option
   const simpleTag = tag<number>();
   expectType<Tag<number>>(simpleTag);
-  expectType<ReadonlyArray<Plugin<number> | Tag<number>>>(simpleTag.use);
+  expectType<
+    ReadonlyArray<
+      | Plugin<number, "any" | "mutable" | "computed">
+      | Tag<number, "any" | "mutable" | "computed">
+    >
+  >(simpleTag.use);
 
   // -----------------------------------------------------------------------------
   // Signal with tag use option
@@ -2302,7 +2322,12 @@ function pluginTests() {
   const level1Tag = tag<number>({ use: [level2Tag] });
 
   expectType<Tag<number>>(level1Tag);
-  expectType<ReadonlyArray<Plugin<number> | Tag<number>>>(level1Tag.use);
+  expectType<
+    ReadonlyArray<
+      | Plugin<number, "any" | "mutable" | "computed">
+      | Tag<number, "any" | "mutable" | "computed">
+    >
+  >(level1Tag.use);
 
   const deepSignal = signal(0, { use: [level1Tag] });
   expectType<MutableSignal<number>>(deepSignal);
@@ -2349,7 +2374,7 @@ function pluginTests() {
   // Use explicit type annotations to prevent type widening
   const computedTag2: Tag<number, "computed"> = tag<number, "computed">();
   const mutableTag2: Tag<number, "mutable"> = tag<number, "mutable">();
-  const generalTag2: Tag<number, SignalKind> = tag<number>();
+  const generalTag2: Tag<number> = tag<number>();
   const depSig = signal(1);
 
   // -----------------------------------------------------------------------------
@@ -2359,7 +2384,7 @@ function pluginTests() {
   // ✅ Same kind assignment
   const testAssign1: Tag<number, "mutable"> = mutableTag2;
   const testAssign2: Tag<number, "computed"> = computedTag2;
-  const testAssign3: Tag<number, SignalKind> = generalTag2;
+  const testAssign3: Tag<number> = generalTag2;
 
   // ❌ Cross-kind assignment (should error)
   // @ts-expect-error - computed tag cannot be assigned to mutable slot
@@ -2370,6 +2395,10 @@ function pluginTests() {
   // ✅ Specific kind to general (upcasting - OK)
   const testAssign6: Tag<number, SignalKind> = mutableTag2;
   const testAssign7: Tag<number, SignalKind> = computedTag2;
+
+  const computedTag = tag<number, "mutable">();
+
+  void signal(0, { use: [computedTag] });
 
   void testAssign1,
     testAssign2,
@@ -2404,6 +2433,7 @@ function pluginTests() {
   // But array literal contexts don't enforce this:
   const testMutableSig1 = signal(0, { use: [mutableTag2] }); // ✅ Correct
   const testMutableSig2 = signal(0, { use: [generalTag2] }); // ✅ Correct
+  // @ts-expect-error - computed tag cannot be assigned to mutable slot
   const testMutableSig3 = signal(0, { use: [computedTag2] }); // ⚠️ Should error but doesn't
 
   const testComputedSig1 = signal({ depSig }, ({ deps }) => deps.depSig, {
@@ -2412,6 +2442,7 @@ function pluginTests() {
   const testComputedSig2 = signal({ depSig }, ({ deps }) => deps.depSig, {
     use: [generalTag2], // ✅ Correct
   });
+  // @ts-expect-error - mutable tag cannot be assigned to computed slot
   const testComputedSig3 = signal({ depSig }, ({ deps }) => deps.depSig, {
     use: [mutableTag2], // ⚠️ Should error but doesn't
   });

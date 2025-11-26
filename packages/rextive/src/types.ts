@@ -656,7 +656,7 @@ export type SignalMap = Record<string, AnySignal<any>>;
  *
  * Tags can accept union kinds (e.g., "mutable" | "computed") to work with both types
  */
-export type SignalKind = "mutable" | "computed";
+export type SignalKind = "mutable" | "computed" | "any";
 
 /**
  * Helper type to get the signal type based on kind
@@ -726,7 +726,7 @@ export type SignalOf<T, K extends SignalKind> = K extends "any"
  * };
  * ```
  */
-export type Plugin<TValue, TKind extends SignalKind = SignalKind> = (
+export type Plugin<TValue, TKind extends SignalKind = "any"> = (
   signal: SignalOf<TValue, TKind>
 ) => (() => void) | void;
 
@@ -754,7 +754,7 @@ export type Plugin<TValue, TKind extends SignalKind = SignalKind> = (
  * const computedTag = tag<number, "computed">();
  * ```
  */
-export type Tag<TValue, TKind extends SignalKind = SignalKind> = {
+export type Tag<TValue, TKind extends SignalKind = "any"> = {
   [TAG_TYPE]: true;
 
   /**
@@ -1146,19 +1146,12 @@ export type UseList<TValue, TKind extends SignalKind> = ReadonlyArray<
   // Use tuple trick to prevent distributive conditional types
   // Checks if TKind is exactly "mutable" or "computed" (not a union)
   [TKind] extends ["mutable"]
-    ?
-        | Plugin<TValue, "mutable">
-        | Plugin<TValue, SignalKind>
-        | Tag<TValue, "mutable">
-        | Tag<TValue, SignalKind>
+    ? Plugin<TValue, "mutable" | "any"> | Tag<TValue, "mutable" | "any">
     : [TKind] extends ["computed"]
-    ?
-        | Plugin<TValue, "computed">
-        | Plugin<TValue, SignalKind>
-        | Tag<TValue, "computed">
-        | Tag<TValue, SignalKind>
+    ? Plugin<TValue, "computed" | "any"> | Tag<TValue, "computed" | "any">
     : // TKind is SignalKind (union of both) - accept general plugins/tags only
-      Plugin<TValue, SignalKind> | Tag<TValue, SignalKind>
+      | Plugin<TValue, "any" | "mutable" | "computed">
+        | Tag<TValue, "any" | "mutable" | "computed">
 >;
 
 /**
