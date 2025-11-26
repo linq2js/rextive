@@ -1265,15 +1265,20 @@ const user = signal({ userId }, async ({ deps, abortSignal }) => {
 
 // Pattern 2: Manual + automatic cancellation
 const searchTerm = signal("");
-const manualController = new AbortController();
+
+// Use producer to create fresh AbortController for each computation
+const manualController = producer(() => new AbortController());
 
 const searchResults = signal({ searchTerm }, async ({ deps, abortSignal }) => {
   if (!deps.searchTerm) return [];
 
+  // Get fresh controller for this computation (creates new one each time)
+  const controller = manualController.next();
+
   // Combine three cancellation sources
   const combinedSignal = AbortSignal.any([
     abortSignal, // Auto: when searchTerm changes
-    manualController.signal, // Manual: when you call abort()
+    controller.signal, // Manual: current computation's controller
     AbortSignal.timeout(10000), // Timeout: after 10 seconds
   ]);
 
@@ -1283,8 +1288,10 @@ const searchResults = signal({ searchTerm }, async ({ deps, abortSignal }) => {
   return res.json();
 });
 
-// Later: manually cancel all searches
-manualController.abort();
+// Cancel current search (only affects in-progress computation)
+manualController.current().abort();
+
+// Next computation will get a fresh AbortController automatically
 
 // Pattern 3: Retry with timeout
 const data = signal(async ({ abortSignal, safe }) => {
@@ -3443,6 +3450,171 @@ function App() {
 - ✨ Simpler than all of them
 
 </details>
+
+---
+
+## 📋 API Cheatsheet
+
+Quick reference for all Rextive APIs.
+
+### Core - Signals
+
+| API                              | Description                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------------- |
+| `signal()`                       | Create empty signal with `undefined` initial value                           |
+| `signal(value)`                  | Create mutable signal with initial value                                     |
+| `signal(value, equals)`          | Create signal with equality strategy (`"strict"` \| `"shallow"` \| `"deep"`) |
+| `signal(value, options)`         | Create signal with full options (name, equals, fallback, onChange, etc.)     |
+| `signal(deps, compute)`          | Create computed signal with explicit dependencies                            |
+| `signal(deps, compute, equals)`  | Computed signal with equality strategy                                       |
+| `signal(deps, compute, options)` | Computed signal with full options                                            |
+| `$`                              | Alias for `signal`                                                           |
+
+### Signal Instance Methods
+
+| Method              | Type     | Description                                                           |
+| ------------------- | -------- | --------------------------------------------------------------------- |
+| `signal()`          | All      | Read current value (shorthand for `.get()`)                           |
+| `.set(value)`       | Mutable  | Set new value directly                                                |
+| `.set(fn)`          | Mutable  | Update value with reducer function                                    |
+| `.reset()`          | Mutable  | Reset to initial value                                                |
+| `.on(listener)`     | All      | Subscribe to changes, returns unsubscribe function                    |
+| `.to(fn)`           | All      | Derive new signal with transform (shorthand for `.pipe(select(...))`) |
+| `.pipe(...ops)`     | All      | Chain operators for transformation                                    |
+| `.map(fn)`          | All      | Alias for `.to()`                                                     |
+| `.dispose()`        | All      | Clean up signal and subscriptions                                     |
+| `.refresh()`        | Computed | Force immediate recomputation                                         |
+| `.stale()`          | Computed | Mark as stale for lazy recomputation                                  |
+| `.when(target, cb)` | All      | React when target signal changes                                      |
+
+### Signal Namespace Methods
+
+| API                                | Description                            |
+| ---------------------------------- | -------------------------------------- |
+| `signal.is(value)`                 | Type guard: check if value is a Signal |
+| `signal.batch(fn)`                 | Batch multiple updates, notify once    |
+| `signal.tag(options?)`             | Create a tag to group/manage signals   |
+| `signal.persist(signals, options)` | Persist signals to storage             |
+| `signal.on(signals, listener)`     | Subscribe to multiple signals at once  |
+
+---
+
+### Async - `wait` Namespace
+
+| API                                    | Description                                  |
+| -------------------------------------- | -------------------------------------------- |
+| `wait(awaitable)`                      | Wait for single/tuple/record (Suspense mode) |
+| `wait(awaitable, onResolve)`           | Wait then transform (Promise mode)           |
+| `wait(awaitable, onResolve, onReject)` | Wait with error handler                      |
+| `wait.all(...)`                        | Alias for `wait()` - wait for all            |
+| `wait.any(record)`                     | First to resolve → `[value, key]`            |
+| `wait.race(record)`                    | First to settle → `[value, key]`             |
+| `wait.settled(awaitables)`             | All settled, never throws                    |
+| `wait.timeout(awaitable, ms)`          | With timeout (throws `TimeoutError`)         |
+| `wait.delay(ms)`                       | Simple delay promise                         |
+
+---
+
+### Async - `loadable` Namespace
+
+| API                         | Description                   |
+| --------------------------- | ----------------------------- |
+| `loadable(value)`           | Normalize value to Loadable   |
+| `loadable.loading(promise)` | Create loading state          |
+| `loadable.success(value)`   | Create success state          |
+| `loadable.error(error)`     | Create error state            |
+| `loadable.is(value)`        | Type guard: check if Loadable |
+
+---
+
+### React Hooks & Components
+
+| API                          | Description                         |
+| ---------------------------- | ----------------------------------- |
+| `rx(signal)`                 | Render single signal value          |
+| `rx(signal, prop)`           | Render signal property              |
+| `rx(signal, selector)`       | Render transformed signal value     |
+| `rx(fn)`                     | Reactive render with auto-tracking  |
+| `useRx(fn)`                  | Track signals in render function    |
+| `useScope(lifecycles)`       | Track component lifecycle phases    |
+| `useScope(factory)`          | Create component-scoped signals     |
+| `useScope(factory, options)` | Scoped signals with watch/lifecycle |
+| `provider(options)`          | Create `[useCtx, Provider]` tuple   |
+
+---
+
+### Operators (`rextive/op`)
+
+| API                          | Description                             |
+| ---------------------------- | --------------------------------------- |
+| `select(fn, equals?)`        | Transform values (like `Array.map`)     |
+| `filter(predicate, equals?)` | Filter values (like `Array.filter`)     |
+| `scan(fn, initial, equals?)` | Accumulate values (like `Array.reduce`) |
+
+---
+
+### Utilities
+
+| API                       | Description                           |
+| ------------------------- | ------------------------------------- |
+| `disposable(...items)`    | Combine disposables into one          |
+| `compose(...fns)`         | Compose functions (right-to-left)     |
+| `awaited(...selectors)`   | Transform async/sync values uniformly |
+| `is(value)`               | Check if any Signal                   |
+| `is(value, "mutable")`    | Check if MutableSignal                |
+| `is(value, "computed")`   | Check if ComputedSignal               |
+| `is(value, "observable")` | Check if has `.on()` method           |
+
+---
+
+### Types (for TypeScript)
+
+| Type                | Description                       |
+| ------------------- | --------------------------------- |
+| `Signal<T>`         | Base signal type                  |
+| `MutableSignal<T>`  | Signal with `.set()`              |
+| `ComputedSignal<T>` | Signal with `.refresh()/.stale()` |
+| `AnySignal<T>`      | Union of Mutable \| Computed      |
+| `Loadable<T>`       | Loading \| Success \| Error state |
+| `Disposable`        | Object with `.dispose()`          |
+| `Tag<T, K>`         | Signal grouping tag               |
+| `Plugin<T, K>`      | Signal plugin function            |
+
+---
+
+### Quick Reference Card
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  SIGNAL CREATION                                            │
+├─────────────────────────────────────────────────────────────┤
+│  signal(0)                    → MutableSignal<number>       │
+│  signal({ a, b }, fn)         → ComputedSignal<T>           │
+│  signal<T>()                  → MutableSignal<T | undefined>│
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  REACT RENDERING                                            │
+├─────────────────────────────────────────────────────────────┤
+│  rx(count)                    → Display signal value        │
+│  rx(() => <div>{count()}</div>) → Auto-tracked render       │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  ASYNC HANDLING                                             │
+├─────────────────────────────────────────────────────────────┤
+│  wait(promise)                → Suspense mode               │
+│  loadable(promise)            → Manual loading states       │
+│  wait.any({ a, b })           → Race: first wins            │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  LIFECYCLE                                                  │
+├─────────────────────────────────────────────────────────────┤
+│  useScope({ mount, dispose }) → Lifecycle tracking          │
+│  useScope(() => disposable({ sig })) → Scoped signals       │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 

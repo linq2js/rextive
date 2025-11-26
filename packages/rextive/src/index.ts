@@ -44,6 +44,7 @@ export { resolveEquals } from "./utils/resolveEquals";
 export type { EqualsStrategy, EqualsOption } from "./utils/resolveEquals";
 export { compose } from "./utils/compose";
 export { dev } from "./utils/dev";
+export { producer } from "./utils/producer";
 export { wait, type Awaitable } from "./wait";
 export { awaited } from "./awaited";
 export { AbortedComputationError } from "./createSignalContext";

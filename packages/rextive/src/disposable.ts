@@ -226,15 +226,47 @@ export function disposable<
   return combined;
 }
 
+/**
+ * Safely attempts to dispose a value if it has a dispose mechanism.
+ *
+ * Handles multiple dispose patterns:
+ * - `{ dispose(): void }` - Calls dispose() method
+ * - `{ dispose: Disposable[] }` - Recursively disposes each item
+ * - `{ dispose: Disposable }` - Recursively disposes the nested disposable
+ *
+ * Does nothing if the value is not disposable (no errors thrown).
+ *
+ * @param disposable - Any value that might be disposable
+ *
+ * @example
+ * ```ts
+ * // Method pattern
+ * tryDispose({ dispose: () => console.log('cleaned up') });
+ *
+ * // Array pattern
+ * tryDispose({ dispose: [signal1, signal2, signal3] });
+ *
+ * // Nested pattern
+ * tryDispose({ dispose: { dispose: () => cleanup() } });
+ *
+ * // Safe on non-disposables (no-op)
+ * tryDispose(null);
+ * tryDispose(42);
+ * tryDispose({ name: 'not disposable' });
+ * ```
+ */
 export function tryDispose(disposable: unknown) {
   if (typeof disposable === "object" && disposable && "dispose" in disposable) {
     if (typeof disposable.dispose === "function") {
+      // Pattern: { dispose(): void }
       disposable.dispose();
     } else if (Array.isArray(disposable.dispose)) {
+      // Pattern: { dispose: Disposable[] }
       for (const item of disposable.dispose) {
         tryDispose(item);
       }
     } else {
+      // Pattern: { dispose: Disposable }
       tryDispose(disposable.dispose);
     }
   }

@@ -1378,3 +1378,40 @@ export type Loadable<T> =
   | LoadingLoadable<T>
   | SuccessLoadable<T>
   | ErrorLoadable<T>;
+
+/**
+ * A lazy factory that produces and manages a single instance at a time.
+ *
+ * @template T - The type of value produced by the factory
+ */
+export type Producer<T> = Disposable & {
+  /**
+   * Get the current value, creating one if it doesn't exist.
+   * This is lazy initialization - the factory is only called when needed.
+   *
+   * @returns The current value (creates new one if none exists)
+   */
+  current(): T;
+
+  /**
+   * Dispose the current value (if any) and create a new one.
+   * Useful for resetting or cycling through instances.
+   *
+   * @returns The newly created value
+   */
+  next(): T;
+
+  /**
+   * Check if there's a current value without triggering creation.
+   *
+   * @returns True if a value exists, false otherwise
+   */
+  has(): boolean;
+
+  /**
+   * Get the current value without creating a new one.
+   *
+   * @returns The current value or undefined if none exists
+   */
+  peek(): T | undefined;
+};
