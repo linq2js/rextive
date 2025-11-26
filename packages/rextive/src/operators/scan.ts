@@ -41,7 +41,7 @@ export function scan<T, U>(
         : equalsOrOptions;
 
     return signal(
-      { source },
+      { source: source as any },
       (ctx: any) => {
         acc = fn(acc, ctx.deps.source);
         return acc;

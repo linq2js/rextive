@@ -649,7 +649,7 @@ export type AnySignal<TValue, TInit = TValue> =
  * Map of signal names to signal instances
  * Accepts both MutableSignal and ComputedSignal
  */
-export type SignalMap = Record<string, Signal<any>>;
+export type SignalMap = Record<string, AnySignal<any>>;
 
 /**
  * Signal kind discriminator

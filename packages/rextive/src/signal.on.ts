@@ -1,4 +1,4 @@
-import type { Signal } from "./types";
+import type { AnySignal } from "./types";
 
 /**
  * Subscription control returned by signal.on()
@@ -28,46 +28,46 @@ export interface SignalOnControl {
 /**
  * Subscribe to multiple signals and call callback when any changes.
  * Unlike computed signals, this does NOT evaluate signals at the beginning.
- * 
+ *
  * @param signals - Array of signals to subscribe to
  * @param callback - Called when any signal changes, receives the signal that triggered
  * @returns Control object with pause, resume, paused, and dispose methods
- * 
+ *
  * @example
  * ```ts
  * const count = signal(0);
  * const name = signal("Alice");
  * const enabled = signal(true);
- * 
+ *
  * const control = signal.on([count, name, enabled], (trigger) => {
  *   console.log("Changed:", trigger());
  * });
- * 
+ *
  * count.set(1); // Logs: "Changed: 1"
  * name.set("Bob"); // Logs: "Changed: Bob"
- * 
+ *
  * control.pause();
  * count.set(2); // No log (paused)
- * 
+ *
  * control.resume();
  * count.set(3); // Logs: "Changed: 3"
- * 
+ *
  * control.dispose(); // Cleanup
  * ```
- * 
+ *
  * @example With different types
  * ```ts
  * const count = signal(0);
  * const name = signal("Alice");
- * 
+ *
  * signal.on([count, name], (trigger) => {
- *   // trigger is typed as: Signal<number> | Signal<string>
+ *   // trigger is typed as: AnySignal<number> | AnySignal<string>
  *   const value = trigger(); // number | string
  *   console.log("Triggered by:", value);
  * });
  * ```
  */
-export function signalOn<TSignals extends Signal<any>[]>(
+export function signalOn<const TSignals extends readonly AnySignal<any>[]>(
   signals: [...TSignals],
   callback: (trigger: TSignals[number]) => void
 ): SignalOnControl {
@@ -110,7 +110,7 @@ export function signalOn<TSignals extends Signal<any>[]>(
       }
       isDisposed = true;
       isPaused = false;
-      
+
       // Unsubscribe from all signals
       for (const unsubscribe of unsubscribers) {
         unsubscribe();
@@ -119,4 +119,3 @@ export function signalOn<TSignals extends Signal<any>[]>(
     },
   };
 }
-

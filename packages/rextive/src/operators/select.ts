@@ -52,6 +52,6 @@ export function select<T, U>(
         ? { equals: equalsOrOptions }
         : equalsOrOptions;
 
-    return signal({ source }, (ctx: any) => fn(ctx.deps.source), options);
+    return signal({ source: source as any }, (ctx: any) => fn(ctx.deps.source), options);
   };
 }

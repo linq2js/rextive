@@ -66,7 +66,7 @@ export function filter<T>(
         : equalsOrOptions;
 
     return signal(
-      { source },
+      { source: source as any },
       (ctx: any) => {
         const currentValue = ctx.deps.source;
 

@@ -1,6 +1,6 @@
 import { createProxy } from "./createProxy";
 import { is } from "../is";
-import { ResolveValueType, Signal, SignalMap } from "../types";
+import { ResolveValueType, AnySignal, SignalMap } from "../types";
 import { isPromiseLike } from "./isPromiseLike";
 import { loadable } from "./loadable";
 
@@ -20,13 +20,13 @@ export type SignalAccessProxyOptions<
    * Called when a signal is accessed via the proxy
    * Use this to track subscriptions, setup listeners, etc.
    */
-  onSignalAccess: (signal: Signal<any>) => void;
+  onSignalAccess: (signal: AnySignal<any>) => void;
 
   /**
    * Transforms the signal value before returning
    * Default: returns signal() directly
    */
-  getValue?: (signal: Signal<any>) => any;
+  getValue?: (signal: AnySignal<any>) => any;
 
   /**
    * Optional condition for when to track signals (lazy tracking)

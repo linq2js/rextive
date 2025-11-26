@@ -193,7 +193,7 @@ export function rx(...args: any[]): ReactNode {
     if (typeof args[1] === "string" || typeof args[1] === "function") {
       // Overload 2b: rx(signal, prop, options?)
       const prop = args[1];
-      signals = { value: signal };
+      signals = { value: signal as any };
       render =
         typeof prop === "function"
           ? (value: any) => prop(value.value)
@@ -201,7 +201,7 @@ export function rx(...args: any[]): ReactNode {
       options = args[2];
     } else {
       // Overload 2a: rx(signal, options?)
-      signals = { value: signal };
+      signals = { value: signal as any };
       render = SINGLE_SIGNAL_RENDER;
       options = args[1];
     }
