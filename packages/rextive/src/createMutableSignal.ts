@@ -30,7 +30,7 @@
 import { Emitter, emitter } from "./utils/emitter";
 import { guardDisposed } from "./utils/guardDisposed";
 import {
-  MutableSignal,
+  Mutable,
   SignalContext,
   SignalMap,
   SignalOptions,
@@ -75,7 +75,7 @@ export function createMutableSignal(
     onRefresh?: () => void,
     onStale?: () => void
   ) => any
-): MutableSignal<any> {
+): Mutable<any> {
   // ============================================================================
   // 1. CONFIGURATION & SETUP
   // ============================================================================
@@ -139,7 +139,7 @@ export function createMutableSignal(
   let context: ReturnType<typeof createContext> | undefined;
 
   /** Reference to the signal instance being created */
-  let instanceRef: MutableSignal<any> | undefined;
+  let instanceRef: Mutable<any> | undefined;
 
   /**
    * Tracks if signal has been modified via set()
@@ -152,7 +152,6 @@ export function createMutableSignal(
    * Prevents multiple synchronous refresh() calls from triggering multiple recomputations
    */
   let refreshScheduled = false;
-
 
   // ============================================================================
   // 4. LIFECYCLE METHODS
@@ -532,7 +531,6 @@ export function createMutableSignal(
   // 8. REACTIVE RELATIONSHIPS (when)
   // ============================================================================
 
-
   // ============================================================================
   // 9. SIGNAL INSTANCE CREATION
   // ============================================================================
@@ -575,7 +573,7 @@ export function createMutableSignal(
   });
 
   // Store reference for use in methods above
-  instanceRef = instance as unknown as MutableSignal<any>;
+  instanceRef = instance as unknown as Mutable<any>;
 
   // ============================================================================
   // 10. INITIALIZATION
@@ -590,5 +588,5 @@ export function createMutableSignal(
     instance.get();
   }
 
-  return instance as unknown as MutableSignal<any>;
+  return instance as unknown as Mutable<any>;
 }

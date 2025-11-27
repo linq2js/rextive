@@ -1,7 +1,7 @@
 import { Emitter, emitter } from "./utils/emitter";
 import { guardDisposed } from "./utils/guardDisposed";
 import {
-  ComputedSignal,
+  Computed,
   ComputedSignalContext,
   SignalMap,
   SignalOptions,
@@ -34,7 +34,7 @@ export function createComputedSignal(
     onStale?: () => void
   ) => any,
   _signal: any // Pass signal function to avoid circular dependency (unused here)
-): ComputedSignal<any> {
+): Computed<any> {
   // Similar to createSignal but without set()
   // and with pause/resume functionality
 
@@ -69,7 +69,7 @@ export function createComputedSignal(
   let current: { value: any; error?: unknown } | undefined = undefined;
   let disposed = false;
   let context: ReturnType<typeof createContext> | undefined;
-  let instanceRef: ComputedSignal<any> | undefined;
+  let instanceRef: Computed<any> | undefined;
   let isPaused = false;
   let hasComputed = false; // Track if signal has been computed (for hydrate)
   let refreshScheduled = false; // Track if refresh is scheduled (for batching)
@@ -287,7 +287,7 @@ export function createComputedSignal(
     stale,
   });
 
-  instanceRef = instance as unknown as ComputedSignal<any>;
+  instanceRef = instance as unknown as Computed<any>;
 
   attacher(instanceRef, onDispose).attach(use);
 
@@ -299,5 +299,5 @@ export function createComputedSignal(
     }
   }
 
-  return instance as unknown as ComputedSignal<any>;
+  return instance as unknown as Computed<any>;
 }

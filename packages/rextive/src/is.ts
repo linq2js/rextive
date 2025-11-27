@@ -1,7 +1,7 @@
 import {
   type Signal,
-  type MutableSignal,
-  type ComputedSignal,
+  type Mutable,
+  type Computed,
   type Accessor,
   type Observable,
   type Tag,
@@ -70,15 +70,15 @@ export function is<T = any>(
 export function is<T = any>(
   value: unknown,
   type: "mutable"
-): value is MutableSignal<T>;
+): value is Mutable<T>;
 export function is<T = any>(
   value: unknown,
   type: "computed"
-): value is ComputedSignal<T>;
+): value is Computed<T>;
 export function is<T = any>(
   value: unknown,
   type?: "mutable" | "computed" | "observable" | "accessor" | "tag"
-): value is Signal<T> | MutableSignal<T> | ComputedSignal<T> {
+): value is Signal<T> | Mutable<T> | Computed<T> {
   if (type === "observable") {
     return typeof value === "object" && value !== null && "on" in value;
   }

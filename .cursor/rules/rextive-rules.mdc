@@ -328,7 +328,7 @@ const doubled = signal({ count }, ({ deps }) => deps.count * 2, {
 **Context parameter:**
 
 ```tsx
-interface ComputedSignalContext<TDeps> {
+interface ComputedContext<TDeps> {
   deps: TDeps; // Dependency values
   abortSignal?: AbortSignal; // For cancellable async operations
 }

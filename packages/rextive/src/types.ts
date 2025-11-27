@@ -392,9 +392,7 @@ export type Signal<TValue, TInit = TValue> = Observable &
      * );
      * ```
      */
-    to<T>(
-      selector: (value: TValue, context: SignalContext) => T
-    ): ComputedSignal<T>;
+    to<T>(selector: (value: TValue, context: SignalContext) => T): Computed<T>;
 
     /**
      * Trigger an immediate recomputation of this signal.
@@ -498,7 +496,7 @@ export type TryInjectDispose<T> = T extends object
  * nullable.set(undefined); // ✅ OK
  * ```
  */
-export type MutableSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
+export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
   /**
    * Update signal value via reducer function (returns new value)
    * @param reducer - Function that receives current value (TValue | TInit) and returns new value (TValue)
@@ -512,16 +510,12 @@ export type MutableSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
   set(value: TValue): void;
 };
 
-export type Mutable<TValue, TInit = TValue> = MutableSignal<TValue, TInit>;
-
-export type Computed<TValue, TInit = TValue> = ComputedSignal<TValue, TInit>;
-
 /**
  *
  * Computed signal - read-only, derived from dependencies
  * Created when signal() is called with dependencies
  */
-export type ComputedSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
+export type Computed<TValue, TInit = TValue> = Signal<TValue, TInit> & {
   /**
    * Pause the signal - stops recomputations when dependencies change
    * The signal will not update until resume() is called
@@ -581,8 +575,8 @@ export type ComputedSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
  * ```
  */
 export type AnySignal<TValue, TInit = TValue> =
-  | MutableSignal<TValue, TInit>
-  | ComputedSignal<TValue, TInit>;
+  | Mutable<TValue, TInit>
+  | Computed<TValue, TInit>;
 
 /**
  * Map of signal names to signal instances
@@ -603,9 +597,9 @@ export type SignalKind = "mutable" | "computed" | "any";
 export type SignalOf<T, K extends SignalKind> = K extends "any"
   ? AnySignal<T>
   : K extends "mutable"
-  ? MutableSignal<T>
+  ? Mutable<T>
   : K extends "computed"
-  ? ComputedSignal<T>
+  ? Computed<T>
   : Signal<T>;
 
 /**

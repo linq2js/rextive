@@ -2,7 +2,7 @@
  * Select operator - Transform/select signal values
  */
 
-import type { Signal, ComputedSignal, SignalOptions } from "../types";
+import type { Signal, Computed, SignalOptions } from "../types";
 import { signal } from "../signal";
 
 /**
@@ -45,13 +45,17 @@ import { signal } from "../signal";
 export function select<T, U>(
   fn: (value: T) => U,
   equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
-): (source: Signal<T>) => ComputedSignal<U> {
+): (source: Signal<T>) => Computed<U> {
   return (source: Signal<T>) => {
     const options: SignalOptions<U> | undefined =
       typeof equalsOrOptions === "string"
         ? { equals: equalsOrOptions }
         : equalsOrOptions;
 
-    return signal({ source: source as any }, (ctx: any) => fn(ctx.deps.source), options);
+    return signal(
+      { source: source as any },
+      (ctx: any) => fn(ctx.deps.source),
+      options
+    );
   };
 }

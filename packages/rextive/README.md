@@ -1789,7 +1789,7 @@ function RegistrationForm() {
     validation,
   }: {
     label: string;
-    field: MutableSignal<string>;
+    field: Mutable<string>;
     validation: Signal<void | string | Promise<string | void>>;
   }) =>
     rx(() => {
@@ -2659,7 +2659,7 @@ const count2 = signal(5, { use: [mutableTag] });
 
 // All signals in this tag are guaranteed to be mutable
 mutableTag.forEach((s) => {
-  s.set((x) => x + 1); // ✅ Safe - all are MutableSignal
+  s.set((x) => x + 1); // ✅ Safe - all are Mutable
 });
 
 // Collect incremented values
@@ -3029,7 +3029,7 @@ function syncSignals<T>(source: AnySignal<T>, target: AnySignal<T>) {
   source.on((value) => {
     // Use signal.is() to check if target is mutable
     if (signal.is(target, "mutable")) {
-      // TypeScript knows target is MutableSignal here
+      // TypeScript knows target is Mutable here
       target.set(value); // ✅ .set() available
     } else {
       console.log("Target is computed (read-only)");
@@ -3112,8 +3112,8 @@ function refreshIfStale<T>(
 
 **When NOT to Use `AnySignal`:**
 
-- ❌ When you specifically need `.set()` - use `MutableSignal<T>` instead
-- ❌ When you specifically need `.pause()` - use `ComputedSignal<T>` instead
+- ❌ When you specifically need `.set()` - use `Mutable<T>` instead
+- ❌ When you specifically need `.pause()` - use `Computed<T>` instead
 - ❌ When you need the base interface only - use `Signal<T>` instead
 
 ### Pattern 5: Fine-Grained Lifecycle Control
@@ -3681,8 +3681,8 @@ Quick reference for all Rextive APIs.
 | `awaited(...selectors)`   | Transform async/sync values uniformly |
 | `producer(factory)`       | Lazy factory for instance management  |
 | `is(value)`               | Check if any Signal                   |
-| `is(value, "mutable")`    | Check if MutableSignal                |
-| `is(value, "computed")`   | Check if ComputedSignal               |
+| `is(value, "mutable")`    | Check if Mutable                      |
+| `is(value, "computed")`   | Check if Computed                     |
 | `is(value, "observable")` | Check if has `.on()` method           |
 
 ---
@@ -3704,20 +3704,20 @@ Quick reference for all Rextive APIs.
 
 ### Types (for TypeScript)
 
-| Type                | Description                       |
-| ------------------- | --------------------------------- |
-| `Signal<T>`         | Base signal type                  |
-| `MutableSignal<T>`  | Signal with `.set()`              |
-| `ComputedSignal<T>` | Signal with `.refresh()/.stale()` |
-| `AnySignal<T>`      | Union of Mutable \| Computed      |
-| `Loadable<T>`       | Loading \| Success \| Error state |
-| `Disposable`        | Object with `.dispose()`          |
-| `Tag<T, K>`         | Signal grouping tag               |
-| `Plugin<T, K>`      | Signal plugin function            |
-| `Producer<T>`       | Lazy instance factory             |
-| `Cache<T, K>`       | Keyed data cache                  |
-| `CacheGroup<T>`     | Group of related caches           |
-| `CacheStrategy<T>`  | Cache strategy plugin             |
+| Type               | Description                       |
+| ------------------ | --------------------------------- |
+| `Signal<T>`        | Base signal type                  |
+| `Mutable<T>`       | Signal with `.set()`              |
+| `Computed<T>`      | Signal with `.refresh()/.stale()` |
+| `AnySignal<T>`     | Union of Mutable \| Computed      |
+| `Loadable<T>`      | Loading \| Success \| Error state |
+| `Disposable`       | Object with `.dispose()`          |
+| `Tag<T, K>`        | Signal grouping tag               |
+| `Plugin<T, K>`     | Signal plugin function            |
+| `Producer<T>`      | Lazy instance factory             |
+| `Cache<T, K>`      | Keyed data cache                  |
+| `CacheGroup<T>`    | Group of related caches           |
+| `CacheStrategy<T>` | Cache strategy plugin             |
 
 ---
 
@@ -3727,9 +3727,9 @@ Quick reference for all Rextive APIs.
 ┌─────────────────────────────────────────────────────────────┐
 │  SIGNAL CREATION                                            │
 ├─────────────────────────────────────────────────────────────┤
-│  signal(0)                    → MutableSignal<number>       │
-│  signal({ a, b }, fn)         → ComputedSignal<T>           │
-│  signal<T>()                  → MutableSignal<T | undefined>│
+│  signal(0)                    → Mutable<number>       │
+│  signal({ a, b }, fn)         → Computed<T>           │
+│  signal<T>()                  → Mutable<T | undefined>│
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
@@ -4001,13 +4001,13 @@ const results = signal(async () => fetchResults(), {
 The callback receives the **exact signal type** (not just the base `Signal`), giving you access to type-specific methods:
 
 ```tsx
-// For MutableSignal: callback receives MutableSignal - can use .set()
+// For Mutable: callback receives Mutable - can use .set()
 const trigger = signal(0);
 const count = signal(0, {
   use: [when(trigger, (current) => current.set(100))], // ✅ .set() available
 });
 
-// For ComputedSignal: callback receives ComputedSignal - can use .refresh(), .stale()
+// For Computed: callback receives Computed - can use .refresh(), .stale()
 const userData = signal(async () => fetchUser(), {
   use: [
     when(userId, (current) => {
@@ -4036,7 +4036,7 @@ const searchResults = signal(async () => fetchResults(), {
   ],
 });
 
-// Pattern 3: Coordinated updates with MutableSignal
+// Pattern 3: Coordinated updates with Mutable
 const masterState = signal("idle");
 const replica1 = signal("idle", {
   use: [when(masterState, (current, trigger) => current.set(trigger()))],
@@ -4514,7 +4514,7 @@ function doSomething<T>(s: AnySignal<T>) {
 
   // Type narrow for mutable-specific operations
   if ("set" in s) {
-    s.set(newValue); // TypeScript knows this is MutableSignal
+    s.set(newValue); // TypeScript knows this is Mutable
   }
 }
 ```
@@ -4529,7 +4529,7 @@ function doSomething<T>(s: AnySignal<T>) {
 **Difference from `Signal<T>`:**
 
 - `Signal<T>` - Base interface with minimal methods
-- `AnySignal<T>` - Union of `MutableSignal<T> | ComputedSignal<T>` with full method access
+- `AnySignal<T>` - Union of `Mutable<T> | Computed<T>` with full method access
 - Use `AnySignal<T>` when you need access to `.refresh()`, `.stale()`, etc.
 
 See [Pattern 3: Generic Functions with AnySignal](#pattern-3-generic-functions-with-anysignal) for comprehensive examples.

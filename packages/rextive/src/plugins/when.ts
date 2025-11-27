@@ -1,10 +1,4 @@
-import type {
-  AnySignal,
-  ComputedSignal,
-  MutableSignal,
-  Plugin,
-  Signal,
-} from "../types";
+import type { AnySignal, Computed, Mutable, Plugin, Signal } from "../types";
 import { emitter } from "../utils/emitter";
 
 /**
@@ -84,9 +78,9 @@ export function when<
   callback: WhenCallback<TSource, TTrigger>
 ): Plugin<
   TSource extends Signal<infer TValue> ? TValue : any,
-  TSource extends MutableSignal<any>
+  TSource extends Mutable<any>
     ? "mutable"
-    : TSource extends ComputedSignal<any>
+    : TSource extends Computed<any>
     ? "computed"
     : "any"
 > {

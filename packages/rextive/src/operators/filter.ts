@@ -4,7 +4,7 @@
 
 import type {
   Signal,
-  ComputedSignal,
+  Computed,
   SignalOptions,
   PredefinedEquals,
 } from "../types";
@@ -47,15 +47,15 @@ import { signal } from "../signal";
 export function filter<T, S extends T>(
   predicate: (value: T) => value is S,
   equalsOrOptions?: PredefinedEquals | SignalOptions<S>
-): (source: Signal<T>) => ComputedSignal<S>;
+): (source: Signal<T>) => Computed<S>;
 export function filter<T>(
   predicate: (value: T) => boolean,
   equalsOrOptions?: PredefinedEquals | SignalOptions<T>
-): (source: Signal<T>) => ComputedSignal<T>;
+): (source: Signal<T>) => Computed<T>;
 export function filter<T>(
   predicate: (value: T) => boolean,
   equalsOrOptions?: PredefinedEquals | SignalOptions<T>
-): (source: Signal<T>) => ComputedSignal<T> {
+): (source: Signal<T>) => Computed<T> {
   return (source: Signal<T>) => {
     let lastValidValue: T;
     let isFirst = true;

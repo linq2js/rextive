@@ -2,7 +2,7 @@
  * Scan operator - Accumulate signal values with state
  */
 
-import type { Signal, ComputedSignal, SignalOptions } from "../types";
+import type { Signal, Computed, SignalOptions } from "../types";
 import { signal } from "../signal";
 
 /**
@@ -32,7 +32,7 @@ export function scan<T, U>(
   fn: (accumulator: U, current: T) => U,
   initialValue: U,
   equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
-): (source: Signal<T>) => ComputedSignal<U> {
+): (source: Signal<T>) => Computed<U> {
   return (source: Signal<T>) => {
     let acc = initialValue;
     const options: SignalOptions<U> | undefined =

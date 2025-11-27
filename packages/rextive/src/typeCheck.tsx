@@ -23,8 +23,8 @@ import { compose } from "./utils/compose";
 import { select } from "./operators";
 import type {
   Signal,
-  MutableSignal,
-  ComputedSignal,
+  Mutable,
+  Computed,
   SignalContext,
   Loadable,
   LoadingLoadable,
@@ -238,10 +238,10 @@ function signalTests() {
   // Special behavior: get() returns T | undefined, but set() requires T
   // -----------------------------------------------------------------------------
 
-  expectType<MutableSignal<unknown, undefined>>(noArgSignal);
+  expectType<Mutable<unknown, undefined>>(noArgSignal);
   expectType<unknown | undefined>(noArgSignal());
 
-  expectType<MutableSignal<TodoPayload, undefined>>(payload);
+  expectType<Mutable<TodoPayload, undefined>>(payload);
 
   // get() returns TodoPayload | undefined
   expectType<TodoPayload | undefined>(payload());
@@ -256,33 +256,33 @@ function signalTests() {
   // -----------------------------------------------------------------------------
 
   // Primitive values
-  expectType<MutableSignal<number>>(numberSignal);
+  expectType<Mutable<number>>(numberSignal);
   expectType<number>(numberSignal());
 
-  expectType<MutableSignal<string>>(stringSignal);
+  expectType<Mutable<string>>(stringSignal);
   expectType<string>(stringSignal());
 
-  expectType<MutableSignal<boolean>>(booleanSignal);
+  expectType<Mutable<boolean>>(booleanSignal);
   expectType<boolean>(booleanSignal());
 
   // Object values
-  expectType<MutableSignal<{ name: string; age: number }>>(objectSignal);
+  expectType<Mutable<{ name: string; age: number }>>(objectSignal);
   expectType<{ name: string; age: number }>(objectSignal());
 
   // Array values
-  expectType<MutableSignal<number[]>>(arraySignal);
+  expectType<Mutable<number[]>>(arraySignal);
   expectType<number[]>(arraySignal());
 
   // -----------------------------------------------------------------------------
   // Overload 2: signal(lazyFn) - with lazy initializer
   // -----------------------------------------------------------------------------
 
-  expectType<MutableSignal<number>>(lazySignal);
+  expectType<Mutable<number>>(lazySignal);
   expectType<number>(lazySignal());
 
   // Lazy with complex return type
   expectType<
-    MutableSignal<{
+    Mutable<{
       user: { id: number; name: string };
       posts: number[];
     }>
@@ -292,11 +292,11 @@ function signalTests() {
   // Overload 2: signal(value, equals) - with equality string shortcut
   // -----------------------------------------------------------------------------
 
-  expectType<MutableSignal<{ name: string }>>(signalShallow);
+  expectType<Mutable<{ name: string }>>(signalShallow);
 
-  expectType<MutableSignal<{ nested: { value: number } }>>(signalDeep);
+  expectType<Mutable<{ nested: { value: number } }>>(signalDeep);
 
-  expectType<MutableSignal<number>>(signalIs);
+  expectType<Mutable<number>>(signalIs);
 
   // @ts-expect-error - custom equals function not allowed as second arg (use options)
   const signalCustomEquals = signal(42, (a, b) => a === b);
@@ -305,37 +305,37 @@ function signalTests() {
   // Overload 2: signal(value, options) - with options
   // -----------------------------------------------------------------------------
 
-  expectType<MutableSignal<number>>(signalWithEquals);
+  expectType<Mutable<number>>(signalWithEquals);
 
-  expectType<MutableSignal<string>>(signalWithName);
+  expectType<Mutable<string>>(signalWithName);
 
-  expectType<MutableSignal<number>>(signalWithFallback);
+  expectType<Mutable<number>>(signalWithFallback);
 
-  expectType<MutableSignal<number>>(signalWithCallbacks);
+  expectType<Mutable<number>>(signalWithCallbacks);
 
   // -----------------------------------------------------------------------------
   // Overload 3: signal(deps, compute) - with dependencies
   // -----------------------------------------------------------------------------
 
-  expectType<ComputedSignal<number>>(doubled);
+  expectType<Computed<number>>(doubled);
   expectType<number>(doubled());
 
   // Multiple dependencies
-  expectType<ComputedSignal<string>>(fullName);
+  expectType<Computed<string>>(fullName);
   expectType<string>(fullName());
 
   // Dependencies with different types
-  expectType<ComputedSignal<{ userName: string; postCount: number }>>(summary);
+  expectType<Computed<{ userName: string; postCount: number }>>(summary);
   expectType<{ userName: string; postCount: number }>(summary());
 
   // -----------------------------------------------------------------------------
   // Overload 3: signal(deps, compute, equals) - with equality string shortcut
   // -----------------------------------------------------------------------------
 
-  expectType<ComputedSignal<{ full: string }>>(computedShallow);
+  expectType<Computed<{ full: string }>>(computedShallow);
 
   expectType<
-    ComputedSignal<{
+    Computed<{
       user: { id: number; name: string; email: string };
       posts: number[];
     }>
@@ -352,7 +352,7 @@ function signalTests() {
   // Overload 3: signal(deps, compute, options) - with options
   // -----------------------------------------------------------------------------
 
-  expectType<ComputedSignal<number>>(computedWithOptions);
+  expectType<Computed<number>>(computedWithOptions);
 
   // -----------------------------------------------------------------------------
   // Signal instance methods
@@ -429,9 +429,9 @@ function signalTests() {
   expectType<Signal<Promise<number>>>(asyncData);
 
   // Nested signal dependencies
-  expectType<MutableSignal<number>>(a);
-  expectType<ComputedSignal<number>>(b);
-  expectType<ComputedSignal<number>>(c);
+  expectType<Mutable<number>>(a);
+  expectType<Computed<number>>(b);
+  expectType<Computed<number>>(c);
   expectType<number>(c());
 }
 
@@ -1112,14 +1112,14 @@ function rxTests() {
 // For type checking, we'll use inline operator definitions
 type SelectOp = <T, U>(
   fn: (value: T) => U
-) => (source: Signal<T>) => ComputedSignal<U>;
+) => (source: Signal<T>) => Computed<U>;
 type ScanOp = <T, U>(
   fn: (acc: U, value: T) => U,
   initial: U
-) => (source: Signal<T>) => ComputedSignal<U>;
+) => (source: Signal<T>) => Computed<U>;
 type FilterOp = <T>(
   fn: (value: T) => boolean
-) => (source: Signal<T>) => ComputedSignal<T>;
+) => (source: Signal<T>) => Computed<T>;
 
 declare const selectOp: SelectOp;
 declare const scanOp: ScanOp;
@@ -1131,17 +1131,17 @@ function pipeOperatorTests() {
 
   // select: number -> string
   const result1 = countSignal.pipe(selectOp((x) => `Count: ${x}`));
-  expectType<ComputedSignal<string>>(result1);
+  expectType<Computed<string>>(result1);
   expectType<string>(result1());
 
   // scan: accumulate numbers
   const result2 = countSignal.pipe(scanOp((sum, x) => sum + x, 0));
-  expectType<ComputedSignal<number>>(result2);
+  expectType<Computed<number>>(result2);
   expectType<number>(result2());
 
   // filter: keep only positive
   const result3 = countSignal.pipe(filterOp((x) => x > 0));
-  expectType<ComputedSignal<number>>(result3);
+  expectType<Computed<number>>(result3);
   expectType<number>(result3());
 
   // Multiple operators - type transformation chain
@@ -1150,7 +1150,7 @@ function pipeOperatorTests() {
     selectOp((x) => x * 2), // number -> number
     selectOp((x) => `Result: ${x}`) // number -> string
   );
-  expectType<ComputedSignal<string>>(chain1);
+  expectType<Computed<string>>(chain1);
   expectType<string>(chain1());
 
   // number -> number -> number -> string
@@ -1159,7 +1159,7 @@ function pipeOperatorTests() {
     selectOp((x: number) => x + 1), // number -> number
     selectOp((x: number) => `Value: ${x}`) // number -> string
   );
-  expectType<ComputedSignal<string>>(chain2);
+  expectType<Computed<string>>(chain2);
   expectType<string>(chain2());
 
   // Complex type transformations
@@ -1173,7 +1173,7 @@ function pipeOperatorTests() {
 
   // Person -> string
   const personName = personSignal.pipe(selectOp((u) => u.name));
-  expectType<ComputedSignal<string>>(personName);
+  expectType<Computed<string>>(personName);
   expectType<string>(personName());
 
   // Person -> { name: string } -> string
@@ -1181,7 +1181,7 @@ function pipeOperatorTests() {
     selectOp((u: Person) => ({ name: u.name })),
     selectOp((obj: { name: string }) => obj.name)
   );
-  expectType<ComputedSignal<string>>(personNameChain);
+  expectType<Computed<string>>(personNameChain);
   expectType<string>(personNameChain());
 
   // Array transformations
@@ -1191,14 +1191,14 @@ function pipeOperatorTests() {
   const doubledArray = numbersSignal.pipe(
     selectOp((arr) => arr.map((x) => x * 2))
   );
-  expectType<ComputedSignal<number[]>>(doubledArray);
+  expectType<Computed<number[]>>(doubledArray);
   expectType<number[]>(doubledArray());
 
   // Array<number> -> number (sum)
   const sum = numbersSignal.pipe(
     selectOp((arr) => arr.reduce((a, b) => a + b, 0))
   );
-  expectType<ComputedSignal<number>>(sum);
+  expectType<Computed<number>>(sum);
   expectType<number>(sum());
 
   // Mixed operators
@@ -1208,16 +1208,16 @@ function pipeOperatorTests() {
     filterOp((x: number) => x > 5), // number -> number
     scanOp((acc: number, x: number) => acc + x, 0) // number -> number
   );
-  expectType<ComputedSignal<number>>(mixed1);
+  expectType<Computed<number>>(mixed1);
   expectType<number>(mixed1());
 
   // Operator returning signal (custom operator)
   const customOp = null as unknown as <T extends number>(
     s: Signal<T>
-  ) => ComputedSignal<string>;
+  ) => Computed<string>;
 
   const custom1 = countSignal.pipe(customOp);
-  expectType<ComputedSignal<string>>(custom1);
+  expectType<Computed<string>>(custom1);
   expectType<string>(custom1());
 
   // Chain with custom operator
@@ -1225,7 +1225,7 @@ function pipeOperatorTests() {
     selectOp((x: number) => x * 2),
     customOp
   );
-  expectType<ComputedSignal<string>>(custom2);
+  expectType<Computed<string>>(custom2);
   expectType<string>(custom2());
 
   // Type inference through chains
@@ -1235,7 +1235,7 @@ function pipeOperatorTests() {
     selectOp((x: number) => x + 1), // number -> number
     selectOp((x: number) => `Value: ${x}`) // number -> string
   );
-  expectType<ComputedSignal<string>>(chain3Ops);
+  expectType<Computed<string>>(chain3Ops);
   expectType<string>(chain3Ops());
 
   // 4 operators: number -> number -> number -> number -> string
@@ -1245,7 +1245,7 @@ function pipeOperatorTests() {
     selectOp((x: number) => x - 1), // number -> number
     selectOp((x: number) => `Result: ${x}`) // number -> string
   );
-  expectType<ComputedSignal<string>>(chain4Ops);
+  expectType<Computed<string>>(chain4Ops);
   expectType<string>(chain4Ops());
 }
 
@@ -1263,14 +1263,14 @@ function signalToTests() {
 
   // Single selector
   const userName = userSig.to((u) => u.name);
-  expectType<ComputedSignal<string>>(userName);
+  expectType<Computed<string>>(userName);
 
   // Two selectors - use pipe() for multiple transformations
   const upperName = userSig.pipe(
     select((u) => u.name),
     select((name) => name.toUpperCase())
   );
-  expectType<ComputedSignal<string>>(upperName);
+  expectType<Computed<string>>(upperName);
 
   // Three selectors with type changes
   const greeting = userSig.pipe(
@@ -1278,7 +1278,7 @@ function signalToTests() {
     select((name) => name.toUpperCase()), // string
     select((name) => `Hello, ${name}!`) // string
   );
-  expectType<ComputedSignal<string>>(greeting);
+  expectType<Computed<string>>(greeting);
 
   // Type transformation chain
   const ageString = userSig.pipe(
@@ -1286,7 +1286,7 @@ function signalToTests() {
     select((age) => age.toString()), // string
     select((str) => str.length) // number
   );
-  expectType<ComputedSignal<number>>(ageString);
+  expectType<Computed<number>>(ageString);
 
   // Complex object transformations
   const transformed = userSig.pipe(
@@ -1295,7 +1295,7 @@ function signalToTests() {
     select((name) => name.split(" ")), // string[]
     select((parts) => parts[0]) // string | undefined
   );
-  expectType<ComputedSignal<string | undefined>>(transformed);
+  expectType<Computed<string | undefined>>(transformed);
 
   // Array operations
   const arraySig = signal([1, 2, 3, 4, 5]);
@@ -1305,7 +1305,7 @@ function signalToTests() {
     select((arr: number[]) => arr.map((x: number) => x * 2)), // number[]
     select((arr: number[]) => arr.reduce((a: number, b: number) => a + b, 0)) // number
   );
-  expectType<ComputedSignal<number>>(arrayResult);
+  expectType<Computed<number>>(arrayResult);
 
   // With computed signals
   const computedUser = signal({ userSig }, ({ deps }) => deps.userSig);
@@ -1314,7 +1314,7 @@ function signalToTests() {
     select((u) => u.name),
     select((name) => `Hi, ${name}`)
   );
-  expectType<ComputedSignal<string>>(computedGreeting);
+  expectType<Computed<string>>(computedGreeting);
 
   // Chaining with numbers
   const numSig = signal(42);
@@ -1325,7 +1325,7 @@ function signalToTests() {
     select((x) => x / 2), // 47
     select((x) => Math.floor(x)) // 47
   );
-  expectType<ComputedSignal<number>>(numChain);
+  expectType<Computed<number>>(numChain);
 
   // Boolean transformations
   const boolChain = numSig.pipe(
@@ -1333,7 +1333,7 @@ function signalToTests() {
     select((bool) => !bool), // boolean
     select((bool) => (bool ? "yes" : "no")) // string
   );
-  expectType<ComputedSignal<string>>(boolChain);
+  expectType<Computed<string>>(boolChain);
 
   // Nullable values
   const nullableSig = signal<string | null>("test");
@@ -1342,7 +1342,7 @@ function signalToTests() {
     select((str) => str?.toUpperCase()), // string | undefined
     select((str) => str ?? "default") // string
   );
-  expectType<ComputedSignal<string>>(nullableChain);
+  expectType<Computed<string>>(nullableChain);
 
   // Union types
   const unionSig = signal<number | string>(42);
@@ -1351,7 +1351,7 @@ function signalToTests() {
     select((val) => (typeof val === "number" ? val * 2 : val.length)), // number
     select((num) => num.toString()) // string
   );
-  expectType<ComputedSignal<string>>(unionChain);
+  expectType<Computed<string>>(unionChain);
 }
 
 // =============================================================================
@@ -1362,18 +1362,18 @@ function awaitedTests() {
   // Non-promise values (sync)
   const dataSig = signal(5);
   const doubled = dataSig.to(awaited((x) => x * 2));
-  expectType<ComputedSignal<number>>(doubled);
+  expectType<Computed<number>>(doubled);
   expectType<number>(doubled());
 
   // Promise values (async)
   const promiseSig = signal(Promise.resolve(5));
   const promiseDoubled = promiseSig.to(awaited((x) => x * 2));
-  expectType<ComputedSignal<Promise<number>>>(promiseDoubled);
+  expectType<Computed<Promise<number>>>(promiseDoubled);
 
   // Mixed promise/non-promise values
   const mixedSig = signal<number | Promise<number>>(5);
   const mixedDoubled = mixedSig.to(awaited((x) => x * 2));
-  expectType<ComputedSignal<number | Promise<number>>>(mixedDoubled);
+  expectType<Computed<number | Promise<number>>>(mixedDoubled);
 
   // Array transformations
   interface Todo {
@@ -1390,7 +1390,7 @@ function awaitedTests() {
   );
 
   const titles = todosSig.to(awaited((items) => items.map((t) => t.title)));
-  expectType<ComputedSignal<Promise<string[]>>>(titles);
+  expectType<Computed<Promise<string[]>>>(titles);
 
   // Object transformations
   const userPromiseSig = signal(
@@ -1398,7 +1398,7 @@ function awaitedTests() {
   );
 
   const userName = userPromiseSig.to(awaited((u) => u.name));
-  expectType<ComputedSignal<Promise<string>>>(userName);
+  expectType<Computed<Promise<string>>>(userName);
 
   // Chaining multiple awaited selectors
   const chainedResult = promiseSig.to(
@@ -1408,7 +1408,7 @@ function awaitedTests() {
       (x) => `Value: ${x}`
     )
   );
-  expectType<ComputedSignal<Promise<string>>>(chainedResult);
+  expectType<Computed<Promise<string>>>(chainedResult);
 
   // Type transformation chain with multiple awaited selectors
   const typeChain = promiseSig.to(
@@ -1418,7 +1418,7 @@ function awaitedTests() {
       (x) => `Value: ${x}` // number -> string
     )
   );
-  expectType<ComputedSignal<Promise<string>>>(typeChain);
+  expectType<Computed<Promise<string>>>(typeChain);
 
   // Complex nested transformations - simpler version
   type UserData = {
@@ -1444,7 +1444,7 @@ function awaitedTests() {
       (user) => user?.name ?? "None"
     )
   );
-  expectType<ComputedSignal<string>>(topUserSync);
+  expectType<Computed<string>>(topUserSync);
 
   // Async selector function
   const asyncResult = dataSig.to(
@@ -1453,11 +1453,11 @@ function awaitedTests() {
       return x * 2;
     })
   );
-  expectType<ComputedSignal<Promise<number>>>(asyncResult);
+  expectType<Computed<Promise<number>>>(asyncResult);
 
   // With .pipe() and select operator
   const pipeResult = promiseSig.pipe(selectOp(awaited((x) => x * 2)));
-  expectType<ComputedSignal<Promise<number>>>(pipeResult);
+  expectType<Computed<Promise<number>>>(pipeResult);
 }
 
 // =============================================================================
@@ -1475,7 +1475,7 @@ function contextUseTests() {
       return ctx.deps.count * 2;
     });
   });
-  expectType<ComputedSignal<number>>(computed1);
+  expectType<Computed<number>>(computed1);
 
   // With additional arguments
   const computed2 = signal({ count }, (context) => {
@@ -1484,7 +1484,7 @@ function contextUseTests() {
     };
     return context.use(multiply, 5);
   });
-  expectType<ComputedSignal<number>>(computed2);
+  expectType<Computed<number>>(computed2);
 
   // Multiple arguments
   const computed3 = signal({ count }, (context) => {
@@ -1498,7 +1498,7 @@ function contextUseTests() {
     };
     return context.use(calculate, 2, 3, "result");
   });
-  expectType<ComputedSignal<string>>(computed3);
+  expectType<Computed<string>>(computed3);
 
   // Async logic function
   const computed4 = signal({ count }, async (context) => {
@@ -1506,7 +1506,7 @@ function contextUseTests() {
       return ctx.deps.count * 2;
     });
   });
-  expectType<ComputedSignal<Promise<number>>>(computed4);
+  expectType<Computed<Promise<number>>>(computed4);
 
   // Async with arguments
   const computed5 = signal({ count }, async (context) => {
@@ -1515,7 +1515,7 @@ function contextUseTests() {
     };
     return await context.use(multiply, 5);
   });
-  expectType<ComputedSignal<Promise<number>>>(computed5);
+  expectType<Computed<Promise<number>>>(computed5);
 
   // Access all context properties
   const computed6 = signal({ count }, (context) => {
@@ -1530,7 +1530,7 @@ function contextUseTests() {
       return ctx.deps.count;
     });
   });
-  expectType<ComputedSignal<number>>(computed6);
+  expectType<Computed<number>>(computed6);
 
   // Nested use calls
   const computed7 = signal({ count }, (context) => {
@@ -1540,7 +1540,7 @@ function contextUseTests() {
       return step2;
     });
   });
-  expectType<ComputedSignal<number>>(computed7);
+  expectType<Computed<number>>(computed7);
 
   // With cleanup
   const computed8 = signal({ count }, (context) => {
@@ -1549,7 +1549,7 @@ function contextUseTests() {
       return ctx.deps.count * 2;
     });
   });
-  expectType<ComputedSignal<number>>(computed8);
+  expectType<Computed<number>>(computed8);
 
   // With run inside use
   const computed9 = signal({ count }, (context) => {
@@ -1558,7 +1558,7 @@ function contextUseTests() {
       return step1;
     });
   });
-  expectType<ComputedSignal<number>>(computed9);
+  expectType<Computed<number>>(computed9);
 
   // Multiple dependencies
   const name = signal("Alice");
@@ -1569,7 +1569,7 @@ function contextUseTests() {
       return `${ctx.deps.name}: ${ctx.deps.count}`;
     });
   });
-  expectType<ComputedSignal<string>>(computed10);
+  expectType<Computed<string>>(computed10);
 
   // Complex object return type
   interface LocalUser {
@@ -1583,7 +1583,7 @@ function contextUseTests() {
       return { id: ctx.deps.userId, name: "User" };
     });
   });
-  expectType<ComputedSignal<Promise<LocalUser>>>(computed11);
+  expectType<Computed<Promise<LocalUser>>>(computed11);
 
   // Array operations
   const items = signal([1, 2, 3]);
@@ -1592,14 +1592,14 @@ function contextUseTests() {
       return ctx.deps.items.map((x) => x * 2);
     });
   });
-  expectType<ComputedSignal<number[]>>(computed12);
+  expectType<Computed<number[]>>(computed12);
 
   // Reusable logic function (using any for simplicity in type checks)
   const multiply = (ctx: any, factor: number) => ctx.deps.count * factor;
   const computed13 = signal({ count }, (context) => context.use(multiply, 3));
   const computed14 = signal({ count }, (context) => context.use(multiply, 5));
-  expectType<ComputedSignal<number>>(computed13);
-  expectType<ComputedSignal<number>>(computed14);
+  expectType<Computed<number>>(computed13);
+  expectType<Computed<number>>(computed14);
 }
 
 // =============================================================================
@@ -1823,7 +1823,7 @@ function pluginTests() {
 
   // Plugin for mutable signals only
   const mutablePlugin: Plugin<number, "mutable"> = (signal) => {
-    expectType<MutableSignal<number>>(signal);
+    expectType<Mutable<number>>(signal);
     expectType<number>(signal());
     expectType<(value: number) => void>(signal.set);
     signal.set(100);
@@ -1832,7 +1832,7 @@ function pluginTests() {
 
   // Plugin for computed signals only
   const computedPlugin: Plugin<number, "computed"> = (signal) => {
-    expectType<ComputedSignal<number>>(signal);
+    expectType<Computed<number>>(signal);
     expectType<number>(signal());
     expectType<() => void>(signal.pause);
     expectType<() => void>(signal.resume);
@@ -1867,7 +1867,7 @@ function pluginTests() {
   // Generic mutable plugin
   function createPersister<T>(_key: string): Plugin<T, "mutable"> {
     return (signal) => {
-      expectType<MutableSignal<T>>(signal);
+      expectType<Mutable<T>>(signal);
       signal.set({} as T);
       return () => {};
     };
@@ -1880,11 +1880,11 @@ function pluginTests() {
 
   // Mutable signal with any plugin
   const mutableWithAny = signal(0, { use: [anyPlugin] });
-  expectType<MutableSignal<number>>(mutableWithAny);
+  expectType<Mutable<number>>(mutableWithAny);
 
   // Mutable signal with mutable plugin
   const mutableWithMutable = signal(0, { use: [mutablePlugin] });
-  expectType<MutableSignal<number>>(mutableWithMutable);
+  expectType<Mutable<number>>(mutableWithMutable);
 
   // Mutable signal with computed plugin - Type error expected
   // @ts-expect-error - Cannot use computed plugin on mutable signal
@@ -1894,13 +1894,13 @@ function pluginTests() {
   const mutableWithMultiple = signal(0, {
     use: [anyPlugin, mutablePlugin],
   });
-  expectType<MutableSignal<number>>(mutableWithMultiple);
+  expectType<Mutable<number>>(mutableWithMultiple);
 
   // Mutable signal with generic plugins
   const mutableWithGeneric = signal("test", {
     use: [createLogger<string>()],
   });
-  expectType<MutableSignal<string>>(mutableWithGeneric);
+  expectType<Mutable<string>>(mutableWithGeneric);
 
   // -----------------------------------------------------------------------------
   // Signal with use option - Computed signals
@@ -1917,7 +1917,7 @@ function pluginTests() {
   const computedWithAny = signal({ dep }, ({ deps }): number => deps.dep * 2, {
     use: [anyPlugin] as any,
   });
-  expectType<ComputedSignal<number>>(computedWithAny);
+  expectType<Computed<number>>(computedWithAny);
 
   // Computed signal with computed plugin
   const computedWithComputed = signal(
@@ -1925,7 +1925,7 @@ function pluginTests() {
     ({ deps }): number => deps.dep * 2,
     { use: [computedPlugin] as any }
   );
-  expectType<ComputedSignal<number>>(computedWithComputed);
+  expectType<Computed<number>>(computedWithComputed);
 
   // Computed signal with mutable plugin - Type error expected
   // Note: Due to `as any` bypass, this also doesn't error at compile time
@@ -1942,7 +1942,7 @@ function pluginTests() {
     ({ deps }): number => deps.dep * 2,
     { use: [anyPlugin, computedPlugin] as any }
   );
-  expectType<ComputedSignal<number>>(computedWithMultiple);
+  expectType<Computed<number>>(computedWithMultiple);
 
   // -----------------------------------------------------------------------------
   // Tag with use option
@@ -2002,20 +2002,20 @@ function pluginTests() {
   // Mutable signal with tag
   const tagForMutable = tag<number>({ use: [mutablePlugin] });
   const sigWithTag = signal(0, { use: [tagForMutable] });
-  expectType<MutableSignal<number>>(sigWithTag);
+  expectType<Mutable<number>>(sigWithTag);
 
   // Computed signal with tag (same limitation as above)
   const tagForComputed = tag<number>({ use: [computedPlugin] });
   const computedWithTag = signal({ dep }, ({ deps }): number => deps.dep * 2, {
     use: [tagForComputed] as any,
   });
-  expectType<ComputedSignal<number>>(computedWithTag);
+  expectType<Computed<number>>(computedWithTag);
 
   // Signal with mixed plugins and tags
   const mixedUse = signal(0, {
     use: [anyPlugin, tagForMutable, mutablePlugin],
   });
-  expectType<MutableSignal<number>>(mixedUse);
+  expectType<Mutable<number>>(mixedUse);
 
   // -----------------------------------------------------------------------------
   // Complex plugin scenarios
@@ -2033,7 +2033,7 @@ function pluginTests() {
   };
 
   const sigWithComplex = signal(0, { use: [complexPlugin] });
-  expectType<MutableSignal<number>>(sigWithComplex);
+  expectType<Mutable<number>>(sigWithComplex);
 
   // Plugin with object value
   interface User {
@@ -2055,7 +2055,7 @@ function pluginTests() {
       use: [userPlugin],
     }
   );
-  expectType<MutableSignal<User>>(userSignal);
+  expectType<Mutable<User>>(userSignal);
 
   // Plugin with array value
   const arrayPlugin: Plugin<number[]> = (signal) => {
@@ -2066,7 +2066,7 @@ function pluginTests() {
   };
 
   const arraySignal = signal([1, 2, 3], { use: [arrayPlugin] });
-  expectType<MutableSignal<number[]>>(arraySignal);
+  expectType<Mutable<number[]>>(arraySignal);
 
   // Plugin with promise value
   const promisePlugin: Plugin<Promise<string>> = (signal) => {
@@ -2078,7 +2078,7 @@ function pluginTests() {
   const promiseSignal = signal(Promise.resolve("test"), {
     use: [promisePlugin],
   });
-  expectType<MutableSignal<Promise<string>>>(promiseSignal);
+  expectType<Mutable<Promise<string>>>(promiseSignal);
 
   // Plugin with union type
   const unionPlugin: Plugin<string | number> = (signal) => {
@@ -2088,7 +2088,7 @@ function pluginTests() {
   };
 
   const unionSignal = signal<string | number>(0, { use: [unionPlugin] });
-  expectType<MutableSignal<string | number>>(unionSignal);
+  expectType<Mutable<string | number>>(unionSignal);
 
   // -----------------------------------------------------------------------------
   // Plugin kind inference
@@ -2112,14 +2112,14 @@ function pluginTests() {
 
   // Use tag with appropriate signal kind
   const mutableSigWithKindTag = signal(0, { use: [mutableKindTag] });
-  expectType<MutableSignal<number>>(mutableSigWithKindTag);
+  expectType<Mutable<number>>(mutableSigWithKindTag);
 
   const computedSigWithKindTag = signal(
     { dep },
     ({ deps }): number => deps.dep * 2,
     { use: [computedKindTag] as any }
   );
-  expectType<ComputedSignal<number>>(computedSigWithKindTag);
+  expectType<Computed<number>>(computedSigWithKindTag);
 
   // -----------------------------------------------------------------------------
   // Deeply nested tag hierarchies
@@ -2138,7 +2138,7 @@ function pluginTests() {
   >(level1Tag.use);
 
   const deepSignal = signal(0, { use: [level1Tag] });
-  expectType<MutableSignal<number>>(deepSignal);
+  expectType<Mutable<number>>(deepSignal);
 
   // -----------------------------------------------------------------------------
   // Edge cases
@@ -2146,29 +2146,29 @@ function pluginTests() {
 
   // Empty use array
   const emptyUse = signal(0, { use: [] });
-  expectType<MutableSignal<number>>(emptyUse);
+  expectType<Mutable<number>>(emptyUse);
 
   // Single plugin
   const singlePlugin = signal(0, { use: [anyPlugin] });
-  expectType<MutableSignal<number>>(singlePlugin);
+  expectType<Mutable<number>>(singlePlugin);
 
   // Signal without use option
   const noUse = signal(0);
-  expectType<MutableSignal<number>>(noUse);
+  expectType<Mutable<number>>(noUse);
 
   // Plugin returning void explicitly
   const voidPlugin: Plugin<number> = (): void => {
     // No return
   };
   const sigWithVoid = signal(0, { use: [voidPlugin] });
-  expectType<MutableSignal<number>>(sigWithVoid);
+  expectType<Mutable<number>>(sigWithVoid);
 
   // Plugin returning undefined explicitly
   const undefinedPlugin: Plugin<number> = (): undefined => {
     return undefined;
   };
   const sigWithUndefined = signal(0, { use: [undefinedPlugin] });
-  expectType<MutableSignal<number>>(sigWithUndefined);
+  expectType<Mutable<number>>(sigWithUndefined);
 
   const myPlugin = define<Plugin<number, "mutable">>();
   const myTag = tag<number>({ use: [mutablePlugin] });
@@ -2507,10 +2507,10 @@ function persistorTests() {
 
   // Individual mode with typed persistor
   const countSig = signal(0, { use: [typedPersist("count")] });
-  expectType<MutableSignal<number>>(countSig);
+  expectType<Mutable<number>>(countSig);
 
   const nameSig = signal("", { use: [typedPersist("name")] });
-  expectType<MutableSignal<string>>(nameSig);
+  expectType<Mutable<string>>(nameSig);
 
   // Type mismatch - signal type must match data shape
   // @ts-expect-error - signal<string> cannot use persist("count") which expects number
