@@ -1451,6 +1451,67 @@ const count = signal(0, { name: "count", use: [logger] });
 
 ---
 
+### 9. Known TypeScript Limitations
+
+#### Computed Signals with `use` Option
+
+**Problem:** TypeScript cannot properly infer the value type `T` for `Plugin<T>` or `Tag<T>` when used with computed signals. The computed function's return type is inferred as `unknown` in the type system, causing `Plugin<number>` to be incompatible with `Plugin<unknown>`.
+
+**Symptom:** TypeScript error "No overload matches this call" when using `use` option with computed signals.
+
+```tsx
+const dep = signal(5);
+
+// ❌ TypeScript Error - type inference fails
+const computedWithPlugin = signal({ dep }, ({ deps }) => deps.dep * 2, {
+  use: [myPlugin], // Error: Plugin<number> not assignable to Plugin<unknown>
+});
+```
+
+**Workaround:** Use `as any` to bypass the type checking:
+
+```tsx
+// ✅ Works - bypass with `as any`
+const computedWithPlugin = signal({ dep }, ({ deps }): number => deps.dep * 2, {
+  use: [myPlugin] as any,
+});
+```
+
+**Important notes:**
+
+1. Add explicit return type annotation to the compute function (`: number =>`)
+2. Cast the entire `use` array with `as any`
+3. Mutable signals do NOT have this issue - only computed signals
+
+**Alternative - Use `.map()` instead:**
+
+```tsx
+// ✅ Also works - use .map() for simple transformations
+const dep = signal(5, { use: [myPlugin] });
+const doubled = dep.map((x) => x * 2);
+```
+
+#### Cross-Kind Tag Assignment in Arrays
+
+**Problem:** TypeScript's structural typing cannot prevent cross-kind tag usage in array literal contexts, even though the types are properly defined.
+
+```tsx
+const computedTag = tag<number, "computed">();
+const mutableTag = tag<number, "mutable">();
+
+// ❌ Should error but doesn't - TypeScript allows it
+const sig = signal(0, { use: [computedTag] }); // Mutable signal with computed tag
+```
+
+**Recommendation:** Use general tags (no kind parameter) unless you have a strong semantic reason to restrict, and be careful with cross-kind usage.
+
+```tsx
+// ✅ Recommended - use general tags
+const generalTag = tag<number>(); // Works with any signal kind
+```
+
+---
+
 ## 🎨 Advanced Patterns
 
 ### Pattern 1: Query with Automatic Refetch
