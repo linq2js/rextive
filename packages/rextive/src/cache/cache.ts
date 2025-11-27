@@ -127,9 +127,15 @@ function createCache<T, K>(
     },
 
     forEach(fn) {
-      entries.forEach((entry, key) => {
+      for (const [key, entry] of entries) {
         fn(entry, key);
-      });
+      }
+    },
+
+    *[Symbol.iterator]() {
+      for (const [key, entry] of entries) {
+        yield [key, entry] as [K, InternalEntry<T, K>];
+      }
     },
 
     keys() {
@@ -138,7 +144,7 @@ function createCache<T, K>(
 
     extract() {
       const data: Record<string, T> = {};
-      entries.forEach((entry, key) => {
+      for (const [key, entry] of entries) {
         if (entry.value !== undefined) {
           // Use stableStringify for consistent key serialization in extract
           const serializedKey =
@@ -149,7 +155,7 @@ function createCache<T, K>(
               : stableStringify(key);
           data[serializedKey] = entry.value;
         }
-      });
+      }
       return data;
     },
   };
@@ -296,12 +302,12 @@ function createCache<T, K>(
   };
 
   cacheInstance.staleAll = () => {
-    entries.forEach((entry) => {
+    for (const [, entry] of entries) {
       entry.isStale = true;
       for (const hooks of strategyHooks) {
         hooks.onStale?.(entry);
       }
-    });
+    }
   };
 
   cacheInstance.refresh = async (key: K): Promise<T> => {
@@ -344,9 +350,9 @@ function createCache<T, K>(
 
   cacheInstance.refreshAll = async (): Promise<T[]> => {
     const promises: Promise<T>[] = [];
-    entries.forEach((entry) => {
+    for (const [, entry] of entries) {
       promises.push(cacheInstance.refresh(entry.key));
-    });
+    }
     return Promise.all(promises);
   };
 
@@ -415,33 +421,39 @@ function createCacheGroup<TFactoryMap extends CacheFactoryMap>(
     name,
 
     staleAll() {
-      caches.forEach((cache) => cache.staleAll());
+      for (const cache of caches.values()) {
+        cache.staleAll();
+      }
     },
 
     clearAll() {
-      caches.forEach((cache) => cache.clear());
+      for (const cache of caches.values()) {
+        cache.clear();
+      }
     },
 
     async refreshAll() {
       const promises: Promise<unknown[]>[] = [];
-      caches.forEach((cache) => {
+      for (const cache of caches.values()) {
         promises.push(cache.refreshAll());
-      });
+      }
       await Promise.all(promises);
     },
 
     extract() {
       const data: Record<string, Record<string, unknown>> = {};
-      caches.forEach((cache, factoryName) => {
+      for (const [factoryName, cache] of caches) {
         data[factoryName] = cache.extract();
-      });
+      }
       return data as {
         [Name in keyof TFactoryMap]: Record<string, unknown>;
       };
     },
 
     dispose() {
-      caches.forEach((cache) => cache.dispose());
+      for (const cache of caches.values()) {
+        cache.dispose();
+      }
       caches.clear();
     },
   } as CacheGroup<TFactoryMap>;

@@ -107,16 +107,16 @@ export function ttl(options: TtlOptions): CacheStrategy {
       const now = Date.now();
       const toDelete: unknown[] = [];
 
-      api.forEach((entry, key) => {
+      for (const [key, entry] of api) {
         // Skip the entry we're currently accessing
-        if (key === excludeKey) return;
+        if (key === excludeKey) continue;
 
         const age = now - entry.createdAt;
 
         // Check expire (time from creation)
         if (options.expire && age > options.expire) {
           toDelete.push(key);
-          return;
+          continue;
         }
 
         // Check idle (time since refCount=0)
@@ -124,7 +124,7 @@ export function ttl(options: TtlOptions): CacheStrategy {
           const released = releasedAt.get(key);
           if (released && now - released > options.idle) {
             toDelete.push(key);
-            return;
+            continue;
           }
         }
 
@@ -137,7 +137,7 @@ export function ttl(options: TtlOptions): CacheStrategy {
         ) {
           api.stale(key);
         }
-      });
+      }
 
       // Delete expired/idle entries
       for (const key of toDelete) {
@@ -240,13 +240,13 @@ export function lru(options: LruOptions): CacheStrategy {
         refCount: number;
       }> = [];
 
-      api.forEach((entry, key) => {
+      for (const [key, entry] of api) {
         entries.push({
           key,
           accessedAt: entry.accessedAt,
           refCount: entry.refCount,
         });
-      });
+      }
 
       // Sort: zero refCount first, then by accessedAt (oldest first)
       entries.sort((a, b) => {

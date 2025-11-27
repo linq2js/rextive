@@ -198,9 +198,9 @@ export class ObjectKeyedMap<K, V> {
    * Iterate over entries with original keys
    */
   forEach(callback: (value: V, key: K) => void): void {
-    this.map.forEach(({ key, value }) => {
+    for (const { key, value } of this.map.values()) {
       callback(value, key);
-    });
+    }
   }
 
   /**
@@ -208,7 +208,9 @@ export class ObjectKeyedMap<K, V> {
    */
   keys(): K[] {
     const keys: K[] = [];
-    this.map.forEach(({ key }) => keys.push(key));
+    for (const { key } of this.map.values()) {
+      keys.push(key);
+    }
     return keys;
   }
 
@@ -217,7 +219,9 @@ export class ObjectKeyedMap<K, V> {
    */
   values(): V[] {
     const values: V[] = [];
-    this.map.forEach(({ value }) => values.push(value));
+    for (const { value } of this.map.values()) {
+      values.push(value);
+    }
     return values;
   }
 
@@ -226,7 +230,9 @@ export class ObjectKeyedMap<K, V> {
    */
   entries(): Array<[K, V]> {
     const entries: Array<[K, V]> = [];
-    this.map.forEach(({ key, value }) => entries.push([key, value]));
+    for (const { key, value } of this.map.values()) {
+      entries.push([key, value]);
+    }
     return entries;
   }
 

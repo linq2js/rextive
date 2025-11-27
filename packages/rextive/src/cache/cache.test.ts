@@ -802,4 +802,221 @@ describe("strategies", () => {
       expect(factory).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("cache group operations", () => {
+    it("should support refreshAll on cache group", async () => {
+      const userFactory = vi.fn(async (id: string) => ({ id, type: "user" }));
+      const postFactory = vi.fn(async (id: string) => ({ id, type: "post" }));
+
+      // Create a cache group by passing factory map
+      const api = cache("api", {
+        users: userFactory,
+        posts: postFactory,
+      });
+
+      // Access some data
+      const userRef = api.users("1");
+      const postRef = api.posts("1");
+      await userRef.value;
+      await postRef.value;
+
+      expect(userFactory).toHaveBeenCalledTimes(1);
+      expect(postFactory).toHaveBeenCalledTimes(1);
+
+      // Refresh all
+      await api.refreshAll();
+
+      // Both factories should be called again
+      expect(userFactory).toHaveBeenCalledTimes(2);
+      expect(postFactory).toHaveBeenCalledTimes(2);
+
+      userRef.unref();
+      postRef.unref();
+    });
+
+    it("should support extract on cache group", async () => {
+      const userFactory = vi.fn(async (id: string) => ({ id, name: "User " + id }));
+      const postFactory = vi.fn(async (id: string) => ({ id, title: "Post " + id }));
+
+      // Create a cache group by passing factory map
+      const api = cache("api", {
+        users: userFactory,
+        posts: postFactory,
+      });
+
+      // Access some data
+      const userRef = api.users("1");
+      const postRef = api.posts("a");
+      await userRef.value;
+      await postRef.value;
+
+      // Extract all data
+      const data = api.extract();
+
+      expect(data).toEqual({
+        users: { "1": { id: "1", name: "User 1" } },
+        posts: { a: { id: "a", title: "Post a" } },
+      });
+
+      userRef.unref();
+      postRef.unref();
+    });
+  });
+
+  describe("ttl strategy onDispose", () => {
+    it("should cleanup interval on dispose", async () => {
+      const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+
+      const factory = vi.fn(async (id: string) => ({ id }));
+      const getUser = cache("users", factory, {
+        use: [
+          ttl({
+            stale: 1000,
+            interval: 500, // Enable periodic cleanup
+          }),
+        ],
+      });
+
+      // Access to trigger interval setup
+      const ref = getUser("1");
+      await ref.value;
+      ref.unref();
+
+      // Dispose the cache
+      getUser.dispose();
+
+      // Interval should have been cleared
+      expect(clearIntervalSpy).toHaveBeenCalled();
+
+      clearIntervalSpy.mockRestore();
+    });
+  });
+
+  describe("ttl strategy onClear", () => {
+    it("should clear released timestamps on cache clear", async () => {
+      const factory = vi.fn(async (id: string) => ({ id }));
+      const getUser = cache("users", factory, {
+        use: [
+          ttl({
+            idle: 5000, // Use idle to track releases
+          }),
+        ],
+      });
+
+      // Access and release
+      const ref = getUser("1");
+      await ref.value;
+      ref.unref();
+
+      // Clear the cache
+      getUser.clear();
+
+      // Re-access should work fresh
+      const ref2 = getUser("1");
+      await ref2.value;
+
+      expect(factory).toHaveBeenCalledTimes(2);
+
+      ref2.unref();
+    });
+  });
+
+  describe("cache dispose with strategies", () => {
+    it("should call onDispose for all strategies", () => {
+      const onDisposeSpy = vi.fn();
+
+      const customStrategy = () => ({
+        onDispose: onDisposeSpy,
+      });
+
+      const factory = vi.fn(async (id: string) => ({ id }));
+      const getUser = cache("users", factory, {
+        use: [customStrategy],
+      });
+
+      getUser.dispose();
+
+      expect(onDisposeSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("cache error handling", () => {
+    it("should handle factory errors correctly", async () => {
+      const factory = vi.fn(async (id: string) => {
+        if (id === "error") {
+          throw new Error("Factory error");
+        }
+        return { id };
+      });
+
+      const getItem = cache("items", factory);
+
+      // Normal fetch works
+      const ref1 = getItem("1");
+      await expect(ref1.value).resolves.toEqual({ id: "1" });
+      ref1.unref();
+
+      // Error fetch throws
+      const ref2 = getItem("error");
+      await expect(ref2.value).rejects.toThrow("Factory error");
+      ref2.unref();
+
+      // Can still fetch other items after error
+      const ref3 = getItem("2");
+      await expect(ref3.value).resolves.toEqual({ id: "2" });
+      ref3.unref();
+    });
+
+    it("should reset isFetching on error", async () => {
+      let shouldThrow = true;
+      const factory = vi.fn(async (id: string) => {
+        if (shouldThrow) {
+          throw new Error("Factory error");
+        }
+        return { id };
+      });
+
+      const getItem = cache("items", factory);
+
+      // First attempt fails
+      const ref1 = getItem("1");
+      await expect(ref1.value).rejects.toThrow("Factory error");
+      ref1.unref();
+
+      // Clear the cache to allow retry
+      getItem.clear();
+
+      // Retry should work after fixing the factory
+      shouldThrow = false;
+      const ref2 = getItem("1");
+      await expect(ref2.value).resolves.toEqual({ id: "1" });
+      ref2.unref();
+
+      // Factory was called twice - once for error, once for success after clear
+      expect(factory).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("cache factory with no existing entry", () => {
+    it("should create entry and return promise for new keys", async () => {
+      const factory = vi.fn(async (id: string) => ({ id }));
+      const getItem = cache("items", factory);
+
+      // First access creates new entry
+      const ref1 = getItem("new-key");
+      expect(ref1.value).toBeInstanceOf(Promise);
+
+      const result = await ref1.value;
+      expect(result).toEqual({ id: "new-key" });
+      ref1.unref();
+
+      // Second access uses cached entry
+      const ref2 = getItem("new-key");
+      await expect(ref2.value).resolves.toEqual({ id: "new-key" });
+      ref2.unref();
+
+      // Factory only called once
+      expect(factory).toHaveBeenCalledTimes(1);
+    });
+  });
 });

@@ -79,7 +79,9 @@ export function batch<T>(fn: () => T): T {
       pendingNotifications.clear();
 
       // Execute all notifications
-      notifications.forEach((notify) => notify());
+      for (const notify of notifications) {
+        notify();
+      }
     }
   }
 }

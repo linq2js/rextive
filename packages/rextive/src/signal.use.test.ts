@@ -164,6 +164,33 @@ describe("signal.use", () => {
 
       count.dispose();
     });
+
+    it("should ignore cleanup errors during error handling rollback", () => {
+      const count = signal(0);
+      const cleanup1 = vi.fn(() => {
+        throw new Error("Cleanup 1 error");
+      });
+      const cleanup2 = vi.fn(() => {
+        throw new Error("Cleanup 2 error");
+      });
+
+      const plugin1: GroupPlugin<{ count: typeof count }> = () => cleanup1;
+      const plugin2: GroupPlugin<{ count: typeof count }> = () => cleanup2;
+      const errorPlugin: GroupPlugin<{ count: typeof count }> = () => {
+        throw new Error("Plugin error");
+      };
+
+      // Should throw original error, not cleanup errors
+      expect(() =>
+        signal.use({ count }, [plugin1, plugin2, errorPlugin])
+      ).toThrow("Plugin error");
+
+      // All cleanups should still have been attempted
+      expect(cleanup1).toHaveBeenCalledOnce();
+      expect(cleanup2).toHaveBeenCalledOnce();
+
+      count.dispose();
+    });
   });
 
   describe("real-world use cases", () => {

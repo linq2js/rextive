@@ -33,7 +33,7 @@ export function attacher<TValue, TKind extends SignalKind>(
       Plugin<TValue, SignalKind> | Tag<TValue, SignalKind>
     >
   ) => {
-    pluginsAndTags.forEach((item) => {
+    for (const item of pluginsAndTags) {
       if (is<TValue, TKind>(item, "tag")) {
         // Handle tag
         tags.add(item);
@@ -51,12 +51,14 @@ export function attacher<TValue, TKind extends SignalKind>(
           onDispose.on(cleanup);
         }
       }
-    });
+    }
   };
 
   // Auto-cleanup: remove signal from all tags when disposed
   onDispose.on(() => {
-    tags.forEach((tag) => tag._delete(signal));
+    for (const tag of tags) {
+      tag._delete(signal);
+    }
   });
 
   return {

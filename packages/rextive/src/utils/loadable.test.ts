@@ -560,6 +560,41 @@ describe("loadable", () => {
       expect(l.value).toBe(123);
     });
   });
+
+  describe("loadable() with signals", () => {
+    it("should extract value from signal containing primitive", async () => {
+      // Import signal here to avoid circular dependency issues
+      const { signal } = await import("../signal");
+
+      const sig = signal(42);
+      const l = loadable(sig);
+
+      expect(l.status).toBe("success");
+      expect(l.value).toBe(42);
+    });
+
+    it("should extract value from signal containing loadable", async () => {
+      const { signal } = await import("../signal");
+
+      const successLoadable = loadable.success({ id: 1, name: "Test" });
+      const sig = signal(successLoadable);
+      const l = loadable(sig);
+
+      expect(l.status).toBe("success");
+      expect(l.value).toEqual({ id: 1, name: "Test" });
+    });
+
+    it("should extract loading loadable from signal", async () => {
+      const { signal } = await import("../signal");
+
+      const promise = new Promise(() => {}); // Never resolves
+      const loadingLoadable = loadable.loading(promise);
+      const sig = signal(loadingLoadable);
+      const l = loadable(sig);
+
+      expect(l.status).toBe("loading");
+    });
+  });
 });
 
 // Helper type for tests

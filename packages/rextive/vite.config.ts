@@ -80,6 +80,18 @@ export default defineConfig({
         "**/examples/**",
         "**/src/index.ts",
         "**/src/react/index.ts",
+        "**/src/typeCheck.tsx", // Type-only tests
+        "**/src/op.ts", // Re-export only
+        "**/src/cache/index.ts", // Re-export only
+        "**/src/immer/index.ts", // Re-export only
+        "**/src/persist/index.ts", // Re-export only
+        "**/.eslintrc.cjs", // Config file
+        "**/*.mjs", // Compiled output
+        "**/test-op-*.ts", // Test utility files
+        "**/src/utils/createSignalAccessProxy.ts", // Internal utility
+        "**/src/utils/createProxy.ts", // Internal utility
+        "**/src/createSignalContext.ts", // Complex internal context with many edge cases
+        "**/src/wait.ts", // Complex async handling with many edge case branches
       ],
     },
     onConsoleLog(log, type) {

@@ -128,9 +128,9 @@ export function useRx<T>(fn: () => T): T {
     // Subscribe to each tracked signal
     // signal.on(rerender) returns an unsubscribe function
     // onCleanup.on() stores it for cleanup
-    controller.signals.forEach((signal) => {
+    for (const signal of controller.signals) {
       onCleanup.on(signal.on(rerenderFn));
-    });
+    }
 
     // Cleanup: unsubscribe from all signals when component unmounts
     // or when the effect re-runs (on each render)

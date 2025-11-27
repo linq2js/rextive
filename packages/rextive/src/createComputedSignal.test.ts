@@ -45,6 +45,41 @@ describe("createComputedSignal", () => {
       expect(() => computed()).toThrow();
     });
 
+    it("should notify subscribers when fallback throws and had previous value", () => {
+      const source = signal(1);
+      let callCount = 0;
+      const onChange = vi.fn();
+
+      const computed = signal(
+        { source },
+        ({ deps }) => {
+          callCount++;
+          if (callCount > 1) {
+            throw new Error("Computation error after first run");
+          }
+          return deps.source * 2;
+        },
+        {
+          fallback: () => {
+            throw new Error("Fallback error");
+          },
+        }
+      );
+
+      // First access succeeds
+      expect(computed()).toBe(2);
+
+      // Subscribe to changes
+      computed.on(onChange);
+
+      // Change source - computation fails, fallback fails
+      // Should still notify about error state change
+      source.set(5);
+
+      // Reading should now throw
+      expect(() => computed()).toThrow();
+    });
+
     it("should call fallback on error", () => {
       const source = signal(1);
       const fallbackFn = vi.fn(() => -1);
@@ -126,6 +161,26 @@ describe("createComputedSignal", () => {
       // Should be removed from both tags
       expect(tag1.has(computed)).toBe(false);
       expect(tag2.has(computed)).toBe(false);
+    });
+  });
+
+  describe("disposed signal behavior", () => {
+    it("should return cached value when disposed signal is accessed", () => {
+      const source = signal(1);
+      const computed = signal({ source }, ({ deps }) => deps.source * 2);
+
+      expect(computed()).toBe(2);
+
+      // Dispose the signal
+      computed.dispose();
+
+      // Accessing after disposal returns the cached value
+      // (no recomputation happens)
+      expect(computed()).toBe(2);
+
+      // Changing source doesn't trigger recomputation
+      source.set(5);
+      expect(computed()).toBe(2); // Still returns cached value
     });
   });
 

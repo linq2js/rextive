@@ -334,7 +334,9 @@ export function tag<TValue, TKind extends SignalKind = "any">(
     use: use || [],
 
     forEach(fn: (signal: SignalOf<TValue, TKind>) => void): void {
-      signals.forEach(fn);
+      for (const signal of signals) {
+        fn(signal);
+      }
     },
 
     signals(): readonly SignalOf<TValue, TKind>[] {
@@ -498,13 +500,13 @@ export namespace tag {
 
     // Iterate through each tag
     for (const t of tags) {
-      t.forEach((signal) => {
+      for (const signal of t.signals()) {
         // Only process each signal once
         if (!seen.has(signal)) {
           seen.add(signal);
           fn(signal as Signal<UnionOfTagTypes<T>>);
         }
-      });
+      }
     }
   }
 
@@ -528,13 +530,13 @@ export namespace tag {
 
     // Collect signals from all tags
     for (const t of tags) {
-      t.forEach((signal) => {
+      for (const signal of t.signals()) {
         // Only add each signal once
         if (!seen.has(signal)) {
           seen.add(signal);
           result.push(signal as Signal<UnionOfTagTypes<T>>);
         }
-      });
+      }
     }
 
     return result;

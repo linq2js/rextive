@@ -88,7 +88,9 @@ export function createComputedSignal(
     context = undefined;
 
     // Cleanup when() subscriptions
-    whenUnsubscribers.forEach((unsub) => unsub());
+    for (const unsub of whenUnsubscribers) {
+      unsub();
+    }
     whenUnsubscribers = [];
   };
 
@@ -281,14 +283,14 @@ export function createComputedSignal(
       const targets = Array.isArray(target) ? target : [target];
 
       // Subscribe to each target signal
-      targets.forEach((targetSignal) => {
+      for (const targetSignal of targets) {
         const unsubscribe = targetSignal.on(() => {
           callback(instance, targetSignal);
         });
 
         // Store unsubscribe function to clean up on disposal (not on recompute)
         whenUnsubscribers.push(unsubscribe);
-      });
+      }
 
       return instance;
     }

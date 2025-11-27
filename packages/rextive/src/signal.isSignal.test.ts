@@ -79,4 +79,56 @@ describe("is", () => {
       expect(computed.paused()).toBe(true);
     }
   });
+
+  it("should identify accessors (function with on method)", () => {
+    const mutable = signal(1);
+    const computed = signal({ mutable }, ({ deps }) => deps.mutable * 2);
+
+    // Signals are accessors (functions with on method)
+    expect(signal.is(mutable, "accessor")).toBe(true);
+    expect(signal.is(computed, "accessor")).toBe(true);
+
+    // Regular functions without on method are not accessors
+    const regularFn = () => 42;
+    expect(signal.is(regularFn, "accessor")).toBe(false);
+
+    // Objects are not accessors
+    expect(signal.is({ on: () => {} }, "accessor")).toBe(false);
+  });
+
+  it("should identify observables (object with on method)", () => {
+    // Object with on method is observable
+    const observable = { on: () => {} };
+    expect(signal.is(observable, "observable")).toBe(true);
+
+    // Null is not observable
+    expect(signal.is(null, "observable")).toBe(false);
+
+    // Object without on method is not observable
+    expect(signal.is({ value: 1 }, "observable")).toBe(false);
+
+    // Functions are not observables (even if they have on)
+    const fn = Object.assign(() => {}, { on: () => {} });
+    expect(signal.is(fn, "observable")).toBe(false);
+  });
+
+  it("should identify tags", () => {
+    const tag = signal.tag<number>();
+
+    expect(signal.is(tag, "tag")).toBe(true);
+
+    // Regular objects are not tags
+    expect(signal.is({}, "tag")).toBe(false);
+    expect(signal.is(null, "tag")).toBe(false);
+
+    // Signals are not tags
+    const mutable = signal(1);
+    expect(signal.is(mutable, "tag")).toBe(false);
+  });
+
+  it("should return false for unknown type parameter", () => {
+    const mutable = signal(1);
+    // Use a type assertion to test the edge case
+    expect(signal.is(mutable, "unknown" as any)).toBe(false);
+  });
 });

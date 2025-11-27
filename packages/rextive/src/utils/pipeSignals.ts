@@ -31,7 +31,9 @@ export function pipeSignals(
     // Attach dispose that cleans up intermediates
     const originalDispose = result.dispose;
     result.dispose = () => {
-      intermediates.forEach((s) => s?.dispose?.());
+      for (const s of intermediates) {
+        s?.dispose?.();
+      }
       // Call original dispose if it exists
       if (typeof originalDispose === "function") {
         originalDispose.call(result);

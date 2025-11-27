@@ -70,13 +70,13 @@ export function emitter<T = void>() {
      */
     on(newListeners: SingleOrMultipleListeners<T>): VoidFunction {
       if (Array.isArray(newListeners)) {
-        newListeners.forEach((listener) => {
+        for (const listener of newListeners) {
           listeners.add(listener);
-        });
+        }
         return () => {
-          newListeners.forEach((listener) => {
+          for (const listener of newListeners) {
             listeners.delete(listener);
-          });
+          }
         };
       }
 

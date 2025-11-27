@@ -367,6 +367,56 @@ describe("wait", () => {
         expect(() => wait.settled([p1, p2])).toThrow(Promise);
       });
 
+      it("should throw promise for record with loading loadable", () => {
+        const l1 = success(1);
+        const l2 = loading(new Promise(() => {}));
+
+        expect(() => wait.settled({ a: l1, b: l2 })).toThrow(Promise);
+      });
+
+      it("should handle array with mix of success, error, and loading states", async () => {
+        const l1 = success(1);
+        const l2 = error(new Error("E2"));
+        const l3 = loading(Promise.resolve(3));
+
+        // Should throw a combined promise since l3 is loading
+        let thrownPromise: Promise<any>;
+        try {
+          wait.settled([l1, l2, l3]);
+        } catch (e) {
+          thrownPromise = e as Promise<any>;
+        }
+
+        expect(thrownPromise!).toBeInstanceOf(Promise);
+
+        // Wait for the combined promise to resolve
+        const results = await thrownPromise!;
+        expect(results).toHaveLength(3);
+        expect(results[0].status).toBe("fulfilled");
+        expect(results[1].status).toBe("rejected");
+        expect(results[2].status).toBe("fulfilled");
+      });
+
+      it("should handle record with mix of success, error, and loading states", async () => {
+        const l1 = success(1);
+        const l2 = error(new Error("E2"));
+        const l3 = loading(Promise.resolve(3));
+
+        // Should throw a combined promise since l3 is loading
+        let thrownPromise: Promise<any>;
+        try {
+          wait.settled({ a: l1, b: l2, c: l3 });
+        } catch (e) {
+          thrownPromise = e as Promise<any>;
+        }
+
+        expect(thrownPromise!).toBeInstanceOf(Promise);
+
+        // Wait for the combined promise to resolve
+        const results = await thrownPromise!;
+        expect(results).toHaveLength(3);
+      });
+
       it("should handle loadables", () => {
         const l1 = success(1);
         const l2 = error(new Error("E2"));
@@ -480,6 +530,44 @@ describe("wait", () => {
 
         expect(result).toBe("handled");
       });
+
+      it("should handle single error loadable in async mode (via promise)", async () => {
+        // Use a rejected promise instead of loadable.error for async path
+        const p = Promise.reject(new Error("Loadable error"));
+        const result = await wait.settled(p, (r: any) => {
+          expect(r.status).toBe("rejected");
+          expect(r.reason.message).toBe("Loadable error");
+          return "error-handled";
+        });
+
+        expect(result).toBe("error-handled");
+      });
+
+      it("should handle single success loadable in async mode (via promise)", async () => {
+        // Use a resolved promise for async path
+        const p = Promise.resolve(100);
+        const result = await wait.settled(p, (r: any) => {
+          expect(r.status).toBe("fulfilled");
+          expect(r.value).toBe(100);
+          return r.value * 2;
+        });
+
+        expect(result).toBe(200);
+      });
+
+      it("should handle single loading loadable in async mode (via promise)", async () => {
+        // Use the raw promise directly rather than wrapping in loadable
+        // as wait.settled awaits promises internally
+        const p = Promise.resolve(42);
+        const result = await wait.settled(p, (r: any) => {
+          expect(r.status).toBe("fulfilled");
+          expect(r.value).toBe(42);
+          return r.value;
+        });
+
+        expect(result).toBe(42);
+      });
+
     });
   });
 

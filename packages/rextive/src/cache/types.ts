@@ -53,6 +53,9 @@ export interface CacheApi<T, K = unknown> {
   /** Iterate over all entries */
   forEach(fn: (entry: CacheEntry<T, K>, key: K) => void): void;
 
+  /** Iterator for for...of loops - yields [key, entry] pairs */
+  [Symbol.iterator](): Iterator<[K, CacheEntry<T, K>]>;
+
   /** Get all keys */
   keys(): K[];
 

@@ -200,7 +200,9 @@ export function createMutableSignal(
 
     // Cleanup when() subscriptions
     // These must be cleaned up manually as they persist across recomputations
-    whenUnsubscribers.forEach((unsub) => unsub());
+    for (const unsub of whenUnsubscribers) {
+      unsub();
+    }
     whenUnsubscribers = [];
 
     // Clear change listeners
@@ -578,7 +580,7 @@ export function createMutableSignal(
       const targets = Array.isArray(target) ? target : [target];
 
       // Subscribe to each target signal
-      targets.forEach((targetSignal) => {
+      for (const targetSignal of targets) {
         const unsubscribe = targetSignal.on(() => {
           // Invoke callback with (current signal, trigger signal)
           callback(instance, targetSignal);
@@ -587,7 +589,7 @@ export function createMutableSignal(
         // Store unsubscribe function for cleanup on disposal
         // NOTE: NOT cleaned up on recompute (persists across recomputations)
         whenUnsubscribers.push(unsubscribe);
-      });
+      }
 
       // Return this signal for method chaining
       return instance;

@@ -293,10 +293,10 @@ async function waitAllAsyncRecord<
   try {
     const resolved = await Promise.all(promises);
     const result: any = {};
-    resolved.forEach((value, index) => {
-      const { key } = loadables[index];
-      result[key] = value;
-    });
+    for (let i = 0; i < resolved.length; i++) {
+      const { key } = loadables[i];
+      result[key] = resolved[i];
+    }
     return await runResolve(result as AwaitedFromRecord<TAwaitables>);
   } catch (error) {
     if (!onError) {
@@ -477,9 +477,9 @@ function waitAnySync<const TAwaitables extends Record<string, Awaitable<any>>>(
     let rejectionCount = 0;
     const rejections: any[] = [];
 
-    promises.forEach((p, index) => {
-      p.then(resolve, (error) => {
-        rejections[index] = error;
+    for (let i = 0; i < promises.length; i++) {
+      promises[i].then(resolve, (error) => {
+        rejections[i] = error;
         rejectionCount++;
         if (rejectionCount === promises.length) {
           const err = new Error("All awaitables failed");
@@ -487,7 +487,7 @@ function waitAnySync<const TAwaitables extends Record<string, Awaitable<any>>>(
           reject(err);
         }
       });
-    });
+    }
   });
 
   throw anyPromise;
@@ -526,9 +526,9 @@ async function waitAnyAsync<
         let rejectionCount = 0;
         const rejections: any[] = [];
 
-        promises.forEach((p, index) => {
-          p.then(resolve, (error) => {
-            rejections[index] = error;
+        for (let i = 0; i < promises.length; i++) {
+          promises[i].then(resolve, (error) => {
+            rejections[i] = error;
             rejectionCount++;
             if (rejectionCount === promises.length) {
               const err = new Error("All awaitables failed");
@@ -536,7 +536,7 @@ async function waitAnyAsync<
               reject(err);
             }
           });
-        });
+        }
       }
     );
     const result = [value, key] as AwaitedKeyedResult<TAwaitables>;
@@ -828,12 +828,12 @@ function waitSettledSync(awaitableOrCollection: any): any {
   }
 
   const result: any = {};
-  loadables.forEach(({ key, loadable: l }) => {
+  for (const { key, loadable: l } of loadables) {
     result[key] =
       l.status === "success"
         ? { status: "fulfilled" as const, value: l.value }
         : { status: "rejected" as const, reason: l.error };
-  });
+  }
   return result;
 }
 
@@ -960,10 +960,10 @@ async function waitSettledAsync(
   );
 
   const result: any = {};
-  settled.forEach((entry, index) => {
-    const { key } = loadables[index];
-    result[key] = entry;
-  });
+  for (let i = 0; i < settled.length; i++) {
+    const { key } = loadables[i];
+    result[key] = settled[i];
+  }
 
   return onSettled ? await onSettled(result) : result;
 }
