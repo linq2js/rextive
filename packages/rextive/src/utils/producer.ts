@@ -56,6 +56,17 @@ import { Producer } from "../types";
  * // Safely get or create
  * const resource = p.current();
  * ```
+ *
+ * @example Transfer ownership (skip disposal)
+ * ```ts
+ * const p = producer(() => new Connection());
+ * p.current(); // Creates connection
+ *
+ * const oldConn = p.peek();       // Get reference to current
+ * const newConn = p.next(false);  // Create new WITHOUT disposing old
+ * // oldConn is still valid - caller manages its lifecycle
+ * oldConn?.close();               // Manual cleanup when ready
+ * ```
  */
 export function producer<T>(factory: () => T): Producer<T> {
   let value: T | undefined;
@@ -83,8 +94,10 @@ export function producer<T>(factory: () => T): Producer<T> {
       return create();
     },
 
-    next(): T {
-      disposeCurrent();
+    next(dispose: boolean = true): T {
+      if (dispose) {
+        disposeCurrent();
+      }
       return create();
     },
 

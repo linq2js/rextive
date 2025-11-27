@@ -24,6 +24,7 @@ export default defineConfig({
         "react/index": resolve(__dirname, "src/react/index.ts"),
         "immer/index": resolve(__dirname, "src/immer/index.ts"),
         "cache/index": resolve(__dirname, "src/cache/index.ts"),
+        "persist/index": resolve(__dirname, "src/persist/index.ts"),
         op: resolve(__dirname, "src/op.ts"),
       },
       formats: ["es"],

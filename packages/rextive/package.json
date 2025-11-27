@@ -26,6 +26,10 @@
     "./cache": {
       "types": "./dist/cache/index.d.ts",
       "default": "./dist/cache/index.js"
+    },
+    "./persist": {
+      "types": "./dist/persist/index.d.ts",
+      "default": "./dist/persist/index.js"
     }
   },
   "files": [

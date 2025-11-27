@@ -2184,97 +2184,109 @@ signal.batch(() => {
 
 ### Example 9: Persist to LocalStorage
 
-Automatically save and load signal state from localStorage:
+Automatically save and load signal state from localStorage using `persistor()`:
 
 ```tsx
 import { signal } from "rextive";
+import { persistor } from "rextive/persist";
 
-// Create signals
-const theme = signal("dark");
-const fontSize = signal(16);
-const sidebarOpen = signal(true);
-const userPreferences = signal({
-  notifications: true,
-  autoSave: true,
+// Define your data shape for type safety
+type AppSettings = {
+  theme: string;
+  fontSize: number;
+  sidebarOpen: boolean;
+};
+
+// Create a type-safe persistor
+const persist = persistor<AppSettings>({
+  // load() is memoized - called only once even with multiple signals
+  load: () => {
+    const stored = localStorage.getItem("appSettings");
+    return stored ? JSON.parse(stored) : {};
+  },
+
+  // save() receives { type, values } - handle merge vs overwrite
+  save: (args) => {
+    if (args.type === "merge") {
+      // Individual mode - merge with existing
+      const existing = JSON.parse(localStorage.getItem("appSettings") || "{}");
+      localStorage.setItem(
+        "appSettings",
+        JSON.stringify({ ...existing, ...args.values })
+      );
+    } else {
+      // Group mode - safe to overwrite
+      localStorage.setItem("appSettings", JSON.stringify(args.values));
+    }
+  },
+
+  // Error handler
+  onError: (error, type) => {
+    console.error(`Persistence ${type} failed:`, error);
+  },
 });
 
-// Persist them to localStorage
-const { signals, pause, resume, status } = signal.persist(
-  { theme, fontSize, sidebarOpen, userPreferences },
-  {
-    // Load initial values from storage
-    load: () => {
-      const stored = localStorage.getItem("appSettings");
-      return stored ? JSON.parse(stored) : {};
-    },
+// Use as individual plugins - type-safe keys!
+const theme = signal("dark", { use: [persist("theme")] }); // ✅
+const fontSize = signal(16, { use: [persist("fontSize")] }); // ✅
+const sidebarOpen = signal(true, { use: [persist("sidebarOpen")] }); // ✅
+// persist("invalid") // ❌ TypeScript error - not a key of AppSettings
 
-    // Save values to storage
-    save: (values) => {
-      localStorage.setItem("appSettings", JSON.stringify(values));
-      console.log("Settings saved:", values);
-    },
-
-    // Error handler
-    onError: (error, type) => {
-      console.error(`Persistence ${type} failed:`, error);
-    },
-
-    // Start automatically
-    autoStart: true,
-  }
-);
-
-// ✅ On page load: Signals are automatically populated from localStorage
-
+// ✅ On page load: Signals are automatically hydrated from localStorage
 // ✅ On signal change: Automatically saved to localStorage
-signals.theme.set("light"); // Saved to localStorage!
-signals.fontSize.set(18); // Saved to localStorage!
-
-// Pause/resume persistence
-pause(); // Stop auto-saving
-signals.theme.set("dark"); // Not saved (paused)
-resume(); // Resume auto-saving
-signals.theme.set("light"); // Saved again!
+theme.set("light"); // Saved: { theme: "light" }
+fontSize.set(18); // Saved: { fontSize: 18 }
 ```
 
 <details>
-<summary>📖 <strong>Persistence Options</strong></summary>
+<summary>📖 <strong>Persistor Options</strong></summary>
 
 ```tsx
-const persistence = signal.persist(
-  { signal1, signal2 },
-  {
-    // REQUIRED: Load function
-    load: () => {
-      // Return an object with signal values
-      // Keys should match signal names
-      return { signal1: value1, signal2: value2 };
-    },
+import { persistor, type SaveArgs } from "rextive/persist";
 
-    // REQUIRED: Save function
-    save: (values) => {
-      // values = { signal1: currentValue1, signal2: currentValue2 }
-      // Save however you want (localStorage, IndexedDB, API, etc.)
-    },
+type MyData = { count: number; name: string };
 
-    // OPTIONAL: Error handler
-    onError: (error, type) => {
-      // type = "load" | "save"
-      console.error(`${type} error:`, error);
-    },
+const persist = persistor<MyData>({
+  // OPTIONAL: Load function (memoized - called once)
+  load: () => {
+    // Return an object with values
+    // Keys should match your data shape
+    return { count: 0, name: "" };
+  },
 
-    // OPTIONAL: Auto-start (default: true)
-    autoStart: true,
+  // OPTIONAL: Save function
+  save: (args: SaveArgs<MyData>) => {
+    // args.type: "merge" | "overwrite"
+    // args.values: Partial<MyData> | MyData
+    if (args.type === "merge") {
+      // Individual mode - only changed key
+      const existing = JSON.parse(localStorage.getItem("data") || "{}");
+      localStorage.setItem(
+        "data",
+        JSON.stringify({ ...existing, ...args.values })
+      );
+    } else {
+      // Group mode - full data shape
+      localStorage.setItem("data", JSON.stringify(args.values));
+    }
+  },
 
-    // OPTIONAL: Debounce saves (milliseconds)
-    debounce: 500, // Wait 500ms before saving
-  }
-);
+  // OPTIONAL: Error handler
+  onError: (error, type) => {
+    // type = "load" | "save"
+    console.error(`${type} error:`, error);
+  },
+});
 
-// Control persistence
-persistence.pause(); // Stop watching for changes
-persistence.resume(); // Resume watching
-persistence.status(); // "active" | "paused"
+// Two usage modes:
+
+// 1. Individual plugin mode - each signal saved separately (merge)
+const count = signal(0, { use: [persist("count")] });
+const name = signal("", { use: [persist("name")] });
+
+// 2. Group mode - all signals saved together (overwrite)
+const cleanup = signal.use({ count, name }, [persist]);
+// Call cleanup() to stop persistence
 ```
 
 </details>
@@ -2283,51 +2295,54 @@ persistence.status(); // "active" | "paused"
 <summary>📖 <strong>Advanced: Custom Storage Backends</strong></summary>
 
 ```tsx
+import { persistor } from "rextive/persist";
+
 // IndexedDB persistence
-const indexedDBPersistence = signal.persist(
-  { data1, data2 },
-  {
-    load: async () => {
-      const db = await openDB();
-      return await db.get("appState");
-    },
-    save: async (values) => {
-      const db = await openDB();
-      await db.put("appState", values);
-    },
-  }
-);
+const indexedDBPersist = persistor({
+  load: async () => {
+    const db = await openDB();
+    return await db.get("appState");
+  },
+  save: async (args) => {
+    const db = await openDB();
+    if (args.type === "overwrite") {
+      await db.put("appState", args.values);
+    } else {
+      const existing = (await db.get("appState")) || {};
+      await db.put("appState", { ...existing, ...args.values });
+    }
+  },
+});
 
 // API persistence
-const apiPersistence = signal.persist(
-  { userSettings },
-  {
-    load: async () => {
-      const res = await fetch("/api/settings");
-      return res.json();
-    },
-    save: async (values) => {
-      await fetch("/api/settings", {
-        method: "POST",
-        body: JSON.stringify(values),
-      });
-    },
-  }
-);
+const apiPersist = persistor({
+  load: async () => {
+    const res = await fetch("/api/settings");
+    return res.json();
+  },
+  save: async (args) => {
+    await fetch("/api/settings", {
+      method: args.type === "merge" ? "PATCH" : "PUT",
+      body: JSON.stringify(args.values),
+    });
+  },
+});
 
-// Session storage (temporary)
-const sessionPersistence = signal.persist(
-  { tempData },
-  {
-    load: () => {
-      const stored = sessionStorage.getItem("temp");
-      return stored ? JSON.parse(stored) : {};
-    },
-    save: (values) => {
-      sessionStorage.setItem("temp", JSON.stringify(values));
-    },
-  }
-);
+// Session storage (simpler - just overwrite)
+const sessionPersist = persistor({
+  load: () => {
+    const stored = sessionStorage.getItem("temp");
+    return stored ? JSON.parse(stored) : {};
+  },
+  save: (args) => {
+    // For simplicity, always merge
+    const existing = JSON.parse(sessionStorage.getItem("temp") || "{}");
+    sessionStorage.setItem(
+      "temp",
+      JSON.stringify({ ...existing, ...args.values })
+    );
+  },
+});
 ```
 
 </details>
@@ -2648,23 +2663,22 @@ user.set({ name: "Bob" });
 **2. Persister Plugin - Auto-save to localStorage:**
 
 ```tsx
-const persister =
-  (key: string): Plugin<any, "mutable"> =>
-  (sig) => {
-    // Load from storage on creation
-    const stored = localStorage.getItem(key);
-    if (stored) {
-      sig.set(JSON.parse(stored));
-    }
+import { persistor } from "rextive/persist";
 
-    // Save on every change
-    return sig.on(() => {
-      localStorage.setItem(key, JSON.stringify(sig()));
-    });
-  };
+// Use the built-in persistor for localStorage persistence
+const persist = persistor({
+  load: () => JSON.parse(localStorage.getItem("app-state") || "{}"),
+  save: (args) => {
+    const existing = JSON.parse(localStorage.getItem("app-state") || "{}");
+    localStorage.setItem(
+      "app-state",
+      JSON.stringify({ ...existing, ...args.values })
+    );
+  },
+});
 
 // Auto-persists theme preference
-const theme = signal("dark", { use: [persister("theme")] });
+const theme = signal("dark", { use: [persist("theme")] });
 theme.set("light"); // Automatically saved to localStorage
 
 // On next page load, theme is restored from localStorage
@@ -3512,13 +3526,13 @@ Quick reference for all Rextive APIs.
 
 ### Signal Namespace Methods
 
-| API                                | Description                            |
-| ---------------------------------- | -------------------------------------- |
-| `signal.is(value)`                 | Type guard: check if value is a Signal |
-| `signal.batch(fn)`                 | Batch multiple updates, notify once    |
-| `signal.tag(options?)`             | Create a tag to group/manage signals   |
-| `signal.persist(signals, options)` | Persist signals to storage             |
-| `signal.on(signals, listener)`     | Subscribe to multiple signals at once  |
+| API                            | Description                               |
+| ------------------------------ | ----------------------------------------- |
+| `signal.is(value)`             | Type guard: check if value is a Signal    |
+| `signal.batch(fn)`             | Batch multiple updates, notify once       |
+| `signal.tag(options?)`         | Create a tag to group/manage signals      |
+| `persistor(options)`           | Create persistor (from `rextive/persist`) |
+| `signal.on(signals, listener)` | Subscribe to multiple signals at once     |
 
 ---
 
@@ -4253,34 +4267,52 @@ control.dispose();
 
 ---
 
-#### `signal.persist(signals, options)`
+#### `persistor(options)` (from `rextive/persist`)
 
-Persist signals to storage with automatic sync:
+Create a persistor for automatic signal persistence:
 
 ```tsx
-const theme = signal("dark");
-const fontSize = signal(16);
+import { signal } from "rextive";
+import { persistor } from "rextive/persist";
 
-const { signals, pause, resume, status } = signal.persist(
-  { theme, fontSize },
-  {
-    load: () => JSON.parse(localStorage.getItem("settings") || "{}"),
-    save: (values) => localStorage.setItem("settings", JSON.stringify(values)),
-    onError: (error, type) => console.error(`${type} error:`, error),
-    autoStart: true,
-  }
-);
+type Settings = { theme: string; fontSize: number };
 
-// signals.theme and signals.fontSize are now auto-persisted
-signals.theme.set("light"); // Automatically saved to localStorage
+const persist = persistor<Settings>({
+  load: () => JSON.parse(localStorage.getItem("settings") || "{}"),
+  save: (args) => {
+    if (args.type === "merge") {
+      const existing = JSON.parse(localStorage.getItem("settings") || "{}");
+      localStorage.setItem(
+        "settings",
+        JSON.stringify({ ...existing, ...args.values })
+      );
+    } else {
+      localStorage.setItem("settings", JSON.stringify(args.values));
+    }
+  },
+  onError: (error, type) => console.error(`${type} error:`, error),
+});
+
+// Individual mode - type-safe keys
+const theme = signal("dark", { use: [persist("theme")] });
+const fontSize = signal(16, { use: [persist("fontSize")] });
+
+// Group mode
+const cleanup = signal.use({ theme, fontSize }, [persist]);
 ```
 
-**Returns:**
+**Options:**
 
-- `signals` - Object containing the persisted signals
-- `pause()` - Temporarily stop auto-saving
-- `resume()` - Resume auto-saving
-- `status()` - Current status: `"active"` | `"paused"`
+- `load()` - Load persisted values (memoized - called once)
+- `save(args)` - Save values with `{ type: "merge" | "overwrite", values }`
+- `onError(error, type)` - Handle load/save errors
+
+**Features:**
+
+- ✅ Type-safe keys from data shape
+- ✅ Memoized load (called once for multiple signals)
+- ✅ Merge mode (individual) vs Overwrite mode (group)
+- ✅ Works as plugin or group plugin
 
 See [Example 9: Persist to LocalStorage](#example-9-persist-to-localstorage) for more details.
 
@@ -6166,7 +6198,7 @@ rextive/cache     # Data caching with strategies
 
 - `signal` / `$` - Reactive state primitive
 - `signal.batch` - Batch updates
-- `signal.persist` - Persistence utilities
+- `persistor` - Persistence utilities (from `rextive/persist`)
 - `signal.tag` - Group signals with tags (with `forEach`, `map`, `size`)
 - `signal.on` - Subscribe to multiple signals with pause/resume control
 - `wait` - Promise utilities (`wait.any`, `wait.race`, `wait.settled`, `wait.timeout`, `wait.delay`)

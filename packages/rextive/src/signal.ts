@@ -156,7 +156,8 @@ export function signal<TValue>(
  */
 export function signal<TValue>(
   value: TValue | ((context: SignalContext) => TValue),
-  options?: SignalOptions<TValue> & SignalExtraOptions<TValue, "mutable">
+  options?: SignalOptions<TValue> &
+    NoInfer<SignalExtraOptions<TValue, "mutable" | "any">>
 ): MutableSignal<TValue>;
 
 /**
@@ -191,7 +192,8 @@ export function signal<TValue, TDependencies extends SignalMap>(
 export function signal<TValue, TDependencies extends SignalMap>(
   dependencies: TDependencies,
   compute: (context: ComputedSignalContext<NoInfer<TDependencies>>) => TValue,
-  options?: SignalOptions<TValue> & SignalExtraOptions<TValue, "computed">
+  options?: SignalOptions<TValue> &
+    NoInfer<SignalExtraOptions<TValue, "computed" | "any">>
 ): ComputedSignal<TValue>;
 export function signal(...args: any[]): any {
   // Overload 1: signal() - no arguments

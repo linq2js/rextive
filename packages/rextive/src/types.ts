@@ -543,16 +543,16 @@ export type TryInjectDispose<T> = T extends object
  */
 export type MutableSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
   /**
-   * Set signal value directly
-   * @param value - New value (type: TValue, not TInit)
-   */
-  set(value: TValue): void;
-
-  /**
    * Update signal value via reducer function (returns new value)
    * @param reducer - Function that receives current value (TValue | TInit) and returns new value (TValue)
    */
   set(reducer: (prev: NoInfer<TValue | TInit>) => TValue): void;
+
+  /**
+   * Set signal value directly
+   * @param value - New value (type: TValue, not TInit)
+   */
+  set(value: TValue): void;
 
   /**
    * Watch other signals and react when they change.
@@ -729,6 +729,46 @@ export type SignalOf<T, K extends SignalKind> = K extends "any"
 export type Plugin<TValue, TKind extends SignalKind = "any"> = (
   signal: SignalOf<TValue, TKind>
 ) => VoidFunction | void;
+
+/**
+ * A plugin that operates on a group of signals together.
+ *
+ * Unlike individual plugins which receive a single signal, group plugins receive
+ * all signals at once, enabling coordinated behavior across related signals.
+ *
+ * @template TSignals - Record of signal names to signal instances
+ * @returns Optional cleanup function called when `signal.use` result is invoked
+ *
+ * @example
+ * ```ts
+ * // Logger that tracks all signals in a group
+ * const groupLogger: GroupPlugin<{ count: Signal<number>; name: Signal<string> }> =
+ *   (signals) => {
+ *     const unsubs = Object.entries(signals).map(([key, sig]) =>
+ *       sig.on(() => console.log(`[${key}]`, sig()))
+ *     );
+ *     return () => unsubs.forEach(fn => fn());
+ *   };
+ *
+ * // Coordinated persistence
+ * const formPersister: GroupPlugin<typeof formSignals> = (signals) => {
+ *   const save = () => {
+ *     const data = Object.fromEntries(
+ *       Object.entries(signals).map(([k, s]) => [k, s()])
+ *     );
+ *     localStorage.setItem('form', JSON.stringify(data));
+ *   };
+ *   const unsubs = Object.values(signals).map(s => s.on(save));
+ *   return () => unsubs.forEach(fn => fn());
+ * };
+ * ```
+ */
+export type GroupPlugin<
+  TSignals extends Record<string, AnySignal<any>> = Record<
+    string,
+    AnySignal<any>
+  >
+> = (signals: TSignals) => VoidFunction | void;
 
 /**
  * A tag for grouping signals together.
@@ -1418,9 +1458,17 @@ export type Producer<T> = Disposable & {
    * Dispose the current value (if any) and create a new one.
    * Useful for resetting or cycling through instances.
    *
+   * @param dispose - Whether to dispose the current value before creating new one (default: true)
    * @returns The newly created value
+   *
+   * @example Skip disposal to transfer ownership
+   * ```ts
+   * const old = producer.peek();
+   * const newVal = producer.next(false); // old is NOT disposed
+   * // caller is responsible for disposing old
+   * ```
    */
-  next(): T;
+  next(dispose?: boolean): T;
 
   /**
    * Check if there's a current value without triggering creation.

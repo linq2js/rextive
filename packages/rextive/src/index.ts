@@ -1,12 +1,5 @@
 export type * from "./types";
 
-// Re-export persist types
-export type {
-  PersistorStatus,
-  PersistSignalsOptions,
-  PersistSignalsResult,
-} from "./persistSignals";
-
 // Re-export signal.on types
 export type { SignalOnControl } from "./signal.on";
 
@@ -16,18 +9,18 @@ export { LOADABLE_TYPE } from "./types";
 // Import signal and utilities, combine them, then export
 import { signal as signalBase } from "./signal";
 import { is } from "./is";
-import { persistSignals as persistSignalsImpl } from "./persistSignals";
 import { batch as batchImpl } from "./batch";
 import { tag as tagImpl } from "./tag";
 import { signalOn } from "./signal.on";
+import { signalUse } from "./signal.use";
 
 // Augment signal with utility methods
 export const signal = Object.assign(signalBase, {
   is: is,
-  persist: persistSignalsImpl,
   batch: batchImpl,
   tag: tagImpl,
   on: signalOn,
+  use: signalUse,
 });
 
 export const $ = signal;
