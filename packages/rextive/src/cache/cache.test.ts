@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cache } from "./cache";
-import { swr, ttl, lru, hydrate } from "./strategies";
+import { lru, hydrate, staleOn, evictOn } from "./strategies";
 
 describe("cache", () => {
   beforeEach(() => {
@@ -395,281 +395,6 @@ describe("strategies", () => {
     vi.useRealTimers();
   });
 
-  describe("swr", () => {
-    it("should mark entry stale after staleTime", async () => {
-      const factory = vi.fn(async (id: string) => ({ id, time: Date.now() }));
-      const getUser = cache("users", factory, {
-        use: [swr({ staleTime: 5000 })],
-      });
-
-      // First access
-      const r1 = getUser("123");
-      await r1.value;
-      r1.unref();
-
-      expect(factory).toHaveBeenCalledTimes(1);
-
-      // Access before staleTime
-      vi.advanceTimersByTime(3000);
-      const r2 = getUser("123");
-      await r2.value;
-      r2.unref();
-
-      expect(factory).toHaveBeenCalledTimes(1);
-
-      // Access after staleTime - marks entry as stale
-      vi.advanceTimersByTime(3000); // Now at 6000ms total
-      const r3 = getUser("123");
-      await r3.value;
-      r3.unref();
-
-      // Entry is now marked stale, factory called on NEXT access
-      expect(factory).toHaveBeenCalledTimes(1);
-
-      // Next access triggers background refresh
-      const r4 = getUser("123");
-      await r4.value;
-      r4.unref();
-
-      expect(factory).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe("ttl", () => {
-    describe("stale option", () => {
-      it("should mark entry stale after stale time", async () => {
-        const factory = vi.fn(async (id: string) => ({ id }));
-        const getUser = cache("users", factory, {
-          use: [ttl({ stale: 5000 })],
-        });
-
-        // First access
-        const r1 = getUser("123");
-        await r1.value;
-        r1.unref();
-
-        expect(factory).toHaveBeenCalledTimes(1);
-
-        // Wait for stale time
-        vi.advanceTimersByTime(6000);
-
-        // Access triggers stale marking, then next access re-fetches
-        const r2 = getUser("123");
-        await r2.value;
-        r2.unref();
-
-        const r3 = getUser("123");
-        await r3.value;
-        r3.unref();
-
-        expect(factory).toHaveBeenCalledTimes(2);
-      });
-    });
-
-    describe("expire option", () => {
-      it("should remove entry after expire time (lazy cleanup)", async () => {
-        const factory = vi.fn(async (id: string) => ({ id }));
-        const getUser = cache("users", factory, {
-          use: [ttl({ expire: 5000 })],
-        });
-
-        // First access
-        const r1 = getUser("123");
-        await r1.value;
-        r1.unref();
-
-        expect(getUser.has("123")).toBe(true);
-
-        // Add another entry to trigger cleanup
-        const r2 = getUser("456");
-        await r2.value;
-        r2.unref();
-
-        // Wait for expire time
-        vi.advanceTimersByTime(6000);
-
-        // Access the second entry - triggers lazy cleanup
-        const r3 = getUser("456");
-        await r3.value;
-        r3.unref();
-
-        // First entry should be expired
-        expect(getUser.has("123")).toBe(false);
-      });
-
-      it("should remove entry after expire time (periodic cleanup)", async () => {
-        const factory = vi.fn(async (id: string) => ({ id }));
-        const getUser = cache("users", factory, {
-          use: [ttl({ expire: 5000, interval: 1000 })],
-        });
-
-        // First access
-        const r1 = getUser("123");
-        await r1.value;
-        r1.unref();
-
-        expect(getUser.has("123")).toBe(true);
-
-        // Wait for expire time + interval
-        vi.advanceTimersByTime(6000);
-
-        expect(getUser.has("123")).toBe(false);
-      });
-    });
-
-    describe("idle option", () => {
-      it("should remove entry after idle time (lazy cleanup)", async () => {
-        const factory = vi.fn(async (id: string) => ({ id }));
-        const getUser = cache("users", factory, {
-          use: [ttl({ idle: 5000 })],
-        });
-
-        // First access and release
-        const r1 = getUser("123");
-        await r1.value;
-        r1.unref();
-
-        expect(getUser.has("123")).toBe(true);
-
-        // Add another entry
-        const r2 = getUser("456");
-        await r2.value;
-        r2.unref();
-
-        // Wait for idle time
-        vi.advanceTimersByTime(6000);
-
-        // Access second entry - triggers lazy cleanup of first
-        const r3 = getUser("456");
-        await r3.value;
-        r3.unref();
-
-        // First entry should be removed (idle)
-        expect(getUser.has("123")).toBe(false);
-      });
-
-      it("should not remove entry if still referenced", async () => {
-        const factory = vi.fn(async (id: string) => ({ id }));
-        const getUser = cache("users", factory, {
-          use: [ttl({ idle: 5000 })],
-        });
-
-        // First access - keep reference
-        const r1 = getUser("123");
-        await r1.value;
-        // Don't unref
-
-        // Add and release another entry
-        const r2 = getUser("456");
-        await r2.value;
-        r2.unref();
-
-        // Wait for idle time
-        vi.advanceTimersByTime(6000);
-
-        // Access triggers cleanup
-        const r3 = getUser("456");
-        await r3.value;
-        r3.unref();
-
-        // First entry should still exist (has refs)
-        expect(getUser.has("123")).toBe(true);
-
-        r1.unref();
-      });
-
-      it("should remove immediately if idle=0", async () => {
-        const factory = vi.fn(async (id: string) => ({ id }));
-        const getUser = cache("users", factory, {
-          use: [ttl({ idle: 0 })],
-        });
-
-        // Access and release
-        const r1 = getUser("123");
-        await r1.value;
-
-        expect(getUser.has("123")).toBe(true);
-
-        r1.unref();
-
-        // Should be removed immediately
-        expect(getUser.has("123")).toBe(false);
-      });
-
-      it("should cancel idle timer if accessed again", async () => {
-        const factory = vi.fn(async (id: string) => ({ id }));
-        const getUser = cache("users", factory, {
-          use: [ttl({ idle: 5000 })],
-        });
-
-        // First access and release
-        const r1 = getUser("123");
-        await r1.value;
-        r1.unref();
-
-        // Wait some time
-        vi.advanceTimersByTime(3000);
-
-        // Access again (should reset idle timer)
-        const r2 = getUser("123");
-        await r2.value;
-        r2.unref();
-
-        // Wait less than idle time from last release
-        vi.advanceTimersByTime(3000);
-
-        // Add another entry to trigger cleanup
-        const r3 = getUser("456");
-        await r3.value;
-
-        // Access to trigger cleanup
-        const r4 = getUser("456");
-        await r4.value;
-        r4.unref();
-        r3.unref();
-
-        // Entry should still exist (not idle long enough from last release)
-        expect(getUser.has("123")).toBe(true);
-      });
-    });
-
-    describe("combined options", () => {
-      it("should handle stale + expire + idle together", async () => {
-        const factory = vi.fn(async (id: string) => ({ id }));
-        const getUser = cache("users", factory, {
-          use: [
-            ttl({
-              stale: 3000,
-              expire: 10000,
-              idle: 5000,
-            }),
-          ],
-        });
-
-        // First access and release
-        const r1 = getUser("123");
-        await r1.value;
-        r1.unref();
-
-        expect(factory).toHaveBeenCalledTimes(1);
-
-        // After stale time - should mark stale
-        vi.advanceTimersByTime(4000);
-
-        const r2 = getUser("123");
-        await r2.value;
-        r2.unref();
-
-        // Next access triggers refresh
-        const r3 = getUser("123");
-        await r3.value;
-        r3.unref();
-
-        expect(factory).toHaveBeenCalledTimes(2);
-      });
-    });
-  });
-
   describe("lru", () => {
     it("should evict least recently used when exceeding maxSize", async () => {
       const factory = vi.fn(async (id: string) => ({ id }));
@@ -863,64 +588,6 @@ describe("strategies", () => {
     });
   });
 
-  describe("ttl strategy onDispose", () => {
-    it("should cleanup interval on dispose", async () => {
-      const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
-
-      const factory = vi.fn(async (id: string) => ({ id }));
-      const getUser = cache("users", factory, {
-        use: [
-          ttl({
-            stale: 1000,
-            interval: 500, // Enable periodic cleanup
-          }),
-        ],
-      });
-
-      // Access to trigger interval setup
-      const ref = getUser("1");
-      await ref.value;
-      ref.unref();
-
-      // Dispose the cache
-      getUser.dispose();
-
-      // Interval should have been cleared
-      expect(clearIntervalSpy).toHaveBeenCalled();
-
-      clearIntervalSpy.mockRestore();
-    });
-  });
-
-  describe("ttl strategy onClear", () => {
-    it("should clear released timestamps on cache clear", async () => {
-      const factory = vi.fn(async (id: string) => ({ id }));
-      const getUser = cache("users", factory, {
-        use: [
-          ttl({
-            idle: 5000, // Use idle to track releases
-          }),
-        ],
-      });
-
-      // Access and release
-      const ref = getUser("1");
-      await ref.value;
-      ref.unref();
-
-      // Clear the cache
-      getUser.clear();
-
-      // Re-access should work fresh
-      const ref2 = getUser("1");
-      await ref2.value;
-
-      expect(factory).toHaveBeenCalledTimes(2);
-
-      ref2.unref();
-    });
-  });
-
   describe("cache dispose with strategies", () => {
     it("should call onDispose for all strategies", () => {
       const onDisposeSpy = vi.fn();
@@ -941,6 +608,40 @@ describe("strategies", () => {
   });
 
   describe("cache error handling", () => {
+    it("should handle sync factory errors", async () => {
+      const factory = vi.fn((id: string) => {
+        if (id === "sync-error") {
+          throw new Error("Sync error");
+        }
+        return Promise.resolve({ id });
+      });
+
+      const getItem = cache("items", factory);
+
+      // Sync error is converted to rejected promise
+      const ref = getItem("sync-error");
+      await expect(ref.value).rejects.toThrow("Sync error");
+      ref.unref();
+
+      // Other keys still work
+      const ref2 = getItem("ok");
+      await expect(ref2.value).resolves.toEqual({ id: "ok" });
+      ref2.unref();
+    });
+
+    it("should handle non-promise factory return", async () => {
+      // Factory returns sync value (not a promise)
+      const factory = vi.fn((id: string) => ({ id, sync: true }) as any);
+
+      const getItem = cache("items", factory);
+
+      // Sync value is normalized to promise
+      const ref = getItem("123");
+      const result = await ref.value;
+      expect(result).toEqual({ id: "123", sync: true });
+      ref.unref();
+    });
+
     it("should handle factory errors correctly", async () => {
       const factory = vi.fn(async (id: string) => {
         if (id === "error") {
@@ -1017,6 +718,394 @@ describe("strategies", () => {
 
       // Factory only called once
       expect(factory).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("onError hook", () => {
+    it("should call onError hook when factory throws", async () => {
+      const onErrorSpy = vi.fn();
+      const customStrategy = () => ({
+        onError: onErrorSpy,
+      });
+
+      const factory = vi.fn(async (id: string) => {
+        throw new Error("Fetch failed");
+      });
+
+      const getItem = cache("items", factory, {
+        use: [customStrategy],
+      });
+
+      const ref = getItem("1");
+      await expect(ref.value).rejects.toThrow("Fetch failed");
+      ref.unref();
+
+      expect(onErrorSpy).toHaveBeenCalledTimes(1);
+      expect(onErrorSpy).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          key: "1",
+          isError: true,
+        })
+      );
+    });
+
+    it("should set isError and error on entry when factory throws", async () => {
+      let capturedEntry: any;
+      const customStrategy = () => ({
+        onError: (_error: unknown, entry: any) => {
+          capturedEntry = entry;
+        },
+      });
+
+      const factory = vi.fn(async () => {
+        throw new Error("Test error");
+      });
+
+      const getItem = cache("items", factory, {
+        use: [customStrategy],
+      });
+
+      const ref = getItem("1");
+      await expect(ref.value).rejects.toThrow("Test error");
+      ref.unref();
+
+      expect(capturedEntry.isError).toBe(true);
+      expect(capturedEntry.error).toBeInstanceOf(Error);
+      expect((capturedEntry.error as Error).message).toBe("Test error");
+    });
+
+    it("should clear isError on successful refetch", async () => {
+      let capturedEntry: any;
+      const customStrategy = () => ({
+        onSet: (_key: unknown, _value: unknown, entry: any) => {
+          capturedEntry = entry;
+        },
+      });
+
+      let shouldFail = true;
+      const factory = vi.fn(async (id: string) => {
+        if (shouldFail) throw new Error("Fetch failed");
+        return { id };
+      });
+
+      const getItem = cache("items", factory, {
+        use: [customStrategy],
+      });
+
+      // First access fails
+      const ref1 = getItem("1");
+      await expect(ref1.value).rejects.toThrow();
+      ref1.unref();
+
+      // Mark as stale to allow retry
+      getItem.stale("1");
+      shouldFail = false;
+
+      // Re-access triggers refetch
+      const ref2 = getItem("1");
+      await ref2.value;
+      ref2.unref();
+
+      expect(capturedEntry.isError).toBe(false);
+      expect(capturedEntry.error).toBeUndefined();
+    });
+  });
+
+  describe("staleOn", () => {
+    it("should mark entry stale after specified time", async () => {
+      const factory = vi.fn(async (id: string) => ({ id }));
+      const getItem = cache("items", factory, {
+        use: [staleOn({ after: 5000 })],
+      });
+
+      // First access
+      const ref1 = getItem("1");
+      await ref1.value;
+      ref1.unref();
+
+      expect(factory).toHaveBeenCalledTimes(1);
+
+      // Access before stale time
+      vi.advanceTimersByTime(3000);
+      const ref2 = getItem("1");
+      await ref2.value;
+      ref2.unref();
+
+      expect(factory).toHaveBeenCalledTimes(1);
+
+      // Access after stale time - marks stale
+      vi.advanceTimersByTime(3000);
+      const ref3 = getItem("1");
+      await ref3.value;
+      ref3.unref();
+
+      // Entry is now stale, next access triggers refetch
+      const ref4 = getItem("1");
+      await ref4.value;
+      ref4.unref();
+
+      expect(factory).toHaveBeenCalledTimes(2);
+    });
+
+    it("should mark entry stale on error", async () => {
+      let shouldFail = true;
+      const factory = vi.fn(async (id: string) => {
+        if (shouldFail) throw new Error("Fetch failed");
+        return { id };
+      });
+
+      const getItem = cache("items", factory, {
+        use: [staleOn({ error: true })],
+      });
+
+      // First access fails
+      const ref1 = getItem("1");
+      await expect(ref1.value).rejects.toThrow("Fetch failed");
+      ref1.unref();
+
+      expect(factory).toHaveBeenCalledTimes(1);
+
+      // Entry is marked stale due to error
+      // Next access triggers refetch
+      shouldFail = false;
+      const ref2 = getItem("1");
+      await ref2.value;
+      ref2.unref();
+
+      expect(factory).toHaveBeenCalledTimes(2);
+    });
+
+    it("should mark entry stale after idle time", async () => {
+      const factory = vi.fn(async (id: string) => ({ id }));
+      const getItem = cache("items", factory, {
+        use: [staleOn({ idle: 5000 })],
+      });
+
+      // Access and release
+      const ref1 = getItem("1");
+      await ref1.value;
+      ref1.unref();
+
+      expect(factory).toHaveBeenCalledTimes(1);
+
+      // Wait for idle time
+      vi.advanceTimersByTime(6000);
+
+      // Access again - entry is stale
+      const ref2 = getItem("1");
+      await ref2.value;
+      ref2.unref();
+
+      // Entry marked stale, next access refetches
+      const ref3 = getItem("1");
+      await ref3.value;
+      ref3.unref();
+
+      expect(factory).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("evictOn", () => {
+    it("should remove entry after specified time", async () => {
+      const factory = vi.fn(async (id: string) => ({ id }));
+      const getItem = cache("items", factory, {
+        use: [evictOn({ after: 5000 })],
+      });
+
+      // Add entry
+      const ref1 = getItem("1");
+      await ref1.value;
+      ref1.unref();
+
+      expect(getItem.has("1")).toBe(true);
+
+      // Add another entry to trigger cleanup
+      const ref2 = getItem("2");
+      await ref2.value;
+      ref2.unref();
+
+      // Wait for expire time
+      vi.advanceTimersByTime(6000);
+
+      // Access entry 2 - triggers lazy cleanup of entry 1
+      const ref3 = getItem("2");
+      await ref3.value;
+      ref3.unref();
+
+      expect(getItem.has("1")).toBe(false);
+    });
+
+    it("should remove entry immediately when idle=0", async () => {
+      const factory = vi.fn(async (id: string) => ({ id }));
+      const getItem = cache("items", factory, {
+        use: [evictOn({ idle: 0 })],
+      });
+
+      // Access and release
+      const ref1 = getItem("1");
+      await ref1.value;
+
+      expect(getItem.has("1")).toBe(true);
+
+      ref1.unref();
+
+      // Should be removed immediately
+      expect(getItem.has("1")).toBe(false);
+    });
+
+    it("should remove entry on error", async () => {
+      const factory = vi.fn(async (id: string) => {
+        throw new Error("Fetch failed");
+      });
+
+      const getItem = cache("items", factory, {
+        use: [evictOn({ error: true })],
+      });
+
+      // Access - triggers error
+      const ref1 = getItem("1");
+      await expect(ref1.value).rejects.toThrow("Fetch failed");
+      ref1.unref();
+
+      // Entry should be removed due to error
+      expect(getItem.has("1")).toBe(false);
+    });
+
+    it("should remove entry after idle time", async () => {
+      const factory = vi.fn(async (id: string) => ({ id }));
+      const getItem = cache("items", factory, {
+        use: [evictOn({ idle: 5000 })],
+      });
+
+      // Access and release
+      const ref1 = getItem("1");
+      await ref1.value;
+      ref1.unref();
+
+      // Add another entry
+      const ref2 = getItem("2");
+      await ref2.value;
+      ref2.unref();
+
+      // Wait for idle time
+      vi.advanceTimersByTime(6000);
+
+      // Access entry 2 - triggers cleanup
+      const ref3 = getItem("2");
+      await ref3.value;
+      ref3.unref();
+
+      expect(getItem.has("1")).toBe(false);
+    });
+
+    it("should not remove entry if still referenced", async () => {
+      const factory = vi.fn(async (id: string) => ({ id }));
+      const getItem = cache("items", factory, {
+        use: [evictOn({ idle: 5000 })],
+      });
+
+      // Access - keep reference
+      const ref1 = getItem("1");
+      await ref1.value;
+      // Don't unref
+
+      // Add another entry
+      const ref2 = getItem("2");
+      await ref2.value;
+      ref2.unref();
+
+      // Wait for idle time
+      vi.advanceTimersByTime(6000);
+
+      // Access entry 2 - triggers cleanup
+      const ref3 = getItem("2");
+      await ref3.value;
+      ref3.unref();
+
+      // Entry 1 should still exist (has refs)
+      expect(getItem.has("1")).toBe(true);
+
+      ref1.unref();
+    });
+
+    it("should handle combined conditions (OR)", async () => {
+      let shouldFail = false;
+      const factory = vi.fn(async (id: string) => {
+        if (shouldFail) throw new Error("Fetch failed");
+        return { id };
+      });
+
+      const getItem = cache("items", factory, {
+        use: [evictOn({ idle: 5000, error: true })],
+      });
+
+      // Access successful entry
+      const ref1 = getItem("1");
+      await ref1.value;
+      ref1.unref();
+
+      expect(getItem.has("1")).toBe(true);
+
+      // Entry with error is removed immediately
+      shouldFail = true;
+      const ref2 = getItem("2");
+      await expect(ref2.value).rejects.toThrow();
+      ref2.unref();
+
+      expect(getItem.has("2")).toBe(false);
+
+      // Entry 1 still exists (not idle yet, no error)
+      expect(getItem.has("1")).toBe(true);
+
+      // Wait for idle time
+      vi.advanceTimersByTime(6000);
+
+      // Need to trigger cleanup
+      shouldFail = false;
+      const ref3 = getItem("3");
+      await ref3.value;
+      ref3.unref();
+
+      // Entry 1 should now be removed (idle)
+      expect(getItem.has("1")).toBe(false);
+    });
+  });
+
+  describe("staleOn + evictOn combined", () => {
+    it("should mark stale on error and evict when idle", async () => {
+      let shouldFail = true;
+      const factory = vi.fn(async (id: string) => {
+        if (shouldFail) throw new Error("Fetch failed");
+        return { id };
+      });
+
+      const getItem = cache("items", factory, {
+        use: [staleOn({ error: true }), evictOn({ idle: 0 })],
+      });
+
+      // First access fails
+      const ref1 = getItem("1");
+      await expect(ref1.value).rejects.toThrow("Fetch failed");
+      // Keep ref for now
+
+      expect(factory).toHaveBeenCalledTimes(1);
+
+      // Entry is stale (error), still exists (has ref)
+      expect(getItem.has("1")).toBe(true);
+
+      // Release - entry is evicted (idle=0)
+      ref1.unref();
+      expect(getItem.has("1")).toBe(false);
+
+      // Next access triggers fresh fetch
+      shouldFail = false;
+      const ref2 = getItem("1");
+      const result = await ref2.value;
+      ref2.unref();
+
+      expect(result).toEqual({ id: "1" });
+      expect(factory).toHaveBeenCalledTimes(2);
     });
   });
 });

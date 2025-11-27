@@ -20,6 +20,10 @@ export interface CacheEntry<T, K = unknown> {
   isStale: boolean;
   /** Whether the entry is currently fetching */
   isFetching: boolean;
+  /** Whether the entry has an error (promise rejected) */
+  isError: boolean;
+  /** The error if isError is true */
+  error?: unknown;
 }
 
 /**
@@ -94,6 +98,9 @@ export interface CacheStrategyHooks<T = unknown, K = unknown> {
 
   /** Called when data is set (fetch complete or injected) */
   onSet?(key: K, value: T, entry: CacheEntry<T, K>): void;
+
+  /** Called when fetch fails (promise rejects) */
+  onError?(error: unknown, entry: CacheEntry<T, K>): void;
 
   /** Called when an entry is deleted/evicted */
   onDelete?(key: K, entry: CacheEntry<T, K>): void;

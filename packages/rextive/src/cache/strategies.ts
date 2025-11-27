@@ -1,210 +1,6 @@
 import { CacheStrategy, CacheStrategyHooks } from "./types";
 
 /**
- * Options for stale-while-revalidate strategy
- */
-export interface SwrOptions {
-  /**
-   * Time in milliseconds after which data is considered stale.
-   * When accessed after this time, cached data is returned immediately
-   * but a background refresh is triggered.
-   */
-  staleTime: number;
-}
-
-/**
- * Stale-while-revalidate strategy
- *
- * Returns cached data immediately but triggers a background refresh
- * if the data is older than `staleTime`.
- *
- * @example
- * ```ts
- * const getUser = cache("users", fetchUser, {
- *   use: [swr({ staleTime: 30000 })], // 30 seconds
- * });
- * ```
- */
-export function swr(options: SwrOptions): CacheStrategy {
-  return (): CacheStrategyHooks => {
-    return {
-      onAccess(entry) {
-        const age = Date.now() - entry.createdAt;
-        if (age > options.staleTime && !entry.isStale && !entry.isFetching) {
-          entry.isStale = true;
-        }
-      },
-    };
-  };
-}
-
-/**
- * Options for TTL (time-to-live) strategy
- *
- * Combines time-based, idle-based, and reference-count-based cleanup.
- */
-export interface TtlOptions {
-  /**
-   * Time in milliseconds after which data is marked stale (from creation).
-   * Stale entries return cached data but trigger background refresh.
-   */
-  stale?: number;
-
-  /**
-   * Time in milliseconds after which data is removed (from creation).
-   * Hard expiration regardless of usage.
-   */
-  expire?: number;
-
-  /**
-   * Time in milliseconds after which unused entries are removed.
-   * "Unused" means refCount=0 for this duration.
-   * Uses lazy cleanup by default (checked on access).
-   */
-  idle?: number;
-
-  /**
-   * Optional interval for periodic cleanup.
-   * If not set, cleanup happens lazily on access (more efficient).
-   * If set, a timer runs periodic scans (guaranteed cleanup even without activity).
-   */
-  interval?: number;
-}
-
-/**
- * Time-to-live strategy
- *
- * Unified strategy for time-based, idle-based, and reference-count cleanup.
- * - `stale`: Mark entries stale after X ms (from creation)
- * - `expire`: Remove entries after X ms (from creation)
- * - `idle`: Remove entries unused for X ms (from last release when refCount=0)
- *
- * By default uses lazy cleanup (on access). Set `interval` for periodic cleanup.
- *
- * @example
- * ```ts
- * // Time-based only
- * ttl({ stale: 30000, expire: 300000 })
- *
- * // Idle-based only (remove if unused for 1 minute)
- * ttl({ idle: 60000 })
- *
- * // Combined with periodic cleanup
- * ttl({ stale: 30000, expire: 300000, idle: 60000, interval: 10000 })
- * ```
- */
-export function ttl(options: TtlOptions): CacheStrategy {
-  return (api): CacheStrategyHooks => {
-    let intervalId: ReturnType<typeof setInterval> | undefined;
-
-    // Track when entries were released (refCount → 0)
-    const releasedAt = new Map<unknown, number>();
-
-    /**
-     * Check and clean up entries based on TTL rules
-     */
-    const cleanup = (excludeKey?: unknown) => {
-      const now = Date.now();
-      const toDelete: unknown[] = [];
-
-      for (const [key, entry] of api) {
-        // Skip the entry we're currently accessing
-        if (key === excludeKey) continue;
-
-        const age = now - entry.createdAt;
-
-        // Check expire (time from creation)
-        if (options.expire && age > options.expire) {
-          toDelete.push(key);
-          continue;
-        }
-
-        // Check idle (time since refCount=0)
-        if (options.idle && entry.refCount === 0) {
-          const released = releasedAt.get(key);
-          if (released && now - released > options.idle) {
-            toDelete.push(key);
-            continue;
-          }
-        }
-
-        // Check stale (time from creation)
-        if (
-          options.stale &&
-          age > options.stale &&
-          !entry.isStale &&
-          !entry.isFetching
-        ) {
-          api.stale(key);
-        }
-      }
-
-      // Delete expired/idle entries
-      for (const key of toDelete) {
-        api.delete(key);
-        releasedAt.delete(key);
-      }
-    };
-
-    return {
-      onInit() {
-        // Start periodic cleanup if interval is set
-        if (options.interval) {
-          intervalId = setInterval(cleanup, options.interval);
-        }
-      },
-
-      onDispose() {
-        if (intervalId) {
-          clearInterval(intervalId);
-          intervalId = undefined;
-        }
-        releasedAt.clear();
-      },
-
-      onAccess(entry) {
-        // Clear released timestamp when accessed
-        releasedAt.delete(entry.key);
-
-        // Check stale on access
-        if (options.stale) {
-          const age = Date.now() - entry.createdAt;
-          if (age > options.stale && !entry.isStale && !entry.isFetching) {
-            entry.isStale = true;
-          }
-        }
-
-        // Lazy cleanup (if no interval set)
-        if (!options.interval && (options.expire || options.idle)) {
-          cleanup(entry.key);
-        }
-      },
-
-      onRelease(entry) {
-        if (entry.refCount === 0) {
-          // Record when this entry became unused
-          releasedAt.set(entry.key, Date.now());
-
-          // Immediate cleanup if idle=0
-          if (options.idle === 0) {
-            api.delete(entry.key);
-            releasedAt.delete(entry.key);
-          }
-        }
-      },
-
-      onDelete(key) {
-        releasedAt.delete(key);
-      },
-
-      onClear() {
-        releasedAt.clear();
-      },
-    };
-  };
-}
-
-/**
  * Options for LRU (least recently used) strategy
  */
 export interface LruOptions {
@@ -325,6 +121,268 @@ export function hydrate<T = unknown>(
             api.stale(key as never);
           }
         }
+      },
+    };
+  };
+}
+
+/**
+ * Conditions for staleOn strategy.
+ * Multiple conditions are OR'd together.
+ */
+export interface StaleOnConditions {
+  /**
+   * Mark stale after X ms from creation.
+   */
+  after?: number;
+
+  /**
+   * Mark stale after X ms of being unused (refCount=0).
+   */
+  idle?: number;
+
+  /**
+   * Mark stale when entry has an error (promise rejected).
+   * This enables automatic retry on next access.
+   */
+  error?: boolean;
+}
+
+/**
+ * Conditions for evictOn strategy.
+ * Multiple conditions are OR'd together.
+ */
+export interface EvictOnConditions {
+  /**
+   * Remove after X ms from creation.
+   */
+  after?: number;
+
+  /**
+   * Remove after X ms of being unused (refCount=0).
+   * Set to 0 for immediate removal when refCount reaches 0.
+   */
+  idle?: number;
+
+  /**
+   * Remove when entry has an error (promise rejected).
+   */
+  error?: boolean;
+
+  /**
+   * Remove when entry is marked as stale.
+   */
+  stale?: boolean;
+}
+
+/**
+ * Mark entries as stale based on conditions.
+ *
+ * Stale entries return cached data immediately but trigger a background re-fetch.
+ * For error entries, the new fetch promise replaces the old rejected promise.
+ * Multiple conditions are OR'd together (any condition triggers stale).
+ *
+ * @example
+ * ```ts
+ * // Mark stale after 30 seconds (like swr({ staleTime: 30000 }))
+ * staleOn({ after: 30000 })
+ *
+ * // Mark errors as stale (enables auto-retry on next access)
+ * staleOn({ error: true })
+ *
+ * // Combined: stale after 30s OR on error
+ * staleOn({ after: 30000, error: true })
+ * ```
+ */
+export function staleOn(conditions: StaleOnConditions): CacheStrategy {
+  return (): CacheStrategyHooks => {
+    // Track when entries were released (refCount → 0)
+    const releasedAt = new Map<unknown, number>();
+
+    return {
+      onAccess(entry) {
+        // Skip if already stale or fetching
+        if (entry.isStale || entry.isFetching) {
+          releasedAt.delete(entry.key);
+          return;
+        }
+
+        // Check after condition (time from creation)
+        if (conditions.after) {
+          const age = Date.now() - entry.createdAt;
+          if (age > conditions.after) {
+            entry.isStale = true;
+            releasedAt.delete(entry.key);
+            return;
+          }
+        }
+
+        // Check idle condition (time since refCount=0)
+        if (conditions.idle) {
+          const released = releasedAt.get(entry.key);
+          if (released && Date.now() - released > conditions.idle) {
+            entry.isStale = true;
+            releasedAt.delete(entry.key);
+            return;
+          }
+        }
+
+        // Clear released timestamp after all checks
+        releasedAt.delete(entry.key);
+      },
+
+      onRelease(entry) {
+        if (entry.refCount === 0) {
+          releasedAt.set(entry.key, Date.now());
+        }
+      },
+
+      onError(_error, entry) {
+        // Mark stale on error (enables retry on next access)
+        if (conditions.error && !entry.isStale) {
+          entry.isStale = true;
+        }
+      },
+
+      onDelete(key) {
+        releasedAt.delete(key);
+      },
+
+      onClear() {
+        releasedAt.clear();
+      },
+
+      onDispose() {
+        releasedAt.clear();
+      },
+    };
+  };
+}
+
+/**
+ * Remove entries based on conditions.
+ *
+ * Multiple conditions are OR'd together (any condition triggers removal).
+ * Uses lazy cleanup (checked on access) by default.
+ *
+ * @example
+ * ```ts
+ * // Remove immediately when refCount=0 (like ttl({ idle: 0 }))
+ * evictOn({ idle: 0 })
+ *
+ * // Remove after 5 minutes (like ttl({ expire: 300000 }))
+ * evictOn({ after: 300000 })
+ *
+ * // Remove errors immediately
+ * evictOn({ error: true })
+ *
+ * // Combined: remove if idle for 1 min OR has error
+ * evictOn({ idle: 60000, error: true })
+ * ```
+ */
+export function evictOn(conditions: EvictOnConditions): CacheStrategy {
+  return (api): CacheStrategyHooks => {
+    // Track when entries were released (refCount → 0)
+    const releasedAt = new Map<unknown, number>();
+
+    /**
+     * Check if an entry should be evicted
+     */
+    const shouldEvict = (entry: {
+      key: unknown;
+      createdAt: number;
+      isStale: boolean;
+      isError: boolean;
+    }) => {
+      const now = Date.now();
+
+      // Check after condition (time from creation)
+      if (conditions.after) {
+        const age = now - entry.createdAt;
+        if (age > conditions.after) return true;
+      }
+
+      // Check idle condition (time since refCount=0)
+      if (conditions.idle !== undefined) {
+        const released = releasedAt.get(entry.key);
+        if (released && now - released > conditions.idle) return true;
+      }
+
+      // Check error condition
+      if (conditions.error && entry.isError) return true;
+
+      // Check stale condition
+      if (conditions.stale && entry.isStale) return true;
+
+      return false;
+    };
+
+    /**
+     * Clean up entries that match eviction conditions
+     */
+    const cleanup = (excludeKey?: unknown) => {
+      const toDelete: unknown[] = [];
+
+      for (const [key, entry] of api) {
+        if (key === excludeKey) continue;
+        if (shouldEvict(entry)) {
+          toDelete.push(key);
+        }
+      }
+
+      for (const key of toDelete) {
+        api.delete(key);
+        releasedAt.delete(key);
+      }
+    };
+
+    return {
+      onAccess(entry) {
+        // Clear released timestamp when accessed
+        releasedAt.delete(entry.key);
+
+        // Lazy cleanup
+        cleanup(entry.key);
+      },
+
+      onRelease(entry) {
+        if (entry.refCount === 0) {
+          releasedAt.set(entry.key, Date.now());
+
+          // Immediate eviction if idle=0
+          if (conditions.idle === 0) {
+            api.delete(entry.key);
+            releasedAt.delete(entry.key);
+          }
+        }
+      },
+
+      onError(_error, entry) {
+        // Evict on error if configured
+        if (conditions.error) {
+          api.delete(entry.key);
+          releasedAt.delete(entry.key);
+        }
+      },
+
+      onStale(entry) {
+        // Evict on stale if configured
+        if (conditions.stale) {
+          api.delete(entry.key);
+          releasedAt.delete(entry.key);
+        }
+      },
+
+      onDelete(key) {
+        releasedAt.delete(key);
+      },
+
+      onClear() {
+        releasedAt.clear();
+      },
+
+      onDispose() {
+        releasedAt.clear();
       },
     };
   };

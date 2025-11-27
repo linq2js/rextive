@@ -20,11 +20,11 @@ export type {
 } from "./types";
 
 // Built-in strategies
-export { swr, ttl, lru, hydrate } from "./strategies";
+export { lru, hydrate, staleOn, evictOn } from "./strategies";
 
 export type {
-  SwrOptions,
-  TtlOptions,
   LruOptions,
   HydrateOptions,
+  StaleOnConditions,
+  EvictOnConditions,
 } from "./strategies";

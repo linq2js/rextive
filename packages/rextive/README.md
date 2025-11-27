@@ -3607,16 +3607,16 @@ Quick reference for all Rextive APIs.
 
 ### Cache (`rextive/cache`)
 
-| API                            | Description                      |
-| ------------------------------ | -------------------------------- |
-| `cache(name, factory)`         | Create keyed data cache          |
-| `cache(name, factoryMap)`      | Create cache group               |
-| `swr({ staleTime })`           | Stale-while-revalidate strategy  |
-| `ttl({ stale, expire, idle })` | Time-to-live strategy            |
-| `lru({ maxSize })`             | Least recently used eviction     |
-| `hydrate({ source })`          | SSR hydration strategy           |
-| `stableStringify(value)`       | Deterministic JSON serialization |
-| `ObjectKeyedMap`               | Map with object key support      |
+| API                                      | Description                      |
+| ---------------------------------------- | -------------------------------- |
+| `cache(name, factory)`                   | Create keyed data cache          |
+| `cache(name, factoryMap)`                | Create cache group               |
+| `staleOn({ after, idle, error })`        | Mark entries stale on conditions |
+| `evictOn({ after, idle, error, stale })` | Remove entries on conditions     |
+| `lru({ maxSize })`                       | Least recently used eviction     |
+| `hydrate({ source })`                    | SSR hydration strategy           |
+| `stableStringify(value)`                 | Deterministic JSON serialization |
+| `ObjectKeyedMap`                         | Map with object key support      |
 
 ---
 
@@ -5722,14 +5722,16 @@ getUser.has("123"); // Check if key exists
 
 Strategies extend cache behavior with pluggable lifecycle hooks:
 
-#### `swr` - Stale While Revalidate
+#### `staleOn` - Mark Entries Stale
+
+Mark entries as stale based on conditions (OR'd together). Stale entries return cached data immediately but trigger a background re-fetch:
 
 ```tsx
-import { cache, swr } from "rextive/cache";
+import { cache, staleOn } from "rextive/cache";
 
 const getUser = cache("users", fetchUser, {
   use: [
-    swr({ staleTime: 30000 }), // Mark stale after 30 seconds
+    staleOn({ after: 30000 }), // Mark stale after 30 seconds
   ],
 });
 
@@ -5737,31 +5739,54 @@ const getUser = cache("users", fetchUser, {
 // After 30s: returns cached data immediately, triggers background refresh
 ```
 
-#### `ttl` - Time To Live
+**Conditions:**
 
-Unified strategy for time-based, idle-based, and reference-count cleanup:
+- `after` - Mark stale after X ms from creation
+- `idle` - Mark stale after X ms of being unused (refCount=0)
+- `error` - Mark errors as stale (enables retry on next access)
 
 ```tsx
-import { cache, ttl } from "rextive/cache";
+// Mark errors as stale - enables automatic retry
+staleOn({ error: true });
+
+// Combined: stale after 30s OR on error
+staleOn({ after: 30000, error: true });
+```
+
+#### `evictOn` - Remove Entries
+
+Remove entries based on conditions (OR'd together):
+
+```tsx
+import { cache, evictOn } from "rextive/cache";
 
 const getUser = cache("users", fetchUser, {
   use: [
-    ttl({
-      stale: 30000, // Mark stale after 30s (lazy re-fetch)
-      expire: 300000, // Remove after 5 minutes (hard expiration)
+    evictOn({
+      after: 300000, // Remove after 5 minutes (hard expiration)
       idle: 60000, // Remove if unused for 1 minute (refCount=0)
-      interval: 10000, // Optional: periodic cleanup every 10s
     }),
   ],
 });
 ```
 
-**Options:**
+**Conditions:**
 
-- `stale` - Time until entry is marked stale (triggers lazy re-fetch)
-- `expire` - Time until entry is removed (hard expiration)
-- `idle` - Time without references until removal (refCount=0)
-- `interval` - Optional periodic cleanup (default: lazy cleanup on access)
+- `after` - Remove after X ms from creation
+- `idle` - Remove after X ms of being unused (refCount=0). Set to 0 for immediate removal.
+- `error` - Remove errors immediately
+- `stale` - Remove when entry is marked stale
+
+```tsx
+// Remove immediately when no longer used
+evictOn({ idle: 0 });
+
+// Remove errors immediately
+evictOn({ error: true });
+
+// Combined: remove if idle for 1 min OR has error
+evictOn({ idle: 60000, error: true });
+```
 
 #### `lru` - Least Recently Used
 
@@ -5802,7 +5827,7 @@ const getUser = cache("users", fetchUser, {
 Manage multiple related caches with shared options:
 
 ```tsx
-import { cache, swr, ttl } from "rextive/cache";
+import { cache, staleOn, evictOn } from "rextive/cache";
 
 const api = cache(
   "api",
@@ -5812,7 +5837,7 @@ const api = cache(
     comments: async (postId: string) => fetchComments(postId),
   },
   {
-    use: [swr({ staleTime: 30000 }), ttl({ expire: 300000 })],
+    use: [staleOn({ after: 30000 }), evictOn({ after: 300000 })],
   }
 );
 
@@ -5829,6 +5854,198 @@ await api.refreshAll(); // Refresh all entries
 const state = api.extract();
 // { users: { "123": {...} }, posts: { "123": [...] } }
 ```
+
+### Shared Fetched Data with Auto-Cleanup
+
+Use cache with signals to share fetched data across components with automatic cleanup when no components are using it:
+
+```tsx
+import { cache, staleOn, evictOn } from "rextive/cache";
+import { signal } from "rextive";
+import { rx, useScope } from "rextive/react";
+import { Suspense } from "react";
+
+// Create a cache for fetching todo list
+// Data is shared across all components that access the same key
+const fetchTodoList = cache(
+  "fetchTodoList",
+  async () => {
+    const res = await fetch("/api/todos");
+    if (!res.ok) throw new Error("Failed to fetch");
+    return res.json();
+  },
+  {
+    use: [
+      // Mark errors as stale - next access triggers re-fetch
+      staleOn({ error: true }),
+      // Auto-remove cache entry when refCount reaches 0
+      evictOn({ idle: 0 }),
+    ],
+  }
+);
+
+// Factory function to create a signal that accesses the cache
+//
+// NOTE: No abortSignal needed here because:
+// - Cache is SHARED data - multiple components access the same entry
+// - No need to abort on recompute - the fetch is managed by cache, not signal
+// - Cache works on key (payload) - same key = same shared data
+// - No side effect - cache handles deduplication automatically
+function createTodoListSignal() {
+  return signal(({ onCleanup }) => {
+    // Access cache - increments refCount
+    const { value, unref } = fetchTodoList();
+
+    // When signal disposes, decrement refCount
+    // If refCount reaches 0, evictOn({ idle: 0 }) removes entry
+    onCleanup(unref);
+
+    return value; // Returns the promise
+  });
+}
+
+// Error Boundary for handling fetch errors
+class TodoErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  handleRetry = () => {
+    // Refresh the cache - triggers re-fetch
+    fetchTodoList.refresh();
+    this.setState({ error: null });
+  };
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div>
+          <p>Error: {this.state.error.message}</p>
+          <button onClick={this.handleRetry}>Retry</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// Component using the shared todo list
+function TodoList() {
+  // useScope creates a component-scoped signal
+  // When component unmounts, signal disposes and calls onCleanup
+  const { todoList } = useScope(() => ({
+    todoList: createTodoListSignal(),
+    dispose: [todoList],
+  }));
+
+  // wait() throws for Suspense when loading, throws error for ErrorBoundary
+  return rx(() => {
+    const todos = wait(todoList());
+    return (
+      <ul>
+        {todos.map((todo) => (
+          <li key={todo.id}>{todo.text}</li>
+        ))}
+      </ul>
+    );
+  });
+}
+
+// Usage: Wrap with Suspense and ErrorBoundary
+function App() {
+  return (
+    <TodoErrorBoundary>
+      <Suspense fallback={<div>Loading...</div>}>
+        <TodoList />
+      </Suspense>
+    </TodoErrorBoundary>
+  );
+}
+
+// Multiple components can share the same cached data
+function TodoCount() {
+  const { todoList } = useScope(() => ({
+    todoList: createTodoListSignal(),
+    dispose: [todoList],
+  }));
+
+  return rx(() => {
+    const todos = wait(todoList());
+    return <span>{todos.length} todos</span>;
+  });
+}
+
+// When BOTH TodoList and TodoCount unmount:
+// - Both signals dispose
+// - Both call unref()
+// - refCount reaches 0
+// - Cache entry is removed (evictOn({ idle: 0 }))
+```
+
+**How it works:**
+
+1. **`cache()`** returns `{ value, unref }` where `value` is a Promise
+2. Each access increments the internal `refCount`
+3. Calling `unref()` decrements `refCount`
+4. When `refCount` reaches 0, `evictOn({ idle: 0 })` removes the entry
+5. Using `signal({ onCleanup })` ensures `unref` is called when the signal disposes
+6. `useScope` auto-disposes signals when the component unmounts
+
+**Error handling with `staleOn({ error: true })`:**
+
+```
+1. Fetch fails → entry.isError = true, entry.isStale = true
+2. Suspense catches → ErrorBoundary shows error UI
+3. User clicks Retry → fetchTodoList.refresh() triggers re-fetch
+4. New promise replaces old rejected promise
+5. Component re-renders with fresh data
+```
+
+**Why no `abortSignal`?**
+
+Unlike computed signals that fetch data directly, cache-backed signals don't need `abortSignal`:
+
+| Approach               | Needs `abortSignal`? | Why?                                         |
+| ---------------------- | -------------------- | -------------------------------------------- |
+| Direct fetch in signal | ✅ Yes               | Each recompute starts a new request          |
+| Cache-backed signal    | ❌ No                | Cache deduplicates - same key = same request |
+
+```tsx
+// ❌ Direct fetch - NEEDS abortSignal to cancel on recompute
+const data = signal({ userId }, async ({ deps, abortSignal }) => {
+  return fetch(`/user/${deps.userId}`, { signal: abortSignal });
+});
+
+// ✅ Cache-backed - NO abortSignal needed
+const data = signal(({ onCleanup }) => {
+  const { value, unref } = userCache(userId);
+  onCleanup(unref);
+  return value; // Cache handles deduplication
+});
+```
+
+**Strategies explained:**
+
+| Strategy                     | Purpose                                            |
+| ---------------------------- | -------------------------------------------------- |
+| `staleOn({ after: 30000 })`  | Mark stale after 30s (background refresh)          |
+| `staleOn({ error: true })`   | Mark errors stale (enables retry)                  |
+| `evictOn({ idle: 0 })`       | Remove immediately when refCount=0                 |
+| `evictOn({ idle: 60000 })`   | Remove after 60s of refCount=0                     |
+| `evictOn({ after: 300000 })` | Remove after 5 min regardless of usage             |
+| `evictOn({ error: true })`   | Remove errors immediately (alternative to staleOn) |
+
+**Benefits:**
+
+- ✅ **Shared data** - Multiple components access the same cached data
+- ✅ **Automatic cleanup** - `evictOn({ idle })` removes entries when refCount=0
+- ✅ **No memory leaks** - Proper ref counting with automatic unref
+- ✅ **Error recovery** - `staleOn({ error: true })` enables retry via `cache.refresh()`
 
 ### Object Keys
 
@@ -5877,18 +6094,18 @@ const getUser = cache("users", fetchUser, {
 ### Combining Strategies
 
 ```tsx
-import { cache, swr, ttl, lru, hydrate } from "rextive/cache";
+import { cache, staleOn, evictOn, lru, hydrate } from "rextive/cache";
 
 const getUser = cache("users", fetchUser, {
   use: [
     // Hydrate from SSR state first
     hydrate({ source: () => window.__CACHE_STATE__?.users }),
 
-    // Stale-while-revalidate after 30 seconds
-    swr({ staleTime: 30000 }),
+    // Mark stale after 30 seconds (background refresh)
+    staleOn({ after: 30000 }),
 
     // Hard expire after 5 minutes, cleanup unused after 1 minute
-    ttl({ expire: 300000, idle: 60000 }),
+    evictOn({ after: 300000, idle: 60000 }),
 
     // Keep max 100 entries
     lru({ maxSize: 100 }),
