@@ -22,6 +22,10 @@
     "./op": {
       "types": "./dist/op.d.ts",
       "default": "./dist/op.js"
+    },
+    "./cache": {
+      "types": "./dist/cache/index.d.ts",
+      "default": "./dist/cache/index.js"
     }
   },
   "files": [

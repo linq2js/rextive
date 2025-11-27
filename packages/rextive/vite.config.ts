@@ -23,6 +23,7 @@ export default defineConfig({
         rextive: resolve(__dirname, "src/index.ts"),
         "react/index": resolve(__dirname, "src/react/index.ts"),
         "immer/index": resolve(__dirname, "src/immer/index.ts"),
+        "cache/index": resolve(__dirname, "src/cache/index.ts"),
         op: resolve(__dirname, "src/op.ts"),
       },
       formats: ["es"],

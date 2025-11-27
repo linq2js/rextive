@@ -3591,6 +3591,21 @@ Quick reference for all Rextive APIs.
 
 ---
 
+### Cache (`rextive/cache`)
+
+| API                            | Description                      |
+| ------------------------------ | -------------------------------- |
+| `cache(name, factory)`         | Create keyed data cache          |
+| `cache(name, factoryMap)`      | Create cache group               |
+| `swr({ staleTime })`           | Stale-while-revalidate strategy  |
+| `ttl({ stale, expire, idle })` | Time-to-live strategy            |
+| `lru({ maxSize })`             | Least recently used eviction     |
+| `hydrate({ source })`          | SSR hydration strategy           |
+| `stableStringify(value)`       | Deterministic JSON serialization |
+| `ObjectKeyedMap`               | Map with object key support      |
+
+---
+
 ### Types (for TypeScript)
 
 | Type                | Description                       |
@@ -3604,6 +3619,9 @@ Quick reference for all Rextive APIs.
 | `Tag<T, K>`         | Signal grouping tag               |
 | `Plugin<T, K>`      | Signal plugin function            |
 | `Producer<T>`       | Lazy instance factory             |
+| `Cache<T, K>`       | Keyed data cache                  |
+| `CacheGroup<T>`     | Group of related caches           |
+| `CacheStrategy<T>`  | Cache strategy plugin             |
 
 ---
 
@@ -5630,6 +5648,252 @@ const deleteTodo = (id: number) => {
 
 ---
 
+## 🗄️ Data Caching (`rextive/cache`)
+
+A powerful keyed data cache with reference counting, lifecycle management, and pluggable strategies.
+
+**Import from `rextive/cache`:**
+
+```tsx
+import { cache, swr, ttl, lru, hydrate } from "rextive/cache";
+```
+
+### Basic Usage
+
+```tsx
+import { cache } from "rextive/cache";
+
+// Create a cache with a factory function
+const getUser = cache("users", async (userId: string) => {
+  const res = await fetch(`/api/users/${userId}`);
+  return res.json();
+});
+
+// Access cached data (creates entry if not exists)
+const { value, unref } = getUser("123");
+const user = await value;
+console.log(user.name);
+
+// Release reference when done (important for cleanup strategies)
+unref();
+
+// Other cache methods
+getUser.stale("123"); // Mark entry as stale (lazy re-fetch on next access)
+getUser.refresh("123"); // Force immediate re-fetch
+getUser.delete("123"); // Remove from cache
+getUser.clear(); // Clear all entries
+getUser.peek("123"); // Get value without creating entry
+getUser.has("123"); // Check if key exists
+```
+
+### Strategies
+
+Strategies extend cache behavior with pluggable lifecycle hooks:
+
+#### `swr` - Stale While Revalidate
+
+```tsx
+import { cache, swr } from "rextive/cache";
+
+const getUser = cache("users", fetchUser, {
+  use: [
+    swr({ staleTime: 30000 }), // Mark stale after 30 seconds
+  ],
+});
+
+// First access: fetches from server
+// After 30s: returns cached data immediately, triggers background refresh
+```
+
+#### `ttl` - Time To Live
+
+Unified strategy for time-based, idle-based, and reference-count cleanup:
+
+```tsx
+import { cache, ttl } from "rextive/cache";
+
+const getUser = cache("users", fetchUser, {
+  use: [
+    ttl({
+      stale: 30000, // Mark stale after 30s (lazy re-fetch)
+      expire: 300000, // Remove after 5 minutes (hard expiration)
+      idle: 60000, // Remove if unused for 1 minute (refCount=0)
+      interval: 10000, // Optional: periodic cleanup every 10s
+    }),
+  ],
+});
+```
+
+**Options:**
+
+- `stale` - Time until entry is marked stale (triggers lazy re-fetch)
+- `expire` - Time until entry is removed (hard expiration)
+- `idle` - Time without references until removal (refCount=0)
+- `interval` - Optional periodic cleanup (default: lazy cleanup on access)
+
+#### `lru` - Least Recently Used
+
+```tsx
+import { cache, lru } from "rextive/cache";
+
+const getUser = cache("users", fetchUser, {
+  use: [
+    lru({ maxSize: 100 }), // Keep max 100 entries
+  ],
+});
+
+// When cache exceeds 100 entries:
+// 1. Entries with refCount=0 are evicted first
+// 2. Then oldest accessed entries are evicted
+```
+
+#### `hydrate` - SSR Hydration
+
+```tsx
+import { cache, hydrate } from "rextive/cache";
+
+const getUser = cache("users", fetchUser, {
+  use: [
+    hydrate({
+      source: () => window.__CACHE_STATE__?.users, // Load from SSR state
+      stale: true, // Mark hydrated data as stale (re-validate after hydration)
+    }),
+  ],
+});
+
+// On page load: cache is pre-populated from window.__CACHE_STATE__
+// If stale: true, accessing hydrated data triggers background refresh
+```
+
+### Cache Groups
+
+Manage multiple related caches with shared options:
+
+```tsx
+import { cache, swr, ttl } from "rextive/cache";
+
+const api = cache(
+  "api",
+  {
+    users: async (id: string) => fetchUser(id),
+    posts: async (userId: string) => fetchPosts(userId),
+    comments: async (postId: string) => fetchComments(postId),
+  },
+  {
+    use: [swr({ staleTime: 30000 }), ttl({ expire: 300000 })],
+  }
+);
+
+// Access individual caches
+const { value: user } = api.users("123");
+const { value: posts } = api.posts("123");
+
+// Bulk operations
+api.staleAll(); // Mark all entries in all caches as stale
+api.clearAll(); // Clear all caches
+await api.refreshAll(); // Refresh all entries
+
+// Extract for SSR
+const state = api.extract();
+// { users: { "123": {...} }, posts: { "123": [...] } }
+```
+
+### Object Keys
+
+Cache supports object keys with automatic stable serialization:
+
+```tsx
+import { cache } from "rextive/cache";
+
+const search = cache("search", async (params: { q: string; page: number }) => {
+  return fetch(`/search?q=${params.q}&page=${params.page}`);
+});
+
+// Same entry regardless of property order
+search({ q: "react", page: 1 });
+search({ page: 1, q: "react" }); // Same cache entry!
+
+// Custom key serialization
+const customCache = cache("custom", fetchData, {
+  stringify: (key) => `${key.type}:${key.id}`, // Custom key format
+});
+```
+
+### SSR/Hydration Pattern
+
+```tsx
+// Server: Extract cache state
+const cacheState = getUser.extract();
+const html = `
+  <script>window.__CACHE_STATE__ = ${JSON.stringify({
+    users: cacheState,
+  })}</script>
+  ${appHtml}
+`;
+
+// Client: Hydrate from server state
+const getUser = cache("users", fetchUser, {
+  use: [
+    hydrate({
+      source: () => window.__CACHE_STATE__?.users,
+      stale: true, // Re-validate after hydration
+    }),
+  ],
+});
+```
+
+### Combining Strategies
+
+```tsx
+import { cache, swr, ttl, lru, hydrate } from "rextive/cache";
+
+const getUser = cache("users", fetchUser, {
+  use: [
+    // Hydrate from SSR state first
+    hydrate({ source: () => window.__CACHE_STATE__?.users }),
+
+    // Stale-while-revalidate after 30 seconds
+    swr({ staleTime: 30000 }),
+
+    // Hard expire after 5 minutes, cleanup unused after 1 minute
+    ttl({ expire: 300000, idle: 60000 }),
+
+    // Keep max 100 entries
+    lru({ maxSize: 100 }),
+  ],
+});
+```
+
+### API Reference
+
+**`cache(name, factory, options?)`**
+
+| Property        | Type                          | Description                             |
+| --------------- | ----------------------------- | --------------------------------------- |
+| `(key)`         | `(K) => CacheAccessResult<T>` | Access/create cache entry               |
+| `name`          | `string`                      | Cache name                              |
+| `size`          | `number`                      | Number of entries                       |
+| `stale(key)`    | `(K) => void`                 | Mark entry as stale                     |
+| `staleAll()`    | `() => void`                  | Mark all entries as stale               |
+| `refresh(key)`  | `(K) => Promise<T>`           | Force immediate re-fetch                |
+| `refreshAll()`  | `() => Promise<T[]>`          | Refresh all entries                     |
+| `delete(key)`   | `(K) => boolean`              | Remove entry                            |
+| `clear()`       | `() => void`                  | Clear all entries                       |
+| `has(key)`      | `(K) => boolean`              | Check if key exists                     |
+| `peek(key)`     | `(K) => T \| undefined`       | Get value without creating/incrementing |
+| `prefetch(key)` | `(K) => Promise<T>`           | Prefetch without incrementing refCount  |
+| `extract()`     | `() => Record<string, T>`     | Extract all data (for SSR)              |
+| `dispose()`     | `() => void`                  | Dispose cache and cleanup               |
+
+**`CacheAccessResult<T>`**
+
+| Property | Type         | Description                     |
+| -------- | ------------ | ------------------------------- |
+| `value`  | `Promise<T>` | The cached value as a promise   |
+| `unref`  | `() => void` | Release reference (for cleanup) |
+
+---
+
 ## 🆚 Comparison with Other Libraries
 
 ### vs React useState + useEffect
@@ -5895,6 +6159,7 @@ rextive/          # Core - works anywhere
 rextive/react     # React integration
 rextive/op        # Operators for signal transformations
 rextive/immer     # Immer integration
+rextive/cache     # Data caching with strategies
 ```
 
 **Core (`rextive`):**
@@ -5927,6 +6192,16 @@ rextive/immer     # Immer integration
 **Immer (`rextive/immer`):**
 
 - `produce` - Immutable updates with mutable API (requires `immer` peer dependency)
+
+**Cache (`rextive/cache`):**
+
+- `cache` - Keyed data caching with reference counting and lifecycle management
+- `swr` - Stale-while-revalidate strategy
+- `ttl` - Time-to-live strategy (stale, expire, idle cleanup)
+- `lru` - Least recently used eviction strategy
+- `hydrate` - SSR hydration strategy
+- `ObjectKeyedMap` - Map supporting object keys with stable serialization
+- `stableStringify` - Deterministic JSON serialization (sorted keys)
 
 ---
 
