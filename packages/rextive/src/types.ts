@@ -87,7 +87,7 @@ export type UnionToIntersection<U> = (
  * @template TSource - The input signal type
  * @template TResult - The output signal type
  */
-export type SignalOperator<TSource, TResult> = (source: TSource) => TResult;
+export type Operator<TSource, TResult> = (source: TSource) => TResult;
 
 /**
  * Infer the result type of a transformation chain
@@ -110,11 +110,11 @@ export type SignalOperator<TSource, TResult> = (source: TSource) => TResult;
  * ```
  */
 export type PipeResult<
-  TOperators extends readonly SignalOperator<any, any>[],
+  TOperators extends readonly Operator<any, any>[],
   TResult
 > = TOperators extends [
-  infer First extends SignalOperator<any, any>,
-  ...infer Rest extends SignalOperator<any, any>[]
+  infer First extends Operator<any, any>,
+  ...infer Rest extends Operator<any, any>[]
 ]
   ? PipeResult<Rest, ReturnType<First>>
   : TResult;
@@ -235,98 +235,96 @@ export type Signal<TValue, TInit = TValue> = Observable &
      */
     // 1 operator
     pipe: {
-      <T1>(
-        op1: SignalOperator<Signal<TValue, TInit>, T1>
-      ): TryInjectDispose<T1>;
+      <T1>(op1: Operator<Signal<TValue, TInit>, T1>): TryInjectDispose<T1>;
 
       // 2 operators
       <T1, T2>(
-        op1: SignalOperator<Signal<TValue, TInit>, T1>,
-        op2: SignalOperator<T1, T2>
+        op1: Operator<Signal<TValue, TInit>, T1>,
+        op2: Operator<T1, T2>
       ): TryInjectDispose<T2>;
 
       // 3 operators
       <T1, T2, T3>(
-        op1: SignalOperator<Signal<TValue, TInit>, T1>,
-        op2: SignalOperator<T1, T2>,
-        op3: SignalOperator<T2, T3>
+        op1: Operator<Signal<TValue, TInit>, T1>,
+        op2: Operator<T1, T2>,
+        op3: Operator<T2, T3>
       ): TryInjectDispose<T3>;
 
       // 4 operators
       <T1, T2, T3, T4>(
-        op1: SignalOperator<Signal<TValue, TInit>, T1>,
-        op2: SignalOperator<T1, T2>,
-        op3: SignalOperator<T2, T3>,
-        op4: SignalOperator<T3, T4>
+        op1: Operator<Signal<TValue, TInit>, T1>,
+        op2: Operator<T1, T2>,
+        op3: Operator<T2, T3>,
+        op4: Operator<T3, T4>
       ): TryInjectDispose<T4>;
 
       // 5 operators
       <T1, T2, T3, T4, T5>(
-        op1: SignalOperator<Signal<TValue, TInit>, T1>,
-        op2: SignalOperator<T1, T2>,
-        op3: SignalOperator<T2, T3>,
-        op4: SignalOperator<T3, T4>,
-        op5: SignalOperator<T4, T5>
+        op1: Operator<Signal<TValue, TInit>, T1>,
+        op2: Operator<T1, T2>,
+        op3: Operator<T2, T3>,
+        op4: Operator<T3, T4>,
+        op5: Operator<T4, T5>
       ): TryInjectDispose<T5>;
 
       // 6 operators
       <T1, T2, T3, T4, T5, T6>(
-        op1: SignalOperator<Signal<TValue, TInit>, T1>,
-        op2: SignalOperator<T1, T2>,
-        op3: SignalOperator<T2, T3>,
-        op4: SignalOperator<T3, T4>,
-        op5: SignalOperator<T4, T5>,
-        op6: SignalOperator<T5, T6>
+        op1: Operator<Signal<TValue, TInit>, T1>,
+        op2: Operator<T1, T2>,
+        op3: Operator<T2, T3>,
+        op4: Operator<T3, T4>,
+        op5: Operator<T4, T5>,
+        op6: Operator<T5, T6>
       ): TryInjectDispose<T6>;
 
       // 7 operators
       <T1, T2, T3, T4, T5, T6, T7>(
-        op1: SignalOperator<Signal<TValue, TInit>, T1>,
-        op2: SignalOperator<T1, T2>,
-        op3: SignalOperator<T2, T3>,
-        op4: SignalOperator<T3, T4>,
-        op5: SignalOperator<T4, T5>,
-        op6: SignalOperator<T5, T6>,
-        op7: SignalOperator<T6, T7>
+        op1: Operator<Signal<TValue, TInit>, T1>,
+        op2: Operator<T1, T2>,
+        op3: Operator<T2, T3>,
+        op4: Operator<T3, T4>,
+        op5: Operator<T4, T5>,
+        op6: Operator<T5, T6>,
+        op7: Operator<T6, T7>
       ): TryInjectDispose<T7>;
 
       // 8 operators
       <T1, T2, T3, T4, T5, T6, T7, T8>(
-        op1: SignalOperator<Signal<TValue, TInit>, T1>,
-        op2: SignalOperator<T1, T2>,
-        op3: SignalOperator<T2, T3>,
-        op4: SignalOperator<T3, T4>,
-        op5: SignalOperator<T4, T5>,
-        op6: SignalOperator<T5, T6>,
-        op7: SignalOperator<T6, T7>,
-        op8: SignalOperator<T7, T8>
+        op1: Operator<Signal<TValue, TInit>, T1>,
+        op2: Operator<T1, T2>,
+        op3: Operator<T2, T3>,
+        op4: Operator<T3, T4>,
+        op5: Operator<T4, T5>,
+        op6: Operator<T5, T6>,
+        op7: Operator<T6, T7>,
+        op8: Operator<T7, T8>
       ): TryInjectDispose<T8>;
 
       // 9 operators
       <T1, T2, T3, T4, T5, T6, T7, T8, T9>(
-        op1: SignalOperator<Signal<TValue, TInit>, T1>,
-        op2: SignalOperator<T1, T2>,
-        op3: SignalOperator<T2, T3>,
-        op4: SignalOperator<T3, T4>,
-        op5: SignalOperator<T4, T5>,
-        op6: SignalOperator<T5, T6>,
-        op7: SignalOperator<T6, T7>,
-        op8: SignalOperator<T7, T8>,
-        op9: SignalOperator<T8, T9>
+        op1: Operator<Signal<TValue, TInit>, T1>,
+        op2: Operator<T1, T2>,
+        op3: Operator<T2, T3>,
+        op4: Operator<T3, T4>,
+        op5: Operator<T4, T5>,
+        op6: Operator<T5, T6>,
+        op7: Operator<T6, T7>,
+        op8: Operator<T7, T8>,
+        op9: Operator<T8, T9>
       ): TryInjectDispose<T9>;
 
       // 10 operators
       <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(
-        op1: SignalOperator<Signal<TValue, TInit>, T1>,
-        op2: SignalOperator<T1, T2>,
-        op3: SignalOperator<T2, T3>,
-        op4: SignalOperator<T3, T4>,
-        op5: SignalOperator<T4, T5>,
-        op6: SignalOperator<T5, T6>,
-        op7: SignalOperator<T6, T7>,
-        op8: SignalOperator<T7, T8>,
-        op9: SignalOperator<T8, T9>,
-        op10: SignalOperator<T9, T10>
+        op1: Operator<Signal<TValue, TInit>, T1>,
+        op2: Operator<T1, T2>,
+        op3: Operator<T2, T3>,
+        op4: Operator<T3, T4>,
+        op5: Operator<T4, T5>,
+        op6: Operator<T5, T6>,
+        op7: Operator<T6, T7>,
+        op8: Operator<T7, T8>,
+        op9: Operator<T8, T9>,
+        op10: Operator<T9, T10>
       ): TryInjectDispose<T10>;
     };
 
@@ -334,12 +332,18 @@ export type Signal<TValue, TInit = TValue> = Observable &
      * Chain value transformations (selector pipeline)
      *
      * Unlike `pipe()` which works with signal operators, `to()` chains value selectors.
-     * Each selector receives the result value of the previous selector.
+     * Each selector receives the result value of the previous selector and the SignalContext.
      *
-     * @example
+     * Supports 1-10 selectors with full type inference.
+     *
+     * @example Single selector
      * ```ts
      * const user = signal({ name: "Alice", age: 30 });
+     * const name = user.to(u => u.name); // "Alice"
+     * ```
      *
+     * @example Multiple selectors (chained)
+     * ```ts
      * const greeting = user.to(
      *   u => u.name,              // "Alice"
      *   name => name.toUpperCase(), // "ALICE"
@@ -347,52 +351,98 @@ export type Signal<TValue, TInit = TValue> = Observable &
      * );
      * // greeting() === "Hello, ALICE!"
      * ```
-     */
-    /**
-     * Simple transformation - apply a single selector to this signal's value.
      *
-     * This is a convenience method for creating a derived signal with a simple
-     * transformation. It's a shorthand for `.pipe(select(...))`.
-     *
-     * **For chaining multiple transformations, use `.pipe()`.**
-     *
-     * @template T - The result type after transformation
-     * @param selector - Function to transform the signal's value
-     * @returns A new computed signal with the transformed value
-     *
-     * @example Basic transformation
+     * @example Using context in any selector
      * ```ts
-     * const count = signal(5);
-     * const doubled = count.to((x) => x * 2);
-     * const formatted = count.to((x) => `Count: ${x}`);
-     *
-     * console.log(doubled()); // 10
-     * console.log(formatted()); // "Count: 5"
-     * ```
-     *
-     * @example Accessing nested properties
-     * ```ts
-     * const user = signal({ name: "Alice", age: 30 });
-     * const userName = user.to((u) => u.name);
-     * const userAge = user.to((u) => u.age);
-     * ```
-     *
-     * @example For multiple transformations, use .pipe()
-     * ```ts
-     * import { select, filter } from "rextive/op";
-     *
-     * // ❌ Don't do this - use .pipe() instead
-     * // count.to(...).to(...).to(...)
-     *
-     * // ✅ Do this for multiple transformations
-     * const result = count.pipe(
-     *   filter((x) => x > 0),
-     *   select((x) => x * 2),
-     *   select((x) => `Value: ${x}`)
+     * const result = source.to(
+     *   (val, ctx) => transform1(val),
+     *   (val, ctx) => ctx.abortSignal ? val : fallback, // Access context
+     *   (val, ctx) => transform3(val)
      * );
      * ```
      */
-    to<T>(selector: (value: TValue, context: SignalContext) => T): Computed<T>;
+    to<A>(s1: Selector<TValue, A>, options?: ToOptions<A>): Computed<A>;
+    to<A, B>(
+      s1: Selector<TValue, A>,
+      s2: Selector<A, B>,
+      options?: ToOptions<B>
+    ): Computed<B>;
+    to<A, B, C>(
+      s1: Selector<TValue, A>,
+      s2: Selector<A, B>,
+      s3: Selector<B, C>,
+      options?: ToOptions<C>
+    ): Computed<C>;
+    to<A, B, C, D>(
+      s1: Selector<TValue, A>,
+      s2: Selector<A, B>,
+      s3: Selector<B, C>,
+      s4: Selector<C, D>,
+      options?: ToOptions<D>
+    ): Computed<D>;
+    to<A, B, C, D, E>(
+      s1: Selector<TValue, A>,
+      s2: Selector<A, B>,
+      s3: Selector<B, C>,
+      s4: Selector<C, D>,
+      s5: Selector<D, E>,
+      options?: ToOptions<E>
+    ): Computed<E>;
+    to<A, B, C, D, E, F>(
+      s1: Selector<TValue, A>,
+      s2: Selector<A, B>,
+      s3: Selector<B, C>,
+      s4: Selector<C, D>,
+      s5: Selector<D, E>,
+      s6: Selector<E, F>,
+      options?: ToOptions<F>
+    ): Computed<F>;
+    to<A, B, C, D, E, F, G>(
+      s1: Selector<TValue, A>,
+      s2: Selector<A, B>,
+      s3: Selector<B, C>,
+      s4: Selector<C, D>,
+      s5: Selector<D, E>,
+      s6: Selector<E, F>,
+      s7: Selector<F, G>,
+      options?: ToOptions<G>
+    ): Computed<G>;
+    to<A, B, C, D, E, F, G, H>(
+      s1: Selector<TValue, A>,
+      s2: Selector<A, B>,
+      s3: Selector<B, C>,
+      s4: Selector<C, D>,
+      s5: Selector<D, E>,
+      s6: Selector<E, F>,
+      s7: Selector<F, G>,
+      s8: Selector<G, H>,
+      options?: ToOptions<H>
+    ): Computed<H>;
+    to<A, B, C, D, E, F, G, H, I>(
+      s1: Selector<TValue, A>,
+      s2: Selector<A, B>,
+      s3: Selector<B, C>,
+      s4: Selector<C, D>,
+      s5: Selector<D, E>,
+      s6: Selector<E, F>,
+      s7: Selector<F, G>,
+      s8: Selector<G, H>,
+      s9: Selector<H, I>,
+      options?: ToOptions<I>
+    ): Computed<I>;
+    to<A, B, C, D, E, F, G, H, I, J>(
+      s1: Selector<TValue, A>,
+      s2: Selector<A, B>,
+      s3: Selector<B, C>,
+      s4: Selector<C, D>,
+      s5: Selector<D, E>,
+      s6: Selector<E, F>,
+      s7: Selector<F, G>,
+      s8: Selector<G, H>,
+      s9: Selector<H, I>,
+      s10: Selector<I, J>,
+      options?: ToOptions<J>
+    ): Computed<J>;
 
     /**
      * Trigger an immediate recomputation of this signal.
@@ -463,6 +513,16 @@ export type Signal<TValue, TInit = TValue> = Observable &
      */
     stale(): void;
   };
+
+export type Selector<TValue, TReturn> = (
+  value: TValue,
+  context: SignalContext
+) => TReturn;
+
+/**
+ * Options for `.to()` method - equality strategy or full signal options
+ */
+export type ToOptions<T> = PredefinedEquals | SignalOptions<T>;
 
 export type TryInjectDispose<T> = T extends object
   ? T & { dispose: VoidFunction }

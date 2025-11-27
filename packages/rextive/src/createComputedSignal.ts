@@ -233,15 +233,48 @@ export function createComputedSignal(
     return pipeSignals(instance, operators);
   };
 
-  const to = function (selector: (value: any, ctx: any) => any): any {
+  const to = function (first: (value: any, ctx: any) => any, ...rest: any[]): any {
+    // Check if last argument is options (not a function)
+    const lastArg = rest[rest.length - 1];
+    const hasOptions =
+      rest.length > 0 && lastArg !== undefined && typeof lastArg !== "function";
+    const opts = hasOptions ? resolveToOptions(lastArg) : {};
+    const selectors = hasOptions ? rest.slice(0, -1) : rest;
+
+    if (selectors.length === 0) {
+      // Single selector - pass context
+      return createComputedSignal(
+        { source: instance } as any,
+        (ctx: any) => first(ctx.deps.source, ctx),
+        opts,
+        createSignalContext,
+        undefined
+      );
+    }
+
+    // Multiple selectors - chain them left-to-right, all receive context
     return createComputedSignal(
       { source: instance } as any,
-      (ctx: any) => selector(ctx.deps.source, ctx),
-      {},
+      (ctx: any) => {
+        let result = first(ctx.deps.source, ctx);
+        for (const selector of selectors) {
+          result = selector(result, ctx);
+        }
+        return result;
+      },
+      opts,
       createSignalContext,
-      undefined // _signal parameter (unused)
+      undefined
     );
   };
+
+  /** Convert ToOptions to SignalOptions */
+  function resolveToOptions(options: any): any {
+    if (typeof options === "string") {
+      return { equals: options };
+    }
+    return options || {};
+  }
 
   const refresh = guardDisposed(
     isDisposed,

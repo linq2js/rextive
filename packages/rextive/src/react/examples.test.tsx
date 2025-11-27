@@ -1,3 +1,4 @@
+import React from "react";
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
@@ -7,7 +8,7 @@ import { wait } from "../wait";
 import { loadable } from "../utils/loadable";
 import { useScope } from "./useScope";
 import { rx } from "./rx";
-import { MutableSignal, Signal } from "../types";
+import { Mutable, Signal } from "../types";
 
 describe("examples", () => {
   it("form validation", async () => {
@@ -72,7 +73,7 @@ describe("examples", () => {
       validation,
     }: {
       testKey: string;
-      field: MutableSignal<string>;
+      field: Mutable<string>;
       validation: Signal<void | string | Promise<string | void>>;
     }) => {
       return rx(() => {

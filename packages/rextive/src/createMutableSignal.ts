@@ -450,29 +450,74 @@ export function createMutableSignal(
   };
 
   /**
-   * Transform signal value (shorthand for pipe + select)
+   * Transform signal value with chained selectors.
    *
    * Creates a computed signal that derives from this signal.
-   * Simpler syntax than pipe(select(...)) for single transformations.
+   * Supports 1-10 selectors chained together (left-to-right).
    *
-   * @param selector - Function to transform value
+   * @param selectors - Functions to transform value (chained left-to-right)
+   * @param options - Optional equality strategy or signal options
    * @returns New computed signal with transformed value
    *
-   * @example
+   * @example Single selector
    * const count = signal(0);
    * const doubled = count.to(x => x * 2);
+   *
+   * @example Multiple selectors
+   * const greeting = user.to(
+   *   u => u.name,
+   *   name => name.toUpperCase(),
+   *   name => `Hello, ${name}!`
+   * );
+   *
+   * @example With options
+   * const user = count.to(x => ({ value: x }), "shallow");
    */
   const to = function (
-    selector: (value: any, context: SignalContext) => any
+    first: (value: any, context: SignalContext) => any,
+    ...rest: any[]
   ): any {
+    // Check if last argument is options (not a function)
+    const lastArg = rest[rest.length - 1];
+    const hasOptions =
+      rest.length > 0 && lastArg !== undefined && typeof lastArg !== "function";
+    const opts = hasOptions ? resolveToOptions(lastArg) : {};
+    const selectors = hasOptions ? rest.slice(0, -1) : rest;
+
+    if (selectors.length === 0) {
+      // Single selector - pass context
+      return createComputedSignal(
+        { source: instance } as any,
+        (ctx: any) => first(ctx.deps.source, ctx),
+        opts,
+        createSignalContext,
+        undefined
+      );
+    }
+
+    // Multiple selectors - chain them left-to-right, all receive context
     return createComputedSignal(
       { source: instance } as any,
-      (ctx: any) => selector(ctx.deps.source, ctx),
-      {},
+      (ctx: any) => {
+        let result = first(ctx.deps.source, ctx);
+        for (const selector of selectors) {
+          result = selector(result, ctx);
+        }
+        return result;
+      },
+      opts,
       createSignalContext,
-      undefined // _signal parameter (unused)
+      undefined
     );
   };
+
+  /** Convert ToOptions to SignalOptions */
+  function resolveToOptions(options: any): any {
+    if (typeof options === "string") {
+      return { equals: options };
+    }
+    return options || {};
+  }
 
   // ============================================================================
   // 7. REFRESH & STALE MANAGEMENT

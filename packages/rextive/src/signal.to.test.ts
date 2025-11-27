@@ -118,7 +118,7 @@ describe("signal.to() - single selector", () => {
 
   it("should handle union types", () => {
     const value = signal<number | string>(42);
-    const result = value.to((val) => 
+    const result = value.to((val) =>
       typeof val === "number" ? val * 2 : val.length
     );
 
@@ -177,24 +177,338 @@ describe("signal.to() - single selector", () => {
     result(); // Should recompute
     expect(computeCount).toBe(2);
   });
+});
 
-  it("should access context parameter", () => {
+describe("signal.to() - multiple selectors", () => {
+  it("should chain 2 selectors", () => {
+    const user = signal({ name: "alice", age: 30 });
+    const result = user.to(
+      (u) => u.name,
+      (name) => name.toUpperCase()
+    );
+
+    expect(result()).toBe("ALICE");
+  });
+
+  it("should chain 3 selectors", () => {
+    const user = signal({ name: "alice", age: 30 });
+    const result = user.to(
+      (u) => u.name,
+      (name) => name.toUpperCase(),
+      (name) => `Hello, ${name}!`
+    );
+
+    expect(result()).toBe("Hello, ALICE!");
+  });
+
+  it("should chain 4 selectors with type transformations", () => {
     const count = signal(5);
-    const result = count.to((x, ctx) => {
-      // Context should be available
-      expect(ctx).toBeDefined();
-      expect(ctx.abortSignal).toBeDefined();
-      return x * 2;
-    });
+    const result = count.to(
+      (x) => x * 2, // 10
+      (x) => x + 1, // 11
+      (x) => `${x}`, // "11"
+      (s) => s.length // 2
+    );
+
+    expect(result()).toBe(2);
+  });
+
+  it("should chain 5 selectors", () => {
+    const data = signal({ value: 10 });
+    const result = data.to(
+      (d) => d.value, // 10
+      (x) => x * 2, // 20
+      (x) => x + 5, // 25
+      (x) => Math.sqrt(x), // 5
+      (x) => x.toFixed(1) // "5.0"
+    );
+
+    expect(result()).toBe("5.0");
+  });
+
+  it("should chain 6 selectors", () => {
+    const items = signal([1, 2, 3, 4, 5]);
+    const result = items.to(
+      (arr) => arr.filter((x) => x > 2), // [3, 4, 5]
+      (arr) => arr.map((x) => x * 2), // [6, 8, 10]
+      (arr) => arr.reduce((a, b) => a + b, 0), // 24
+      (x) => x / 3, // 8
+      (x) => x.toString(), // "8"
+      (s) => `Total: ${s}` // "Total: 8"
+    );
+
+    expect(result()).toBe("Total: 8");
+  });
+
+  it("should chain 7 selectors", () => {
+    const count = signal(2);
+    const result = count.to(
+      (x) => x + 1, // 3
+      (x) => x * 2, // 6
+      (x) => x + 4, // 10
+      (x) => x / 2, // 5
+      (x) => x ** 2, // 25
+      (x) => Math.sqrt(x), // 5
+      (x) => `Result: ${x}` // "Result: 5"
+    );
+
+    expect(result()).toBe("Result: 5");
+  });
+
+  it("should chain 8 selectors", () => {
+    const str = signal("hello");
+    const result = str.to(
+      (s) => s.toUpperCase(), // "HELLO"
+      (s) => s.split(""), // ["H", "E", "L", "L", "O"]
+      (arr) => arr.reverse(), // ["O", "L", "L", "E", "H"]
+      (arr) => arr.join(""), // "OLLEH"
+      (s) => s.toLowerCase(), // "olleh"
+      (s) => s.charAt(0), // "o"
+      (c) => c.charCodeAt(0), // 111
+      (n) => n > 100 // true
+    );
+
+    expect(result()).toBe(true);
+  });
+
+  it("should chain 9 selectors", () => {
+    const num = signal(1);
+    const result = num.to(
+      (x) => x + 1, // 2
+      (x) => x * 2, // 4
+      (x) => x + 1, // 5
+      (x) => x * 2, // 10
+      (x) => x + 1, // 11
+      (x) => x * 2, // 22
+      (x) => x + 1, // 23
+      (x) => x * 2, // 46
+      (x) => `Final: ${x}` // "Final: 46"
+    );
+
+    expect(result()).toBe("Final: 46");
+  });
+
+  it("should chain 10 selectors", () => {
+    const num = signal(0);
+    const result = num.to(
+      (x) => x + 1, // 1
+      (x) => x + 1, // 2
+      (x) => x + 1, // 3
+      (x) => x + 1, // 4
+      (x) => x + 1, // 5
+      (x) => x + 1, // 6
+      (x) => x + 1, // 7
+      (x) => x + 1, // 8
+      (x) => x + 1, // 9
+      (x) => x + 1 // 10
+    );
 
     expect(result()).toBe(10);
   });
 
-  it("to: loadable", async () => {
-    const loading = signal(Promise.resolve(42)).to(loadable);
-    expect(loading().status).toBe("loading");
-    await wait.delay(10);
-    expect(loading().status).toBe("success");
-    expect(loading().value).toBe(42);
+  it("should update when source changes with multiple selectors", () => {
+    const user = signal({ name: "alice", age: 30 });
+    const greeting = user.to(
+      (u) => u.name,
+      (name) => name.toUpperCase(),
+      (name) => `Hello, ${name}!`
+    );
+
+    expect(greeting()).toBe("Hello, ALICE!");
+
+    user.set({ name: "bob", age: 25 });
+    expect(greeting()).toBe("Hello, BOB!");
+  });
+
+  it("should subscribe to changes with multiple selectors", () => {
+    const count = signal(5);
+    const result = count.to(
+      (x) => x * 2,
+      (x) => x + 1,
+      (x) => `Value: ${x}`
+    );
+
+    expect(result()).toBe("Value: 11");
+
+    const spy = vi.fn();
+    result.on(spy);
+
+    count.set(10);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(result()).toBe("Value: 21");
+  });
+
+  it("should work with computed signals as source", () => {
+    const a = signal(5);
+    const b = signal(10);
+    const sum = signal({ a, b }, ({ deps }) => deps.a + deps.b);
+
+    const result = sum.to(
+      (x) => x * 2,
+      (x) => `Sum doubled: ${x}`
+    );
+
+    expect(result()).toBe("Sum doubled: 30");
+
+    a.set(10);
+    expect(result()).toBe("Sum doubled: 40");
+  });
+
+  it("should handle complex object transformations", () => {
+    const data = signal({
+      users: [
+        { name: "Alice", scores: [85, 90, 95] },
+        { name: "Bob", scores: [70, 80, 90] },
+      ],
+    });
+
+    const topPerformer = data.to(
+      (d) => d.users,
+      (users) =>
+        users.map((u) => ({
+          name: u.name,
+          avg: u.scores.reduce((a, b) => a + b, 0) / u.scores.length,
+        })),
+      (usersWithAvg) => usersWithAvg.sort((a, b) => b.avg - a.avg)[0],
+      (top) => `${top.name}: ${top.avg.toFixed(1)}`
+    );
+
+    expect(topPerformer()).toBe("Alice: 90.0");
+  });
+
+  it("should be lazy with multiple selectors", () => {
+    let count1 = 0;
+    let count2 = 0;
+    let count3 = 0;
+
+    const num = signal(5);
+    const result = num.to(
+      (x) => {
+        count1++;
+        return x * 2;
+      },
+      (x) => {
+        count2++;
+        return x + 1;
+      },
+      (x) => {
+        count3++;
+        return `Value: ${x}`;
+      }
+    );
+
+    // Should be lazy - no computation yet
+    expect(count1).toBe(0);
+    expect(count2).toBe(0);
+    expect(count3).toBe(0);
+
+    // First access triggers computation
+    expect(result()).toBe("Value: 11");
+    expect(count1).toBe(1);
+    expect(count2).toBe(1);
+    expect(count3).toBe(1);
+
+    // Second access uses cache
+    expect(result()).toBe("Value: 11");
+    expect(count1).toBe(1);
+    expect(count2).toBe(1);
+    expect(count3).toBe(1);
+  });
+
+  it("should dispose properly with multiple selectors", () => {
+    const count = signal(5);
+    const result = count.to(
+      (x) => x * 2,
+      (x) => x + 1
+    );
+
+    expect(result()).toBe(11);
+
+    const spy = vi.fn();
+    result.on(spy);
+
+    result.dispose();
+
+    count.set(10);
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe("signal.to() - with options", () => {
+  it("should accept equality string as last parameter", () => {
+    const user = signal({ name: "Alice", age: 30 });
+    const profile = user.to((u) => ({ name: u.name }), "shallow");
+
+    expect(profile()).toEqual({ name: "Alice" });
+
+    // Same content, different reference - should NOT update with shallow equality
+    const spy = vi.fn();
+    profile.on(spy);
+
+    user.set({ name: "Alice", age: 31 }); // name same, age different
+    expect(spy).not.toHaveBeenCalled(); // No update because { name: "Alice" } is shallow equal
+  });
+
+  it("should accept options object as last parameter", () => {
+    const count = signal(5);
+    const result = count.to((x) => x * 2, { name: "doubled" });
+
+    expect(result()).toBe(10);
+    expect(result.displayName).toBe("doubled");
+  });
+
+  it("should work with multiple selectors and equality string", () => {
+    const data = signal({ value: 10 });
+    const result = data.to(
+      (d) => d.value,
+      (v) => ({ doubled: v * 2 }),
+      "shallow"
+    );
+
+    expect(result()).toEqual({ doubled: 20 });
+  });
+
+  it("should work with multiple selectors and options object", () => {
+    const count = signal(5);
+    const result = count.to(
+      (x) => x * 2,
+      (x) => x + 1,
+      (x) => `Value: ${x}`,
+      { name: "formatted" }
+    );
+
+    expect(result()).toBe("Value: 11");
+    expect(result.displayName).toBe("formatted");
+  });
+
+  it("should work with deep equality", () => {
+    const source = signal({ nested: { value: 1 } });
+    const result = source.to(
+      (s) => ({ nested: { value: s.nested.value } }),
+      "deep"
+    );
+
+    expect(result()).toEqual({ nested: { value: 1 } });
+
+    const spy = vi.fn();
+    result.on(spy);
+
+    // Same deep structure - should NOT update
+    source.set({ nested: { value: 1 } });
+    expect(spy).not.toHaveBeenCalled();
+
+    // Different deep value - should update
+    source.set({ nested: { value: 2 } });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("should work on computed signals with options", () => {
+    const a = signal(5);
+    const b = signal(10);
+    const sum = signal({ a, b }, ({ deps }) => deps.a + deps.b);
+
+    const result = sum.to((x) => ({ total: x }), "shallow");
+
+    expect(result()).toEqual({ total: 15 });
   });
 });

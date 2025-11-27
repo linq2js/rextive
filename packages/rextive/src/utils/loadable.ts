@@ -6,7 +6,6 @@ import {
   type SuccessLoadable,
   type ErrorLoadable,
   type Loadable,
-  SignalContext,
   Signal,
 } from "../types";
 import { getCurrent } from "../contextDispatcher";
@@ -47,8 +46,7 @@ export type {
  * ```
  */
 export function loadable<TValue>(
-  value: TValue,
-  context?: SignalContext
+  value: TValue
 ): TValue extends Signal<infer T>
   ? Loadable<Awaited<T>>
   : TValue extends Loadable<any>
@@ -62,10 +60,6 @@ export function loadable<TValue>(
   const l = toLoadableImpl(value) as any;
 
   getCurrent().trackLoadable(l);
-
-  if (context && l.status === "loading") {
-    l.promise.finally(context.refresh);
-  }
 
   return l;
 }

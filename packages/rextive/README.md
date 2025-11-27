@@ -3591,19 +3591,19 @@ Quick reference for all Rextive APIs.
 
 ### Signal Instance Methods
 
-| Method          | Type     | Description                                                           |
-| --------------- | -------- | --------------------------------------------------------------------- |
-| `signal()`      | All      | Read current value (shorthand for `.get()`)                           |
-| `.set(value)`   | Mutable  | Set new value directly                                                |
-| `.set(fn)`      | Mutable  | Update value with reducer function                                    |
-| `.reset()`      | Mutable  | Reset to initial value                                                |
-| `.on(listener)` | All      | Subscribe to changes, returns unsubscribe function                    |
-| `.to(fn)`       | All      | Derive new signal with transform (shorthand for `.pipe(select(...))`) |
-| `.pipe(...ops)` | All      | Chain operators for transformation                                    |
-| `.map(fn)`      | All      | Alias for `.to()`                                                     |
-| `.dispose()`    | All      | Clean up signal and subscriptions                                     |
-| `.refresh()`    | Computed | Force immediate recomputation                                         |
-| `.stale()`      | Computed | Mark as stale for lazy recomputation                                  |
+| Method                  | Type     | Description                                         |
+| ----------------------- | -------- | --------------------------------------------------- |
+| `signal()`              | All      | Read current value (shorthand for `.get()`)         |
+| `.set(value)`           | Mutable  | Set new value directly                              |
+| `.set(fn)`              | Mutable  | Update value with reducer function                  |
+| `.reset()`              | Mutable  | Reset to initial value                              |
+| `.on(listener)`         | All      | Subscribe to changes, returns unsubscribe function  |
+| `.to(...fns, options?)` | All      | Chain 1-10 selectors with optional equality/options |
+| `.pipe(...ops)`         | All      | Chain operators for transformation                  |
+| `.map(fn)`              | All      | Alias for `.to()`                                   |
+| `.dispose()`            | All      | Clean up signal and subscriptions                   |
+| `.refresh()`            | Computed | Force immediate recomputation                       |
+| `.stale()`              | Computed | Mark as stale for lazy recomputation                |
 
 ### Signal Namespace Methods
 
@@ -3704,20 +3704,23 @@ Quick reference for all Rextive APIs.
 
 ### Types (for TypeScript)
 
-| Type               | Description                       |
-| ------------------ | --------------------------------- |
-| `Signal<T>`        | Base signal type                  |
-| `Mutable<T>`       | Signal with `.set()`              |
-| `Computed<T>`      | Signal with `.refresh()/.stale()` |
-| `AnySignal<T>`     | Union of Mutable \| Computed      |
-| `Loadable<T>`      | Loading \| Success \| Error state |
-| `Disposable`       | Object with `.dispose()`          |
-| `Tag<T, K>`        | Signal grouping tag               |
-| `Plugin<T, K>`     | Signal plugin function            |
-| `Producer<T>`      | Lazy instance factory             |
-| `Cache<T, K>`      | Keyed data cache                  |
-| `CacheGroup<T>`    | Group of related caches           |
-| `CacheStrategy<T>` | Cache strategy plugin             |
+| Type               | Description                             |
+| ------------------ | --------------------------------------- |
+| `Signal<T>`        | Base signal type                        |
+| `Mutable<T>`       | Signal with `.set()`                    |
+| `Computed<T>`      | Signal with `.refresh()/.stale()`       |
+| `AnySignal<T>`     | Union of Mutable \| Computed            |
+| `Selector<T, R>`   | Value transform function for `.to()`    |
+| `ToOptions<T>`     | Options for `.to()` (equality/options)  |
+| `Operator<S, R>`   | Signal transform function for `.pipe()` |
+| `Loadable<T>`      | Loading \| Success \| Error state       |
+| `Disposable`       | Object with `.dispose()`                |
+| `Tag<T, K>`        | Signal grouping tag                     |
+| `Plugin<T, K>`     | Signal plugin function                  |
+| `Producer<T>`      | Lazy instance factory                   |
+| `Cache<T, K>`      | Keyed data cache                        |
+| `CacheGroup<T>`    | Group of related caches                 |
+| `CacheStrategy<T>` | Cache strategy plugin                   |
 
 ---
 
@@ -3869,23 +3872,54 @@ count.set(5); // Logs: "Count changed to: 5"
 unsubscribe(); // Stop listening
 ```
 
-#### Transform: `.to(fn, equals?)`
+#### Transform: `.to(...selectors, options?)`
 
-The simplest way to transform a signal - shorthand for `.pipe(select(...))`:
+Chain value transformations with 1-10 type-safe selectors, with optional equality/options:
 
 ```tsx
 const count = signal(5);
 
-// Transform value
+// Single selector
 const doubled = count.to((x) => x * 2);
 const formatted = count.to((x) => `Count: ${x}`);
 
-// With custom equality
-const user = signal({ name: "Alice", age: 30 });
-const userName = user.to((u) => u.name, "shallow");
-
 console.log(doubled()); // 10
 console.log(formatted()); // "Count: 5"
+
+// Multiple selectors (chained left-to-right)
+const user = signal({ name: "alice", age: 30 });
+const greeting = user.to(
+  (u) => u.name, // "alice"
+  (name) => name.toUpperCase(), // "ALICE"
+  (name) => `Hello, ${name}!` // "Hello, ALICE!"
+);
+
+// Type transformations through the chain
+const result = count.to(
+  (x) => x * 2, // number -> number (10)
+  (x) => `Value: ${x}`, // number -> string ("Value: 10")
+  (s) => s.length // string -> number (10)
+);
+
+// With equality strategy (prevents unnecessary updates)
+const profile = user.to((u) => ({ name: u.name }), "shallow");
+const config = data.to((d) => d.nested, "deep");
+
+// With full options
+const named = count.to((x) => x * 2, { name: "doubled", equals: "strict" });
+
+// Multiple selectors with options
+const formatted = count.to(
+  (x) => x * 2,
+  (x) => ({ value: x }),
+  "shallow" // equality for final result
+);
+
+// All selectors receive SignalContext
+const withContext = count.to(
+  (x, ctx) => x * 2,
+  (x, ctx) => (ctx.abortSignal ? x : 0) // Access context in any selector
+);
 ```
 
 #### Advanced Transform: `.pipe(...operators)`
