@@ -48,6 +48,8 @@
  * ```
  */
 
+import { isPromiseLike } from "./utils/isPromiseLike";
+
 // Track batching state
 let batchDepth = 0;
 const pendingNotifications = new Set<() => void>();
@@ -61,7 +63,7 @@ export function batch<T>(fn: () => T): T {
     const result = fn();
 
     // Check if result is a promise (async function)
-    if (result && typeof result === "object" && "then" in result) {
+    if (isPromiseLike(result)) {
       throw new Error(
         "batch() does not support async functions. " +
           "Batch operations must be synchronous to ensure all updates complete before notifications."

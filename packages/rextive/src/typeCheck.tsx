@@ -2301,20 +2301,15 @@ function anySignalTests() {
   // Test 2: Generic function with AnySignal has access to common methods
   // -----------------------------------------------------------------------------
 
-  function watchSignal<T>(s: AnySignal<T>, trigger: Signal<any>) {
+  function watchSignal<T>(s: AnySignal<T>) {
     // ✅ Methods available on both MutableSignal and ComputedSignal work
-    s.when(trigger, (current) => {
-      console.log("Changed:", current());
-      current.refresh(); // Available on both
-    });
-
     const unsub = s.on(() => console.log("Value:", s()));
+    s.refresh(); // Available on both
     void unsub;
   }
 
-  const trigger = signal(0);
-  watchSignal(count, trigger); // ✅ Works with MutableSignal
-  watchSignal(doubled, trigger); // ✅ Works with ComputedSignal
+  watchSignal(count); // ✅ Works with MutableSignal
+  watchSignal(doubled); // ✅ Works with ComputedSignal
 
   // -----------------------------------------------------------------------------
   // Test 3: Type narrowing for mutable-specific operations
@@ -2352,9 +2347,8 @@ function anySignalTests() {
   }
 
   const s = createSignal(true);
-  s.when(trigger, (current) => {
-    current.refresh(); // ✅ Works
-  });
+  s.on(() => console.log("Changed")); // ✅ Works
+  s.refresh(); // ✅ Works
 }
 
 // =============================================================================
@@ -2367,7 +2361,7 @@ import {
   type PersistorOptions,
   type PersistedValues,
   type SaveArgs,
-} from "./persist";
+} from "./plugins";
 
 function persistorTests() {
   // -----------------------------------------------------------------------------
