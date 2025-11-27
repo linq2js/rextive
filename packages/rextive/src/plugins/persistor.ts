@@ -140,6 +140,9 @@ export interface Persistor<
  *
  * @example Type-safe localStorage persistence
  * ```ts
+ * import { signal } from "rextive";
+ * import { persistor } from "rextive/plugins";
+ *
  * // Define your data shape
  * type AppState = { count: number; name: string };
  *
@@ -350,3 +353,4 @@ export function persistor<
 
   return persistorFn as Persistor<TData>;
 }
+

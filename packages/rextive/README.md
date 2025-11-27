@@ -2188,7 +2188,7 @@ Automatically save and load signal state from localStorage using `persistor()`:
 
 ```tsx
 import { signal } from "rextive";
-import { persistor } from "rextive/persist";
+import { persistor } from "rextive/plugins";
 
 // Define your data shape for type safety
 type AppSettings = {
@@ -2242,7 +2242,7 @@ fontSize.set(18); // Saved: { fontSize: 18 }
 <summary>📖 <strong>Persistor Options</strong></summary>
 
 ```tsx
-import { persistor, type SaveArgs } from "rextive/persist";
+import { persistor, type SaveArgs } from "rextive/plugins";
 
 type MyData = { count: number; name: string };
 
@@ -2295,7 +2295,7 @@ const cleanup = signal.use({ count, name }, [persist]);
 <summary>📖 <strong>Advanced: Custom Storage Backends</strong></summary>
 
 ```tsx
-import { persistor } from "rextive/persist";
+import { persistor } from "rextive/plugins";
 
 // IndexedDB persistence
 const indexedDBPersist = persistor({
@@ -2344,6 +2344,91 @@ const sessionPersist = persistor({
   },
 });
 ```
+
+</details>
+
+---
+
+### Example 10: React to Other Signals with `when` Plugin
+
+The `when` plugin lets a signal react to changes in other signals. This is useful for
+cache invalidation, automatic refresh, and coordinating between signals.
+
+```tsx
+import { signal } from "rextive";
+import { when } from "rextive/plugins";
+
+// Trigger signals
+const userId = signal(1);
+const refreshTrigger = signal(0);
+
+// Create a signal that reacts to triggers
+const userData = signal(
+  { userId },
+  async ({ deps }) => fetchUser(deps.userId),
+  {
+    use: [
+      // Refresh when refreshTrigger changes
+      when({ on: refreshTrigger, do: (sig) => sig.refresh() }),
+    ],
+  }
+);
+
+// Later: trigger a refresh
+refreshTrigger.set((n) => n + 1); // userData will refresh
+
+// Multiple triggers
+const filter = signal("all");
+const sort = signal("date");
+
+const todos = signal(async () => fetchTodos(), {
+  use: [
+    // React to multiple signals
+    when({ on: [filter, sort], do: (sig) => sig.refresh() }),
+  ],
+});
+
+// Either filter or sort changing will refresh todos
+filter.set("active");
+sort.set("priority");
+```
+
+<details>
+<summary>📖 <strong>When Plugin API</strong></summary>
+
+```tsx
+import { when } from "rextive/plugins";
+
+// Basic usage
+const count = signal(0, {
+  use: [when({ on: trigger, do: (sig) => sig.set(100) })],
+});
+
+// Watch multiple signals
+const result = signal(0, {
+  use: [when({ on: [a, b, c], do: (sig) => sig.refresh() })],
+});
+
+// Callback receives current signal and trigger signal
+const cache = signal(async () => fetchData(), {
+  use: [
+    when({
+      on: invalidateTrigger,
+      do: (current, trigger) => {
+        console.log("Triggered by:", trigger());
+        current.stale(); // Mark for recomputation
+      },
+    }),
+  ],
+});
+```
+
+**Use Cases:**
+
+- **Cache invalidation**: Refresh cached data when dependencies change
+- **Cross-signal coordination**: Coordinate updates between related signals
+- **Trigger-based updates**: React to user actions or external events
+- **Batch operations**: Mark multiple signals as stale from a single trigger
 
 </details>
 
@@ -2663,7 +2748,7 @@ user.set({ name: "Bob" });
 **2. Persister Plugin - Auto-save to localStorage:**
 
 ```tsx
-import { persistor } from "rextive/persist";
+import { persistor } from "rextive/plugins";
 
 // Use the built-in persistor for localStorage persistence
 const persist = persistor({
@@ -3526,13 +3611,14 @@ Quick reference for all Rextive APIs.
 
 ### Signal Namespace Methods
 
-| API                            | Description                               |
-| ------------------------------ | ----------------------------------------- |
-| `signal.is(value)`             | Type guard: check if value is a Signal    |
-| `signal.batch(fn)`             | Batch multiple updates, notify once       |
-| `signal.tag(options?)`         | Create a tag to group/manage signals      |
-| `persistor(options)`           | Create persistor (from `rextive/persist`) |
-| `signal.on(signals, listener)` | Subscribe to multiple signals at once     |
+| API                            | Description                                     |
+| ------------------------------ | ----------------------------------------------- |
+| `signal.is(value)`             | Type guard: check if value is a Signal          |
+| `signal.batch(fn)`             | Batch multiple updates, notify once             |
+| `signal.tag(options?)`         | Create a tag to group/manage signals            |
+| `persistor(options)`           | Create persistor (from `rextive/plugins`)       |
+| `when({ on, do })`             | React to other signals (from `rextive/plugins`) |
+| `signal.on(signals, listener)` | Subscribe to multiple signals at once           |
 
 ---
 
@@ -4267,13 +4353,13 @@ control.dispose();
 
 ---
 
-#### `persistor(options)` (from `rextive/persist`)
+#### `persistor(options)` (from `rextive/plugins`)
 
 Create a persistor for automatic signal persistence:
 
 ```tsx
 import { signal } from "rextive";
-import { persistor } from "rextive/persist";
+import { persistor } from "rextive/plugins";
 
 type Settings = { theme: string; fontSize: number };
 
@@ -4315,6 +4401,57 @@ const cleanup = signal.use({ theme, fontSize }, [persist]);
 - ✅ Works as plugin or group plugin
 
 See [Example 9: Persist to LocalStorage](#example-9-persist-to-localstorage) for more details.
+
+---
+
+#### `when({ on, do })` (from `rextive/plugins`)
+
+Create a plugin that reacts to changes in other signals:
+
+```tsx
+import { signal } from "rextive";
+import { when } from "rextive/plugins";
+
+const trigger = signal(0);
+const invalidate = signal(0);
+
+// React to a single trigger
+const count = signal(0, {
+  use: [when({ on: trigger, do: (sig) => sig.set(100) })],
+});
+
+// React to multiple triggers
+const data = signal(async () => fetchData(), {
+  use: [when({ on: [trigger, invalidate], do: (sig) => sig.refresh() })],
+});
+
+// Callback receives current signal and the trigger that fired
+const cache = signal(async () => fetchData(), {
+  use: [
+    when({
+      on: invalidate,
+      do: (current, trigger) => {
+        console.log("Invalidated:", trigger());
+        current.stale();
+      },
+    }),
+  ],
+});
+```
+
+**Options:**
+
+- `on` - Signal or array of signals to watch
+- `do` - Callback `(current, trigger) => void` called when any trigger changes
+
+**Features:**
+
+- ✅ React to single or multiple signals
+- ✅ Type-safe: callback receives correct signal type
+- ✅ Cleanup on signal disposal
+- ✅ Use for cache invalidation, coordination, triggers
+
+See [Example 10: React to Other Signals](#example-10-react-to-other-signals-with-when-plugin) for more details.
 
 ---
 
@@ -6415,7 +6552,8 @@ rextive/cache     # Data caching with strategies
 
 - `signal` / `$` - Reactive state primitive
 - `signal.batch` - Batch updates
-- `persistor` - Persistence utilities (from `rextive/persist`)
+- `persistor` - Persistence utilities (from `rextive/plugins`)
+- `when` - React to other signals (from `rextive/plugins`)
 - `signal.tag` - Group signals with tags (with `forEach`, `map`, `size`)
 - `signal.on` - Subscribe to multiple signals with pause/resume control
 - `wait` - Promise utilities (`wait.any`, `wait.race`, `wait.settled`, `wait.timeout`, `wait.delay`)

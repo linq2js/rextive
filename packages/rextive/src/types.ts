@@ -466,49 +466,6 @@ export type Signal<TValue, TInit = TValue> = Observable &
     stale(): void;
   };
 
-/**
- * Type-safe when() method for signals.
- *
- * This helper type provides proper type inference for the when() method,
- * ensuring the callback receives the exact signal type (MutableSignal or ComputedSignal)
- * rather than the base Signal type.
- *
- * @template TCurrent - The exact signal type (MutableSignal<T> or ComputedSignal<T>)
- * @param target - Single signal or readonly array of signals to watch
- * @param callback - Called when any target signal changes
- *   - `current`: The exact signal type with all its methods (set, refresh, stale, etc.)
- *   - `trigger`: The signal that triggered the callback
- * @returns The current signal (for method chaining)
- *
- * @example Type-safe callbacks
- * ```ts
- * // MutableSignal: callback receives MutableSignal
- * const count = signal(0);
- * count.when(trigger, (current) => {
- *   current.set(100); // ✅ .set() available
- * });
- *
- * // ComputedSignal: callback receives ComputedSignal
- * const user = signal(async () => fetchUser());
- * user.when(userId, (current) => {
- *   current.refresh(); // ✅ .refresh() available
- *   current.stale();   // ✅ .stale() available
- *   // current.set()   // ❌ Not available - computed is read-only
- * });
- * ```
- *
- * @example Method chaining
- * ```ts
- * cache
- *   .when(userId, (current) => current.refresh())
- *   .when([filter, sort], (current) => current.stale());
- * ```
- */
-export type When<TCurrent> = <const TOther extends Signal<any>>(
-  target: TOther | readonly TOther[],
-  callback: (current: TCurrent, trigger: TOther) => void
-) => TCurrent;
-
 export type TryInjectDispose<T> = T extends object
   ? T & { dispose: VoidFunction }
   : T;
@@ -553,16 +510,6 @@ export type MutableSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    * @param value - New value (type: TValue, not TInit)
    */
   set(value: TValue): void;
-
-  /**
-   * Watch other signals and react when they change.
-   * The callback receives this mutable signal, allowing you to call `.set()`.
-   *
-   * @param target - Single signal or array of signals to watch
-   * @param callback - Called when any target signal changes
-   * @returns This signal (for chaining)
-   */
-  when: When<MutableSignal<TValue, TInit>>;
 };
 
 /**
@@ -586,23 +533,13 @@ export type ComputedSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    * Check if the signal is currently paused
    */
   paused(): boolean;
-
-  /**
-   * Watch other signals and react when they change.
-   * The callback receives this computed signal, allowing you to call `.refresh()`, `.stale()`.
-   *
-   * @param target - Single signal or array of signals to watch
-   * @param callback - Called when any target signal changes
-   * @returns This signal (for chaining)
-   */
-  when: When<ComputedSignal<TValue, TInit>>;
 };
 
 /**
  * Union type representing any signal (mutable or computed).
  *
  * Useful for generic functions that accept any signal type while still having
- * access to common methods like `when()`, `on()`, `refresh()`, etc.
+ * access to common methods like `on()`, `refresh()`, etc.
  *
  * Unlike the base `Signal<T>` type, `AnySignal<T>` includes both `MutableSignal<T>`
  * and `ComputedSignal<T>`, which means TypeScript can infer methods that exist
@@ -614,10 +551,7 @@ export type ComputedSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
  * @example Generic function accepting any signal
  * ```ts
  * function watchSignal<T>(s: AnySignal<T>) {
- *   s.when(otherSignal, (current) => {
- *     console.log('Changed:', current());
- *     // current can be either MutableSignal or ComputedSignal
- *   });
+ *   s.on(() => console.log('Changed:', s()));
  * }
  *
  * const count = signal(0);

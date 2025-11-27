@@ -21,7 +21,6 @@
  * - `hydrate()` - Set value from external source (skips if already modified)
  * - `refresh()` - Force recomputation (batched)
  * - `stale()` - Mark as stale (recompute on next access)
- * - `when()` - React to other signals' changes
  * - `on()` - Subscribe to changes
  * - `dispose()` - Clean up resources
  *
@@ -154,11 +153,6 @@ export function createMutableSignal(
    */
   let refreshScheduled = false;
 
-  /**
-   * Unsubscribe functions for when() watchers
-   * Stored separately to persist across recomputations (unlike onCleanup)
-   */
-  let whenUnsubscribers: VoidFunction[] = [];
 
   // ============================================================================
   // 4. LIFECYCLE METHODS
@@ -173,9 +167,8 @@ export function createMutableSignal(
    * This method:
    * 1. Disposes the signal context
    * 2. Emits cleanup events
-   * 3. Unsubscribes from all when() watchers
-   * 4. Clears all event listeners
-   * 5. Marks signal as disposed (prevents further operations)
+   * 3. Clears all event listeners
+   * 4. Marks signal as disposed (prevents further operations)
    *
    * Once disposed, the signal cannot be used anymore and will throw errors
    * if any mutating methods are called.
@@ -197,13 +190,6 @@ export function createMutableSignal(
     // Mark as disposed
     disposed = true;
     context = undefined;
-
-    // Cleanup when() subscriptions
-    // These must be cleaned up manually as they persist across recomputations
-    for (const unsub of whenUnsubscribers) {
-      unsub();
-    }
-    whenUnsubscribers = [];
 
     // Clear change listeners
     onChange.clear();
@@ -546,55 +532,6 @@ export function createMutableSignal(
   // 8. REACTIVE RELATIONSHIPS (when)
   // ============================================================================
 
-  /**
-   * Watch other signals and react when they change
-   *
-   * Creates a reactive relationship where this signal reacts to changes in
-   * other signals. The callback receives both the current signal (this) and
-   * the signal that triggered the change.
-   *
-   * Features:
-   * - Type-safe: callback receives MutableSignal (can call .set())
-   * - Supports single signal or array of signals
-   * - Returns this signal for method chaining
-   * - Subscriptions persist across recomputations
-   * - Cleaned up on disposal
-   *
-   * @param target - Signal(s) to watch
-   * @param callback - Called when any target changes
-   * @returns This signal (for chaining)
-   *
-   * @example
-   * const count = signal(0);
-   * count.when(trigger, (current) => {
-   *   current.set(100); // Can use .set() - it's MutableSignal
-   * });
-   *
-   * Guarded: throws if signal is disposed
-   */
-  const when = guardDisposed(
-    isDisposed,
-    "Cannot attach when() listener to disposed signal",
-    (target: any, callback: any) => {
-      // Normalize to array
-      const targets = Array.isArray(target) ? target : [target];
-
-      // Subscribe to each target signal
-      for (const targetSignal of targets) {
-        const unsubscribe = targetSignal.on(() => {
-          // Invoke callback with (current signal, trigger signal)
-          callback(instance, targetSignal);
-        });
-
-        // Store unsubscribe function for cleanup on disposal
-        // NOTE: NOT cleaned up on recompute (persists across recomputations)
-        whenUnsubscribers.push(unsubscribe);
-      }
-
-      // Return this signal for method chaining
-      return instance;
-    }
-  );
 
   // ============================================================================
   // 9. SIGNAL INSTANCE CREATION
@@ -635,9 +572,6 @@ export function createMutableSignal(
     // Lifecycle
     refresh, // Force recomputation
     stale, // Mark for lazy recomputation
-
-    // Reactive relationships
-    when, // Watch other signals
   });
 
   // Store reference for use in methods above

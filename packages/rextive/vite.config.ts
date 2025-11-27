@@ -24,7 +24,7 @@ export default defineConfig({
         "react/index": resolve(__dirname, "src/react/index.ts"),
         "immer/index": resolve(__dirname, "src/immer/index.ts"),
         "cache/index": resolve(__dirname, "src/cache/index.ts"),
-        "persist/index": resolve(__dirname, "src/persist/index.ts"),
+        "plugins/index": resolve(__dirname, "src/plugins/index.ts"),
         op: resolve(__dirname, "src/op.ts"),
       },
       formats: ["es"],
@@ -84,7 +84,7 @@ export default defineConfig({
         "**/src/op.ts", // Re-export only
         "**/src/cache/index.ts", // Re-export only
         "**/src/immer/index.ts", // Re-export only
-        "**/src/persist/index.ts", // Re-export only
+        "**/src/plugins/index.ts", // Re-export only
         "**/.eslintrc.cjs", // Config file
         "**/*.mjs", // Compiled output
         "**/test-op-*.ts", // Test utility files

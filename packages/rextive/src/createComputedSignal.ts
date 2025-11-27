@@ -73,7 +73,6 @@ export function createComputedSignal(
   let isPaused = false;
   let hasComputed = false; // Track if signal has been computed (for hydrate)
   let refreshScheduled = false; // Track if refresh is scheduled (for batching)
-  let whenUnsubscribers: VoidFunction[] = []; // Store when() subscriptions separately
   const onDispose = emitter<void>();
 
   const isDisposed = () => disposed;
@@ -86,12 +85,6 @@ export function createComputedSignal(
     onDispose.emitAndClear();
     disposed = true;
     context = undefined;
-
-    // Cleanup when() subscriptions
-    for (const unsub of whenUnsubscribers) {
-      unsub();
-    }
-    whenUnsubscribers = [];
   };
 
   const recompute = () => {
@@ -276,26 +269,6 @@ export function createComputedSignal(
     }
   );
 
-  const when = guardDisposed(
-    isDisposed,
-    "Cannot attach when() listener to disposed signal",
-    (target: any, callback: any) => {
-      const targets = Array.isArray(target) ? target : [target];
-
-      // Subscribe to each target signal
-      for (const targetSignal of targets) {
-        const unsubscribe = targetSignal.on(() => {
-          callback(instance, targetSignal);
-        });
-
-        // Store unsubscribe function to clean up on disposal (not on recompute)
-        whenUnsubscribers.push(unsubscribe);
-      }
-
-      return instance;
-    }
-  );
-
   const instance = Object.assign(get, {
     [SIGNAL_TYPE]: true,
     displayName: name,
@@ -312,7 +285,6 @@ export function createComputedSignal(
     to,
     refresh,
     stale,
-    when,
   });
 
   instanceRef = instance as unknown as ComputedSignal<any>;
