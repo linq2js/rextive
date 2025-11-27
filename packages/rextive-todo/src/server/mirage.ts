@@ -1,8 +1,8 @@
 import { createServer, Model, Response } from "miragejs";
 import type { Todo } from "../types/todo";
 
-// Simulate network latency (3 seconds)
-const LATENCY = 3000;
+// Simulate network latency (2 seconds)
+const LATENCY = 2000;
 
 // localStorage key for server data
 const SERVER_STORAGE_KEY = "rextive-todo:server-data";
@@ -157,7 +157,10 @@ export function makeServer() {
                   createdAt: change.data?.createdAt || Date.now(),
                   modifiedAt: Date.now(),
                 });
-                results.push({ success: true, todoId: todo.attrs.id as string });
+                results.push({
+                  success: true,
+                  todoId: (todo.attrs as Todo).id as string,
+                });
                 break;
               }
               case "update": {

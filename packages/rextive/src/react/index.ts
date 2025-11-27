@@ -51,5 +51,4 @@ export type { UseScopeOptions } from "./useScope";
 // Export React components and hooks
 export { rx } from "./rx";
 export { useScope } from "./useScope";
-export { useRx } from "./useRx";
 export * from "./provider";

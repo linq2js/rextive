@@ -249,3 +249,25 @@ function tryWait(value: unknown): any {
 const Rx = memo((props: { fn: () => unknown }) => {
   return <>{useRx(props.fn) ?? null}</>;
 });
+
+/**
+ * rx.use - Hook for subscribing to signals in render functions
+ *
+ * This is the underlying hook used by `rx()` for automatic signal tracking.
+ * Use this when you need to subscribe to signals in a custom hook or component
+ * without wrapping the entire render in `rx()`.
+ *
+ * @example
+ * ```tsx
+ * function MyComponent() {
+ *   const value = rx.use(() => {
+ *     const a = signalA();
+ *     const b = signalB();
+ *     return a + b;
+ *   });
+ *
+ *   return <div>{value}</div>;
+ * }
+ * ```
+ */
+rx.use = useRx;

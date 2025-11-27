@@ -3572,7 +3572,7 @@ Quick reference for all Rextive APIs.
 | `rx(signal, prop)`           | Render signal property              |
 | `rx(signal, selector)`       | Render transformed signal value     |
 | `rx(fn)`                     | Reactive render with auto-tracking  |
-| `useRx(fn)`                  | Track signals in render function    |
+| `rx.use(fn)`                 | Track signals in render function    |
 | `useScope(lifecycles)`       | Track component lifecycle phases    |
 | `useScope(factory)`          | Create component-scoped signals     |
 | `useScope(factory, options)` | Scoped signals with watch/lifecycle |
@@ -4965,16 +4965,16 @@ function UserAnalytics({ user }) {
 
 ---
 
-### `useRx()` - Reactive Rendering Hook
+### `rx.use()` - Reactive Rendering Hook
 
-Low-level hook for automatic signal tracking. Usually you'll use `rx()` instead, but `useRx()` is available for advanced use cases:
+Low-level hook for automatic signal tracking. Usually you'll use `rx()` instead, but `rx.use()` is available for advanced use cases:
 
 ```tsx
-import { useRx } from "rextive/react";
+import { rx } from "rextive/react";
 
 function Component() {
   // Automatically tracks any signals accessed inside the function
-  const value = useRx(() => {
+  const value = rx.use(() => {
     const userData = wait(user()); // Tracks 'user' signal
     const postList = wait(posts()); // Tracks 'posts' signal
     return { userData, postList };
@@ -4995,7 +4995,7 @@ function Component() {
 - **Lazy tracking** - Only signals actually accessed are subscribed to
 - **Conditional tracking** - Signals in conditional branches are only tracked when executed
 
-**⚠️ Important caveat:** Signal calls OUTSIDE `useRx()` or `rx()` are NOT tracked:
+**⚠️ Important caveat:** Signal calls OUTSIDE `rx.use()` or `rx()` are NOT tracked:
 
 ```tsx
 function Component() {
@@ -6210,7 +6210,7 @@ rextive/cache     # Data caching with strategies
 **React (`rextive/react`):**
 
 - `rx` - Reactive rendering with automatic signal tracking
-- `useRx` - Low-level hook for signal tracking (used by `rx`)
+- `rx.use` - Low-level hook for signal tracking (used by `rx`)
 - `useScope` - Component-scoped signals & lifecycle control (3 modes)
 - `provider` - Create signal-based React Context
 - All core features re-exported
