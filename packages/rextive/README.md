@@ -5687,7 +5687,7 @@ A powerful keyed data cache with reference counting, lifecycle management, and p
 **Import from `rextive/cache`:**
 
 ```tsx
-import { cache, swr, ttl, lru, hydrate } from "rextive/cache";
+import { cache, staleOn, evictOn, lru, hydrate } from "rextive/cache";
 ```
 
 ### Basic Usage
@@ -6445,8 +6445,8 @@ rextive/cache     # Data caching with strategies
 **Cache (`rextive/cache`):**
 
 - `cache` - Keyed data caching with reference counting and lifecycle management
-- `swr` - Stale-while-revalidate strategy
-- `ttl` - Time-to-live strategy (stale, expire, idle cleanup)
+- `staleOn` - Mark entries stale on conditions (after, idle, error)
+- `evictOn` - Remove entries on conditions (after, idle, error, stale)
 - `lru` - Least recently used eviction strategy
 - `hydrate` - SSR hydration strategy
 - `ObjectKeyedMap` - Map supporting object keys with stable serialization
