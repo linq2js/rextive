@@ -1,6 +1,6 @@
 {
   "name": "rextive",
-  "version": "2.16.1",
+  "version": "2.17.0",
   "description": "A reactive state management library for React with explicit dependencies",
   "type": "module",
   "main": "./dist/rextive.js",
