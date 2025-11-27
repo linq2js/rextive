@@ -12,7 +12,7 @@
  * const trigger = signal(0);
  * const count = signal(0, {
  *   use: [
- *     when({ on: trigger, do: (sig) => sig.refresh() }),
+ *     when(trigger, (sig) => sig.refresh()),
  *     persistor({ load, save })("count"),
  *   ]
  * });
@@ -22,7 +22,7 @@
  */
 
 export { when } from "./when";
-export type { WhenConfig } from "./when";
+export type { WhenCallback } from "./when";
 
 export { persistor } from "./persistor";
 export type {

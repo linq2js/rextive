@@ -1,21 +1,19 @@
-import type { AnySignal, Plugin } from "../types";
+import type {
+  AnySignal,
+  ComputedSignal,
+  MutableSignal,
+  Plugin,
+  Signal,
+} from "../types";
+import { emitter } from "../utils/emitter";
 
 /**
- * Configuration for `when` plugin
+ * Callback type for `when` plugin
  */
-export interface WhenConfig<T> {
-  /**
-   * Trigger signal(s) to watch
-   */
-  on: AnySignal<unknown> | AnySignal<unknown>[];
-
-  /**
-   * Callback invoked when trigger signal changes
-   * @param signal - The signal this plugin is attached to
-   * @param trigger - The trigger signal that changed
-   */
-  do: (signal: AnySignal<T>, trigger: AnySignal<unknown>) => void;
-}
+export type WhenCallback<
+  TSource extends AnySignal<any>,
+  TTrigger extends AnySignal<any>
+> = (signal: TSource, trigger: TTrigger) => void;
 
 /**
  * React to changes in other signals.
@@ -34,7 +32,7 @@ export interface WhenConfig<T> {
  * const userId = signal(1);
  * const userData = signal(
  *   async () => fetchUser(userId()),
- *   { use: [when({ on: userId, do: (sig) => sig.refresh() })] }
+ *   { use: [when(userId, (sig) => sig.refresh())] }
  * );
  * ```
  *
@@ -47,8 +45,8 @@ export interface WhenConfig<T> {
  *   async () => search(searchTerm(), sortBy()),
  *   {
  *     use: [
- *       when({ on: searchTerm, do: (sig) => sig.refresh() }),
- *       when({ on: sortBy, do: (sig) => sig.stale() }),
+ *       when(searchTerm, (sig) => sig.refresh()),
+ *       when(sortBy, (sig) => sig.stale()),
  *     ]
  *   }
  * );
@@ -58,12 +56,9 @@ export interface WhenConfig<T> {
  * ```ts
  * const results = signal([], {
  *   use: [
- *     when({
- *       on: [searchTerm, sortBy],
- *       do: (sig, trigger) => {
- *         console.log("Changed:", trigger === searchTerm ? "search" : "sort");
- *         sig.refresh();
- *       }
+ *     when([searchTerm, sortBy], (sig, trigger) => {
+ *       console.log("Changed:", trigger === searchTerm ? "search" : "sort");
+ *       sig.refresh();
  *     })
  *   ]
  * });
@@ -73,33 +68,44 @@ export interface WhenConfig<T> {
  * ```ts
  * const masterState = signal("init");
  * const replica = signal("init", {
- *   use: [when({ on: masterState, do: (sig, trigger) => sig.set(trigger()) })]
+ *   use: [when(masterState, (sig, trigger) => sig.set(trigger()))]
  * });
  * ```
  *
- * @param config - Configuration with `on` (triggers) and `do` (callback)
+ * @param triggers - Single signal or array of signals to watch
+ * @param callback - Called when any trigger changes with (current, trigger)
  * @returns Plugin that sets up subscriptions on signal creation
  */
-export function when<T>(config: WhenConfig<T>): Plugin<T> {
-  return (signal) => {
-    const triggers = Array.isArray(config.on) ? config.on : [config.on];
-    const unsubscribers: VoidFunction[] = [];
+export function when<
+  const TTrigger extends AnySignal<any> = AnySignal<any>,
+  const TSource extends AnySignal<any> = AnySignal<any>
+>(
+  triggers: TTrigger | readonly TTrigger[],
+  callback: WhenCallback<TSource, TTrigger>
+): Plugin<
+  TSource extends Signal<infer TValue> ? TValue : any,
+  TSource extends MutableSignal<any>
+    ? "mutable"
+    : TSource extends ComputedSignal<any>
+    ? "computed"
+    : "any"
+> {
+  return (signal: any) => {
+    const triggerArray = Array.isArray(triggers) ? triggers : [triggers];
+    const onCleanup = emitter();
 
     // Subscribe to each trigger signal
-    for (const trigger of triggers) {
+    for (const trigger of triggerArray) {
       const unsubscribe = trigger.on(() => {
         // Invoke callback with (this signal, trigger signal)
-        config.do(signal, trigger);
+        callback(signal, trigger);
       });
-      unsubscribers.push(unsubscribe);
+      onCleanup.on(unsubscribe);
     }
 
     // Return cleanup function
     return () => {
-      for (const unsub of unsubscribers) {
-        unsub();
-      }
+      onCleanup.emitAndClear();
     };
   };
 }
-

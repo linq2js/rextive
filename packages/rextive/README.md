@@ -2369,7 +2369,7 @@ const userData = signal(
   {
     use: [
       // Refresh when refreshTrigger changes
-      when({ on: refreshTrigger, do: (sig) => sig.refresh() }),
+      when(refreshTrigger, (sig) => sig.refresh()),
     ],
   }
 );
@@ -2384,7 +2384,7 @@ const sort = signal("date");
 const todos = signal(async () => fetchTodos(), {
   use: [
     // React to multiple signals
-    when({ on: [filter, sort], do: (sig) => sig.refresh() }),
+    when([filter, sort], (sig) => sig.refresh()),
   ],
 });
 
@@ -2401,23 +2401,20 @@ import { when } from "rextive/plugins";
 
 // Basic usage
 const count = signal(0, {
-  use: [when({ on: trigger, do: (sig) => sig.set(100) })],
+  use: [when(trigger, (sig) => sig.set(100))],
 });
 
 // Watch multiple signals
 const result = signal(0, {
-  use: [when({ on: [a, b, c], do: (sig) => sig.refresh() })],
+  use: [when([a, b, c], (sig) => sig.refresh())],
 });
 
 // Callback receives current signal and trigger signal
 const cache = signal(async () => fetchData(), {
   use: [
-    when({
-      on: invalidateTrigger,
-      do: (current, trigger) => {
-        console.log("Triggered by:", trigger());
-        current.stale(); // Mark for recomputation
-      },
+    when(invalidateTrigger, (current, trigger) => {
+      console.log("Triggered by:", trigger());
+      current.stale(); // Mark for recomputation
     }),
   ],
 });
@@ -3007,13 +3004,8 @@ import { signal, AnySignal } from "rextive";
 // ✅ Generic function that accepts any signal type
 function logSignalChanges<T>(s: AnySignal<T>, label: string) {
   // Common methods work on both types
-  s.on((value) => {
-    console.log(`[${label}] changed to:`, value);
-  });
-
-  s.when(someOtherSignal, (current) => {
-    console.log(`[${label}] triggered by dependency`);
-    current.refresh(); // ✅ Available on both types
+  s.on(() => {
+    console.log(`[${label}] changed to:`, s());
   });
 
   return () => {
@@ -3093,14 +3085,19 @@ function trackDependencies(signals: AnySignal<any>[]) {
   return tracker;
 }
 
-// Use Case 3: Conditional refresh
-function refreshIfStale<T>(s: AnySignal<T>, maxAge: number) {
-  const lastRefresh = Date.now();
+// Use Case 3: Conditional refresh using signal.on
+function refreshIfStale<T>(
+  s: AnySignal<T>,
+  trigger: AnySignal<unknown>,
+  maxAge: number
+) {
+  let lastRefresh = Date.now();
 
-  s.when(someEvent, (current) => {
+  trigger.on(() => {
     const age = Date.now() - lastRefresh;
     if (age > maxAge) {
-      current.refresh(); // ✅ Works for both types
+      s.refresh(); // ✅ Works for both types
+      lastRefresh = Date.now();
     }
   });
 }
@@ -3594,20 +3591,19 @@ Quick reference for all Rextive APIs.
 
 ### Signal Instance Methods
 
-| Method              | Type     | Description                                                           |
-| ------------------- | -------- | --------------------------------------------------------------------- |
-| `signal()`          | All      | Read current value (shorthand for `.get()`)                           |
-| `.set(value)`       | Mutable  | Set new value directly                                                |
-| `.set(fn)`          | Mutable  | Update value with reducer function                                    |
-| `.reset()`          | Mutable  | Reset to initial value                                                |
-| `.on(listener)`     | All      | Subscribe to changes, returns unsubscribe function                    |
-| `.to(fn)`           | All      | Derive new signal with transform (shorthand for `.pipe(select(...))`) |
-| `.pipe(...ops)`     | All      | Chain operators for transformation                                    |
-| `.map(fn)`          | All      | Alias for `.to()`                                                     |
-| `.dispose()`        | All      | Clean up signal and subscriptions                                     |
-| `.refresh()`        | Computed | Force immediate recomputation                                         |
-| `.stale()`          | Computed | Mark as stale for lazy recomputation                                  |
-| `.when(target, cb)` | All      | React when target signal changes                                      |
+| Method          | Type     | Description                                                           |
+| --------------- | -------- | --------------------------------------------------------------------- |
+| `signal()`      | All      | Read current value (shorthand for `.get()`)                           |
+| `.set(value)`   | Mutable  | Set new value directly                                                |
+| `.set(fn)`      | Mutable  | Update value with reducer function                                    |
+| `.reset()`      | Mutable  | Reset to initial value                                                |
+| `.on(listener)` | All      | Subscribe to changes, returns unsubscribe function                    |
+| `.to(fn)`       | All      | Derive new signal with transform (shorthand for `.pipe(select(...))`) |
+| `.pipe(...ops)` | All      | Chain operators for transformation                                    |
+| `.map(fn)`      | All      | Alias for `.to()`                                                     |
+| `.dispose()`    | All      | Clean up signal and subscriptions                                     |
+| `.refresh()`    | Computed | Force immediate recomputation                                         |
+| `.stale()`      | Computed | Mark as stale for lazy recomputation                                  |
 
 ### Signal Namespace Methods
 
@@ -3617,7 +3613,7 @@ Quick reference for all Rextive APIs.
 | `signal.batch(fn)`             | Batch multiple updates, notify once             |
 | `signal.tag(options?)`         | Create a tag to group/manage signals            |
 | `persistor(options)`           | Create persistor (from `rextive/plugins`)       |
-| `when({ on, do })`             | React to other signals (from `rextive/plugins`) |
+| `when(triggers, callback)`     | React to other signals (from `rextive/plugins`) |
 | `signal.on(signals, listener)` | Subscribe to multiple signals at once           |
 
 ---
@@ -3978,26 +3974,25 @@ userComments.stale();
 - `refresh()` - Eager: recomputes immediately
 - `stale()` - Lazy: recomputes on next access
 
-#### React to Other Signals: `.when(target, callback)`
+#### React to Other Signals: `when` Plugin
 
-Create reactive relationships between signals - watch other signals and react when they change:
+Create reactive relationships between signals using the `when` plugin from `rextive/plugins`:
 
 ```tsx
-const userId = signal(1);
-const userData = signal(async () => fetchUser(userId()));
+import { signal } from "rextive";
+import { when } from "rextive/plugins";
 
-// Refresh userData when userId changes
-userData.when(userId, (current) => {
-  current.refresh();
+const userId = signal(1);
+const userData = signal(async () => fetchUser(userId()), {
+  // Refresh userData when userId changes
+  use: [when(userId, (current) => current.refresh())],
 });
 
 // Or watch multiple signals
 const filter = signal("");
 const sortBy = signal("name");
-const results = signal(async () => fetchResults());
-
-results.when([filter, sortBy], (current) => {
-  current.refresh();
+const results = signal(async () => fetchResults(), {
+  use: [when([filter, sortBy], (current) => current.refresh())],
 });
 ```
 
@@ -4007,67 +4002,64 @@ The callback receives the **exact signal type** (not just the base `Signal`), gi
 
 ```tsx
 // For MutableSignal: callback receives MutableSignal - can use .set()
-const count = signal(0);
-count.when(trigger, (current) => {
-  current.set(100); // ✅ .set() available on MutableSignal
+const trigger = signal(0);
+const count = signal(0, {
+  use: [when(trigger, (current) => current.set(100))], // ✅ .set() available
 });
 
 // For ComputedSignal: callback receives ComputedSignal - can use .refresh(), .stale()
-const userData = signal(async () => fetchUser());
-userData.when(userId, (current) => {
-  current.refresh(); // ✅ .refresh() available on ComputedSignal
-  current.stale(); // ✅ .stale() available on ComputedSignal
-  // current.set() // ❌ Not available - ComputedSignal is read-only
+const userData = signal(async () => fetchUser(), {
+  use: [
+    when(userId, (current) => {
+      current.refresh(); // ✅ .refresh() available
+      current.stale(); // ✅ .stale() available
+    }),
+  ],
 });
 ```
 
 **Key Patterns:**
 
 ```tsx
-// Pattern 1: Cross-signal cache invalidation
-const userCache = signal(async () => fetchUser());
-const postsCache = signal(async () => fetchPosts());
+import { when } from "rextive/plugins";
 
-userCache.when(userId, (current) => {
-  current.stale(); // Lazy invalidation
+// Pattern 1: Cross-signal cache invalidation
+const userCache = signal(async () => fetchUser(), {
+  use: [when(userId, (current) => current.stale())], // Lazy invalidation
 });
 
 // Pattern 2: Different actions for different triggers
-const searchResults = signal(async () => fetchResults());
-
-searchResults
-  .when(searchTerm, (current) => {
-    current.refresh(); // Immediate refresh for search
-  })
-  .when(sortPreference, (current) => {
-    current.stale(); // Lazy for sort changes
-  });
+const searchResults = signal(async () => fetchResults(), {
+  use: [
+    when(searchTerm, (current) => current.refresh()), // Immediate
+    when(sortPreference, (current) => current.stale()), // Lazy
+  ],
+});
 
 // Pattern 3: Coordinated updates with MutableSignal
 const masterState = signal("idle");
-const replica1 = signal("idle");
-const replica2 = signal("idle");
-
-replica1.when(masterState, (current, trigger) => {
-  current.set(trigger()); // ✅ .set() available - current is MutableSignal
+const replica1 = signal("idle", {
+  use: [when(masterState, (current, trigger) => current.set(trigger()))],
 });
-
-replica2.when(masterState, (current, trigger) => {
-  current.set(trigger()); // ✅ .set() available
+const replica2 = signal("idle", {
+  use: [when(masterState, (current, trigger) => current.set(trigger()))],
 });
 
 // Pattern 4: Detect which trigger fired
-const log = signal<string[]>([]);
-
-log.when([signal1, signal2], (current, trigger) => {
-  const name = trigger.displayName || "unknown";
-  current.set((prev) => [...prev, `Changed: ${name}`]); // ✅ Type-safe
+const signal1 = signal(0);
+const signal2 = signal(0);
+const log = signal<string[]>([], {
+  use: [
+    when([signal1, signal2], (current, trigger) => {
+      const name = trigger.displayName || "unknown";
+      current.set((prev) => [...prev, `Changed: ${name}`]);
+    }),
+  ],
 });
 ```
 
 **Behavior:**
 
-- Returns the signal for method chaining
 - Automatically unsubscribes when signal is disposed
 - Callback receives `(currentSignal, triggerSignal)` with **exact types**
 - Works with both mutable and computed signals
@@ -4404,7 +4396,7 @@ See [Example 9: Persist to LocalStorage](#example-9-persist-to-localstorage) for
 
 ---
 
-#### `when({ on, do })` (from `rextive/plugins`)
+#### `when(triggers, callback)` (from `rextive/plugins`)
 
 Create a plugin that reacts to changes in other signals:
 
@@ -4417,32 +4409,29 @@ const invalidate = signal(0);
 
 // React to a single trigger
 const count = signal(0, {
-  use: [when({ on: trigger, do: (sig) => sig.set(100) })],
+  use: [when(trigger, (sig) => sig.set(100))],
 });
 
 // React to multiple triggers
 const data = signal(async () => fetchData(), {
-  use: [when({ on: [trigger, invalidate], do: (sig) => sig.refresh() })],
+  use: [when([trigger, invalidate], (sig) => sig.refresh())],
 });
 
 // Callback receives current signal and the trigger that fired
 const cache = signal(async () => fetchData(), {
   use: [
-    when({
-      on: invalidate,
-      do: (current, trigger) => {
-        console.log("Invalidated:", trigger());
-        current.stale();
-      },
+    when(invalidate, (current, trigger) => {
+      console.log("Invalidated:", trigger());
+      current.stale();
     }),
   ],
 });
 ```
 
-**Options:**
+**Parameters:**
 
-- `on` - Signal or array of signals to watch
-- `do` - Callback `(current, trigger) => void` called when any trigger changes
+- `triggers` - Signal or array of signals to watch
+- `callback` - `(current, trigger) => void` called when any trigger changes
 
 **Features:**
 
@@ -4503,9 +4492,8 @@ import { signal, AnySignal } from "rextive";
 
 // Generic function accepting any signal type
 function watchSignal<T>(s: AnySignal<T>) {
-  s.when(otherSignal, (current) => {
-    console.log("Changed:", current());
-    // current can be either MutableSignal or ComputedSignal
+  s.on(() => {
+    console.log("Changed:", s());
   });
 }
 
@@ -4522,7 +4510,7 @@ watchSignal(doubled); // ✅ Works
 function doSomething<T>(s: AnySignal<T>) {
   // Common operations work on both types
   s.on(() => console.log("Changed"));
-  s.when(trigger, (current) => current.refresh());
+  s.refresh(); // Available on both
 
   // Type narrow for mutable-specific operations
   if ("set" in s) {
@@ -4542,7 +4530,7 @@ function doSomething<T>(s: AnySignal<T>) {
 
 - `Signal<T>` - Base interface with minimal methods
 - `AnySignal<T>` - Union of `MutableSignal<T> | ComputedSignal<T>` with full method access
-- Use `AnySignal<T>` when you need access to `.when()`, `.refresh()`, etc.
+- Use `AnySignal<T>` when you need access to `.refresh()`, `.stale()`, etc.
 
 See [Pattern 3: Generic Functions with AnySignal](#pattern-3-generic-functions-with-anysignal) for comprehensive examples.
 

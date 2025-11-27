@@ -1,5 +1,5 @@
 import { signal } from "rextive";
-import { persistor } from "rextive/persist";
+import { persistor } from "rextive/plugins";
 import type { Todo, TodoFilter, OfflineChange } from "../types/todo";
 
 // Generate unique ID

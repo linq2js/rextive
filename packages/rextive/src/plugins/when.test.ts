@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { signal } from "../index";
+import { Mutable, signal } from "../index";
 import { when } from "./when";
 
 describe("when plugin", () => {
@@ -9,7 +9,7 @@ describe("when plugin", () => {
       const callback = vi.fn();
 
       const count = signal(0, {
-        use: [when({ on: trigger, do: callback })],
+        use: [when(trigger, callback)],
       });
 
       expect(callback).not.toHaveBeenCalled();
@@ -30,7 +30,7 @@ describe("when plugin", () => {
       const callback = vi.fn();
 
       const count = signal(0, {
-        use: [when({ on: [trigger1, trigger2], do: callback })],
+        use: [when([trigger1, trigger2], callback)],
       });
 
       trigger1.set(1);
@@ -49,7 +49,7 @@ describe("when plugin", () => {
       const callback = vi.fn();
 
       const count = signal(0, {
-        use: [when({ on: trigger, do: callback })],
+        use: [when(trigger, callback)],
       });
 
       trigger.set(1);
@@ -66,7 +66,7 @@ describe("when plugin", () => {
     it("should allow setting value in callback", () => {
       const trigger = signal(0);
       const count = signal(0, {
-        use: [when({ on: trigger, do: (sig) => sig.set(100) })],
+        use: [when(trigger, (sig: Mutable<number>) => sig.set(100))],
       });
 
       expect(count()).toBe(0);
@@ -83,8 +83,8 @@ describe("when plugin", () => {
 
       const count = signal(0, {
         use: [
-          when({ on: increment, do: (sig) => sig.set((v) => v + 1) }),
-          when({ on: reset, do: (sig) => sig.set(0) }),
+          when(increment, (sig: Mutable<number>) => sig.set((v) => v + 1)),
+          when(reset, (sig: Mutable<number>) => sig.set(0)),
         ],
       });
 
@@ -127,12 +127,9 @@ describe("when plugin", () => {
 
       signal(0, {
         use: [
-          when({
-            on: trigger,
-            do: () => {
-              computed.refresh();
-              computed.stale();
-            },
+          when(trigger, () => {
+            computed.refresh();
+            computed.stale();
           }),
         ],
       });
@@ -158,7 +155,7 @@ describe("when plugin", () => {
       const staleTrigger = signal(0);
 
       signal(0, {
-        use: [when({ on: staleTrigger, do: () => computed.stale() })],
+        use: [when(staleTrigger, () => computed.stale())],
       });
 
       expect(computed()).toBe(0);
@@ -182,10 +179,7 @@ describe("when plugin", () => {
       const callback2 = vi.fn();
 
       const count = signal(0, {
-        use: [
-          when({ on: trigger1, do: callback1 }),
-          when({ on: trigger2, do: callback2 }),
-        ],
+        use: [when(trigger1, callback1), when(trigger2, callback2)],
       });
 
       trigger1.set(1);
@@ -209,7 +203,7 @@ describe("when plugin", () => {
       const testPlugin = () => pluginCleanup;
 
       const count = signal(0, {
-        use: [testPlugin, when({ on: trigger, do: whenCallback })],
+        use: [testPlugin, when(trigger, whenCallback)],
       });
 
       trigger.set(1);
@@ -229,12 +223,9 @@ describe("when plugin", () => {
       // TypeScript should infer `sig` as MutableSignal<number>
       const count = signal(0, {
         use: [
-          when({
-            on: trigger,
-            do: (sig) => {
-              sig.set(100); // ✅ .set() available
-              sig.reset(); // ✅ .reset() available
-            },
+          when(trigger, (sig: Mutable<number>) => {
+            sig.set(100); // ✅ .set() available
+            sig.reset(); // ✅ .reset() available
           }),
         ],
       });
@@ -246,4 +237,3 @@ describe("when plugin", () => {
     });
   });
 });
-

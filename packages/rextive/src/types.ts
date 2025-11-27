@@ -512,7 +512,12 @@ export type MutableSignal<TValue, TInit = TValue> = Signal<TValue, TInit> & {
   set(value: TValue): void;
 };
 
+export type Mutable<TValue, TInit = TValue> = MutableSignal<TValue, TInit>;
+
+export type Computed<TValue, TInit = TValue> = ComputedSignal<TValue, TInit>;
+
 /**
+ *
  * Computed signal - read-only, derived from dependencies
  * Created when signal() is called with dependencies
  */
