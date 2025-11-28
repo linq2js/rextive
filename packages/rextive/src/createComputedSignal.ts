@@ -73,6 +73,12 @@ export function createComputedSignal(
   if (onErrorCallbacks) {
     onErrorValue.on(onErrorCallbacks);
   }
+  // Notify devtools on error (only subscribe if devtools is enabled)
+  if (globalThis.__REXTIVE_DEVTOOLS__) {
+    onErrorValue.on((error) => {
+      globalThis.__REXTIVE_DEVTOOLS__?.onSignalError?.(instanceRef!, error);
+    });
+  }
 
   const onCleanup = emitter<void>();
 

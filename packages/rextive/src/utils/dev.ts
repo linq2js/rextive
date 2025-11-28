@@ -189,12 +189,6 @@ export namespace dev {
   }
 }
 
-// Legacy exports for backward compatibility (deprecated)
-/** @deprecated Use `dev()` instead */
-export function isDev(): boolean {
-  return checkIsDev();
-}
-
 /** @deprecated Use `dev.log()` instead */
 export function devLog(message: string, ...args: any[]): void {
   dev.log(message, ...args);

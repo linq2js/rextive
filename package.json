@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "build": "pnpm --filter rextive build",
-    "test": "pnpm --filter rextive test"
+    "test": "pnpm --filter rextive test",
+    "dev:todo": "concurrently -k -n rextive,todo -c cyan,green \"pnpm --filter rextive watch\" \"pnpm --filter rextive-todo dev\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

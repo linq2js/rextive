@@ -1682,6 +1682,9 @@ export type DevTools = {
   /** Called when a signal value changes */
   onSignalChange?(signal: AnySignal<any>, value: unknown): void;
 
+  /** Called when a signal throws an error (computed signal, async error, etc.) */
+  onSignalError?(signal: AnySignal<any>, error: unknown): void;
+
   /** Called when a tag is created */
   onTagCreate?(tag: Tag<any, any>): void;
 

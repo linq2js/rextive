@@ -25,6 +25,8 @@ export default defineConfig({
         "immer/index": resolve(__dirname, "src/immer/index.ts"),
         "cache/index": resolve(__dirname, "src/cache/index.ts"),
         "plugins/index": resolve(__dirname, "src/plugins/index.ts"),
+        "devtools/index": resolve(__dirname, "src/devtools/index.ts"),
+        "devtools/panel/index": resolve(__dirname, "src/devtools/panel/index.ts"),
         op: resolve(__dirname, "src/op.ts"),
       },
       formats: ["es"],

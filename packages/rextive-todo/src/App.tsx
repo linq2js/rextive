@@ -1,8 +1,10 @@
 import { useEffect } from "react";
+import { DevToolsPanel } from "rextive/devtools/panel";
 import { TodoInput } from "./components/TodoInput";
 import { TodoList } from "./components/TodoList";
 import { TodoFilters } from "./components/TodoFilters";
 import { SyncControls } from "./components/SyncControls";
+import { ScopeTest } from "./components/ScopeTest";
 import { initializeStore } from "./store/todoStore";
 import "./App.css";
 
@@ -52,7 +54,13 @@ export function App() {
         <footer className="app-footer">
           <p>Double-click to edit • Built with Rextive signals</p>
         </footer>
+
+        {/* Test component for useScope signals */}
+        <ScopeTest />
       </main>
+
+      {/* DevTools Panel - only in development */}
+      {import.meta.env.DEV && <DevToolsPanel />}
     </div>
   );
 }

@@ -1,14 +1,24 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { makeServer } from "./server/mirage";
-import { App } from "./App";
+import { enableDevTools } from "rextive/devtools";
 
-// Start MirageJS mock server
-makeServer();
+// Enable devtools BEFORE any signals are created (must be before App import!)
+enableDevTools({ name: "rextive-todo", logToConsole: false });
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-);
+// Dynamic import to ensure devtools is enabled before signals are created
+async function bootstrap() {
+  // Start MirageJS mock server
+  const { makeServer } = await import("./server/mirage");
+  makeServer();
 
+  // Now import App (which imports todoStore and creates signals)
+  const { App } = await import("./App");
+
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>
+  );
+}
+
+bootstrap();

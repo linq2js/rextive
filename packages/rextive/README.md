@@ -7087,6 +7087,7 @@ rextive/react     # React integration
 rextive/op        # Operators for signal transformations
 rextive/immer     # Immer integration
 rextive/cache     # Data caching with strategies
+rextive/devtools  # Developer tools for debugging
 ```
 
 **Core (`rextive`):**
@@ -7133,6 +7134,61 @@ rextive/cache     # Data caching with strategies
 - `ObjectKeyedMap` - Map supporting object keys with stable serialization
 - `stableStringify` - Deterministic JSON serialization (sorted keys)
 
+**DevTools (`rextive/devtools`):**
+
+- `enableDevTools` - Enable signal tracking for debugging
+- `DevToolsPanel` - React UI panel for inspecting signals (from `rextive/devtools/panel`)
+- Real-time signal inspection, change history, and event logging
+
+---
+
+## 🔧 DevTools
+
+Debug and inspect your reactive state with the built-in DevTools panel.
+
+```tsx
+// 1. Enable DevTools (before any signals are created)
+import { enableDevTools } from "rextive/devtools";
+
+if (import.meta.env.DEV) {
+  enableDevTools({ name: "my-app" });
+}
+
+// 2. Add the DevTools panel to your app
+import { DevToolsPanel } from "rextive/devtools/panel";
+
+function App() {
+  return (
+    <>
+      <YourApp />
+      {import.meta.env.DEV && <DevToolsPanel />}
+    </>
+  );
+}
+```
+
+### Features
+
+- 🔍 **Signal Registry** - See all signals in your app
+- 📊 **Live Values** - Watch values update in real-time
+- 📜 **Event Log** - Track signal changes, creates, and disposals
+- 🏷️ **Tag Tracking** - View tags and their associated signals
+- ⚠️ **Error Tracking** - See signals that have thrown errors
+- 🎨 **Visual Feedback** - Flash animations on value changes
+- 📱 **Responsive** - Works on desktop and mobile
+
+### Quick Tips
+
+```tsx
+// Name your signals for better debugging
+const count = signal(0, { name: "count" });
+
+// Use "User" toggle to hide auto-generated signals (#mutable-1, etc.)
+// Use "🗑" button to clear disposed signals
+```
+
+📖 **[Full DevTools Documentation](https://github.com/gialynguyen/rxblox/blob/main/packages/rextive/src/devtools/README.md)**
+
 ---
 
 ## 🎓 Learn More
@@ -7155,6 +7211,7 @@ Advanced topics and guides:
 - 📘 [API Reference](./docs/API_REFERENCE.md) - Complete API documentation
 - 📘 [Service Pattern](./docs/SERVICE_PATTERN.md) - Building scalable applications
 - 📘 [Architecture](./docs/ARCHITECTURE.md) - Internal design and concepts
+- 🔧 [DevTools Guide](https://github.com/gialynguyen/rxblox/blob/main/packages/rextive/src/devtools/README.md) - Debugging with DevTools
 
 ---
 

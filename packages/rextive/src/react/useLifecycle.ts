@@ -1,5 +1,6 @@
 import { useLayoutEffect, useState } from "react";
-import { isDev } from "../utils/dev";
+import { dev } from "../utils/dev";
+import { tryDispose } from "../disposable";
 
 /**
  * Lifecycle phase type
@@ -36,7 +37,10 @@ type InternalLifecycleOptions = {
   init?: ((target: any) => void) | VoidFunction;
   mount?: ((target: any) => void) | VoidFunction;
   render?: ((target: any) => void) | VoidFunction;
-  update?: ((target: any) => void) | VoidFunction | [(target: any) => void, ...any[]];
+  update?:
+    | ((target: any) => void)
+    | VoidFunction
+    | [(target: any) => void, ...any[]];
   cleanup?: ((target: any) => void) | VoidFunction;
   dispose?: ((target: any) => void) | VoidFunction;
 };
@@ -118,6 +122,7 @@ export function useLifecycle(
       } else {
         (currentOptions.dispose as VoidFunction)?.();
       }
+      tryDispose(targetToDispose);
     };
 
     return {
@@ -190,7 +195,7 @@ export function useLifecycle(
           }
 
           if (currentOptions.dispose) {
-            if (isDev()) {
+            if (dev()) {
               /**
                * Defer dispose callback to microtask for StrictMode safety
                * Use a flag to track if dispose should run (can be canceled if remounting same target)
@@ -199,6 +204,9 @@ export function useLifecycle(
               pendingDispose = disposeTask;
 
               Promise.resolve().then(() => {
+                if (phase !== "cleanup") {
+                  return;
+                }
                 if (disposeTask.shouldRun) {
                   try {
                     dispose(capturedTarget);

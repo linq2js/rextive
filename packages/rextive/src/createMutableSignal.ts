@@ -123,6 +123,12 @@ export function createMutableSignal(
   if (onErrorCallbacks) {
     onErrorValue.on(onErrorCallbacks);
   }
+  // Notify devtools on error (only subscribe if devtools is enabled)
+  if (globalThis.__REXTIVE_DEVTOOLS__) {
+    onErrorValue.on((error) => {
+      globalThis.__REXTIVE_DEVTOOLS__?.onSignalError?.(instanceRef!, error);
+    });
+  }
 
   // Cleanup emitter (triggered on recomputation)
   const onCleanup = emitter<void>();

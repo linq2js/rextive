@@ -256,7 +256,11 @@ export function disposable<
  * ```
  */
 export function tryDispose(disposable: unknown) {
-  if (typeof disposable === "object" && disposable && "dispose" in disposable) {
+  if (
+    (typeof disposable === "object" || typeof disposable === "function") &&
+    disposable &&
+    "dispose" in disposable
+  ) {
     if (typeof disposable.dispose === "function") {
       // Pattern: { dispose(): void }
       disposable.dispose();

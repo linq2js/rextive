@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { dev, devLog, devWarn, devError, devOnly, devAssert, isDev } from "./dev";
+import { dev, devLog, devWarn, devError, devOnly, devAssert } from "./dev";
 
 describe("dev utilities", () => {
   let consoleLogSpy: any;
@@ -105,10 +105,6 @@ describe("dev utilities", () => {
       it("should return true in development", () => {
         expect(dev()).toBe(true);
       });
-
-      it("should match isDev()", () => {
-        expect(dev()).toBe(isDev());
-      });
     });
 
     describe("dev(fn)", () => {
@@ -148,7 +144,9 @@ describe("dev utilities", () => {
       it("should warn in development", () => {
         dev.warn("warning message");
 
-        expect(consoleWarnSpy).toHaveBeenCalledWith("[rextive] warning message");
+        expect(consoleWarnSpy).toHaveBeenCalledWith(
+          "[rextive] warning message"
+        );
       });
 
       it("should support multiple arguments", () => {

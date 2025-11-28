@@ -42,26 +42,39 @@ const persist = persistor<PersistedData>({
 
 // ==================== SIGNALS ====================
 
+// Test signals without names (auto-generated) - for testing DevTools "Show all" toggle
+// These will appear as #mutable-X in devtools
+const _tempSignal1 = signal(0); // #mutable-X
+const _tempSignal2 = signal("test"); // #mutable-X
+const _tempComputed = signal(
+  { _tempSignal1 },
+  ({ deps }) => deps._tempSignal1 * 2
+); // #computed-X
+
 // Remote todos from server
-export const remoteTodos = signal<Todo[]>([]);
+export const remoteTodos = signal<Todo[]>([], { name: "remoteTodos" });
 
 // Offline changes queue - persisted to localStorage
 export const offlineChanges = signal<OfflineChange[]>([], {
+  name: "offlineChanges",
   use: [persist("offlineChanges")],
 });
 
 // Current filter
-export const filter = signal<TodoFilter>("all");
+export const filter = signal<TodoFilter>("all", { name: "filter" });
 
 // Search text
-export const searchText = signal("");
+export const searchText = signal("", { name: "searchText" });
 
 // Sync status
-export const syncStatus = signal<"idle" | "syncing" | "error">("idle");
+export const syncStatus = signal<"idle" | "syncing" | "error">("idle", {
+  name: "syncStatus",
+});
 export const lastSyncTime = signal<number | null>(null, {
+  name: "lastSyncTime",
   use: [persist("lastSyncTime")],
 });
-export const syncError = signal<string | null>(null);
+export const syncError = signal<string | null>(null, { name: "syncError" });
 
 // ==================== COMPUTED SIGNALS ====================
 
@@ -113,7 +126,8 @@ export const localTodos = signal(
 
     // Sort by createdAt (most recently created first)
     return todos.sort((a, b) => b.createdAt - a.createdAt);
-  }
+  },
+  { name: "localTodos" }
 );
 
 // Filtered todos
@@ -139,25 +153,30 @@ export const filteredTodos = signal(
     }
 
     return todos;
-  }
+  },
+  { name: "filteredTodos" }
 );
 
 // Counts
 export const totalCount = signal(
   { localTodos },
-  ({ deps }) => deps.localTodos.length
+  ({ deps }) => deps.localTodos.length,
+  { name: "totalCount" }
 );
 export const activeCount = signal(
   { localTodos },
-  ({ deps }) => deps.localTodos.filter((t) => !t.completed).length
+  ({ deps }) => deps.localTodos.filter((t) => !t.completed).length,
+  { name: "activeCount" }
 );
 export const completedCount = signal(
   { localTodos },
-  ({ deps }) => deps.localTodos.filter((t) => t.completed).length
+  ({ deps }) => deps.localTodos.filter((t) => t.completed).length,
+  { name: "completedCount" }
 );
 export const pendingChangesCount = signal(
   { offlineChanges },
-  ({ deps }) => deps.offlineChanges.length
+  ({ deps }) => deps.offlineChanges.length,
+  { name: "pendingChangesCount" }
 );
 
 // ==================== ACTIONS ====================
