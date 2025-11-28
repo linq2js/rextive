@@ -15,3 +15,4 @@ export { focus } from "./focus";
 export { pace } from "./pace";
 export { debounce, debounceScheduler } from "./debounce";
 export { throttle, throttleScheduler } from "./throttle";
+export { delay, delayScheduler } from "./delay";
