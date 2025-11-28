@@ -1,5 +1,5 @@
 /**
- * Select operator - Transform/select signal values
+ * To operator - Transform signal values
  *
  * Supports chaining multiple selectors like .to() method,
  * with SignalContext available as second argument.
@@ -13,67 +13,67 @@ import {
 } from "./resolveSelectors";
 
 /**
- * Options for select operator
+ * Options for to operator
  */
-export type SelectOptions<T> = SelectorOptions<T>;
+export type ToOperatorOptions<T> = SelectorOptions<T>;
 
 // =============================================================================
 // OVERLOADS: 1-10 selectors with optional options
 // =============================================================================
 
 // 1 selector
-export function select<T, A>(
+export function to<T, A>(
   s1: Selector<T, A>,
-  options?: SelectOptions<A>
+  options?: ToOperatorOptions<A>
 ): (source: Signal<T>) => Computed<A>;
 
 // 2 selectors
-export function select<T, A, B>(
+export function to<T, A, B>(
   s1: Selector<T, A>,
   s2: Selector<A, B>,
-  options?: SelectOptions<B>
+  options?: ToOperatorOptions<B>
 ): (source: Signal<T>) => Computed<B>;
 
 // 3 selectors
-export function select<T, A, B, C>(
+export function to<T, A, B, C>(
   s1: Selector<T, A>,
   s2: Selector<A, B>,
   s3: Selector<B, C>,
-  options?: SelectOptions<C>
+  options?: ToOperatorOptions<C>
 ): (source: Signal<T>) => Computed<C>;
 
 // 4 selectors
-export function select<T, A, B, C, D>(
+export function to<T, A, B, C, D>(
   s1: Selector<T, A>,
   s2: Selector<A, B>,
   s3: Selector<B, C>,
   s4: Selector<C, D>,
-  options?: SelectOptions<D>
+  options?: ToOperatorOptions<D>
 ): (source: Signal<T>) => Computed<D>;
 
 // 5 selectors
-export function select<T, A, B, C, D, E>(
+export function to<T, A, B, C, D, E>(
   s1: Selector<T, A>,
   s2: Selector<A, B>,
   s3: Selector<B, C>,
   s4: Selector<C, D>,
   s5: Selector<D, E>,
-  options?: SelectOptions<E>
+  options?: ToOperatorOptions<E>
 ): (source: Signal<T>) => Computed<E>;
 
 // 6 selectors
-export function select<T, A, B, C, D, E, F>(
+export function to<T, A, B, C, D, E, F>(
   s1: Selector<T, A>,
   s2: Selector<A, B>,
   s3: Selector<B, C>,
   s4: Selector<C, D>,
   s5: Selector<D, E>,
   s6: Selector<E, F>,
-  options?: SelectOptions<F>
+  options?: ToOperatorOptions<F>
 ): (source: Signal<T>) => Computed<F>;
 
 // 7 selectors
-export function select<T, A, B, C, D, E, F, G>(
+export function to<T, A, B, C, D, E, F, G>(
   s1: Selector<T, A>,
   s2: Selector<A, B>,
   s3: Selector<B, C>,
@@ -81,11 +81,11 @@ export function select<T, A, B, C, D, E, F, G>(
   s5: Selector<D, E>,
   s6: Selector<E, F>,
   s7: Selector<F, G>,
-  options?: SelectOptions<G>
+  options?: ToOperatorOptions<G>
 ): (source: Signal<T>) => Computed<G>;
 
 // 8 selectors
-export function select<T, A, B, C, D, E, F, G, H>(
+export function to<T, A, B, C, D, E, F, G, H>(
   s1: Selector<T, A>,
   s2: Selector<A, B>,
   s3: Selector<B, C>,
@@ -94,11 +94,11 @@ export function select<T, A, B, C, D, E, F, G, H>(
   s6: Selector<E, F>,
   s7: Selector<F, G>,
   s8: Selector<G, H>,
-  options?: SelectOptions<H>
+  options?: ToOperatorOptions<H>
 ): (source: Signal<T>) => Computed<H>;
 
 // 9 selectors
-export function select<T, A, B, C, D, E, F, G, H, I>(
+export function to<T, A, B, C, D, E, F, G, H, I>(
   s1: Selector<T, A>,
   s2: Selector<A, B>,
   s3: Selector<B, C>,
@@ -108,11 +108,11 @@ export function select<T, A, B, C, D, E, F, G, H, I>(
   s7: Selector<F, G>,
   s8: Selector<G, H>,
   s9: Selector<H, I>,
-  options?: SelectOptions<I>
+  options?: ToOperatorOptions<I>
 ): (source: Signal<T>) => Computed<I>;
 
 // 10 selectors
-export function select<T, A, B, C, D, E, F, G, H, I, J>(
+export function to<T, A, B, C, D, E, F, G, H, I, J>(
   s1: Selector<T, A>,
   s2: Selector<A, B>,
   s3: Selector<B, C>,
@@ -123,7 +123,7 @@ export function select<T, A, B, C, D, E, F, G, H, I, J>(
   s8: Selector<G, H>,
   s9: Selector<H, I>,
   s10: Selector<I, J>,
-  options?: SelectOptions<J>
+  options?: ToOperatorOptions<J>
 ): (source: Signal<T>) => Computed<J>;
 
 // =============================================================================
@@ -131,7 +131,7 @@ export function select<T, A, B, C, D, E, F, G, H, I, J>(
 // =============================================================================
 
 /**
- * Select/transform signal values with chained selectors
+ * Transform signal values with chained selectors
  *
  * Creates a new computed signal that applies transformation functions
  * to each value from the source signal. Multiple selectors are chained
@@ -146,17 +146,17 @@ export function select<T, A, B, C, D, E, F, G, H, I, J>(
  *
  * @example Basic transformation
  * ```ts
- * import { select } from "rextive/operators";
+ * import { to } from "rextive/op";
  *
  * const count = signal(5);
- * const doubled = count.pipe(select(x => x * 2));
+ * const doubled = count.pipe(to(x => x * 2));
  * ```
  *
  * @example Chained selectors
  * ```ts
  * const user = signal({ name: "Alice", age: 30 });
  * const greeting = user.pipe(
- *   select(
+ *   to(
  *     u => u.name,
  *     name => name.toUpperCase(),
  *     name => `Hello, ${name}!`
@@ -169,7 +169,7 @@ export function select<T, A, B, C, D, E, F, G, H, I, J>(
  * ```ts
  * const data = signal(initialData);
  * const processed = data.pipe(
- *   select((value, ctx) => {
+ *   to((value, ctx) => {
  *     // Access context for async operations
  *     if (ctx.abortSignal?.aborted) return fallback;
  *     return transform(value);
@@ -181,14 +181,14 @@ export function select<T, A, B, C, D, E, F, G, H, I, J>(
  * ```ts
  * const user = signal({ name: "Alice", age: 30 });
  * const profile = user.pipe(
- *   select(
+ *   to(
  *     u => ({ name: u.name, age: u.age }),
  *     "shallow" // Use shallow equality
  *   )
  * );
  * ```
  */
-export function select(
+export function to(
   first: Selector<any, any>,
   ...rest: any[]
 ): (source: Signal<any>) => Computed<any> {
@@ -203,3 +203,4 @@ export function select(
     );
   };
 }
+

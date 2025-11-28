@@ -6,7 +6,7 @@ export type { SelectorFn, SelectorOptions, ResolvedSelectors } from "./resolveSe
 export { resolveSelectors, resolveSelectorsRequired } from "./resolveSelectors";
 
 // Existing operators
-export { select } from "./select";
+export { to, type ToOperatorOptions } from "./to";
 export { scan } from "./scan";
 export { filter } from "./filter";
 export { focus } from "./focus";

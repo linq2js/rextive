@@ -2050,6 +2050,7 @@ function Component() {
 - `batch()` - Batch updates
 - `disposable()` - Combine disposables
 - `validate()` - Wrap validators (Zod, Yup, custom) into unified result
+- `signal.from()` - Combine signals into record or tuple
 - `is()` - Check if observable
 - `isSignal()` - Check if signal
 - `emitter()` - Create event emitter
@@ -2117,6 +2118,44 @@ const result = await validated();
 - Object with `isValid`: `{ isValid: (x) => x > 0 }` (Yup)
 - Zod `safeParse`: `schema.safeParse`
 - Throwing validators (errors are caught)
+
+---
+
+### `signal.from()` - Combine Signals
+
+Combine multiple signals into a single computed signal. Two overloads:
+
+**Record form:**
+
+```tsx
+const name = signal("Alice");
+const age = signal(30);
+
+const user = signal.from({ name, age });
+console.log(user()); // { name: "Alice", age: 30 }
+
+name.set("Bob");
+console.log(user()); // { name: "Bob", age: 30 }
+```
+
+**Tuple form:**
+
+```tsx
+const x = signal(10);
+const y = signal(20);
+
+const coords = signal.from([x, y]);
+console.log(coords()); // [10, 20]
+
+x.set(100);
+console.log(coords()); // [100, 20]
+```
+
+**Use cases:**
+
+- Collect form fields into a single object
+- Combine coordinates or related values
+- Create derived state from multiple signals
 
 ---
 

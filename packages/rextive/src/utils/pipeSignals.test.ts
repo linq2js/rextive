@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { pipeSignals } from "./pipeSignals";
 import { signal } from "../signal";
-import { select } from "../operators";
+import { to } from "../operators";
 import { is } from "../is";
 
 describe("pipeSignals", () => {
@@ -14,7 +14,7 @@ describe("pipeSignals", () => {
 
   it("should apply single operator", () => {
     const source = signal(5);
-    const result = pipeSignals(source, [(s) => select((x: number) => x * 2)(s)]);
+    const result = pipeSignals(source, [(s) => to((x: number) => x * 2)(s)]);
 
     expect(result()).toBe(10);
   });
@@ -22,9 +22,9 @@ describe("pipeSignals", () => {
   it("should chain multiple operators", () => {
     const source = signal(5);
     const result = pipeSignals(source, [
-      (s) => select((x: number) => x * 2)(s),
-      (s) => select((x: number) => x + 1)(s),
-      (s) => select((x: number) => `Value: ${x}`)(s),
+      (s) => to((x: number) => x * 2)(s),
+      (s) => to((x: number) => x + 1)(s),
+      (s) => to((x: number) => `Value: ${x}`)(s),
     ]);
 
     expect(result()).toBe("Value: 11");
@@ -45,9 +45,9 @@ describe("pipeSignals", () => {
     };
 
     const result = pipeSignals(source, [
-      (s) => trackDispose(select((x: number) => x * 2)(s), intermediate1Spy),
-      (s) => trackDispose(select((x: number) => x + 1)(s), intermediate2Spy),
-      (s) => select((x: number) => `Value: ${x}`)(s),
+      (s) => trackDispose(to((x: number) => x * 2)(s), intermediate1Spy),
+      (s) => trackDispose(to((x: number) => x + 1)(s), intermediate2Spy),
+      (s) => to((x: number) => `Value: ${x}`)(s),
     ]);
 
     expect(result()).toBe("Value: 11");
@@ -81,7 +81,7 @@ describe("pipeSignals", () => {
         s.on(() => console.log("changed"));
         return s;
       },
-      (s) => select((x: number) => x * 2)(s),
+      (s) => to((x: number) => x * 2)(s),
     ]);
 
     expect(result()).toBe(10);
@@ -102,9 +102,9 @@ describe("pipeSignals", () => {
 
     const result = pipeSignals(source, [
       (s) => s, // Returns same
-      (s) => trackDispose(select((x: number) => x * 2)(s), spy), // Creates new
+      (s) => trackDispose(to((x: number) => x * 2)(s), spy), // Creates new
       (s) => s, // Returns same
-      (s) => select((x: number) => x + 1)(s), // Creates new
+      (s) => to((x: number) => x + 1)(s), // Creates new
     ]);
 
     expect(result()).toBe(11);
@@ -120,7 +120,7 @@ describe("pipeSignals", () => {
 
     // Create a mock operator that returns an object without dispose
     const result = pipeSignals(source, [
-      (s) => select((x: number) => x * 2)(s),
+      (s) => to((x: number) => x * 2)(s),
       (s) => ({ ...s, dispose: undefined }), // Remove dispose
     ]);
 
@@ -132,7 +132,7 @@ describe("pipeSignals", () => {
     it("should preserve user-defined name on result signal", () => {
       const source = signal(5, { name: "myCount" });
       const result = pipeSignals(source, [
-        (s) => select((x: number) => x * 2, { name: "userDefinedName" })(s),
+        (s) => to((x: number) => x * 2, { name: "userDefinedName" })(s),
       ]);
 
       // User-defined name should be preserved (doesn't start with #)
@@ -164,7 +164,7 @@ describe("pipeSignals", () => {
     it("should rename auto-generated result to pipe(source|result)", () => {
       const source = signal(5, { name: "myCount" });
       const result = pipeSignals(source, [
-        (s) => select((x: number) => x * 2)(s),
+        (s) => to((x: number) => x * 2)(s),
       ]);
 
       // Verify result is a signal
@@ -179,7 +179,7 @@ describe("pipeSignals", () => {
       const source = signal(5, { name: "testSource" });
       
       // Create a signal with auto-generated name
-      const computed = select((x: number) => x * 2)(source);
+      const computed = to((x: number) => x * 2)(source);
       
       // Verify the computed signal has auto-generated name
       expect(computed.displayName).toMatch(/^#computed-\d+$/);
@@ -187,7 +187,7 @@ describe("pipeSignals", () => {
       
       // Now pipe it
       const result = pipeSignals(source, [
-        (s) => select((x: number) => x * 2)(s),
+        (s) => to((x: number) => x * 2)(s),
       ]);
       
       // The rename should trigger because:

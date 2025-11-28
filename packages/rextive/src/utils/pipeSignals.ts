@@ -44,6 +44,8 @@ export function pipeSignals(
     Object.assign(result, {
       displayName: `pipe(${source.displayName}|${result.displayName})`,
     });
+    // Notify DevTools of the rename
+    globalThis.__REXTIVE_DEVTOOLS__?.onSignalRename?.(result as any);
   }
 
   // If no intermediates, no need for cleanup dispose

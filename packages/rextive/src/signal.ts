@@ -12,6 +12,7 @@ import { createComputedSignal } from "./createComputedSignal";
 import { createSignalContext } from "./createSignalContext";
 import { EqualsStrategy } from "./utils/resolveEquals";
 import { signalOn } from "./signal.on";
+import { signalFrom } from "./signal.from";
 
 // Re-export signal.on types
 export type { SignalOnControl } from "./signal.on";
@@ -227,3 +228,4 @@ export function signal(...args: any[]): any {
 
 // Attach namespace methods to signal function
 signal.on = signalOn;
+signal.from = signalFrom;

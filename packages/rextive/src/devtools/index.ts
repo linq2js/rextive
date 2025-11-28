@@ -49,6 +49,9 @@ export type {
 /** Registry of all tracked signals */
 const signals = new Map<string, SignalInfo>();
 
+/** Reverse lookup: signal reference → current ID (for rename tracking) */
+const signalToId = new WeakMap<Signal<any>, string>();
+
 /** Registry of all tracked tags */
 const tags = new Map<string, TagInfo>();
 
@@ -93,60 +96,57 @@ function getSignalKind(signal: Signal<any>): "mutable" | "computed" {
 
 const devToolsHooks: DevTools = {
   onSignalCreate(signal: Signal<any>): void {
+    const id = signal.displayName;
     const now = Date.now();
 
-    // Defer registration to allow synchronous renames (e.g., from pipeSignals) to complete.
-    // This ensures we capture the final displayName, not the initial auto-generated one.
-    queueMicrotask(() => {
-      const id = signal.displayName || "unnamed";
-
-      // If a signal with this ID exists and is disposed, rename the disposed one
-      // to preserve it in the history (e.g., "scopedCount-1" → "scopedCount-1 (disposed)")
-      const existingInfo = signals.get(id);
-      if (existingInfo && existingInfo.disposed) {
-        const disposedId = `${id} (disposed)`;
-        // Check if we already have too many disposed versions
-        let counter = 1;
-        let finalDisposedId = disposedId;
-        while (signals.has(finalDisposedId)) {
-          counter++;
-          finalDisposedId = `${id} (disposed ${counter})`;
-        }
-        existingInfo.id = finalDisposedId;
-        signals.delete(id);
-        signals.set(finalDisposedId, existingInfo);
+    // If a signal with this ID exists and is disposed, rename the disposed one
+    // to preserve it in the history (e.g., "scopedCount-1" → "scopedCount-1 (disposed)")
+    const existingInfo = signals.get(id);
+    if (existingInfo && existingInfo.disposed) {
+      const disposedId = `${id} (disposed)`;
+      // Check if we already have too many disposed versions
+      let counter = 1;
+      let finalDisposedId = disposedId;
+      while (signals.has(finalDisposedId)) {
+        counter++;
+        finalDisposedId = `${id} (disposed ${counter})`;
       }
+      existingInfo.id = finalDisposedId;
+      signals.delete(id);
+      signals.set(finalDisposedId, existingInfo);
+    }
 
-      // Check which tags already have this signal registered
-      // (onTagAdd may have been called before onSignalCreate during initialization)
-      const signalTags = new Set<string>();
-      for (const [tagId, tagInfo] of tags) {
-        if (tagInfo.signals.has(id)) {
-          signalTags.add(tagId);
-        }
+    // Check which tags already have this signal registered
+    // (onTagAdd may have been called before onSignalCreate during initialization)
+    const signalTags = new Set<string>();
+    for (const [tagId, tagInfo] of tags) {
+      if (tagInfo.signals.has(id)) {
+        signalTags.add(tagId);
       }
+    }
 
-      const info: SignalInfo = {
-        id,
-        kind: getSignalKind(signal),
-        signal,
-        createdAt: now,
-        updatedAt: now,
-        changeCount: 0,
-        history: [],
-        tags: signalTags,
-        errorCount: 0,
-        errors: [],
-        disposed: false,
-      };
+    const info: SignalInfo = {
+      id,
+      kind: getSignalKind(signal),
+      signal,
+      createdAt: now,
+      updatedAt: now,
+      changeCount: 0,
+      history: [],
+      tags: signalTags,
+      errorCount: 0,
+      errors: [],
+      disposed: false,
+    };
 
-      signals.set(id, info);
-      emit({ type: "signal:create", signal: info });
-    });
+    signals.set(id, info);
+    signalToId.set(signal, id); // Track signal → ID mapping
+    emit({ type: "signal:create", signal: info });
   },
 
   onSignalDispose(signal: Signal<any>): void {
-    const id = signal.displayName || "unnamed";
+    // Use reverse lookup to find current ID (handles renamed signals)
+    const id = signalToId.get(signal) || signal.displayName || "unnamed";
     const now = Date.now();
 
     // Mark as disposed instead of deleting (keeps history visible)
@@ -168,8 +168,31 @@ const devToolsHooks: DevTools = {
     emit({ type: "signal:dispose", signalId: id });
   },
 
+  onSignalRename(signal: Signal<any>): void {
+    // Look up current ID by signal reference
+    const oldId = signalToId.get(signal);
+    const newId = signal.displayName || "unnamed";
+
+    // Skip if signal not tracked or ID unchanged
+    if (!oldId || oldId === newId) return;
+
+    const info = signals.get(oldId);
+    if (!info) return;
+
+    // Update the registry
+    signals.delete(oldId);
+    info.id = newId;
+    signals.set(newId, info);
+
+    // Update reverse mapping
+    signalToId.set(signal, newId);
+
+    emit({ type: "signal:rename", oldId, newId });
+  },
+
   onSignalChange(signal: Signal<any>, value: unknown): void {
-    const id = signal.displayName || "unnamed";
+    // Use reverse lookup to find current ID (handles renamed signals)
+    const id = signalToId.get(signal) || signal.displayName || "unnamed";
     const info = signals.get(id);
     const now = Date.now();
 
@@ -190,7 +213,8 @@ const devToolsHooks: DevTools = {
   },
 
   onSignalError(signal: Signal<any>, error: unknown): void {
-    const id = signal.displayName || "unnamed";
+    // Use reverse lookup to find current ID (handles renamed signals)
+    const id = signalToId.get(signal) || signal.displayName || "unnamed";
     const info = signals.get(id);
     const now = Date.now();
 

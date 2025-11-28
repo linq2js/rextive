@@ -460,7 +460,7 @@ export function createMutableSignal(
    * Pipe signal through operators
    *
    * Enables composing transformations like:
-   * signal.pipe(filter(...), select(...), scan(...))
+   * signal.pipe(filter(...), to(...), scan(...))
    *
    * @param operators - Array of operator functions
    * @returns New signal with transformations applied

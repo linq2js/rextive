@@ -4,12 +4,12 @@
  */
 import { describe, it, expect } from "vitest";
 import { signal } from "./signal";
-import { select } from "./operators";
+import { to } from "./operators";
 
 describe("pipe() explicit overloads", () => {
   it("should infer types correctly with 1 operator", () => {
     const count = signal(5);
-    const doubled = count.pipe(select((x) => x * 2));
+    const doubled = count.pipe(to((x) => x * 2));
 
     expect(doubled()).toBe(10);
 
@@ -21,9 +21,9 @@ describe("pipe() explicit overloads", () => {
   it("should infer types correctly with 3 operators", () => {
     const count = signal(5);
     const result = count.pipe(
-      select((x) => x * 2), // number -> number
-      select((x) => x + 1), // number -> number
-      select((x) => `Value: ${x}`) // number -> string
+      to((x) => x * 2), // number -> number
+      to((x) => x + 1), // number -> number
+      to((x) => `Value: ${x}`) // number -> string
     );
 
     expect(result()).toBe("Value: 11");
@@ -36,9 +36,9 @@ describe("pipe() explicit overloads", () => {
   it("should infer types correctly with complex transformations", () => {
     const user = signal({ name: "Alice", age: 30 });
     const result = user.pipe(
-      select((u) => u.name), // { name, age } -> string
-      select((name) => name.length), // string -> number
-      select((len) => len > 5) // number -> boolean
+      to((u) => u.name), // { name, age } -> string
+      to((name) => name.length), // string -> number
+      to((len) => len > 5) // number -> boolean
     );
 
     expect(result()).toBe(false); // "Alice".length = 5, which is NOT > 5
@@ -64,9 +64,9 @@ describe("to() explicit overloads", () => {
   it("should infer types correctly with 3 selectors", () => {
     const user = signal({ name: "Alice", age: 30 });
     const greeting = user.pipe(
-      select((u) => u.name), // string
-      select((name) => name.toUpperCase()), // string
-      select((name) => `Hello, ${name}!`) // string
+      to((u) => u.name), // string
+      to((name) => name.toUpperCase()), // string
+      to((name) => `Hello, ${name}!`) // string
     );
 
     expect(greeting()).toBe("Hello, ALICE!");
@@ -79,10 +79,10 @@ describe("to() explicit overloads", () => {
   it("should infer types correctly with type transformations", () => {
     const count = signal(42);
     const result = count.pipe(
-      select((x) => x * 2), // number -> number
-      select((x) => x.toString()), // number -> string
-      select((str) => str.length), // string -> number
-      select((len) => len > 1) // number -> boolean
+      to((x) => x * 2), // number -> number
+      to((x) => x.toString()), // number -> string
+      to((str) => str.length), // string -> number
+      to((len) => len > 1) // number -> boolean
     );
 
     expect(result()).toBe(true);
@@ -95,9 +95,9 @@ describe("to() explicit overloads", () => {
   it("should infer types correctly with arrays", () => {
     const numbers = signal([1, 2, 3, 4, 5]);
     const result = numbers.pipe(
-      select((arr) => arr.filter((x) => x > 2)), // number[] -> number[] = [3, 4, 5]
-      select((arr) => arr.map((x) => x * 2)), // number[] -> number[] = [6, 8, 10]
-      select((arr) => arr.reduce((a, b) => a + b, 0)) // number[] -> number = 24
+      to((arr) => arr.filter((x) => x > 2)), // number[] -> number[] = [3, 4, 5]
+      to((arr) => arr.map((x) => x * 2)), // number[] -> number[] = [6, 8, 10]
+      to((arr) => arr.reduce((a, b) => a + b, 0)) // number[] -> number = 24
     );
 
     expect(result()).toBe(24); // (3 * 2) + (4 * 2) + (5 * 2) = 6 + 8 + 10 = 24
@@ -113,7 +113,7 @@ describe("Combined pipe() and to()", () => {
     const count = signal(5);
 
     // Use pipe() to transform the signal
-    const doubled = count.pipe(select((x) => x * 2));
+    const doubled = count.pipe(to((x) => x * 2));
 
     // Use to() for simple single transformation
     const result = doubled.to((x) => `Result: ${x}`);

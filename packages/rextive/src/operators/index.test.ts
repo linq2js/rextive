@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { signal } from "../signal";
-import { select, scan, filter } from "./index";
+import { to, scan, filter } from "./index";
 
 describe("operators", () => {
-  describe("select", () => {
+  describe("to", () => {
     it("should transform signal values", () => {
       const count = signal(5);
-      const doubled = select((x: number) => x * 2)(count);
+      const doubled = to((x: number) => x * 2)(count);
 
       expect(doubled()).toBe(10);
 
@@ -16,14 +16,14 @@ describe("operators", () => {
 
     it("should work with .pipe() method", () => {
       const count = signal(5);
-      const doubled = count.pipe(select((x) => x * 2));
+      const doubled = count.pipe(to((x) => x * 2));
 
       expect(doubled()).toBe(10);
     });
 
     it("should support equality shortcuts", () => {
       const user = signal({ name: "Alice", age: 30 });
-      const name = user.pipe(select((u) => u.name, "shallow"));
+      const name = user.pipe(to((u) => u.name, "shallow"));
 
       expect(name()).toBe("Alice");
 
@@ -35,7 +35,7 @@ describe("operators", () => {
     it("should support options object", () => {
       const count = signal(5);
       const doubled = count.pipe(
-        select((x) => x * 2, { equals: "strict", name: "doubled" })
+        to((x) => x * 2, { equals: "strict", name: "doubled" })
       );
 
       expect(doubled()).toBe(10);
@@ -44,7 +44,7 @@ describe("operators", () => {
 
     it("should notify listeners on changes", () => {
       const count = signal(5);
-      const doubled = count.pipe(select((x) => x * 2));
+      const doubled = count.pipe(to((x) => x * 2));
       const listener = vi.fn();
 
       doubled.on(listener);
@@ -56,7 +56,7 @@ describe("operators", () => {
     it("should chain multiple selectors", () => {
       const user = signal({ name: "alice", age: 30 });
       const greeting = user.pipe(
-        select(
+        to(
           (u) => u.name,
           (name) => name.toUpperCase(),
           (name) => `Hello, ${name}!`
@@ -69,7 +69,7 @@ describe("operators", () => {
     it("should chain 2 selectors with type transformation", () => {
       const count = signal(5);
       const result = count.pipe(
-        select(
+        to(
           (x) => x * 2,
           (x) => `Value: ${x}`
         )
@@ -86,7 +86,7 @@ describe("operators", () => {
       const ctxReceived: any[] = [];
 
       const result = count.pipe(
-        select((value, ctx) => {
+        to((value, ctx) => {
           ctxReceived.push(ctx);
           expect(ctx).toBeDefined();
           expect(ctx.deps).toBeDefined();
@@ -103,7 +103,7 @@ describe("operators", () => {
       const ctxReceived: any[] = [];
 
       const result = count.pipe(
-        select(
+        to(
           (value, ctx) => {
             ctxReceived.push({ selector: 1, ctx });
             return value * 2;
@@ -124,7 +124,7 @@ describe("operators", () => {
     it("should support options with chained selectors", () => {
       const user = signal({ name: "alice", age: 30 });
       const profile = user.pipe(
-        select(
+        to(
           (u) => u.name,
           (name) => ({ displayName: name.toUpperCase() }),
           "shallow"
@@ -137,7 +137,7 @@ describe("operators", () => {
     it("should support options object with chained selectors", () => {
       const count = signal(5);
       const result = count.pipe(
-        select(
+        to(
           (x) => x * 2,
           (x) => x + 1,
           { name: "computed-result", equals: "strict" }
@@ -243,7 +243,7 @@ describe("operators", () => {
       const count = signal(1);
       const result = count.pipe(
         filter((x) => x > 0),
-        select((x) => x * 2)
+        to((x) => x * 2)
       );
 
       expect(result()).toBe(2);
@@ -298,7 +298,7 @@ describe("operators", () => {
       const count = signal(1);
       const result = count.pipe(
         filter((x) => x > 0),
-        select((x) => x * 2),
+        to((x) => x * 2),
         scan((acc, curr) => acc + curr, 0)
       );
 
@@ -312,8 +312,8 @@ describe("operators", () => {
     });
 
     it("should create reusable operators", () => {
-      const double = select((x: number) => x * 2);
-      const addOne = select((x: number) => x + 1);
+      const double = to((x: number) => x * 2);
+      const addOne = to((x: number) => x + 1);
       const positiveOnly = filter((x: number) => x > 0);
 
       const count1 = signal(5);

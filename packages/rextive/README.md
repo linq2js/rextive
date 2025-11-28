@@ -271,9 +271,9 @@ doubled = 20
 For complex transformations or chaining multiple operations, use operators:
 
 ```tsx
-import { select } from "rextive/op";
+import { to } from "rextive/op";
 
-const doubled = count.pipe(select((x) => x * 2));
+const doubled = count.pipe(to((x) => x * 2));
 // Same result, but .to() is shorter for single transformations
 ```
 
@@ -301,11 +301,11 @@ const userData = user.to((u) => u.data, "deep");
 const user = signal({ name: "Alice", age: 30 });
 
 // Without custom equality
-const copy1 = user.pipe(select((u) => ({ ...u })));
+const copy1 = user.pipe(to((u) => ({ ...u })));
 user.set({ name: "Alice", age: 30 }); // ❌ Triggers update (new object reference)
 
 // With shallow equality
-const copy2 = user.pipe(select((u) => ({ ...u }), "shallow"));
+const copy2 = user.pipe(to((u) => ({ ...u }), "shallow"));
 user.set({ name: "Alice", age: 30 }); // ✅ No update (content unchanged)
 user.set({ name: "Bob", age: 30 }); // ✅ Updates (name changed)
 ```
@@ -624,6 +624,7 @@ Here's when to use each pattern:
 | **With equality** | Objects/arrays that need comparison | `signal({ name: 'John' }, "shallow")`             |
 | **`.to()`**       | Transform one signal                | `count.to(x => x * 2)`                            |
 | **Multiple deps** | Combine multiple signals            | `signal({ a, b }, ({ deps }) => deps.a + deps.b)` |
+| **`signal.from`** | Collect signals into record/tuple   | `signal.from({ a, b })` or `signal.from([a, b])`  |
 | **Async**         | Data fetching                       | `signal(async () => fetch(...))`                  |
 | **Async + deps**  | Data fetching with params           | `signal({ id }, async ({ deps }) => fetch(...))`  |
 
@@ -632,7 +633,7 @@ Here's when to use each pattern:
 
 ```tsx
 import { signal } from "rextive";
-import { select } from "rextive/op";
+import { to } from "rextive/op";
 
 // 1. Simple value
 const count = signal(0);
@@ -641,7 +642,7 @@ const count = signal(0);
 const user = signal({ name: "Alice", age: 30 }, "shallow");
 
 // 3. Transform with operator
-const doubled = count.pipe(select((x) => x * 2));
+const doubled = count.pipe(to((x) => x * 2));
 
 // 4. Multiple dependencies
 const fullName = signal(
@@ -1359,7 +1360,7 @@ Create signals that live with your component and automatically cleanup when unmo
 
 ```tsx
 import { signal, disposable, rx, useScope } from "rextive/react";
-import { select } from "rextive/op";
+import { to } from "rextive/op";
 
 // ✅ Extract factory function for cleaner code
 function createTodoListScope() {
@@ -1379,7 +1380,7 @@ function createTodoListScope() {
 
   // Derived: count of active todos
   const activeCount = todos.to(
-    select((list) => list.filter((t) => t.status === "active").length)
+    to((list) => list.filter((t) => t.status === "active").length)
   );
 
   // Actions
@@ -2442,18 +2443,18 @@ For complex transformations, chain multiple operators together:
 
 ```tsx
 import { signal } from "rextive";
-import { select, filter, scan } from "rextive/op";
+import { to, filter, scan } from "rextive/op";
 
 // Source signal
 const count = signal(1);
 
 // Single transformation
-const doubled = count.pipe(select((x) => x * 2));
+const doubled = count.pipe(to((x) => x * 2));
 
 // Chain multiple operators (executed left-to-right)
 const result = count.pipe(
   filter((x) => x > 0), // Step 1: Only positive numbers
-  select((x) => x * 2), // Step 2: Double the value
+  to((x) => x * 2), // Step 2: Double the value
   scan((acc, x) => acc + x, 0) // Step 3: Running sum
 );
 
@@ -2472,11 +2473,11 @@ console.log(result()); // 20 (2 * 2 = 4, sum = 16 + 4)
 <details>
 <summary>📖 <strong>Available Operators</strong></summary>
 
-**`select(fn, equals?)`** - Transform each value
+**`to(fn, equals?)`** - Transform each value
 
 ```tsx
-const doubled = count.pipe(select((x) => x * 2));
-const userName = user.pipe(select((u) => u.name));
+const doubled = count.pipe(to((x) => x * 2));
+const userName = user.pipe(to((u) => u.name));
 ```
 
 **`filter(predicate, equals?)`** - Only emit values that pass the test
@@ -2500,11 +2501,11 @@ See the [Operators](#operators) section for detailed documentation.
 #### Create Reusable Operator Pipelines
 
 ```tsx
-import { select, filter, scan } from "rextive/op";
+import { to, filter, scan } from "rextive/op";
 
 // Define reusable operators
 const positiveOnly = filter((x: number) => x > 0);
-const double = select((x: number) => x * 2);
+const double = to((x: number) => x * 2);
 const runningSum = scan((acc: number, x: number) => acc + x, 0);
 
 // Apply to multiple signals
@@ -3616,6 +3617,7 @@ Quick reference for all Rextive APIs.
 | `signal.is(value)`             | Type guard: check if value is a Signal          |
 | `signal.batch(fn)`             | Batch multiple updates, notify once             |
 | `signal.tag(options?)`         | Create a tag to group/manage signals            |
+| `signal.from(signals)`         | Combine signals into one (record or tuple)      |
 | `persistor(options)`           | Create persistor (from `rextive/plugins`)       |
 | `when(triggers, callback)`     | React to other signals (from `rextive/plugins`) |
 | `signal.on(signals, listener)` | Subscribe to multiple signals at once           |
@@ -3670,7 +3672,7 @@ Quick reference for all Rextive APIs.
 
 | API                          | Description                                    |
 | ---------------------------- | ---------------------------------------------- |
-| `select(fn, equals?)`        | Transform values (like `Array.map`)            |
+| `to(fn, equals?)`            | Transform values (like `Array.map`)            |
 | `filter(predicate, equals?)` | Filter values (like `Array.filter`)            |
 | `scan(fn, initial, equals?)` | Accumulate values (like `Array.reduce`)        |
 | `focus(path, options?)`      | Bidirectional lens into nested mutable signals |
@@ -3801,12 +3803,12 @@ settings.set({ theme: "light" }); // Updates (content changed)
 #### Computed Signals (Derived State)
 
 ```tsx
-import { select } from "rextive/op";
+import { to } from "rextive/op";
 
 const count = signal(0);
 
 // Transform with operator
-const doubled = count.pipe(select((x) => x * 2));
+const doubled = count.pipe(to((x) => x * 2));
 
 // Multiple dependencies
 const firstName = signal("John");
@@ -3936,17 +3938,17 @@ const withContext = count.to(
 For chaining multiple transformations or using advanced operators:
 
 ```tsx
-import { select, filter, scan } from "rextive/op";
+import { to, filter, scan } from "rextive/op";
 
 const numbers = signal(1);
 
 // Single transformation (prefer .to() for this)
-const doubled = numbers.pipe(select((x) => x * 2));
+const doubled = numbers.pipe(to((x) => x * 2));
 
 // Chain multiple operators
 const result = numbers.pipe(
   filter((x) => x > 0),
-  select((x) => x * 2),
+  to((x) => x * 2),
   scan((acc, x) => acc + x, 0)
 );
 ```
@@ -4521,6 +4523,88 @@ const computedTag: Tag<number, "computed"> = tag<number, "computed">();
 ```
 
 See [Pattern 2: Group Signals with Tags](#pattern-2-group-signals-with-tags) for more details.
+
+---
+
+#### `signal.from()`
+
+Combine multiple signals into a single computed signal. Two overloads:
+
+**Record form - combine named signals:**
+
+```tsx
+const name = signal("Alice");
+const age = signal(30);
+const active = signal(true);
+
+// Combine into a record
+const user = signal.from({ name, age, active });
+
+console.log(user()); // { name: "Alice", age: 30, active: true }
+
+// Updates automatically when any dependency changes
+name.set("Bob");
+console.log(user()); // { name: "Bob", age: 30, active: true }
+```
+
+**Tuple form - combine ordered signals:**
+
+```tsx
+const x = signal(10);
+const y = signal(20);
+const z = signal(30);
+
+// Combine into a tuple
+const coords = signal.from([x, y, z]);
+
+console.log(coords()); // [10, 20, 30]
+
+// Updates when any dependency changes
+x.set(100);
+console.log(coords()); // [100, 20, 30]
+```
+
+<details>
+<summary>📖 <strong>Use Cases</strong></summary>
+
+```tsx
+// Form data - collect all fields into one object
+const firstName = signal("");
+const lastName = signal("");
+const email = signal("");
+
+const formData = signal.from({ firstName, lastName, email });
+
+// Submit handler uses combined data
+async function handleSubmit() {
+  const data = formData();
+  await api.submit(data);
+}
+
+// Coordinates - useful with destructuring
+const mouseX = signal(0);
+const mouseY = signal(0);
+
+const mousePos = signal.from([mouseX, mouseY]);
+const [x, y] = mousePos();
+
+// Combine computed signals
+const count = signal(5);
+const doubled = count.to((x) => x * 2);
+const squared = count.to((x) => x * x);
+
+const stats = signal.from({ count, doubled, squared });
+console.log(stats()); // { count: 5, doubled: 10, squared: 25 }
+```
+
+</details>
+
+**Behavior:**
+
+- ✅ **Returns computed signal** - read-only, auto-updates
+- ✅ **Type-safe** - full TypeScript inference for both forms
+- ✅ **Disposable** - call `.dispose()` to cleanup
+- ✅ **Works with both mutable and computed signals**
 
 ---
 
@@ -5321,7 +5405,7 @@ A powerful hook with three modes for different use cases:
 
 ```tsx
 import { signal, disposable, useScope } from "rextive/react";
-import { select } from "rextive/op";
+import { to } from "rextive/op";
 
 function TodoList() {
   // Factory function runs once on mount
@@ -5717,31 +5801,23 @@ Operators are composable, reusable functions for transforming signals. They work
 **Import from `rextive/op`:**
 
 ```tsx
-import {
-  select,
-  filter,
-  scan,
-  focus,
-  debounce,
-  throttle,
-  pace,
-} from "rextive/op";
+import { to, filter, scan, focus, debounce, throttle, pace } from "rextive/op";
 ```
 
 ---
 
-### `select()` - Transform Values
+### `to()` - Transform Values
 
 Like `Array.map()` but for signals - transforms each value:
 
 ```tsx
 import { signal } from "rextive";
-import { select } from "rextive/op";
+import { to } from "rextive/op";
 
 const count = signal(5);
 
 // Basic transformation
-const doubled = count.pipe(select((x) => x * 2));
+const doubled = count.pipe(to((x) => x * 2));
 console.log(doubled()); // 10
 
 count.set(10);
@@ -5749,11 +5825,11 @@ console.log(doubled()); // 20 (automatically updated!)
 
 // Transform objects
 const user = signal({ firstName: "John", lastName: "Doe" });
-const fullName = user.pipe(select((u) => `${u.firstName} ${u.lastName}`));
+const fullName = user.pipe(to((u) => `${u.firstName} ${u.lastName}`));
 console.log(fullName()); // "John Doe"
 
 // With equality check (for objects/arrays)
-const userName = user.pipe(select((u) => ({ name: u.firstName }), "shallow"));
+const userName = user.pipe(to((u) => ({ name: u.firstName }), "shallow"));
 // No update if result content is the same
 ```
 
@@ -5764,7 +5840,7 @@ const userName = user.pipe(select((u) => ({ name: u.firstName }), "shallow"));
 // Async transformation
 const userId = signal(1);
 const user = userId.pipe(
-  select(async (id) => {
+  to(async (id) => {
     const res = await fetch(`/api/users/${id}`);
     return res.json();
   })
@@ -5772,18 +5848,18 @@ const user = userId.pipe(
 
 // With full options
 const formatted = count.pipe(
-  select((x) => `Count: ${x}`, {
+  to((x) => `Count: ${x}`, {
     equals: "strict",
     name: "formattedCount",
     lazy: true,
   })
 );
 
-// Chain multiple selects
+// Chain multiple to operators
 const result = count.pipe(
-  select((x) => x * 2), // Double
-  select((x) => x + 1), // Add 1
-  select((x) => `Result: ${x}`) // Format
+  to((x) => x * 2), // Double
+  to((x) => x + 1), // Add 1
+  to((x) => `Result: ${x}`) // Format
 );
 ```
 
@@ -5792,7 +5868,7 @@ const result = count.pipe(
 **Signature:**
 
 ```tsx
-select<T, U>(
+to<T, U>(
   fn: (value: T) => U,
   equals?: EqualityOption
 ): (signal: Signal<T>) => Signal<U>
@@ -5865,10 +5941,10 @@ const validCount = count.pipe(
   filter((x) => x >= 0 && x <= 100) // Only 0-100
 );
 
-// Combining with select
+// Combining with to
 const result = count.pipe(
   filter((x) => x > 0), // Only positive
-  select((x) => x * 2) // Then double
+  to((x) => x * 2) // Then double
 );
 ```
 
@@ -6219,7 +6295,7 @@ debouncedForm.on(() => {
 // Chain with other operators
 const searchResults = searchInput.pipe(
   debounce(300), // Wait for user to stop typing
-  select(async (query) => {
+  to(async (query) => {
     // Then fetch results
     if (!query) return [];
     const res = await fetch(`/api/search?q=${query}`);
@@ -6298,8 +6374,8 @@ throttledActions.on(() => {
 // Chain with other operators
 const scrollProgress = scrollY.pipe(
   throttle(100), // Rate limit
-  select((y) => y / document.body.scrollHeight), // Calculate %
-  select((pct) => Math.round(pct * 100)) // Round
+  to((y) => y / document.body.scrollHeight), // Calculate %
+  to((pct) => Math.round(pct * 100)) // Round
 );
 ```
 
@@ -6334,8 +6410,16 @@ import { pace } from "rextive/op";
 
 const count = signal(0);
 
-// Simple delay: emit 100ms after each change
-const delayed = count.pipe(pace((notify) => () => setTimeout(notify, 100)));
+// Debounce: emit 100ms after the last change (clears pending on new value)
+const debounced = count.pipe(
+  pace((notify) => {
+    let timeout: ReturnType<typeof setTimeout>;
+    return () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(notify, 100);
+    };
+  })
+);
 
 // Identity (pass-through, for testing)
 const immediate = count.pipe(pace((notify) => notify));
@@ -6441,14 +6525,14 @@ Chain multiple operators for powerful transformations:
 
 ```tsx
 import { signal } from "rextive";
-import { select, filter, scan } from "rextive/op";
+import { to, filter, scan } from "rextive/op";
 
 const count = signal(1);
 
 // Chain operators left-to-right
 const result = count.to(
   filter((x) => x > 0), // Step 1: Only positive
-  select((x) => x * 2), // Step 2: Double it
+  to((x) => x * 2), // Step 2: Double it
   scan((acc, x) => acc + x, 0) // Step 3: Running sum
 );
 
@@ -6466,7 +6550,7 @@ console.log(result()); // 16 (12 + 2*2)
 ```tsx
 // Define reusable operators
 const positiveOnly = filter((x: number) => x > 0);
-const double = select((x: number) => x * 2);
+const double = to((x: number) => x * 2);
 const runningSum = scan((acc: number, x: number) => acc + x, 0);
 
 // Apply to different signals
@@ -7371,6 +7455,7 @@ rextive/devtools  # Developer tools for debugging
 - `persistor` - Persistence utilities (from `rextive/plugins`)
 - `when` - React to other signals (from `rextive/plugins`)
 - `signal.tag` - Group signals with tags (with `forEach`, `map`, `size`)
+- `signal.from` - Combine signals into one (record or tuple)
 - `signal.on` - Subscribe to multiple signals with pause/resume control
 - `wait` - Promise utilities (`wait.any`, `wait.race`, `wait.settled`, `wait.timeout`, `wait.delay`)
 - `awaited` - Transform async/sync values uniformly
@@ -7389,7 +7474,7 @@ rextive/devtools  # Developer tools for debugging
 
 **Operators (`rextive/op`):**
 
-- `select` - Transform values (like `Array.map`)
+- `to` - Transform values (like `Array.map`)
 - `filter` - Filter values (like `Array.filter`)
 - `scan` - Accumulate values (like `Array.reduce`)
 - `focus` - Bidirectional lens into nested mutable signals (perfect for forms)

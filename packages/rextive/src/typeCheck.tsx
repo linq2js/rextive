@@ -20,7 +20,7 @@ import { wait, type Awaitable, type AwaitedFromAwaitable } from "./wait";
 import { awaited } from "./awaited";
 import { compose } from "./utils/compose";
 // Operators imported when needed for type checking
-import { select } from "./operators";
+import { to } from "./operators";
 import type {
   Signal,
   Mutable,
@@ -380,7 +380,7 @@ function signalTests() {
   // displayName
   expectType<string | undefined>(testSignal.displayName);
 
-  // .map() and .scan() methods removed - use select/scan operators from rextive/op instead
+  // .map() and .scan() methods removed - use to/scan operators from rextive/op instead
 
   // toJSON method
   expectType<number>(count.toJSON());
@@ -1107,7 +1107,7 @@ function rxTests() {
 // =============================================================================
 
 // Import operators (commented out to avoid runtime issues)
-// import { select, scan, filter } from "./operators";
+// import { to, scan, filter } from "./operators";
 
 // For type checking, we'll use inline operator definitions
 type SelectOp = <T, U>(
@@ -1121,7 +1121,7 @@ type FilterOp = <T>(
   fn: (value: T) => boolean
 ) => (source: Signal<T>) => Computed<T>;
 
-declare const selectOp: SelectOp;
+declare const toOp: SelectOp;
 declare const scanOp: ScanOp;
 declare const filterOp: FilterOp;
 
@@ -1129,8 +1129,8 @@ function pipeOperatorTests() {
   // Single operator
   const countSignal = signal(5);
 
-  // select: number -> string
-  const result1 = countSignal.pipe(selectOp((x) => `Count: ${x}`));
+  // to: number -> string
+  const result1 = countSignal.pipe(toOp((x) => `Count: ${x}`));
   expectType<Computed<string>>(result1);
   expectType<string>(result1());
 
@@ -1147,17 +1147,17 @@ function pipeOperatorTests() {
   // Multiple operators - type transformation chain
   // number -> number -> string
   const chain1 = countSignal.pipe(
-    selectOp((x) => x * 2), // number -> number
-    selectOp((x) => `Result: ${x}`) // number -> string
+    toOp((x) => x * 2), // number -> number
+    toOp((x) => `Result: ${x}`) // number -> string
   );
   expectType<Computed<string>>(chain1);
   expectType<string>(chain1());
 
   // number -> number -> number -> string
   const chain2 = countSignal.pipe(
-    selectOp((x: number) => x * 2), // number -> number
-    selectOp((x: number) => x + 1), // number -> number
-    selectOp((x: number) => `Value: ${x}`) // number -> string
+    toOp((x: number) => x * 2), // number -> number
+    toOp((x: number) => x + 1), // number -> number
+    toOp((x: number) => `Value: ${x}`) // number -> string
   );
   expectType<Computed<string>>(chain2);
   expectType<string>(chain2());
@@ -1172,14 +1172,14 @@ function pipeOperatorTests() {
   const personSignal = signal<Person>({ id: 1, name: "Alice", age: 30 });
 
   // Person -> string
-  const personName = personSignal.pipe(selectOp((u) => u.name));
+  const personName = personSignal.pipe(toOp((u) => u.name));
   expectType<Computed<string>>(personName);
   expectType<string>(personName());
 
   // Person -> { name: string } -> string
   const personNameChain = personSignal.pipe(
-    selectOp((u: Person) => ({ name: u.name })),
-    selectOp((obj: { name: string }) => obj.name)
+    toOp((u: Person) => ({ name: u.name })),
+    toOp((obj: { name: string }) => obj.name)
   );
   expectType<Computed<string>>(personNameChain);
   expectType<string>(personNameChain());
@@ -1188,23 +1188,19 @@ function pipeOperatorTests() {
   const numbersSignal = signal([1, 2, 3]);
 
   // Array<number> -> Array<number>
-  const doubledArray = numbersSignal.pipe(
-    selectOp((arr) => arr.map((x) => x * 2))
-  );
+  const doubledArray = numbersSignal.pipe(toOp((arr) => arr.map((x) => x * 2)));
   expectType<Computed<number[]>>(doubledArray);
   expectType<number[]>(doubledArray());
 
   // Array<number> -> number (sum)
-  const sum = numbersSignal.pipe(
-    selectOp((arr) => arr.reduce((a, b) => a + b, 0))
-  );
+  const sum = numbersSignal.pipe(toOp((arr) => arr.reduce((a, b) => a + b, 0)));
   expectType<Computed<number>>(sum);
   expectType<number>(sum());
 
   // Mixed operators
-  // select -> filter -> scan
+  // to -> filter -> scan
   const mixed1 = countSignal.pipe(
-    selectOp((x: number) => x * 2), // number -> number
+    toOp((x: number) => x * 2), // number -> number
     filterOp((x: number) => x > 5), // number -> number
     scanOp((acc: number, x: number) => acc + x, 0) // number -> number
   );
@@ -1222,7 +1218,7 @@ function pipeOperatorTests() {
 
   // Chain with custom operator
   const custom2 = countSignal.pipe(
-    selectOp((x: number) => x * 2),
+    toOp((x: number) => x * 2),
     customOp
   );
   expectType<Computed<string>>(custom2);
@@ -1231,19 +1227,19 @@ function pipeOperatorTests() {
   // Type inference through chains
   // 3 operators: number -> number -> number -> string
   const chain3Ops = countSignal.pipe(
-    selectOp((x: number) => x * 2), // number -> number
-    selectOp((x: number) => x + 1), // number -> number
-    selectOp((x: number) => `Value: ${x}`) // number -> string
+    toOp((x: number) => x * 2), // number -> number
+    toOp((x: number) => x + 1), // number -> number
+    toOp((x: number) => `Value: ${x}`) // number -> string
   );
   expectType<Computed<string>>(chain3Ops);
   expectType<string>(chain3Ops());
 
   // 4 operators: number -> number -> number -> number -> string
   const chain4Ops = countSignal.pipe(
-    selectOp((x: number) => x * 2), // number -> number
-    selectOp((x: number) => x + 1), // number -> number
-    selectOp((x: number) => x - 1), // number -> number
-    selectOp((x: number) => `Result: ${x}`) // number -> string
+    toOp((x: number) => x * 2), // number -> number
+    toOp((x: number) => x + 1), // number -> number
+    toOp((x: number) => x - 1), // number -> number
+    toOp((x: number) => `Result: ${x}`) // number -> string
   );
   expectType<Computed<string>>(chain4Ops);
   expectType<string>(chain4Ops());
@@ -1267,33 +1263,33 @@ function signalToTests() {
 
   // Two selectors - use pipe() for multiple transformations
   const upperName = userSig.pipe(
-    select((u) => u.name),
-    select((name) => name.toUpperCase())
+    to((u) => u.name),
+    to((name) => name.toUpperCase())
   );
   expectType<Computed<string>>(upperName);
 
   // Three selectors with type changes
   const greeting = userSig.pipe(
-    select((u) => u.name), // string
-    select((name) => name.toUpperCase()), // string
-    select((name) => `Hello, ${name}!`) // string
+    to((u) => u.name), // string
+    to((name) => name.toUpperCase()), // string
+    to((name) => `Hello, ${name}!`) // string
   );
   expectType<Computed<string>>(greeting);
 
   // Type transformation chain
   const ageString = userSig.pipe(
-    select((u) => u.age), // number
-    select((age) => age.toString()), // string
-    select((str) => str.length) // number
+    to((u) => u.age), // number
+    to((age) => age.toString()), // string
+    to((str) => str.length) // number
   );
   expectType<Computed<number>>(ageString);
 
   // Complex object transformations
   const transformed = userSig.pipe(
-    select((u) => ({ fullName: u.name, years: u.age })), // { fullName: string, years: number }
-    select((obj) => obj.fullName), // string
-    select((name) => name.split(" ")), // string[]
-    select((parts) => parts[0]) // string | undefined
+    to((u) => ({ fullName: u.name, years: u.age })), // { fullName: string, years: number }
+    to((obj) => obj.fullName), // string
+    to((name) => name.split(" ")), // string[]
+    to((parts) => parts[0]) // string | undefined
   );
   expectType<Computed<string | undefined>>(transformed);
 
@@ -1301,9 +1297,9 @@ function signalToTests() {
   const arraySig = signal([1, 2, 3, 4, 5]);
 
   const arrayResult = arraySig.pipe(
-    select((arr: number[]) => arr.filter((x: number) => x > 2)), // number[]
-    select((arr: number[]) => arr.map((x: number) => x * 2)), // number[]
-    select((arr: number[]) => arr.reduce((a: number, b: number) => a + b, 0)) // number
+    to((arr: number[]) => arr.filter((x: number) => x > 2)), // number[]
+    to((arr: number[]) => arr.map((x: number) => x * 2)), // number[]
+    to((arr: number[]) => arr.reduce((a: number, b: number) => a + b, 0)) // number
   );
   expectType<Computed<number>>(arrayResult);
 
@@ -1311,8 +1307,8 @@ function signalToTests() {
   const computedUser = signal({ userSig }, ({ deps }) => deps.userSig);
 
   const computedGreeting = computedUser.pipe(
-    select((u) => u.name),
-    select((name) => `Hi, ${name}`)
+    to((u) => u.name),
+    to((name) => `Hi, ${name}`)
   );
   expectType<Computed<string>>(computedGreeting);
 
@@ -1320,18 +1316,18 @@ function signalToTests() {
   const numSig = signal(42);
 
   const numChain = numSig.pipe(
-    select((x) => x * 2), // 84
-    select((x) => x + 10), // 94
-    select((x) => x / 2), // 47
-    select((x) => Math.floor(x)) // 47
+    to((x) => x * 2), // 84
+    to((x) => x + 10), // 94
+    to((x) => x / 2), // 47
+    to((x) => Math.floor(x)) // 47
   );
   expectType<Computed<number>>(numChain);
 
   // Boolean transformations
   const boolChain = numSig.pipe(
-    select((x) => x > 50), // boolean
-    select((bool) => !bool), // boolean
-    select((bool) => (bool ? "yes" : "no")) // string
+    to((x) => x > 50), // boolean
+    to((bool) => !bool), // boolean
+    to((bool) => (bool ? "yes" : "no")) // string
   );
   expectType<Computed<string>>(boolChain);
 
@@ -1339,8 +1335,8 @@ function signalToTests() {
   const nullableSig = signal<string | null>("test");
 
   const nullableChain = nullableSig.pipe(
-    select((str) => str?.toUpperCase()), // string | undefined
-    select((str) => str ?? "default") // string
+    to((str) => str?.toUpperCase()), // string | undefined
+    to((str) => str ?? "default") // string
   );
   expectType<Computed<string>>(nullableChain);
 
@@ -1348,8 +1344,8 @@ function signalToTests() {
   const unionSig = signal<number | string>(42);
 
   const unionChain = unionSig.pipe(
-    select((val) => (typeof val === "number" ? val * 2 : val.length)), // number
-    select((num) => num.toString()) // string
+    to((val) => (typeof val === "number" ? val * 2 : val.length)), // number
+    to((num) => num.toString()) // string
   );
   expectType<Computed<string>>(unionChain);
 }
@@ -1456,7 +1452,7 @@ function awaitedTests() {
   expectType<Computed<Promise<number>>>(asyncResult);
 
   // With .pipe() and select operator
-  const pipeResult = promiseSig.pipe(selectOp(awaited((x) => x * 2)));
+  const pipeResult = promiseSig.pipe(toOp(awaited((x) => x * 2)));
   expectType<Computed<Promise<number>>>(pipeResult);
 }
 
@@ -2846,6 +2842,55 @@ function focusOperatorTests() {
     doubled;
 }
 
+// =============================================================================
+// signal.from() Tests - Combine multiple signals
+// =============================================================================
+
+function signalFromTests() {
+  // Record overload: signal.from({ a, b, c })
+  const numSig = signal(42);
+  const strSig = signal("hello");
+  const boolSig = signal(true);
+
+  const combined1 = signal.from({ num: numSig, str: strSig, bool: boolSig });
+  expectType<Computed<{ num: number; str: string; bool: boolean }>>(combined1);
+  expectType<{ num: number; str: string; bool: boolean }>(combined1());
+
+  // Tuple overload: signal.from([a, b, c])
+  const combined2 = signal.from([numSig, strSig, boolSig]);
+  expectType<Computed<readonly [number, string, boolean]>>(combined2);
+  expectType<readonly [number, string, boolean]>(combined2());
+
+  // Empty record
+  const emptyRecord = signal.from({});
+  expectType<Computed<{}>>(emptyRecord);
+
+  // Empty tuple
+  const emptyTuple = signal.from([]);
+  expectType<Computed<readonly []>>(emptyTuple);
+
+  // Single signal record
+  const single1 = signal.from({ value: numSig });
+  expectType<Computed<{ value: number }>>(single1);
+
+  // Single signal tuple
+  const single2 = signal.from([numSig]);
+  expectType<Computed<readonly [number]>>(single2);
+
+  // Computed signal as input
+  const computed = signal({ num: numSig }, ({ deps }) => deps.num * 2);
+  const fromComputed = signal.from({ original: numSig, doubled: computed });
+  expectType<Computed<{ original: number; doubled: number }>>(fromComputed);
+
+  void combined1,
+    combined2,
+    emptyRecord,
+    emptyTuple,
+    single1,
+    single2,
+    fromComputed;
+}
+
 export {
   signalTests,
   loadableTests,
@@ -2862,4 +2907,5 @@ export {
   persistorTests,
   pathTypeTests,
   focusOperatorTests,
+  signalFromTests,
 };

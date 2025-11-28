@@ -69,6 +69,7 @@ export type DevToolsEvent =
       timestamp: number;
     }
   | { type: "signal:error"; signalId: string; error: SignalError }
+  | { type: "signal:rename"; oldId: string; newId: string }
   | { type: "tag:create"; tag: TagInfo }
   | { type: "tag:add"; tagId: string; signalId: string }
   | { type: "tag:remove"; tagId: string; signalId: string };

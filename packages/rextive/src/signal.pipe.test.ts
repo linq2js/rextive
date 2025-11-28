@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { signal } from "./signal";
-import { select, scan } from "./operators";
+import { to, scan } from "./operators";
 
 describe("signal.pipe()", () => {
   it("should chain single transformation", () => {
     const count = signal(5);
-    const double = select((x: number) => x * 2);
+    const double = to((x: number) => x * 2);
 
     const result = count.pipe(double);
 
@@ -14,9 +14,9 @@ describe("signal.pipe()", () => {
 
   it("should chain multiple transformations", () => {
     const count = signal(5);
-    const double = select((x: number) => x * 2);
-    const addOne = select((x: number) => x + 1);
-    const format = select((x: number) => `Value: ${x}`);
+    const double = to((x: number) => x * 2);
+    const addOne = to((x: number) => x + 1);
+    const format = to((x: number) => `Value: ${x}`);
 
     const result = count.pipe(double, addOne, format);
 
@@ -25,8 +25,8 @@ describe("signal.pipe()", () => {
 
   it("should update when source changes", () => {
     const count = signal(5);
-    const double = select((x: number) => x * 2);
-    const addOne = select((x: number) => x + 1);
+    const double = to((x: number) => x * 2);
+    const addOne = to((x: number) => x + 1);
 
     const result = count.pipe(double, addOne);
 
@@ -55,8 +55,8 @@ describe("signal.pipe()", () => {
 
   it("should notify listeners on changes", () => {
     const count = signal(5);
-    const double = select((x: number) => x * 2);
-    const addOne = select((x: number) => x + 1);
+    const double = to((x: number) => x * 2);
+    const addOne = to((x: number) => x + 1);
 
     const result = count.pipe(double, addOne);
     const listener = vi.fn();
@@ -73,8 +73,8 @@ describe("signal.pipe()", () => {
     const b = signal(3);
     const sum = signal({ a, b }, ({ deps }) => deps.a + deps.b);
 
-    const double = select((x: number) => x * 2);
-    const addTen = select((x: number) => x + 10);
+    const double = to((x: number) => x * 2);
+    const addTen = to((x: number) => x + 10);
 
     const result = sum.pipe(double, addTen);
 
@@ -88,9 +88,9 @@ describe("signal.pipe()", () => {
     const count = signal(1);
 
     // Reusable operators
-    const double = select((x: number) => x * 2);
-    const square = select((x: number) => x * x);
-    const addFive = select((x: number) => x + 5);
+    const double = to((x: number) => x * 2);
+    const square = to((x: number) => x * x);
+    const addFive = to((x: number) => x + 5);
 
     const result = count.pipe(double, square, addFive);
 
@@ -103,9 +103,9 @@ describe("signal.pipe()", () => {
   it("should work with custom operators that return different types", () => {
     const count = signal(5);
 
-    const toArray = select((x: number) => [x]);
-    const appendValue = select((arr: number[]) => [...arr, arr[0] * 2]);
-    const join = select((arr: number[]) => arr.join(","));
+    const toArray = to((x: number) => [x]);
+    const appendValue = to((arr: number[]) => [...arr, arr[0] * 2]);
+    const join = to((arr: number[]) => arr.join(","));
 
     const result = count.pipe(toArray, appendValue, join);
 
@@ -127,8 +127,8 @@ describe("signal.pipe()", () => {
 
   it("should create independent signal chain", () => {
     const count = signal(5);
-    const double = select((x: number) => x * 2);
-    const addOne = select((x: number) => x + 1);
+    const double = to((x: number) => x * 2);
+    const addOne = to((x: number) => x + 1);
 
     const result1 = count.pipe(double, addOne);
     const result2 = count.pipe(double, addOne);
@@ -159,9 +159,9 @@ describe("signal.pipe()", () => {
     };
 
     const result = count.pipe(
-      (s) => trackDispose(select((x: number) => x * 2)(s), intermediate1Spy),
-      (s) => trackDispose(select((x: number) => x + 1)(s), intermediate2Spy),
-      (s) => select((x: number) => `Value: ${x}`)(s)
+      (s) => trackDispose(to((x: number) => x * 2)(s), intermediate1Spy),
+      (s) => trackDispose(to((x: number) => x + 1)(s), intermediate2Spy),
+      (s) => to((x: number) => `Value: ${x}`)(s)
     );
 
     expect(result()).toBe("Value: 11");
@@ -188,7 +188,7 @@ describe("signal.pipe()", () => {
 
   it("should handle single operator (no intermediates)", () => {
     const count = signal(5);
-    const result = count.pipe((s) => select((x: number) => x * 2)(s));
+    const result = count.pipe((s) => to((x: number) => x * 2)(s));
 
     expect(result()).toBe(10);
 

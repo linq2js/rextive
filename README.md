@@ -1,14 +1,61 @@
-# RxBlox Monorepo
+## Rextive
 
-> **⚠️ IMPORTANT:** The `rxblox` package has been deprecated and archived. This repository now focuses on **[rextive](./packages/rextive)** - a modern reactive state management library for React.
+**Rextive** is a signal-based reactive state management library with explicit dependencies.
 
-## Active Package
+### Key Features
 
-- **[packages/rextive](./packages/rextive)** - Modern reactive state management with explicit dependencies (publishable to NPM)
+- 🎯 **One unified primitive** - `signal()` for all reactive needs (state, computed, async)
+- 📦 **Explicit dependencies** - Dependencies are always declared, never auto-tracked
+- ⚡ **Lazy tracking** - Only subscribes to signals that are actually accessed
+- 🔄 **Unified sync/async** - Same API handles both synchronous and asynchronous values
+- 🧹 **Built-in cleanup** - Automatic disposal and memory management
+- ⚛️ **React-first** - Seamless integration with React via `rx()` and `useScope()`
 
-## Archived Packages
+### Quick Example
 
-Legacy packages have been moved to the `archived/` directory. See [ARCHIVED_PACKAGES.md](./ARCHIVED_PACKAGES.md) for details.
+```tsx
+import { signal, rx, useScope } from "rextive/react";
+
+// Create reactive state
+const count = signal(0);
+const doubled = count.to((x) => x * 2);
+
+// React component
+function Counter() {
+  return (
+    <div>
+      <p>Count: {rx(count)}</p>
+      <p>Doubled: {rx(doubled)}</p>
+      <button onClick={() => count.set((x) => x + 1)}>+1</button>
+    </div>
+  );
+}
+```
+
+### 📚 Full Documentation
+
+See **[packages/rextive/README.md](./packages/rextive/README.md)** for complete documentation including:
+
+- Getting started guide
+- API reference
+- React integration
+- Operators (`to`, `filter`, `scan`, `debounce`, `throttle`, etc.)
+- Advanced patterns
+- DevTools integration
+
+---
+
+## Repository Structure
+
+### Active Package
+
+- **[packages/rextive](./packages/rextive)** - Modern reactive state management (publishable to NPM)
+
+### Demo App
+
+- **[packages/rextive-todo](./packages/rextive-todo)** - Todo app demonstrating rextive patterns
+
+---
 
 ## Getting Started
 
@@ -43,6 +90,8 @@ pnpm test:ui
 pnpm test:coverage
 ```
 
+---
+
 ## Publishing
 
 To publish the `rextive` package:
@@ -59,10 +108,12 @@ pnpm pu:mi   # minor version
 pnpm pu:ma   # major version
 ```
 
+---
+
 ## Documentation
 
-- [rextive README](./packages/rextive/README.md) - Complete documentation for the active package
-- [Migration Guide](./ARCHIVED_PACKAGES.md) - Information about archived packages
+- **[rextive README](./packages/rextive/README.md)** - Complete documentation for the active package
+- **[Migration Guide](./ARCHIVED_PACKAGES.md)** - Information about archived packages
 
 ## Legacy Documentation
 

@@ -1,6 +1,6 @@
 import { signal, validate } from "rextive";
 import { persistor } from "rextive/plugins";
-import { debounce, select } from "rextive/operators";
+import { debounce, to } from "rextive/operators";
 import { z } from "zod";
 import type { Todo, TodoFilter, OfflineChange } from "../types/todo";
 
@@ -80,12 +80,10 @@ const searchTextSchema = z
 // Validated search text - debounced and validated
 export const searchTextValidated = searchText.pipe(
   debounce(300),
-  select(
+  to(
     validate(searchTextSchema.safeParse),
-    (x) => {
-      return x.error?.errors?.[0]?.message;
-    },
-    "shallow"
+    // return first error message
+    (x) => x.error?.errors?.[0]?.message
   )
 );
 

@@ -13,6 +13,7 @@ import { batch as batchImpl } from "./batch";
 import { tag as tagImpl } from "./tag";
 import { signalOn } from "./signal.on";
 import { signalUse } from "./signal.use";
+import { signalFrom } from "./signal.from";
 
 // Augment signal with utility methods
 export const signal = Object.assign(signalBase, {
@@ -21,6 +22,7 @@ export const signal = Object.assign(signalBase, {
   tag: tagImpl,
   on: signalOn,
   use: signalUse,
+  from: signalFrom,
 });
 
 export const $ = signal;

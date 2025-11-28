@@ -39,14 +39,14 @@ import { wait } from "./wait";
  * // titles() returns string[] (sync)
  * ```
  *
- * @example With .pipe() and select operator
+ * @example With .pipe() and to operator
  * ```ts
  * import { signal, awaited } from "rextive";
- * import { select } from "rextive/op";
+ * import { to } from "rextive/op";
  *
  * const todoList = signal(fetchTodos());
  * const titles = todoList.pipe(
- *   select(awaited(todos => todos.map(t => t.title)))
+ *   to(awaited(todos => todos.map(t => t.title)))
  * );
  * ```
  *

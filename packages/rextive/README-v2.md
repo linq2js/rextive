@@ -89,10 +89,10 @@ Signals are callable values. Reading subscribes lazily, writing notifies depende
 ### 2. Operators for single sources
 
 ```ts
-import { select, filter, scan } from "rextive/op";
+import { to, filter, scan } from "rextive/op";
 
 const count = signal(1);
-const doubled = count.pipe(select((n) => n * 2));
+const doubled = count.pipe(to((n) => n * 2));
 const positive = count.pipe(filter((n) => n > 0));
 const total = count.pipe(scan((sum, n) => sum + n, 0));
 ```
@@ -143,10 +143,10 @@ Use `'strict'` (default), `'shallow'`, `'deep'`, or provide a custom comparer to
 
 ```tsx
 import { signal, rx } from "rextive/react";
-import { select } from "rextive/op";
+import { to } from "rextive/op";
 
 const count = signal(0);
-const doubled = count.pipe(select((n) => n * 2));
+const doubled = count.pipe(to((n) => n * 2));
 
 const Counter = () => (
   <div>
@@ -271,11 +271,11 @@ const { signals } = signal.persist(
 Import from `rextive/op` and compose like array helpers.
 
 ```ts
-import { select, filter, scan } from "rextive/op";
+import { to, filter, scan } from "rextive/op";
 
 const stats = count.pipe(
   filter((n) => n > 0),
-  select((n) => n * 2),
+  to((n) => n * 2),
   scan(
     (state, value) => ({
       sum: state.sum + value,
@@ -288,7 +288,7 @@ const stats = count.pipe(
 );
 ```
 
-- `select(fn, equals?)` – map values (optionally provide equality strategy)
+- `to(fn, equals?)` – map values (optionally provide equality strategy)
 - `filter(predicate, equals?)` – keep the last value that passed
 - `scan(reducer, initial, equals?)` – stateful accumulation (like `Array.reduce`)
 
@@ -337,7 +337,7 @@ return <div>{value.user.name}</div>;
 | Local state + memo + side-effects | `useState` + `useMemo` + `useEffect` | `signal`                     |
 | Global state                      | Redux / Zustand / Jotai              | Export a `signal`            |
 | Data fetching                     | React Query / SWR                    | `signal({ deps }, async fn)` |
-| Derived data                      | Selectors & memoization libraries    | `.pipe(select())`            |
+| Derived data                      | Selectors & memoization libraries    | `.pipe(to())`                |
 | Request cancellation              | Manual AbortController wiring        | Auto `abortSignal` argument  |
 
 ## 📚 Learn More

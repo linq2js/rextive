@@ -114,11 +114,11 @@ describe("awaited() helper", () => {
     expect(result()).toBe("Value: 11");
   });
 
-  it("should work with .pipe() and select operator", async () => {
-    const { select } = await import("./operators");
+  it("should work with .pipe() and to operator", async () => {
+    const { to } = await import("./operators");
 
     const data = signal(Promise.resolve(5));
-    const doubled = data.pipe(select(awaited((x) => x * 2)));
+    const doubled = data.pipe(to(awaited((x) => x * 2)));
 
     expect(await doubled()).toBe(10);
   });

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { signal } from "../signal";
 import { debounce } from "./debounce";
-import { select } from "./select";
+import { to } from "./to";
 
 describe("debounce operator", () => {
   beforeEach(() => {
@@ -150,7 +150,7 @@ describe("debounce operator", () => {
     // Use debounced signal as dependency
     const doubled = source.pipe(
       debounce(100),
-      select((x) => x * 2)
+      to((x) => x * 2)
     );
 
     expect(doubled()).toBe(10);
