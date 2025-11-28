@@ -111,10 +111,12 @@ export function createMutableSignal(
   if (onChangeCallbacks) {
     onChangeValue.on(onChangeCallbacks);
   }
-  // Notify devtools on value change
-  onChangeValue.on((value) => {
-    globalThis.__REXTIVE_DEVTOOLS__?.onSignalChange?.(instanceRef!, value);
-  });
+  // Notify devtools on value change (only subscribe if devtools is enabled)
+  if (globalThis.__REXTIVE_DEVTOOLS__) {
+    onChangeValue.on((value) => {
+      globalThis.__REXTIVE_DEVTOOLS__?.onSignalChange?.(instanceRef!, value);
+    });
+  }
 
   // Error emitter (passes error to listeners)
   const onErrorValue = emitter<unknown>();
