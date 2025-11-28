@@ -6,8 +6,6 @@
 
 A powerful developer tool for debugging Rextive signals in real-time.
 
-![DevTools Panel](./screenshots/devtools-panel.png)
-
 </div>
 
 ---
@@ -28,35 +26,41 @@ A powerful developer tool for debugging Rextive signals in real-time.
 ## ✨ Features
 
 ### 🔍 Signal Registry & Discovery
+
 - **Automatic tracking** of all signals created in your app
 - **Real-time updates** as signals are created, changed, or disposed
 - **Filter by type** - mutable, computed, or both
 - **Show/hide auto-generated** signals with the "User/All" toggle
 
 ### 📊 Real-Time Value Inspector
+
 - **Live values** - see current signal values update in real-time
 - **Value history** - track how values change over time
 - **Change counter** - see how many times each signal has changed
 - **Expandable details** - click any signal to see more info
 
 ### 📜 Change Timeline / Events Log
+
 - **Chronological event log** - see all signal events as they happen
 - **Event types** - create, change, dispose, error
 - **Timestamps** - know exactly when each event occurred
 - **Clear events** - reset the log when needed
 
 ### 🎨 Visual Feedback
+
 - **Flash animations** - signals flash when their values change
 - **Color-coded badges** - mutable (green), computed (blue), tags (purple)
 - **Disposed signals** - grayed out with strikethrough styling
 - **Error indicators** - signals with errors are highlighted
 
 ### ⚡ Performance
+
 - **Zero overhead when disabled** - no impact on production builds
 - **Conditional subscriptions** - only subscribes to events when devtools is active
 - **Efficient updates** - batched UI refreshes every 500ms
 
 ### 🎯 Additional Features
+
 - **Tag tracking** - see all tags and their associated signals
 - **Error tracking** - view signals that have thrown errors
 - **Statistics** - quick overview of signal counts
@@ -94,7 +98,7 @@ export function App() {
     <div>
       {/* Your app content */}
       <MainContent />
-      
+
       {/* DevTools panel - only in development */}
       {import.meta.env.DEV && <DevToolsPanel />}
     </div>
@@ -105,8 +109,6 @@ export function App() {
 ### 3. That's It! 🎉
 
 The DevTools panel will appear on the left side of your screen. Click to expand and start debugging!
-
-![DevTools Expanded](./screenshots/devtools-expanded.png)
 
 ---
 
@@ -149,14 +151,14 @@ import { DevToolsPanel } from "rextive/devtools/panel";
 
 ### Header Controls
 
-| Control | Description |
-|---------|-------------|
-| `M 12` | Mutable signal count |
-| `C 8` | Computed signal count |
+| Control        | Description                                |
+| -------------- | ------------------------------------------ |
+| `M 12`         | Mutable signal count                       |
+| `C 8`          | Computed signal count                      |
 | `User` / `All` | Toggle to show/hide auto-generated signals |
-| `▼` / `◀` | Toggle panel position (bottom/left) |
-| `🗑 N` | Clear N disposed signals |
-| `↺` | Reset DevTools config |
+| `▼` / `◀`      | Toggle panel position (bottom/left)        |
+| `🗑 N`          | Clear N disposed signals                   |
+| `↺`            | Reset DevTools config                      |
 
 ### Signal Item
 
@@ -173,24 +175,13 @@ import { DevToolsPanel } from "rextive/devtools/panel";
 
 ### Tabs
 
-| Tab | Description |
-|-----|-------------|
-| **Signals** | List of all tracked signals |
-| **Tags** | List of all tags and their signals |
-| **Errors** | Signals that have thrown errors |
-| **Events** | Chronological event log |
-| **Stats** | Overview statistics |
-
-### Screenshots
-
-#### Signals Tab
-![Signals Tab](./screenshots/signals-tab.png)
-
-#### Disposed Signals
-![Disposed Signals](./screenshots/disposed-signals.png)
-
-#### Events Tab
-![Events Tab](./screenshots/events-tab.png)
+| Tab         | Description                        |
+| ----------- | ---------------------------------- |
+| **Signals** | List of all tracked signals        |
+| **Tags**    | List of all tags and their signals |
+| **Errors**  | Signals that have thrown errors    |
+| **Events**  | Chronological event log            |
+| **Stats**   | Overview statistics                |
 
 ---
 
@@ -204,17 +195,17 @@ Enable DevTools tracking. **Must be called before any signals are created.**
 import { enableDevTools } from "rextive/devtools";
 
 enableDevTools({
-  name: "my-app",        // App name (shown in console logs)
-  logToConsole: false,   // Log events to browser console
-  maxHistory: 50,        // Max history entries per signal
+  name: "my-app", // App name (shown in console logs)
+  logToConsole: false, // Log events to browser console
+  maxHistory: 50, // Max history entries per signal
 });
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `name` | `string` | `"rextive"` | App name for logs |
-| `logToConsole` | `boolean` | `false` | Log events to console |
-| `maxHistory` | `number` | `50` | Max history per signal |
+| Option         | Type      | Default     | Description            |
+| -------------- | --------- | ----------- | ---------------------- |
+| `name`         | `string`  | `"rextive"` | App name for logs      |
+| `logToConsole` | `boolean` | `false`     | Log events to console  |
+| `maxHistory`   | `number`  | `50`        | Max history per signal |
 
 ### `disableDevTools()`
 
@@ -373,13 +364,13 @@ unsubscribe();
 
 The DevTools panel persists these settings in `localStorage`:
 
-| Setting | Key | Description |
-|---------|-----|-------------|
-| Position | `rextive-devtools-config` | Panel position (left/bottom) |
-| Expanded | `rextive-devtools-config` | Whether panel is expanded |
-| Active Tab | `rextive-devtools-config` | Currently selected tab |
-| Show Auto | `rextive-devtools-config` | Show auto-generated signals |
-| Panel Size | `rextive-devtools-config` | Custom panel size |
+| Setting    | Key                       | Description                  |
+| ---------- | ------------------------- | ---------------------------- |
+| Position   | `rextive-devtools-config` | Panel position (left/bottom) |
+| Expanded   | `rextive-devtools-config` | Whether panel is expanded    |
+| Active Tab | `rextive-devtools-config` | Currently selected tab       |
+| Show Auto  | `rextive-devtools-config` | Show auto-generated signals  |
+| Panel Size | `rextive-devtools-config` | Custom panel size            |
 
 ### Reset Configuration
 
@@ -449,9 +440,9 @@ if (process.env.NODE_ENV === "development") {
 Enable console logging when debugging specific issues:
 
 ```tsx
-enableDevTools({ 
+enableDevTools({
   name: "my-app",
-  logToConsole: true  // See all events in console
+  logToConsole: true, // See all events in console
 });
 ```
 
@@ -464,6 +455,7 @@ enableDevTools({
 **Problem:** Signals don't show up in DevTools.
 
 **Solutions:**
+
 1. Ensure `enableDevTools()` is called **before** any signals are created
 2. Use dynamic imports to delay signal creation:
    ```tsx
@@ -477,6 +469,7 @@ enableDevTools({
 **Problem:** Signals show as `#mutable-1`, `#computed-2` instead of meaningful names.
 
 **Solution:** Add `name` option when creating signals:
+
 ```tsx
 const count = signal(0, { name: "count" });
 ```
@@ -486,6 +479,7 @@ const count = signal(0, { name: "count" });
 **Problem:** App feels slow with DevTools enabled.
 
 **Solutions:**
+
 1. DevTools only subscribes to events when enabled - disable for production
 2. Use "User" filter to hide auto-generated signals
 3. Clear disposed signals with 🗑 button
@@ -496,6 +490,7 @@ const count = signal(0, { name: "count" });
 **Problem:** DevTools panel doesn't appear.
 
 **Solutions:**
+
 1. Ensure `<DevToolsPanel />` is rendered in your app
 2. Check browser console for errors
 3. Try clicking the collapsed panel on the left edge
@@ -506,6 +501,7 @@ const count = signal(0, { name: "count" });
 **Problem:** Removed signals don't appear as disposed.
 
 **Solution:** Ensure signals are properly disposed:
+
 ```tsx
 const { signal } = useScope(() => ({
   signal: signal(0, { name: "mySignal" }),
@@ -526,4 +522,3 @@ const { signal } = useScope(() => ({
 ## 📄 License
 
 MIT © Rextive Contributors
-

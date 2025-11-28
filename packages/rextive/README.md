@@ -7546,7 +7546,7 @@ const count = signal(0, { name: "count" });
 // Use "🗑" button to clear disposed signals
 ```
 
-📖 **[Full DevTools Documentation](https://github.com/linq2js/rextive/blob/main/packages/rextive/src/devtools/README.md)**
+📖 **[Full DevTools Documentation](./src/devtools/README.md)**
 
 ---
 
