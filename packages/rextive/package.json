@@ -80,7 +80,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/linq2js/rxblox.git",
+    "url": "git+https://github.com/linq2js/rextive.git",
     "directory": "packages/rextive"
   },
   "peerDependencies": {
