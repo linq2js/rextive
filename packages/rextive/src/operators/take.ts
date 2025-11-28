@@ -1,7 +1,7 @@
 import { signal } from "../signal";
 import type { Signal, Computed } from "../types";
 import type { Operator } from "./types";
-import { AUTO_NAME_PREFIX } from "../utils/nameGenerator";
+import { autoPrefix } from "../utils/nameGenerator";
 import { wrapDispose } from "../disposable";
 import { emitter } from "../utils/emitter";
 
@@ -24,11 +24,11 @@ import { emitter } from "../utils/emitter";
 export function take<T>(count: number): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
     const internal = signal(source(), {
-      name: `${AUTO_NAME_PREFIX}take_internal(${source.displayName})`,
+      name: autoPrefix(`take_internal(${source.displayName})`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}take(${source.displayName})`,
+      name: autoPrefix(`take(${source.displayName})`),
     });
 
     let emissions = 0;
@@ -91,11 +91,11 @@ export function takeWhile<T>(
 
   return (source: Signal<T>): Computed<T> => {
     const internal = signal(source(), {
-      name: `${AUTO_NAME_PREFIX}takeWhile_internal(${source.displayName})`,
+      name: autoPrefix(`takeWhile_internal(${source.displayName})`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}takeWhile(${source.displayName})`,
+      name: autoPrefix(`takeWhile(${source.displayName})`),
     });
 
     let index = 0;
@@ -154,12 +154,12 @@ export function takeLast<T>(
     const buffer: T[] = [source()];
 
     const internal = signal<T[]>([...buffer], {
-      name: `${AUTO_NAME_PREFIX}takeLast_internal(${source.displayName})`,
+      name: autoPrefix(`takeLast_internal(${source.displayName})`),
       equals: "shallow",
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}takeLast(${source.displayName})`,
+      name: autoPrefix(`takeLast(${source.displayName})`),
     });
 
     const cleanup = emitter();
@@ -216,11 +216,11 @@ export function takeUntil<T>(
 
   return (source: Signal<T>): Computed<T> => {
     const internal = signal(source(), {
-      name: `${AUTO_NAME_PREFIX}takeUntil_internal(${source.displayName})`,
+      name: autoPrefix(`takeUntil_internal(${source.displayName})`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}takeUntil(${source.displayName})`,
+      name: autoPrefix(`takeUntil(${source.displayName})`),
     });
 
     let stopped = false;

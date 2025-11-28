@@ -1,7 +1,7 @@
 import { signal } from "../signal";
 import type { Signal, Computed } from "../types";
 import type { Operator } from "./types";
-import { AUTO_NAME_PREFIX } from "../utils/nameGenerator";
+import { autoPrefix } from "../utils/nameGenerator";
 import { wrapDispose } from "../disposable";
 import { emitter } from "../utils/emitter";
 
@@ -43,11 +43,11 @@ export function distinctUntilChanged<T, K = T>(
       : undefined;
 
     const internal = signal(previousValue, {
-      name: `${AUTO_NAME_PREFIX}distinctUntilChanged_internal(${source.displayName})`,
+      name: autoPrefix(`distinctUntilChanged_internal(${source.displayName})`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}distinctUntilChanged(${source.displayName})`,
+      name: autoPrefix(`distinctUntilChanged(${source.displayName})`),
     });
 
     const cleanup = emitter();
@@ -119,11 +119,11 @@ export function distinct<T, K = T>(
     seen.add(initialKey);
 
     const internal = signal(initialValue, {
-      name: `${AUTO_NAME_PREFIX}distinct_internal(${source.displayName})`,
+      name: autoPrefix(`distinct_internal(${source.displayName})`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}distinct(${source.displayName})`,
+      name: autoPrefix(`distinct(${source.displayName})`),
     });
 
     const cleanup = emitter();

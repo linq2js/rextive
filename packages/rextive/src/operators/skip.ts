@@ -1,7 +1,7 @@
 import { signal } from "../signal";
 import type { Signal, Computed } from "../types";
 import type { Operator } from "./types";
-import { AUTO_NAME_PREFIX } from "../utils/nameGenerator";
+import { autoPrefix } from "../utils/nameGenerator";
 import { wrapDispose } from "../disposable";
 import { emitter } from "../utils/emitter";
 
@@ -24,11 +24,11 @@ import { emitter } from "../utils/emitter";
 export function skip<T>(count: number): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
     const internal = signal(source(), {
-      name: `${AUTO_NAME_PREFIX}skip_internal(${source.displayName})`,
+      name: autoPrefix(`skip_internal(${source.displayName})`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}skip(${source.displayName})`,
+      name: autoPrefix(`skip(${source.displayName})`),
     });
 
     let skipped = 0;
@@ -76,11 +76,11 @@ export function skipWhile<T>(
 ): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
     const internal = signal(source(), {
-      name: `${AUTO_NAME_PREFIX}skipWhile_internal(${source.displayName})`,
+      name: autoPrefix(`skipWhile_internal(${source.displayName})`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}skipWhile(${source.displayName})`,
+      name: autoPrefix(`skipWhile(${source.displayName})`),
     });
 
     let index = 0;
@@ -137,20 +137,40 @@ export function skipLast<T>(
   return (source: Signal<T>): Computed<T | undefined> => {
     if (count === 0) {
       // Special case: skip nothing, just pass through
-      const result = signal({ source }, ({ deps }) => deps.source, {
-        name: `${AUTO_NAME_PREFIX}skipLast(${source.displayName})`,
+      const internal = signal<T | undefined>(source(), {
+        name: autoPrefix(`skipLast_internal(${source.displayName})`),
       });
+
+      const result = signal({ internal }, ({ deps }) => deps.internal, {
+        name: autoPrefix(`skipLast(${source.displayName})`),
+      });
+
+      const cleanup = emitter();
+
+      cleanup.on(
+        source.on(() => {
+          if (disposed()) return;
+          internal.set(source());
+        })
+      );
+
+      const disposed = wrapDispose(
+        result,
+        [cleanup.emitAndClear, internal],
+        "after"
+      );
+
       return result;
     }
 
     const buffer: T[] = [source()];
 
     const internal = signal<T | undefined>(undefined, {
-      name: `${AUTO_NAME_PREFIX}skipLast_internal(${source.displayName})`,
+      name: autoPrefix(`skipLast_internal(${source.displayName})`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}skipLast(${source.displayName})`,
+      name: autoPrefix(`skipLast(${source.displayName})`),
     });
 
     const cleanup = emitter();
@@ -209,11 +229,11 @@ export function skipUntil<T>(
 
   return (source: Signal<T>): Computed<T> => {
     const internal = signal(source(), {
-      name: `${AUTO_NAME_PREFIX}skipUntil_internal(${source.displayName})`,
+      name: autoPrefix(`skipUntil_internal(${source.displayName})`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}skipUntil(${source.displayName})`,
+      name: autoPrefix(`skipUntil(${source.displayName})`),
     });
 
     let skipping = true;
@@ -246,4 +266,3 @@ export function skipUntil<T>(
     return result;
   };
 }
-

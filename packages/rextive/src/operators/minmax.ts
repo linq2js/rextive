@@ -1,7 +1,7 @@
 import { signal } from "../signal";
 import type { Signal, Computed } from "../types";
 import type { Operator } from "./types";
-import { AUTO_NAME_PREFIX } from "../utils/nameGenerator";
+import { autoPrefix } from "../utils/nameGenerator";
 import { wrapDispose } from "../disposable";
 import { emitter } from "../utils/emitter";
 
@@ -50,11 +50,11 @@ export function max<T>(comparer?: Comparer<T>): Operator<T> {
     let maxValue = source();
 
     const internal = signal(maxValue, {
-      name: `${AUTO_NAME_PREFIX}max_internal(${source.displayName})`,
+      name: autoPrefix(`max_internal(${source.displayName})`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}max(${source.displayName})`,
+      name: autoPrefix(`max(${source.displayName})`),
     });
 
     const cleanup = emitter();
@@ -108,11 +108,11 @@ export function min<T>(comparer?: Comparer<T>): Operator<T> {
     let minValue = source();
 
     const internal = signal(minValue, {
-      name: `${AUTO_NAME_PREFIX}min_internal(${source.displayName})`,
+      name: autoPrefix(`min_internal(${source.displayName})`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}min(${source.displayName})`,
+      name: autoPrefix(`min(${source.displayName})`),
     });
 
     const cleanup = emitter();

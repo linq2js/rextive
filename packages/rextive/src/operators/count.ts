@@ -1,7 +1,6 @@
 import { signal } from "../signal";
 import type { Signal, Computed } from "../types";
-import type { Operator } from "./types";
-import { AUTO_NAME_PREFIX } from "../utils/nameGenerator";
+import { autoPrefix } from "../utils/nameGenerator";
 import { wrapDispose } from "../disposable";
 import { emitter } from "../utils/emitter";
 
@@ -34,11 +33,11 @@ export function count<T>(
 ): (source: Signal<T>) => Computed<number> {
   return (source: Signal<T>): Computed<number> => {
     const internal = signal(0, {
-      name: `${AUTO_NAME_PREFIX}count_internal(${source.displayName})`,
+      name: autoPrefix(`count_internal(${source.displayName})`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}count(${source.displayName})`,
+      name: autoPrefix(`count(${source.displayName})`),
     });
 
     let index = 0;
@@ -67,4 +66,3 @@ export function count<T>(
     return result;
   };
 }
-

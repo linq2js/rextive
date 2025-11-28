@@ -1,7 +1,7 @@
 import { signal } from "../signal";
 import type { Signal, Computed } from "../types";
 import type { Scheduler, Operator } from "./types";
-import { AUTO_NAME_PREFIX } from "../utils/nameGenerator";
+import { autoPrefix } from "../utils/nameGenerator";
 import { wrapDispose } from "../disposable";
 
 /**
@@ -36,12 +36,12 @@ export function pace<T>(scheduler: Scheduler): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
     // Internal mutable signal holds the paced value (hidden from devtools by default)
     const internal = signal(source(), {
-      name: `${AUTO_NAME_PREFIX}pace_internal(${source.displayName})`,
+      name: autoPrefix(`pace_internal(${source.displayName})`),
     });
 
     // Computed signal exposes it as read-only (hidden from devtools by default)
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: `${AUTO_NAME_PREFIX}paced(${source.displayName})`,
+      name: autoPrefix(`paced(${source.displayName})`),
     });
 
     // Track if disposed to prevent updates after disposal
