@@ -8,6 +8,8 @@ A powerful developer tool for debugging Rextive signals in real-time.
 
 </div>
 
+<img src="./screenshots/image.png"/>
+
 ---
 
 ## 📋 Table of Contents
@@ -164,14 +166,22 @@ import { DevToolsPanel } from "rextive/devtools/panel";
 
 ```
 ┌──────────────────────────────────────┐
-│  M   signalName              ×5      │
+│  M   signalName         [↺]  ×5      │
 │       "current value"                │
 └──────────────────────────────────────┘
- │     │                       │
- │     │                       └── Change count
+ │     │                   │    │
+ │     │                   │    └── Change count
+ │     │                   └── Action button (reset/refresh)
  │     └── Signal name
  └── Badge: M=mutable, C=computed, ✕=disposed
 ```
+
+### Signal Actions
+
+| Button | Signal Type | Action                        |
+| ------ | ----------- | ----------------------------- |
+| `↺`    | Mutable     | Reset signal to initial value |
+| `⟳`    | Computed    | Refresh / Resume if paused    |
 
 ### Tabs
 
@@ -182,6 +192,15 @@ import { DevToolsPanel } from "rextive/devtools/panel";
 | **Errors**  | Signals that have thrown errors    |
 | **Events**  | Chronological event log            |
 | **Stats**   | Overview statistics                |
+
+### Events Tab Navigation
+
+In the Events tab, signal and tag names are clickable:
+
+- **Click on a signal name** → navigates to Signals tab and filters by that signal
+- **Click on a tag name** → navigates to Tags tab and filters by that tag
+
+This makes it easy to quickly inspect a signal after seeing it change in the event log.
 
 ---
 

@@ -534,3 +534,26 @@ export const searchClearStyles: React.CSSProperties = {
   marginLeft: "4px",
   transition: "all 0.15s ease",
 };
+
+// Signal action button styles
+export const signalActionButtonStyles: React.CSSProperties = {
+  backgroundColor: colors.bgHover,
+  border: `1px solid ${colors.border}`,
+  color: colors.textMuted,
+  cursor: "pointer",
+  padding: "2px 6px",
+  fontSize: "9px",
+  borderRadius: "3px",
+  transition: "all 0.15s ease",
+  fontFamily: "inherit",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "2px",
+};
+
+export const signalActionsContainerStyles: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "4px",
+  flexShrink: 0,
+};

@@ -101,18 +101,19 @@ describe("DevToolsPanel", () => {
     expect(screen.getByText("Computed")).toBeInTheDocument();
   });
 
-  it("should show quick stats in header when enabled and expanded", () => {
+  it("should show filter buttons in signals tab when enabled and expanded", () => {
     enableDevTools();
     signal(1, { name: "sig1" });
     signal({ sig1: signal(0) }, ({ deps }) => deps.sig1 * 2, { name: "sig2" });
 
     render(<DevToolsPanel />);
 
-    // Expand panel to see stats badges (collapsed left drawer hides them)
+    // Expand panel to see filter buttons
     fireEvent.click(screen.getByTitle("Expand"));
 
-    // Header should show M (mutable) and C (computed) badges
-    expect(screen.getByText(/M \d/)).toBeInTheDocument();
-    expect(screen.getByText(/C \d/)).toBeInTheDocument();
+    // Signals tab should show A (All), M (Mutable), C (Computed) filter buttons
+    expect(screen.getByTitle("Show all signals")).toBeInTheDocument();
+    expect(screen.getByTitle("Show mutable signals")).toBeInTheDocument();
+    expect(screen.getByTitle("Show computed signals")).toBeInTheDocument();
   });
 });
