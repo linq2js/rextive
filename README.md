@@ -1,6 +1,6 @@
 ## Rextive
 
-**Rextive** is a signal-based reactive state management library with explicit dependencies.
+**Rextive** is a signal-based reactive state management library.
 
 ### Key Features
 
