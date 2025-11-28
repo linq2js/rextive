@@ -62,6 +62,10 @@ export function createComputedSignal(
   if (onChangeCallbacks) {
     onChangeValue.on(onChangeCallbacks);
   }
+  // Notify devtools on value change
+  onChangeValue.on((value) => {
+    globalThis.__REXTIVE_DEVTOOLS__?.onSignalChange?.(instanceRef!, value);
+  });
 
   const onErrorValue = emitter<unknown>();
   if (onErrorCallbacks) {
@@ -89,6 +93,9 @@ export function createComputedSignal(
     onDispose.emitAndClear();
     disposed = true;
     context = undefined;
+
+    // Notify devtools
+    globalThis.__REXTIVE_DEVTOOLS__?.onSignalDispose?.(instanceRef!);
   };
 
   const recompute = () => {
@@ -331,6 +338,9 @@ export function createComputedSignal(
   instanceRef = instance as unknown as Computed<any>;
 
   attacher(instanceRef, onDispose).attach(use);
+
+  // Notify devtools of signal creation
+  globalThis.__REXTIVE_DEVTOOLS__?.onSignalCreate?.(instanceRef);
 
   if (!lazy) {
     try {

@@ -111,6 +111,10 @@ export function createMutableSignal(
   if (onChangeCallbacks) {
     onChangeValue.on(onChangeCallbacks);
   }
+  // Notify devtools on value change
+  onChangeValue.on((value) => {
+    globalThis.__REXTIVE_DEVTOOLS__?.onSignalChange?.(instanceRef!, value);
+  });
 
   // Error emitter (passes error to listeners)
   const onErrorValue = emitter<unknown>();
@@ -196,6 +200,9 @@ export function createMutableSignal(
 
     // Clear change listeners
     onChange.clear();
+
+    // Notify devtools
+    globalThis.__REXTIVE_DEVTOOLS__?.onSignalDispose?.(instanceRef!);
   };
 
   /**
@@ -632,6 +639,9 @@ export function createMutableSignal(
   // Attach plugins and tags
   // This must happen after instance is created so plugins can access it
   attacher(instanceRef, onDispose).attach(use);
+
+  // Notify devtools of signal creation
+  globalThis.__REXTIVE_DEVTOOLS__?.onSignalCreate?.(instanceRef);
 
   // Eager evaluation if not lazy
   if (!lazy) {

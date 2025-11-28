@@ -371,6 +371,9 @@ export function tag<TValue, TKind extends SignalKind = "any">(
       onDelete?.(signal, tagInstance);
       onChange?.("delete", signal, tagInstance);
 
+      // Notify devtools
+      globalThis.__REXTIVE_DEVTOOLS__?.onTagRemove?.(tagInstance, signal);
+
       // Step 3: Dispose signal if autoDispose is enabled
       // Do this last so callbacks can still access the signal
       // Note: signal.dispose() will call _delete() on all its tags,
@@ -402,6 +405,9 @@ export function tag<TValue, TKind extends SignalKind = "any">(
         // This allows callbacks to access signal state
         onDelete?.(signal, tagInstance);
         onChange?.("delete", signal, tagInstance);
+
+        // Notify devtools
+        globalThis.__REXTIVE_DEVTOOLS__?.onTagRemove?.(tagInstance, signal);
 
         // Dispose signal if autoDispose is enabled
         // Note: signal.dispose() will call _delete() on all its tags,
@@ -457,6 +463,9 @@ export function tag<TValue, TKind extends SignalKind = "any">(
       // Called AFTER signal is added so tag.size is correct
       onAdd?.(signal, tagInstance);
       onChange?.("add", signal, tagInstance);
+
+      // Notify devtools
+      globalThis.__REXTIVE_DEVTOOLS__?.onTagAdd?.(tagInstance, signal);
     },
 
     _delete(signal: SignalOf<TValue, TKind>): void {
@@ -478,9 +487,15 @@ export function tag<TValue, TKind extends SignalKind = "any">(
         // Still call callbacks to notify about the removal
         onDelete?.(signal, tagInstance);
         onChange?.("delete", signal, tagInstance);
+
+        // Notify devtools
+        globalThis.__REXTIVE_DEVTOOLS__?.onTagRemove?.(tagInstance, signal);
       }
     },
   };
+
+  // Notify devtools of tag creation
+  globalThis.__REXTIVE_DEVTOOLS__?.onTagCreate?.(tagInstance);
 
   return tagInstance as Tag<TValue, TKind>;
 }

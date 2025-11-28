@@ -1650,3 +1650,49 @@ export type Producer<T> = Disposable & {
    */
   peek(): T | undefined;
 };
+
+// ============================================================================
+// DEVTOOLS
+// ============================================================================
+
+/**
+ * DevTools connector interface for external tooling integration.
+ *
+ * Set `globalThis.__REXTIVE_DEVTOOLS__` to enable devtools.
+ * When undefined (default), no devtools overhead is incurred.
+ *
+ * @example
+ * ```ts
+ * // Enable devtools (e.g., in browser extension or dev setup)
+ * globalThis.__REXTIVE_DEVTOOLS__ = {
+ *   onSignalCreate: (signal) => console.log('Signal created:', signal.displayName),
+ *   onSignalDispose: (signal) => console.log('Signal disposed:', signal.displayName),
+ *   onSignalChange: (signal, value) => console.log('Signal changed:', signal.displayName, value),
+ *   onTagCreate: (tag) => console.log('Tag created:', tag.displayName),
+ * };
+ * ```
+ */
+export type DevTools = {
+  /** Called when a signal is created */
+  onSignalCreate?(signal: Signal<any>): void;
+
+  /** Called when a signal is disposed */
+  onSignalDispose?(signal: Signal<any>): void;
+
+  /** Called when a signal value changes */
+  onSignalChange?(signal: Signal<any>, value: unknown): void;
+
+  /** Called when a tag is created */
+  onTagCreate?(tag: Tag<any>): void;
+
+  /** Called when a signal is added to a tag */
+  onTagAdd?(tag: Tag<any>, signal: Signal<any>): void;
+
+  /** Called when a signal is removed from a tag */
+  onTagRemove?(tag: Tag<any>, signal: Signal<any>): void;
+};
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __REXTIVE_DEVTOOLS__: DevTools | undefined;
+}
