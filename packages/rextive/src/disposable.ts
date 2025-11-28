@@ -227,6 +227,99 @@ export function disposable<
 }
 
 /**
+ * When to call the original dispose method.
+ * - "before": Call originalDispose before customDispose
+ * - "after": Call originalDispose after customDispose
+ * - "manual": Don't auto-call, customDispose receives originalDispose to call manually
+ */
+export type WrapDisposeWhen = "before" | "after" | "manual";
+
+/**
+ * Wraps custom dispose logic into an object that may have a dispose method.
+ *
+ * This utility simplifies the common pattern of overriding dispose methods
+ * to add custom cleanup logic while preserving the original dispose behavior.
+ *
+ * @param target - The object to wrap dispose on
+ * @param customDispose - Custom dispose function (or function that returns custom dispose for "manual" mode)
+ * @param when - When to call original dispose: "before", "after", or "manual" (default: "after")
+ * @returns A function that returns true if the target has been disposed
+ *
+ * @example
+ * ```ts
+ * // "after" mode (default) - original dispose called after custom
+ * const disposed = wrapDispose(result, () => {
+ *   cleanup.emitAndClear();
+ *   internal.dispose();
+ * });
+ * // Execution: customDispose() -> originalDispose()
+ * ```
+ *
+ * @example
+ * ```ts
+ * // "before" mode - original dispose called before custom
+ * const disposed = wrapDispose(result, () => {
+ *   // originalDispose already called
+ *   doFinalCleanup();
+ * }, "before");
+ * // Execution: originalDispose() -> customDispose()
+ * ```
+ *
+ * @example
+ * ```ts
+ * // "manual" mode - you control when to call original
+ * const disposed = wrapDispose(result, (originalDispose) => () => {
+ *   cleanup.emitAndClear();
+ *   internal.dispose();
+ *   originalDispose(); // Call manually
+ * }, "manual");
+ * ```
+ */
+export function wrapDispose<T extends { dispose?: VoidFunction }>(
+  target: T,
+  customDispose:
+    | ((originalDispose: VoidFunction) => void)
+    | readonly (VoidFunction | Disposable)[],
+  when?: WrapDisposeWhen
+): () => boolean {
+  let disposed = false;
+
+  const originalDispose =
+    typeof target.dispose === "function" ? target.dispose.bind(target) : noop;
+
+  const finalDispose = () => {
+    if (disposed) return;
+    disposed = true;
+    if (when === "before") {
+      originalDispose();
+    }
+    if (Array.isArray(customDispose)) {
+      for (const item of customDispose) {
+        if (typeof item === "function") {
+          item();
+        } else {
+          tryDispose(item);
+        }
+      }
+    } else if (typeof customDispose === "function") {
+      customDispose(originalDispose);
+    }
+    if (when === "after") {
+      originalDispose();
+    }
+  };
+
+  target.dispose = finalDispose;
+
+  return () => disposed;
+}
+
+/**
+ * A no-operation function.
+ */
+export const noop: VoidFunction = () => {};
+
+/**
  * Safely attempts to dispose a value if it has a dispose mechanism.
  *
  * Handles multiple dispose patterns:

@@ -2,6 +2,7 @@ import { signal } from "../signal";
 import type { Signal, Computed } from "../types";
 import type { Scheduler, Operator } from "./types";
 import { AUTO_NAME_PREFIX } from "../utils/nameGenerator";
+import { wrapDispose } from "../disposable";
 
 /**
  * Creates a derived signal that updates according to the provided scheduler.
@@ -64,25 +65,7 @@ export function pace<T>(scheduler: Scheduler): Operator<T> {
     });
 
     // Override dispose to clean up everything
-    const originalDispose = result.dispose.bind(result);
-
-    Object.defineProperty(result, "dispose", {
-      value: () => {
-        if (disposed) return;
-        disposed = true;
-
-        // Unsubscribe from source
-        unsubscribe();
-
-        // Dispose internal mutable signal
-        internal.dispose();
-
-        // Dispose the result computed signal
-        originalDispose();
-      },
-      writable: false,
-      configurable: false,
-    });
+    wrapDispose(result, [unsubscribe, internal], "after");
 
     return result;
   };

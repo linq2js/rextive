@@ -1,4 +1,4 @@
-import { disposable, DisposalAggregateError } from "./disposable";
+import { disposable, DisposalAggregateError, wrapDispose, noop } from "./disposable";
 import { describe, it, expect, vi } from "vitest";
 
 describe("disposable", () => {
@@ -706,5 +706,284 @@ describe("disposable", () => {
       expect(services.api).toBe(api);
       expect(typeof services.dispose).toBe("function");
     });
+  });
+});
+
+describe("wrapDispose", () => {
+  describe("default mode (manual)", () => {
+    it("should call custom with originalDispose", () => {
+      const order: string[] = [];
+      const original = vi.fn(() => order.push("original"));
+
+      const target = { dispose: original };
+      wrapDispose(target, (originalDispose) => {
+        order.push("custom-start");
+        originalDispose();
+        order.push("custom-end");
+      });
+
+      target.dispose();
+
+      expect(order).toEqual(["custom-start", "original", "custom-end"]);
+    });
+
+    it("should allow not calling original", () => {
+      const original = vi.fn();
+
+      const target = { dispose: original };
+      wrapDispose(target, () => {
+        // Don't call originalDispose
+      });
+
+      target.dispose();
+
+      expect(original).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("before mode", () => {
+    it("should call original dispose then custom", () => {
+      const order: string[] = [];
+      const original = vi.fn(() => order.push("original"));
+
+      const target = { dispose: original };
+      wrapDispose(
+        target,
+        () => {
+          order.push("custom");
+        },
+        "before"
+      );
+
+      target.dispose();
+
+      expect(order).toEqual(["original", "custom"]);
+    });
+  });
+
+  describe("after mode", () => {
+    it("should call custom then original dispose", () => {
+      const order: string[] = [];
+      const original = vi.fn(() => order.push("original"));
+
+      const target = { dispose: original };
+      wrapDispose(
+        target,
+        () => {
+          order.push("custom");
+        },
+        "after"
+      );
+
+      target.dispose();
+
+      expect(order).toEqual(["custom", "original"]);
+    });
+  });
+
+  describe("disposed check", () => {
+    it("should return function to check disposed status", () => {
+      const target = { dispose: vi.fn() };
+      const disposed = wrapDispose(target, () => {});
+
+      expect(disposed()).toBe(false);
+
+      target.dispose();
+
+      expect(disposed()).toBe(true);
+    });
+
+    it("should prevent double disposal", () => {
+      const custom = vi.fn();
+      const original = vi.fn();
+
+      const target = { dispose: original };
+      wrapDispose(target, custom);
+
+      target.dispose();
+      target.dispose(); // Second call
+
+      expect(custom).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("edge cases", () => {
+    it("should handle target without dispose method", () => {
+      const custom = vi.fn();
+      const target: { dispose?: VoidFunction } = {};
+
+      wrapDispose(target, custom);
+
+      target.dispose!();
+
+      expect(custom).toHaveBeenCalledTimes(1);
+    });
+
+    it("should use noop for original when target has no dispose", () => {
+      const order: string[] = [];
+      const target: { dispose?: VoidFunction } = {};
+
+      wrapDispose(target, (originalDispose) => {
+        order.push("custom");
+        originalDispose(); // Should be noop
+        order.push("after-noop");
+      });
+
+      target.dispose!();
+
+      expect(order).toEqual(["custom", "after-noop"]);
+    });
+  });
+
+  describe("array-based customDispose", () => {
+    it("should dispose array of functions", () => {
+      const order: string[] = [];
+      const fn1 = vi.fn(() => order.push("fn1"));
+      const fn2 = vi.fn(() => order.push("fn2"));
+      const fn3 = vi.fn(() => order.push("fn3"));
+
+      const target = { dispose: vi.fn(() => order.push("original")) };
+      wrapDispose(target, [fn1, fn2, fn3], "after");
+
+      target.dispose();
+
+      expect(fn1).toHaveBeenCalledTimes(1);
+      expect(fn2).toHaveBeenCalledTimes(1);
+      expect(fn3).toHaveBeenCalledTimes(1);
+      expect(order).toEqual(["fn1", "fn2", "fn3", "original"]);
+    });
+
+    it("should dispose array of Disposables", () => {
+      const order: string[] = [];
+      const d1 = { dispose: vi.fn(() => order.push("d1")) };
+      const d2 = { dispose: vi.fn(() => order.push("d2")) };
+      const d3 = { dispose: vi.fn(() => order.push("d3")) };
+
+      const target = { dispose: vi.fn(() => order.push("original")) };
+      wrapDispose(target, [d1, d2, d3], "after");
+
+      target.dispose();
+
+      expect(d1.dispose).toHaveBeenCalledTimes(1);
+      expect(d2.dispose).toHaveBeenCalledTimes(1);
+      expect(d3.dispose).toHaveBeenCalledTimes(1);
+      expect(order).toEqual(["d1", "d2", "d3", "original"]);
+    });
+
+    it("should dispose mixed array of functions and Disposables", () => {
+      const order: string[] = [];
+      const fn1 = vi.fn(() => order.push("fn1"));
+      const d1 = { dispose: vi.fn(() => order.push("d1")) };
+      const fn2 = vi.fn(() => order.push("fn2"));
+      const d2 = { dispose: vi.fn(() => order.push("d2")) };
+
+      const target = { dispose: vi.fn(() => order.push("original")) };
+      wrapDispose(target, [fn1, d1, fn2, d2], "after");
+
+      target.dispose();
+
+      expect(fn1).toHaveBeenCalledTimes(1);
+      expect(d1.dispose).toHaveBeenCalledTimes(1);
+      expect(fn2).toHaveBeenCalledTimes(1);
+      expect(d2.dispose).toHaveBeenCalledTimes(1);
+      expect(order).toEqual(["fn1", "d1", "fn2", "d2", "original"]);
+    });
+
+    it("should handle empty array", () => {
+      const original = vi.fn();
+      const target = { dispose: original };
+
+      wrapDispose(target, [], "after");
+
+      target.dispose();
+
+      expect(original).toHaveBeenCalledTimes(1);
+    });
+
+    it("should call array disposables before original with 'after' mode", () => {
+      const order: string[] = [];
+      const fn = vi.fn(() => order.push("custom"));
+
+      const target = { dispose: vi.fn(() => order.push("original")) };
+      wrapDispose(target, [fn], "after");
+
+      target.dispose();
+
+      expect(order).toEqual(["custom", "original"]);
+    });
+
+    it("should call array disposables after original with 'before' mode", () => {
+      const order: string[] = [];
+      const fn = vi.fn(() => order.push("custom"));
+
+      const target = { dispose: vi.fn(() => order.push("original")) };
+      wrapDispose(target, [fn], "before");
+
+      target.dispose();
+
+      expect(order).toEqual(["original", "custom"]);
+    });
+
+    it("should not call original with array and no when mode", () => {
+      const order: string[] = [];
+      const fn = vi.fn(() => order.push("custom"));
+      const original = vi.fn(() => order.push("original"));
+
+      const target = { dispose: original };
+      wrapDispose(target, [fn]);
+
+      target.dispose();
+
+      expect(order).toEqual(["custom"]);
+      expect(original).not.toHaveBeenCalled();
+    });
+
+    it("should work with nested disposable arrays", () => {
+      const order: string[] = [];
+      const innerD1 = { dispose: vi.fn(() => order.push("inner1")) };
+      const innerD2 = { dispose: vi.fn(() => order.push("inner2")) };
+      const outerD = { dispose: [innerD1, innerD2] };
+
+      const target = { dispose: vi.fn(() => order.push("original")) };
+      wrapDispose(target, [outerD], "after");
+
+      target.dispose();
+
+      expect(innerD1.dispose).toHaveBeenCalledTimes(1);
+      expect(innerD2.dispose).toHaveBeenCalledTimes(1);
+      expect(order).toEqual(["inner1", "inner2", "original"]);
+    });
+
+    it("should prevent double disposal with array", () => {
+      const fn = vi.fn();
+      const d = { dispose: vi.fn() };
+
+      const target = { dispose: vi.fn() };
+      wrapDispose(target, [fn, d], "after");
+
+      target.dispose();
+      target.dispose(); // Second call
+
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(d.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it("should return disposed status check with array", () => {
+      const target = { dispose: vi.fn() };
+      const disposed = wrapDispose(target, [() => {}], "after");
+
+      expect(disposed()).toBe(false);
+
+      target.dispose();
+
+      expect(disposed()).toBe(true);
+    });
+  });
+});
+
+describe("noop", () => {
+  it("should be a function that does nothing", () => {
+    expect(typeof noop).toBe("function");
+    expect(noop()).toBeUndefined();
   });
 });

@@ -46,9 +46,15 @@ export { AbortedComputationError } from "./createSignalContext";
 export { FallbackError } from "./common";
 
 // Disposable utilities
-export { disposable, DisposalAggregateError } from "./disposable";
+export {
+  disposable,
+  DisposalAggregateError,
+  wrapDispose,
+  noop,
+} from "./disposable";
 export type {
   PropertyMergeStrategy,
   CombineDisposablesOptions,
+  WrapDisposeWhen,
 } from "./disposable";
 export { validate } from "./validate";

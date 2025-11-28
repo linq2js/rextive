@@ -16,3 +16,7 @@ export { pace } from "./pace";
 export { debounce, debounceScheduler } from "./debounce";
 export { throttle, throttleScheduler } from "./throttle";
 export { delay, delayScheduler } from "./delay";
+
+// Take operators
+export { take, takeWhile, takeLast, takeUntil } from "./take";
+export type { TakeWhileOptions } from "./take";
