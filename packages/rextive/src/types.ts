@@ -953,7 +953,7 @@ export type GroupPlugin<
  * const computedTag = tag<number, "computed">();
  * ```
  */
-export type Tag<TValue, TKind extends SignalKind = "any"> = {
+export type Tag<TValue, TKind extends SignalKind = any> = {
   [TAG_TYPE]: true;
 
   /**
@@ -1674,22 +1674,22 @@ export type Producer<T> = Disposable & {
  */
 export type DevTools = {
   /** Called when a signal is created */
-  onSignalCreate?(signal: Signal<any>): void;
+  onSignalCreate?(signal: AnySignal<any>): void;
 
   /** Called when a signal is disposed */
-  onSignalDispose?(signal: Signal<any>): void;
+  onSignalDispose?(signal: AnySignal<any>): void;
 
   /** Called when a signal value changes */
-  onSignalChange?(signal: Signal<any>, value: unknown): void;
+  onSignalChange?(signal: AnySignal<any>, value: unknown): void;
 
   /** Called when a tag is created */
-  onTagCreate?(tag: Tag<any>): void;
+  onTagCreate?(tag: Tag<any, any>): void;
 
   /** Called when a signal is added to a tag */
-  onTagAdd?(tag: Tag<any>, signal: Signal<any>): void;
+  onTagAdd?(tag: Tag<any, any>, signal: AnySignal<any>): void;
 
   /** Called when a signal is removed from a tag */
-  onTagRemove?(tag: Tag<any>, signal: Signal<any>): void;
+  onTagRemove?(tag: Tag<any, any>, signal: AnySignal<any>): void;
 };
 
 declare global {
