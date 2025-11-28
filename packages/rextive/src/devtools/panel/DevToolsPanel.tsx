@@ -224,6 +224,40 @@ export function DevToolsPanel(): React.ReactElement | null {
     }
   }, [isResizing, position, sizeBottom, sizeLeft]);
 
+  // Manage body padding to prevent content from being hidden by devtools
+  useEffect(() => {
+    const updateBodyPadding = () => {
+      if (position === "bottom" && isExpanded) {
+        // Add padding to bottom when panel is at bottom and expanded
+        const height = sizeBottom ?? styles.PANEL_SIZE_EXPANDED_BOTTOM;
+        document.body.style.paddingBottom = `${height}px`;
+        document.body.style.paddingLeft = "";
+      } else if (position === "left" && isExpanded) {
+        // Add padding to left when panel is at left and expanded
+        const width = sizeLeft ?? styles.PANEL_SIZE_EXPANDED_LEFT;
+        document.body.style.paddingLeft = `${width}px`;
+        document.body.style.paddingBottom = "";
+      } else {
+        // Remove padding when panel is collapsed
+        if (position === "bottom") {
+          document.body.style.paddingBottom = `${styles.PANEL_SIZE_COLLAPSED}px`;
+          document.body.style.paddingLeft = "";
+        } else {
+          document.body.style.paddingLeft = `${styles.PANEL_SIZE_COLLAPSED}px`;
+          document.body.style.paddingBottom = "";
+        }
+      }
+    };
+
+    updateBodyPadding();
+
+    // Cleanup: remove padding when component unmounts
+    return () => {
+      document.body.style.paddingBottom = "";
+      document.body.style.paddingLeft = "";
+    };
+  }, [position, isExpanded, sizeBottom, sizeLeft]);
+
   // Check if devtools is enabled
   useEffect(() => {
     const checkEnabled = () => {

@@ -6,6 +6,8 @@
 
 A powerful developer tool for debugging Rextive signals in real-time.
 
+![DevTools Panel](./screenshots/devtools-panel.png)
+
 </div>
 
 ---
@@ -104,6 +106,8 @@ export function App() {
 
 The DevTools panel will appear on the left side of your screen. Click to expand and start debugging!
 
+![DevTools Expanded](./screenshots/devtools-expanded.png)
+
 ---
 
 ## 📦 Installation
@@ -176,6 +180,17 @@ import { DevToolsPanel } from "rextive/devtools/panel";
 | **Errors** | Signals that have thrown errors |
 | **Events** | Chronological event log |
 | **Stats** | Overview statistics |
+
+### Screenshots
+
+#### Signals Tab
+![Signals Tab](./screenshots/signals-tab.png)
+
+#### Disposed Signals
+![Disposed Signals](./screenshots/disposed-signals.png)
+
+#### Events Tab
+![Events Tab](./screenshots/events-tab.png)
 
 ---
 
