@@ -112,9 +112,4 @@ pnpm pu:ma   # major version
 
 ## Documentation
 
-- **[rextive README](./packages/rextive/README.md)** - Complete documentation for the active package
-- **[Migration Guide](./ARCHIVED_PACKAGES.md)** - Information about archived packages
-
-## Legacy Documentation
-
-Documentation for archived packages can be found in the `archived/` directory.
+- **[rextive README](./packages/rextive/README.md)** - Complete documentation
