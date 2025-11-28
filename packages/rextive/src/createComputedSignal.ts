@@ -16,6 +16,7 @@ import { pipeSignals } from "./utils/pipeSignals";
 import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
 import { getCurrent } from "./contextDispatcher";
+import { nextName } from "./utils/nameGenerator";
 
 /**
  * Create a computed signal (with dependencies)
@@ -52,6 +53,9 @@ export function createComputedSignal(
 
   // Resolve equals option to actual function (handles string shortcuts)
   const equals = resolveEquals(equalsOption) || Object.is;
+
+  // Generate display name: use provided name or auto-generate for devtools
+  const displayName = name ?? nextName("computed");
 
   const onChange = emitter<void>();
   const onChangeValue = emitter<any>();
@@ -146,7 +150,7 @@ export function createComputedSignal(
           }
         } catch (fallbackError) {
           current = {
-            error: new FallbackError(error, fallbackError, name),
+            error: new FallbackError(error, fallbackError, displayName),
             value: undefined,
           };
           // Notify about error state change
@@ -233,7 +237,10 @@ export function createComputedSignal(
     return pipeSignals(instance, operators);
   };
 
-  const to = function (first: (value: any, ctx: any) => any, ...rest: any[]): any {
+  const to = function (
+    first: (value: any, ctx: any) => any,
+    ...rest: any[]
+  ): any {
     // Check if last argument is options (not a function)
     const lastArg = rest[rest.length - 1];
     const hasOptions =
@@ -304,10 +311,11 @@ export function createComputedSignal(
 
   const instance = Object.assign(get, {
     [SIGNAL_TYPE]: true,
-    displayName: name,
+    displayName,
     get,
     on,
     dispose,
+    disposed: isDisposed,
     reset,
     toJSON: get,
     pause,

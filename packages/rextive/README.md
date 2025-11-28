@@ -1361,59 +1361,57 @@ Create signals that live with your component and automatically cleanup when unmo
 import { signal, disposable, rx, useScope } from "rextive/react";
 import { select } from "rextive/op";
 
-function TodoList() {
-  // Create component-scoped signals and actions
-  const scope = useScope(() => {
-    // These signals exist only while this component is mounted
-    const todos = signal([
-      { id: 1, text: "Learn Rextive", status: "done" },
-      { id: 2, text: "Build app", status: "active" },
-      { id: 3, text: "Deploy", status: "active" },
-    ]);
+// ✅ Extract factory function for cleaner code
+function createTodoListScope() {
+  const todos = signal([
+    { id: 1, text: "Learn Rextive", status: "done" },
+    { id: 2, text: "Build app", status: "active" },
+    { id: 3, text: "Deploy", status: "active" },
+  ]);
 
-    const filter = signal("all"); // "all" | "active" | "done"
+  const filter = signal("all"); // "all" | "active" | "done"
 
-    // Derived: filtered todos based on current filter
-    const filteredTodos = signal({ todos, filter }, ({ deps }) => {
-      if (deps.filter === "all") return deps.todos;
-      return deps.todos.filter((t) => t.status === deps.filter);
-    });
-
-    // Derived: count of active todos
-    const activeCount = todos.pipe(
-      select((list) => list.filter((t) => t.status === "active").length)
-    );
-
-    // Actions
-    const addTodo = (text) => {
-      todos.set((list) => [
-        ...list,
-        { id: Date.now(), text, status: "active" },
-      ]);
-    };
-
-    const toggleTodo = (id) => {
-      todos.set((list) =>
-        list.map((t) =>
-          t.id === id
-            ? { ...t, status: t.status === "active" ? "done" : "active" }
-            : t
-        )
-      );
-    };
-
-    // ✅ disposable() only disposes items with dispose method
-    // Regular functions (addTodo, toggleTodo) are included for convenience
-    // When component unmounts, signals are automatically cleaned up
-    return disposable({
-      todos,
-      filter,
-      filteredTodos,
-      activeCount,
-      addTodo,
-      toggleTodo,
-    });
+  // Derived: filtered todos based on current filter
+  const filteredTodos = signal({ todos, filter }, ({ deps }) => {
+    if (deps.filter === "all") return deps.todos;
+    return deps.todos.filter((t) => t.status === deps.filter);
   });
+
+  // Derived: count of active todos
+  const activeCount = todos.to(
+    select((list) => list.filter((t) => t.status === "active").length)
+  );
+
+  // Actions
+  const addTodo = (text) => {
+    todos.set((list) => [...list, { id: Date.now(), text, status: "active" }]);
+  };
+
+  const toggleTodo = (id) => {
+    todos.set((list) =>
+      list.map((t) =>
+        t.id === id
+          ? { ...t, status: t.status === "active" ? "done" : "active" }
+          : t
+      )
+    );
+  };
+
+  // disposable() only disposes items with dispose method
+  // Regular functions (addTodo, toggleTodo) are included for convenience
+  return disposable({
+    todos,
+    filter,
+    filteredTodos,
+    activeCount,
+    addTodo,
+    toggleTodo,
+  });
+}
+
+function TodoList() {
+  // Create component-scoped signals - auto-cleanup on unmount
+  const scope = useScope(createTodoListScope);
 
   return (
     <div>
@@ -1500,12 +1498,14 @@ function BadComponent() {
 **With useScope (auto-cleanup):**
 
 ```tsx
-// ✅ GOOD: Signal cleaned up on unmount
+// ✅ GOOD: Extract factory function for cleaner code
+function createCounterScope() {
+  const mySignal = signal(0);
+  return disposable({ mySignal });
+}
+
 function GoodComponent() {
-  const { mySignal } = useScope(() => {
-    const mySignal = signal(0);
-    return disposable({ mySignal });
-  });
+  const { mySignal } = useScope(createCounterScope);
 
   return <div>{rx(mySignal)}</div>;
   // When this component unmounts, mySignal is automatically disposed
@@ -1726,51 +1726,54 @@ import {
   loadable,
 } from "rextive/react";
 
+// ✅ Extract factory function for cleaner code
+function createRegistrationFormScope() {
+  // Simulated database of existing usernames
+  const existingUsernames = ["admin", "testuser", "john123"];
+
+  // Form fields
+  const fields = {
+    name: signal(""),
+    username: signal(""),
+  };
+
+  // Validation errors - each derives from its field
+  const errors = {
+    // Sync validation: name field
+    name: fields.name.to((value) => {
+      if (value.length === 0) {
+        return "Name is required";
+      }
+      if (value.length < 2) {
+        return "Name must be at least 2 characters";
+      }
+      return undefined;
+    }),
+
+    // Async validation: username field
+    // Uses safe() to cancel if user changes input during validation
+    username: fields.username.to(async (value, { safe }) => {
+      if (value.length === 0) {
+        return "Username is required";
+      }
+
+      // Simulate async validation (e.g., API call to check username)
+      // safe() ensures this never resolves if the signal is aborted
+      await safe(wait.delay(500));
+
+      if (existingUsernames.includes(value)) {
+        return "Username already taken";
+      }
+
+      return undefined;
+    }),
+  };
+
+  return disposable({ fields, errors });
+}
+
 function RegistrationForm() {
-  const scope = useScope(() => {
-    // Simulated database of existing usernames
-    const existingUsernames = ["admin", "testuser", "john123"];
-
-    // Form fields
-    const fields = {
-      name: signal(""),
-      username: signal(""),
-    };
-
-    // Validation errors - each derives from its field
-    const errors = {
-      // Sync validation: name field
-      name: fields.name.to((value) => {
-        if (value.length === 0) {
-          return "Name is required";
-        }
-        if (value.length < 2) {
-          return "Name must be at least 2 characters";
-        }
-        return undefined;
-      }),
-
-      // Async validation: username field
-      // Uses safe() to cancel if user changes input during validation
-      username: fields.username.to(async (value, { safe }) => {
-        if (value.length === 0) {
-          return "Username is required";
-        }
-
-        // Simulate async validation (e.g., API call to check username)
-        // safe() ensures this never resolves if the signal is aborted
-        await safe(wait.delay(500));
-
-        if (existingUsernames.includes(value)) {
-          return "Username already taken";
-        }
-
-        return undefined;
-      }),
-    };
-
-    return disposable({ fields, errors });
-  });
+  const scope = useScope(createRegistrationFormScope);
 
   /**
    * Rendering with loadable():
@@ -3602,6 +3605,7 @@ Quick reference for all Rextive APIs.
 | `.pipe(...ops)`         | All      | Chain operators for transformation                  |
 | `.map(fn)`              | All      | Alias for `.to()`                                   |
 | `.dispose()`            | All      | Clean up signal and subscriptions                   |
+| `.disposed()`           | All      | Check if signal has been disposed (returns boolean) |
 | `.refresh()`            | Computed | Force immediate recomputation                       |
 | `.stale()`              | Computed | Mark as stale for lazy recomputation                |
 
@@ -3664,26 +3668,28 @@ Quick reference for all Rextive APIs.
 
 ### Operators (`rextive/op`)
 
-| API                          | Description                             |
-| ---------------------------- | --------------------------------------- |
-| `select(fn, equals?)`        | Transform values (like `Array.map`)     |
-| `filter(predicate, equals?)` | Filter values (like `Array.filter`)     |
-| `scan(fn, initial, equals?)` | Accumulate values (like `Array.reduce`) |
+| API                          | Description                                    |
+| ---------------------------- | ---------------------------------------------- |
+| `select(fn, equals?)`        | Transform values (like `Array.map`)            |
+| `filter(predicate, equals?)` | Filter values (like `Array.filter`)            |
+| `scan(fn, initial, equals?)` | Accumulate values (like `Array.reduce`)        |
+| `focus(path, options?)`      | Bidirectional lens into nested mutable signals |
 
 ---
 
 ### Utilities
 
-| API                       | Description                           |
-| ------------------------- | ------------------------------------- |
-| `disposable(...items)`    | Combine disposables into one          |
-| `compose(...fns)`         | Compose functions (right-to-left)     |
-| `awaited(...selectors)`   | Transform async/sync values uniformly |
-| `producer(factory)`       | Lazy factory for instance management  |
-| `is(value)`               | Check if any Signal                   |
-| `is(value, "mutable")`    | Check if Mutable                      |
-| `is(value, "computed")`   | Check if Computed                     |
-| `is(value, "observable")` | Check if has `.on()` method           |
+| API                       | Description                                  |
+| ------------------------- | -------------------------------------------- |
+| `disposable(...items)`    | Combine disposables into one                 |
+| `compose(...fns)`         | Compose functions (right-to-left)            |
+| `awaited(...selectors)`   | Transform async/sync values uniformly        |
+| `producer(factory)`       | Lazy factory for instance management         |
+| `validate(validator)`     | Wrap validators (Zod, Yup, custom) uniformly |
+| `is(value)`               | Check if any Signal                          |
+| `is(value, "mutable")`    | Check if Mutable                             |
+| `is(value, "computed")`   | Check if Computed                            |
+| `is(value, "observable")` | Check if has `.on()` method                  |
 
 ---
 
@@ -4684,6 +4690,335 @@ console.log(composed(1, 5, 3, 2)); // 10 (max is 5, doubled)
 
 ---
 
+#### `validate(validator)`
+
+Wrap various validator patterns (Zod, Yup, custom predicates) into a unified result format:
+
+```tsx
+import { signal, validate } from "rextive";
+
+// Simple predicate
+const isPositive = (x: number) => x > 0;
+const count = signal(5);
+
+const validated = count.to(validate(isPositive));
+
+console.log(validated().success); // true
+console.log(validated().value); // 5
+
+count.set(-1);
+console.log(validated().success); // false
+console.log(validated().result); // false
+```
+
+**With Zod:**
+
+```tsx
+import { z } from "zod";
+import { signal, validate } from "rextive";
+
+const schema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+});
+
+const form = signal({ name: "John", email: "john@example.com" });
+const validated = form.to(validate(schema.safeParse));
+
+console.log(validated().success); // true
+console.log(validated().value); // { name: "John", email: "john@example.com" }
+
+// Invalid data
+form.set({ name: "", email: "invalid" });
+console.log(validated().success); // false
+console.log(validated().error); // ZodError with issues
+```
+
+**With Yup:**
+
+```tsx
+import * as yup from "yup";
+import { signal, validate } from "rextive";
+
+const schema = yup.object({
+  name: yup.string().required(),
+});
+
+const form = signal({ name: "John" });
+
+// Pass the schema object (not schema.isValid - it's not bound)
+const validated = form.to(validate(schema));
+
+console.log(validated().success); // true
+```
+
+**With throwing validators:**
+
+```tsx
+const mustBePositive = (x: number) => {
+  if (x <= 0) throw new Error("Must be positive");
+  return x;
+};
+
+const count = signal(5);
+const validated = count.to(validate(mustBePositive));
+
+count.set(-1);
+console.log(validated().success); // false
+console.log(validated().error); // Error: Must be positive
+```
+
+<details>
+<summary>📖 <strong>Async Validation Pattern</strong></summary>
+
+**Note:** `validate()` is designed for **synchronous validation only**.
+
+For async validation (e.g., server-side uniqueness checks), chain an async selector:
+
+```tsx
+const username = signal("guest");
+
+const validated = username.to(
+  // Step 1: Sync validation (client-side)
+  validate((name) => name.length >= 3),
+
+  // Step 2: Async validation (server-side)
+  async (result) => {
+    // Skip server check if client validation failed
+    if (!result.success) {
+      return result;
+    }
+
+    // Perform async validation
+    const response = await fetch(`/api/check-username/${result.value}`);
+    const { available } = await response.json();
+
+    return {
+      value: result.value,
+      success: available,
+      error: available ? undefined : "Username is taken",
+    };
+  }
+);
+
+// Result is a Promise due to async selector
+const result = await validated();
+console.log(result.success); // true if valid and available
+```
+
+</details>
+
+**Supported validator patterns:**
+
+| Pattern               | Example                     | Success          |
+| --------------------- | --------------------------- | ---------------- |
+| Boolean return        | `(x) => x > 0`              | `true` / `false` |
+| Object with `isValid` | `{ isValid: (x) => x > 0 }` | Return value     |
+| Zod `safeParse`       | `schema.safeParse`          | `result.success` |
+| Throwing validator    | Throws on invalid           | Caught → `error` |
+
+**Return type:**
+
+```tsx
+type ValidationResult<T, R> = {
+  value: T; // Original value
+  success: boolean; // Validation result
+  result?: R; // Validator return (on success)
+  error?: unknown; // Error (on failure)
+};
+```
+
+<details>
+<summary>📖 <strong>Real-World Form with focus() + validate() + Zod</strong></summary>
+
+Combine `focus()` for nested state management and `validate()` with Zod for schema validation:
+
+```tsx
+import { signal, validate, disposable, rx, useScope } from "rextive/react";
+import { focus } from "rextive/op";
+import { z } from "zod";
+
+// Zod schemas for validation
+const userSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Invalid email address"),
+  age: z.number().min(18, "Must be 18 or older").max(120, "Invalid age"),
+});
+
+// Factory function for form state
+function createUserFormScope() {
+  // Single source of truth for form data
+  const form = signal({
+    user: { name: "", email: "", age: 0 },
+    settings: { newsletter: false },
+  });
+
+  // Create focused signals for each field
+  const name = form.to(focus("user.name"));
+  const email = form.to(focus("user.email"));
+  const age = form.to(focus("user.age"));
+  const newsletter = form.to(focus("settings.newsletter"));
+
+  // Validate the entire user object
+  const validation = form.to((f) => f.user, validate(userSchema.safeParse));
+
+  // Individual field validation (reactive)
+  const errors = {
+    name: name.to(validate((v) => v.length >= 2)),
+    email: email.to(validate((v) => v.includes("@"))),
+    age: age.to(validate((v) => v >= 18 && v <= 120)),
+  };
+
+  // Check if entire form is valid
+  const isValid = validation.to((v) => v.success);
+
+  return disposable({
+    form,
+    fields: { name, email, age, newsletter },
+    validation,
+    errors,
+    isValid,
+  });
+}
+
+function UserForm() {
+  const { fields, errors, isValid } = useScope(createUserFormScope);
+
+  return rx(() => (
+    <form>
+      <div>
+        <label>Name:</label>
+        <input
+          value={fields.name()}
+          onChange={(e) => fields.name.set(e.target.value)}
+        />
+        {!errors.name().success && <span>Name too short</span>}
+      </div>
+
+      <div>
+        <label>Email:</label>
+        <input
+          type="email"
+          value={fields.email()}
+          onChange={(e) => fields.email.set(e.target.value)}
+        />
+        {!errors.email().success && <span>Invalid email</span>}
+      </div>
+
+      <div>
+        <label>Age:</label>
+        <input
+          type="number"
+          value={fields.age()}
+          onChange={(e) => fields.age.set(Number(e.target.value))}
+        />
+        {!errors.age().success && <span>Must be 18-120</span>}
+      </div>
+
+      <div>
+        <label>
+          <input
+            type="checkbox"
+            checked={fields.newsletter()}
+            onChange={(e) => fields.newsletter.set(e.target.checked)}
+          />
+          Subscribe to newsletter
+        </label>
+      </div>
+
+      <button type="submit" disabled={!isValid()}>
+        Submit
+      </button>
+    </form>
+  ));
+}
+```
+
+**Benefits:**
+
+- ✅ **Single source of truth** - All form data in one signal
+- ✅ **Focused signals** - Edit nested fields directly
+- ✅ **Schema validation** - Full Zod schema support
+- ✅ **Reactive errors** - Field-level validation updates instantly
+- ✅ **Type-safe** - Full TypeScript inference throughout
+
+</details>
+
+<details>
+<summary>📖 <strong>Real-World Form with focus() + Yup</strong></summary>
+
+Using Yup for validation with focus():
+
+```tsx
+import { signal, validate, disposable, rx, useScope } from "rextive/react";
+import { focus } from "rextive/op";
+import * as yup from "yup";
+
+// Yup schema
+const profileSchema = yup.object({
+  firstName: yup.string().required("First name is required"),
+  lastName: yup.string().required("Last name is required"),
+  email: yup.string().email("Invalid email").required("Email is required"),
+});
+
+function createProfileFormScope() {
+  const form = signal({
+    firstName: "",
+    lastName: "",
+    email: "",
+  });
+
+  // Focused fields for direct access
+  const firstName = form.to(focus("firstName"));
+  const lastName = form.to(focus("lastName"));
+  const email = form.to(focus("email"));
+
+  // Validate with Yup schema
+  const validation = form.to(validate(profileSchema));
+
+  return disposable({
+    form,
+    fields: { firstName, lastName, email },
+    validation,
+  });
+}
+
+function ProfileForm() {
+  const { fields, validation } = useScope(createProfileFormScope);
+
+  return rx(() => {
+    const result = validation();
+
+    return (
+      <form>
+        <input
+          placeholder="First name"
+          value={fields.firstName()}
+          onChange={(e) => fields.firstName.set(e.target.value)}
+        />
+        <input
+          placeholder="Last name"
+          value={fields.lastName()}
+          onChange={(e) => fields.lastName.set(e.target.value)}
+        />
+        <input
+          type="email"
+          placeholder="Email"
+          value={fields.email()}
+          onChange={(e) => fields.email.set(e.target.value)}
+        />
+        <button disabled={!result.success}>Submit</button>
+        {!result.success && <pre>{JSON.stringify(result.error, null, 2)}</pre>}
+      </form>
+    );
+  });
+}
+```
+
+</details>
+
+---
+
 #### `disposable(obj)`
 
 Mark an object as disposable, adding a `dispose()` method that cleans up all disposable properties:
@@ -4706,21 +5041,24 @@ scope.dispose(); // Calls count.dispose(), name.dispose(), derived.dispose()
 **With useScope:**
 
 ```tsx
-import { useScope, disposable } from "rextive/react";
+import { signal, useScope, disposable } from "rextive/react";
+
+// ✅ Extract factory function for cleaner code
+function createTodoScope() {
+  const todos = signal([]);
+  const filter = signal("all");
+  const filtered = signal({ todos, filter }, ({ deps }) => {
+    return deps.filter === "all"
+      ? deps.todos
+      : deps.todos.filter((t) => t.status === deps.filter);
+  });
+
+  return disposable({ todos, filter, filtered });
+}
 
 function Component() {
-  const scope = useScope(() => {
-    const todos = signal([]);
-    const filter = signal("all");
-    const filtered = signal({ todos, filter }, ({ deps }) => {
-      return deps.filter === "all"
-        ? deps.todos
-        : deps.todos.filter((t) => t.status === deps.filter);
-    });
-
-    // disposable() enables auto-cleanup on unmount
-    return disposable({ todos, filter, filtered });
-  });
+  // Pass factory function to useScope
+  const scope = useScope(createTodoScope);
 
   // When component unmounts, all signals are automatically disposed
 }
@@ -5642,6 +5980,187 @@ scan<T, U>(
 
 ---
 
+### `focus()` - Bidirectional Lens
+
+Create a mutable signal focused on a specific path within another mutable signal. Changes flow **bidirectionally**: update the focused signal and the source updates, update the source and the focused signal updates.
+
+**Perfect for forms and nested state management.**
+
+```tsx
+import { signal } from "rextive";
+import { focus } from "rextive/op";
+
+const form = signal({
+  user: { name: "Alice", age: 30 },
+  settings: { theme: "dark" },
+});
+
+// Create focused signals for nested paths
+const userName = form.to(focus("user.name"));
+const userAge = form.to(focus("user.age"));
+const theme = form.to(focus("settings.theme"));
+
+// Read focused values
+console.log(userName()); // "Alice"
+console.log(userAge()); // 30
+
+// Update via focused signal → source updates
+userName.set("Bob");
+console.log(form().user.name); // "Bob" ✓
+
+// Update source → focused signal updates
+form.set((prev) => ({
+  ...prev,
+  user: { ...prev.user, name: "Charlie" },
+}));
+console.log(userName()); // "Charlie" ✓
+```
+
+<details>
+<summary>📖 <strong>Array Index Access</strong></summary>
+
+```tsx
+const list = signal({
+  items: [
+    { id: 1, text: "First" },
+    { id: 2, text: "Second" },
+  ],
+});
+
+// Focus on array item by index
+const firstItem = list.to(focus("items.0"));
+console.log(firstItem()); // { id: 1, text: "First" }
+
+// Focus on nested property in array
+const firstItemText = list.to(focus("items.0.text"));
+console.log(firstItemText()); // "First"
+
+firstItemText.set("Updated");
+console.log(list().items[0].text); // "Updated" ✓
+```
+
+</details>
+
+<details>
+<summary>📖 <strong>With Validation</strong></summary>
+
+```tsx
+const form = signal({ age: 25 });
+
+const age = form.to(
+  focus("age", {
+    validate: (value, ctx) => {
+      // Basic range check
+      if (value < 0 || value > 150) return false;
+
+      // Rate limiting: max change of 10 per update
+      if (ctx.prev !== undefined && Math.abs(value - ctx.prev) > 10) {
+        return false;
+      }
+
+      return true;
+    },
+    onError: (error, ctx) => {
+      console.error("Validation failed. Previous value:", ctx?.prev);
+    },
+  })
+);
+
+age.set(30); // ✓ Valid
+age.set(-5); // ✗ Rejected (out of range)
+age.set(50); // ✗ Rejected (change > 10)
+age.set(35); // ✓ Valid (30 + 5)
+```
+
+</details>
+
+<details>
+<summary>📖 <strong>With Transform</strong></summary>
+
+```tsx
+const form = signal({ email: "" });
+
+const email = form.to(
+  focus("email", {
+    // Transform on read
+    get: (value) => value.toLowerCase(),
+
+    // Transform on write (before validation)
+    set: (value, ctx) => value.trim().toLowerCase(),
+  })
+);
+
+email.set("  ALICE@EXAMPLE.COM  ");
+console.log(form().email); // "alice@example.com" (trimmed & lowercase)
+```
+
+</details>
+
+<details>
+<summary>📖 <strong>With Fallback & Error Handling</strong></summary>
+
+```tsx
+const form = signal<{ user?: { name: string } }>({ user: undefined });
+
+const userName = form.to(
+  focus("user.name" as any, {
+    // Fallback for initial read errors (e.g., path doesn't exist)
+    fallback: (error) => "Anonymous",
+
+    // Called on any error (path access, validation, set)
+    onError: (error, ctx) => {
+      console.error("Error:", error);
+      if (ctx) {
+        console.log("Previous value was:", ctx.prev);
+      }
+    },
+  })
+);
+
+console.log(userName()); // "Anonymous" (fallback used)
+```
+
+</details>
+
+**Signature:**
+
+```tsx
+focus<T extends object, P extends Path<T>>(
+  path: P,
+  options?: FocusOptions<PathValue<T, P>>
+): (signal: Signal<T>) => Mutable<PathValue<T, P>>
+```
+
+**Options:**
+
+| Option     | Type                                          | Description                                      |
+| ---------- | --------------------------------------------- | ------------------------------------------------ |
+| `equals`   | `"strict"` \| `"shallow"` \| `"deep"` \| `fn` | Equality strategy for focused value              |
+| `name`     | `string`                                      | Debug name for the focused signal                |
+| `get`      | `(value: T) => T`                             | Transform value when reading from source         |
+| `set`      | `(value: T, ctx: FocusContext<T>) => T`       | Transform value when writing to source           |
+| `validate` | `(value: T, ctx: FocusContext<T>) => boolean` | Validate before write (return `false` to reject) |
+| `fallback` | `(error: unknown) => T`                       | Fallback value factory for initial read errors   |
+| `onError`  | `(error: unknown, ctx?) => void`              | Called on any error (validation, path, set)      |
+
+**FocusContext:**
+
+```tsx
+interface FocusContext<T> {
+  prev: T; // Previous value before the change
+}
+```
+
+**Key Behaviors:**
+
+- ✅ **Bidirectional sync** - Changes flow both ways automatically
+- ✅ **Circular prevention** - No infinite update loops
+- ✅ **Immutable updates** - Source object is never mutated
+- ✅ **Type-safe paths** - Full TypeScript inference for nested paths
+- ⚠️ **Mutable signals only** - Throws if used with computed signals
+
+---
+
 ### Composing Operators
 
 Chain multiple operators for powerful transformations:
@@ -5653,7 +6172,7 @@ import { select, filter, scan } from "rextive/op";
 const count = signal(1);
 
 // Chain operators left-to-right
-const result = count.pipe(
+const result = count.to(
   filter((x) => x > 0), // Step 1: Only positive
   select((x) => x * 2), // Step 2: Double it
   scan((acc, x) => acc + x, 0) // Step 3: Running sum
@@ -5680,12 +6199,12 @@ const runningSum = scan((acc: number, x: number) => acc + x, 0);
 const signal1 = signal(5);
 const signal2 = signal(10);
 
-const result1 = signal1.pipe(positiveOnly, double, runningSum);
-const result2 = signal2.pipe(positiveOnly, double, runningSum);
+const result1 = signal1.to(positiveOnly, double, runningSum);
+const result2 = signal2.to(positiveOnly, double, runningSum);
 
 // Or create a pipeline factory
 function createPositiveDoubleSum(source: Signal<number>) {
-  return source.pipe(positiveOnly, double, runningSum);
+  return source.to(positiveOnly, double, runningSum);
 }
 
 const result3 = createPositiveDoubleSum(signal(15));
@@ -6581,6 +7100,7 @@ rextive/cache     # Data caching with strategies
 - `wait` - Promise utilities (`wait.any`, `wait.race`, `wait.settled`, `wait.timeout`, `wait.delay`)
 - `awaited` - Transform async/sync values uniformly
 - `compose` - Function composition utility
+- `validate` - Wrap validators (Zod, Yup, custom) into unified result format
 - `disposable` - Automatic cleanup for objects
 - `producer` - Lazy factory for instance management (AbortControllers, connections, etc.)
 
@@ -6597,6 +7117,7 @@ rextive/cache     # Data caching with strategies
 - `select` - Transform values (like `Array.map`)
 - `filter` - Filter values (like `Array.filter`)
 - `scan` - Accumulate values (like `Array.reduce`)
+- `focus` - Bidirectional lens into nested mutable signals (perfect for forms)
 
 **Immer (`rextive/immer`):**
 

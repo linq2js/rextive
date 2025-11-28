@@ -2049,10 +2049,74 @@ function Component() {
 
 - `batch()` - Batch updates
 - `disposable()` - Combine disposables
+- `validate()` - Wrap validators (Zod, Yup, custom) into unified result
 - `is()` - Check if observable
 - `isSignal()` - Check if signal
 - `emitter()` - Create event emitter
 - `tryDispose()` - Safe disposal
+
+---
+
+### `validate()` - Validation Utility
+
+Wrap various validator patterns into a unified result format. **Sync validation only.**
+
+```tsx
+import { signal, validate } from "rextive";
+
+// Simple predicate
+const isPositive = (x: number) => x > 0;
+const count = signal(5);
+const validated = count.to(validate(isPositive));
+
+console.log(validated().success); // true
+console.log(validated().value);   // 5
+
+// With Zod
+import { z } from "zod";
+const schema = z.object({ name: z.string() });
+const form = signal({ name: "John" });
+const validated = form.to(validate(schema.safeParse));
+
+// With Yup (pass schema object, not schema.isValid)
+import * as yup from "yup";
+const schema = yup.object({ name: yup.string() });
+const validated = form.to(validate(schema));
+```
+
+**Async validation pattern:**
+
+```tsx
+const username = signal("guest");
+
+const validated = username.to(
+  // Step 1: Sync validation (client-side)
+  validate((name) => name.length >= 3),
+
+  // Step 2: Async validation (server-side)
+  async (result) => {
+    if (!result.success) return result;
+
+    const response = await fetch(`/api/check-username/${result.value}`);
+    const { available } = await response.json();
+
+    return {
+      value: result.value,
+      success: available,
+      error: available ? undefined : "Username is taken",
+    };
+  }
+);
+
+const result = await validated();
+```
+
+**Supported patterns:**
+
+- Boolean predicates: `(x) => x > 0`
+- Object with `isValid`: `{ isValid: (x) => x > 0 }` (Yup)
+- Zod `safeParse`: `schema.safeParse`
+- Throwing validators (errors are caught)
 
 ---
 

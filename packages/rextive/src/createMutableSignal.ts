@@ -46,6 +46,7 @@ import { createComputedSignal } from "./createComputedSignal";
 import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
 import { getCurrent } from "./contextDispatcher";
+import { nextName } from "./utils/nameGenerator";
 
 /**
  * Create a mutable signal instance
@@ -94,6 +95,9 @@ export function createMutableSignal(
   // Resolve equals option to actual comparison function
   // Supports: "strict", "shallow", "deep", custom function, or defaults to Object.is
   const equals = resolveEquals(equalsOption) || Object.is;
+
+  // Generate display name: use provided name or auto-generate for devtools
+  const displayName = name ?? nextName("mutable");
 
   // ============================================================================
   // 2. EVENT EMITTERS
@@ -272,7 +276,7 @@ export function createMutableSignal(
         } catch (fallbackError) {
           // Fallback itself failed - store both errors
           current = {
-            error: new FallbackError(error, fallbackError, name),
+            error: new FallbackError(error, fallbackError, displayName),
             value: undefined,
           };
           // Don't throw - just store error state
@@ -591,12 +595,13 @@ export function createMutableSignal(
     [SIGNAL_TYPE]: true,
 
     // Debug name for development/debugging
-    displayName: name,
+    displayName,
 
     // Core methods
     get, // Read value
     on, // Subscribe to changes
     dispose, // Clean up resources
+    disposed: isDisposed, // Check if disposed
 
     // Mutable-specific methods
     set, // Update value

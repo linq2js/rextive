@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { signal } from "./signal";
+import { validate } from "./validate";
 
 describe("zod", () => {
   it("should validate with zod", () => {
@@ -8,7 +9,8 @@ describe("zod", () => {
       name: z.string(),
     });
     const person = signal({ name: "John" });
-    const validated = person.to((p) => schema.safeParse(p));
+    const validated = person.to(validate(schema.safeParse));
     expect(validated().success).toBe(true);
+    expect(validated().value).toBe(person());
   });
 });

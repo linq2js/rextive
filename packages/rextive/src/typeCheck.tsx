@@ -2556,6 +2556,296 @@ function persistorTests() {
   name.dispose();
 }
 
+// =============================================================================
+// PATH TYPE TESTS - Type-safe nested property access
+// =============================================================================
+
+import type { Path, PathValue, PathSetter, PathGetter } from "./types";
+
+function pathTypeTests() {
+  // Test object type
+  type User = {
+    name: string;
+    age: number;
+    address: {
+      city: string;
+      zip: number;
+      coords: {
+        lat: number;
+        lng: number;
+      };
+    };
+    tags: string[];
+    scores: number[];
+    metadata: Record<string, unknown>;
+  };
+
+  // Path tests - should infer all valid paths
+  type UserPaths = Path<User>;
+  const validPaths: UserPaths[] = [
+    "name",
+    "age",
+    "address",
+    "address.city",
+    "address.zip",
+    "address.coords",
+    "address.coords.lat",
+    "address.coords.lng",
+    "tags",
+    "scores",
+    "metadata",
+  ];
+
+  // PathValue tests - should infer correct value types
+  type NameType = PathValue<User, "name">;
+  expectType<NameType>("" as string);
+
+  type AgeType = PathValue<User, "age">;
+  expectType<AgeType>(0 as number);
+
+  type CityType = PathValue<User, "address.city">;
+  expectType<CityType>("" as string);
+
+  type ZipType = PathValue<User, "address.zip">;
+  expectType<ZipType>(0 as number);
+
+  type LatType = PathValue<User, "address.coords.lat">;
+  expectType<LatType>(0 as number);
+
+  type AddressType = PathValue<User, "address">;
+  expectType<AddressType>({} as User["address"]);
+
+  type TagsType = PathValue<User, "tags">;
+  expectType<TagsType>([] as string[]);
+
+  // PathSetter usage
+  const setter: PathSetter<User> = (_path, _value) => {
+    // Implementation would go here
+  };
+
+  // These should all compile correctly with inferred value types
+  setter("name", "Alice");
+  setter("age", 30);
+  setter("address.city", "NYC");
+  setter("address.zip", 10001);
+  setter("address.coords.lat", 40.7128);
+  setter("tags", ["tag1", "tag2"]);
+
+  // With updater function
+  setter("age", (prev) => prev + 1);
+  setter("name", (prev) => prev.toUpperCase());
+  setter("tags", (prev) => [...prev, "new"]);
+
+  // PathGetter usage
+  const getter: PathGetter<User> = <P extends Path<User>>(_path: P) => {
+    return {} as PathValue<User, P>;
+  };
+
+  const name: string = getter("name");
+  const age: number = getter("age");
+  const city: string = getter("address.city");
+  const lat: number = getter("address.coords.lat");
+  const tags: string[] = getter("tags");
+
+  // Array index paths
+  type ArrayItem = {
+    items: { id: number; name: string }[];
+  };
+
+  type ItemPaths = Path<ArrayItem>;
+  const arrayPaths: ItemPaths[] = [
+    "items",
+    // Array with numeric index paths
+    "items.0",
+    "items.0.id",
+    "items.0.name",
+    "items.1",
+    "items.99",
+  ];
+
+  // PathValue for array indexed paths
+  type ItemsType = PathValue<ArrayItem, "items">;
+  expectType<ItemsType>([] as { id: number; name: string }[]);
+
+  type FirstItemType = PathValue<ArrayItem, "items.0">;
+  expectType<FirstItemType>({} as { id: number; name: string });
+
+  type ItemIdType = PathValue<ArrayItem, "items.0.id">;
+  expectType<ItemIdType>(0 as number);
+
+  type ItemNameType = PathValue<ArrayItem, "items.0.name">;
+  expectType<ItemNameType>("" as string);
+
+  // Setter with array paths
+  const arraySetter: PathSetter<ArrayItem> = (_path, _value) => {};
+  arraySetter("items", [{ id: 1, name: "test" }]);
+  arraySetter("items.0", { id: 1, name: "test" });
+  arraySetter("items.0.id", 42);
+  arraySetter("items.0.name", "updated");
+
+  // Tuple type paths
+  type TupleType = {
+    coords: [number, number, number];
+  };
+
+  type TuplePaths = Path<TupleType>;
+  const tuplePaths: TuplePaths[] = [
+    "coords",
+    "coords.0",
+    "coords.1",
+    "coords.2",
+  ];
+
+  type TupleFirstType = PathValue<TupleType, "coords.0">;
+  expectType<TupleFirstType>(0 as number);
+
+  // Nested arrays
+  type NestedArray = {
+    matrix: { row: number[] }[];
+  };
+
+  type MatrixPaths = Path<NestedArray>;
+  const matrixPaths: MatrixPaths[] = [
+    "matrix",
+    "matrix.0",
+    "matrix.0.row",
+    "matrix.0.row.0",
+  ];
+
+  type MatrixRowType = PathValue<NestedArray, "matrix.0.row">;
+  expectType<MatrixRowType>([] as number[]);
+
+  type MatrixCellType = PathValue<NestedArray, "matrix.0.row.0">;
+  expectType<MatrixCellType>(0 as number);
+
+  void validPaths,
+    name,
+    age,
+    city,
+    lat,
+    tags,
+    arrayPaths,
+    tuplePaths,
+    matrixPaths;
+}
+
+// ============================================================================
+// Focus Operator Type Tests
+// ============================================================================
+import { focus } from "./operators/focus";
+
+function focusOperatorTests() {
+  // Basic object
+  type User = {
+    name: string;
+    age: number;
+    email: string;
+  };
+
+  const user = signal<User>({
+    name: "Alice",
+    age: 30,
+    email: "alice@example.com",
+  });
+
+  // Should infer string type for name
+  const userName = user.pipe(focus("name"));
+  expectType<Mutable<string>>(userName);
+  expectType<string>(userName());
+
+  // Should infer number type for age
+  const userAge = user.pipe(focus("age"));
+  expectType<Mutable<number>>(userAge);
+  expectType<number>(userAge());
+
+  // Set should accept correct type
+  userName.set("Bob");
+  userName.set((prev) => prev.toUpperCase());
+
+  userAge.set(25);
+  userAge.set((prev) => prev + 1);
+
+  // Nested objects
+  type Form = {
+    user: {
+      profile: {
+        displayName: string;
+        bio: string;
+      };
+      settings: {
+        theme: "light" | "dark";
+        notifications: boolean;
+      };
+    };
+    items: { id: number; text: string }[];
+  };
+
+  const form = signal<Form>({
+    user: {
+      profile: { displayName: "Alice", bio: "Hello" },
+      settings: { theme: "light", notifications: true },
+    },
+    items: [{ id: 1, text: "First" }],
+  });
+
+  // Nested path should work
+  const displayName = form.pipe(focus("user.profile.displayName"));
+  expectType<Mutable<string>>(displayName);
+
+  const theme = form.pipe(focus("user.settings.theme"));
+  expectType<Mutable<"light" | "dark">>(theme);
+
+  const notifications = form.pipe(focus("user.settings.notifications"));
+  expectType<Mutable<boolean>>(notifications);
+
+  // Array access
+  const firstItem = form.pipe(focus("items.0"));
+  expectType<Mutable<{ id: number; text: string }>>(firstItem);
+
+  const firstItemId = form.pipe(focus("items.0.id"));
+  expectType<Mutable<number>>(firstItemId);
+
+  const firstItemText = form.pipe(focus("items.0.text"));
+  expectType<Mutable<string>>(firstItemText);
+
+  // Options should work
+  const userNameWithOptions = user.pipe(
+    focus("name", {
+      equals: "shallow",
+      fallback: () => "default",
+      name: "userName",
+      get: (v) => v.toUpperCase(),
+      set: (v) => v.trim(),
+      validate: (v) => v.length > 0,
+      onError: (e) => console.error(e),
+    })
+  );
+  expectType<Mutable<string>>(userNameWithOptions);
+
+  // Should have disposed() method
+  expectType<() => boolean>(user.disposed);
+  expectType<boolean>(user.disposed());
+
+  // disposed() should work on mutable signal
+  const count = signal(0);
+  expectType<() => boolean>(count.disposed);
+
+  // disposed() should work on computed signal
+  const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+  expectType<() => boolean>(doubled.disposed);
+
+  void userName,
+    userAge,
+    displayName,
+    theme,
+    notifications,
+    firstItem,
+    firstItemId,
+    firstItemText,
+    userNameWithOptions,
+    doubled;
+}
+
 export {
   signalTests,
   loadableTests,
@@ -2570,4 +2860,6 @@ export {
   pluginTests,
   anySignalTests,
   persistorTests,
+  pathTypeTests,
+  focusOperatorTests,
 };

@@ -143,9 +143,25 @@ export type HydrateStatus = "success" | "skipped";
 export type Signal<TValue, TInit = TValue> = Observable &
   Disposable &
   Accessor<TValue | TInit> & {
-    readonly displayName?: string;
+    readonly displayName: string;
 
     get(): TValue | TInit;
+
+    /**
+     * Check if the signal has been disposed.
+     *
+     * @returns true if the signal has been disposed, false otherwise
+     *
+     * @example
+     * ```ts
+     * const count = signal(0);
+     * console.log(count.disposed()); // false
+     *
+     * count.dispose();
+     * console.log(count.disposed()); // true
+     * ```
+     */
+    disposed(): boolean;
 
     /**
      * Reset the signal to its initial value
@@ -524,6 +540,156 @@ export type Selector<TValue, TReturn> = (
  */
 export type ToOptions<T> = PredefinedEquals | SignalOptions<T>;
 
+// ============================================================================
+// PATH TYPES - Type-safe nested property access (similar to React Hook Form)
+// ============================================================================
+
+/**
+ * Primitive types that terminate path traversal
+ */
+type Primitive = string | number | boolean | bigint | symbol | null | undefined;
+
+/**
+ * Check if a type is any (used to prevent infinite recursion)
+ */
+type IsAny<T> = 0 extends 1 & T ? true : false;
+
+/**
+ * Array key type for indexed access
+ */
+type ArrayKey = number;
+
+/**
+ * Tuple keys (numeric string literals for tuple indices)
+ */
+type TupleKeys<T extends readonly any[]> = Exclude<keyof T, keyof any[]>;
+
+/**
+ * Check if array is a tuple (has known length)
+ */
+type IsTuple<T extends readonly any[]> = number extends T["length"]
+  ? false
+  : true;
+
+/**
+ * Get all valid dot-notation paths for an object type.
+ * Supports nested objects, arrays with numeric indices, and tuples.
+ *
+ * @example
+ * ```ts
+ * type User = { name: string; address: { city: string } };
+ * type UserPaths = Path<User>;
+ * // "name" | "address" | "address.city"
+ *
+ * type List = { items: { id: number }[] };
+ * type ListPaths = Path<List>;
+ * // "items" | `items.${number}` | `items.${number}.id`
+ * ```
+ */
+export type Path<T> = T extends readonly any[]
+  ? IsTuple<T> extends true
+    ? TupleKeys<T> | PathImplArray<T, TupleKeys<T> & string>
+    : `${ArrayKey}` | PathImplArray<T, `${ArrayKey}`>
+  : PathImplObject<T>;
+
+type PathImplObject<T> = {
+  [K in keyof T & string]: IsAny<T[K]> extends true
+    ? K
+    : T[K] extends Primitive
+    ? K
+    : T[K] extends readonly any[]
+    ? K | `${K}.${Path<T[K]>}`
+    : T[K] extends object
+    ? K | `${K}.${Path<T[K]>}`
+    : K;
+}[keyof T & string];
+
+type PathImplArray<
+  T extends readonly any[],
+  K extends string
+> = T extends readonly (infer V)[]
+  ? IsAny<V> extends true
+    ? K
+    : V extends Primitive
+    ? K
+    : V extends readonly any[]
+    ? K | `${K}.${Path<V>}`
+    : V extends object
+    ? K | `${K}.${Path<V>}`
+    : K
+  : K;
+
+/**
+ * Get the value type at a given path.
+ * Handles nested objects, array indices, and tuples.
+ *
+ * @example
+ * ```ts
+ * type User = { name: string; address: { city: string } };
+ * type Name = PathValue<User, "name">; // string
+ * type City = PathValue<User, "address.city">; // string
+ *
+ * type List = { items: { id: number }[] };
+ * type ItemId = PathValue<List, "items.0.id">; // number
+ * ```
+ */
+export type PathValue<
+  T,
+  P extends Path<T>
+> = P extends `${infer K}.${infer Rest}`
+  ? K extends keyof T
+    ? Rest extends Path<T[K]>
+      ? PathValue<T[K], Rest>
+      : never
+    : K extends `${ArrayKey}`
+    ? T extends readonly (infer V)[]
+      ? Rest extends Path<V>
+        ? PathValue<V, Rest>
+        : never
+      : never
+    : never
+  : P extends keyof T
+  ? T[P]
+  : P extends `${ArrayKey}`
+  ? T extends readonly (infer V)[]
+    ? V
+    : never
+  : never;
+
+/**
+ * Type-safe setter function signature for nested paths.
+ *
+ * @example
+ * ```ts
+ * interface FormState {
+ *   user: { name: string; age: number };
+ *   tags: string[];
+ * }
+ *
+ * const form = signal<FormState>({ user: { name: "", age: 0 }, tags: [] });
+ *
+ * // With PathSetter type:
+ * type SetFn = PathSetter<FormState>;
+ * // Equivalent to:
+ * // <P extends Path<FormState>>(path: P, value: PathValue<FormState, P>) => void
+ *
+ * form.setPath("user.name", "Alice"); // ✅ value must be string
+ * form.setPath("user.age", 30);       // ✅ value must be number
+ * form.setPath("tags", ["a", "b"]);   // ✅ value must be string[]
+ * ```
+ */
+export type PathSetter<T extends object> = <P extends Path<T>>(
+  path: P,
+  value: PathValue<T, P> | ((prev: PathValue<T, P>) => PathValue<T, P>)
+) => void;
+
+/**
+ * Type-safe getter function signature for nested paths.
+ */
+export type PathGetter<T extends object> = <P extends Path<T>>(
+  path: P
+) => PathValue<T, P>;
+
 export type TryInjectDispose<T> = T extends object
   ? T & { dispose: VoidFunction }
   : T;
@@ -789,6 +955,13 @@ export type GroupPlugin<
  */
 export type Tag<TValue, TKind extends SignalKind = "any"> = {
   [TAG_TYPE]: true;
+
+  /**
+   * Debug name for the tag.
+   * Auto-generated if not provided (e.g., "tag-1", "tag-2").
+   * Useful for devtools and debugging.
+   */
+  readonly displayName: string;
 
   /**
    * Plugins attached to this tag.

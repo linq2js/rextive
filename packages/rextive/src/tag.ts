@@ -36,6 +36,7 @@ import {
   UseList,
 } from "./types";
 import { is } from "./is";
+import { nextName } from "./utils/nameGenerator";
 
 /**
  * Configuration options for creating a tag.
@@ -327,8 +328,14 @@ export function tag<TValue, TKind extends SignalKind = "any">(
   const { name, maxSize, onAdd, onDelete, onChange, autoDispose, use } =
     options;
 
+  // Generate display name: use provided name or auto-generate for devtools
+  const displayName = name ?? nextName("tag");
+
   const tagInstance: Tag<NoInfer<TValue>, TKind> = {
     [TAG_TYPE]: true,
+
+    // Debug name for development/devtools
+    displayName,
 
     // Store plugins (readonly, cannot be modified after creation)
     use: use || [],

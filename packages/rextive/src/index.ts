@@ -49,3 +49,4 @@ export type {
   PropertyMergeStrategy,
   CombineDisposablesOptions,
 } from "./disposable";
+export { validate } from "./validate";
