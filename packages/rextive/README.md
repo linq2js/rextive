@@ -3678,7 +3678,21 @@ Quick reference for all Rextive APIs.
 | `focus(path, options?)`      | Bidirectional lens into nested mutable signals |
 | `debounce(ms)`               | Delay until value stops changing               |
 | `throttle(ms)`               | Rate limit updates to max once per interval    |
+| `delay(ms \| Date)`          | Delay emissions by time or until date          |
 | `pace(scheduler)`            | Custom timing control (low-level primitive)    |
+| `take(count)`                | Take first N emissions then stop               |
+| `takeWhile(predicate)`       | Take while predicate is true                   |
+| `takeLast(count)`            | Keep last N values as array                    |
+| `takeUntil(notifier)`        | Take until notifier signal emits               |
+| `skip(count)`                | Skip first N emissions                         |
+| `skipWhile(predicate)`       | Skip while predicate is true                   |
+| `skipLast(count)`            | Skip last N values (buffered)                  |
+| `skipUntil(notifier)`        | Skip until notifier signal emits               |
+| `min(comparer?)`             | Emit minimum value seen so far                 |
+| `max(comparer?)`             | Emit maximum value seen so far                 |
+| `count(predicate?)`          | Count emissions (optionally filtered)          |
+| `distinct(keySelector?)`     | Only emit all-time unique values               |
+| `distinctUntilChanged()`     | Only emit when value differs from previous     |
 
 ---
 
@@ -6516,6 +6530,297 @@ type Scheduler = (notify: () => void) => () => void;
 - ✅ **Composable** - Combine with other operators
 - ✅ **Auto-cleanup** - Unsubscribes and disposes on signal dispose
 - ✅ **Initial sync** - Output starts with source's current value
+
+---
+
+### `delay()` - Delay Emissions
+
+Delays emissions by a fixed duration or until a specific time.
+
+```tsx
+import { signal } from "rextive";
+import { delay } from "rextive/op";
+
+const source = signal(0);
+
+// Delay by 500ms
+const delayed = source.pipe(delay(500));
+
+source.set(1); // delayed will be 1 after 500ms
+source.set(2); // delayed will be 2 after 500ms from this set
+
+// Delay until a specific time
+const showAt = source.pipe(delay(new Date("2024-12-25T00:00:00")));
+```
+
+**Signature:**
+
+```tsx
+delay<T>(due: number | Date): (signal: Signal<T>) => Computed<T>
+```
+
+---
+
+### `take()` - Take First N Values
+
+Takes only the first N emissions, then stops updating.
+
+```tsx
+import { signal } from "rextive";
+import { take } from "rextive/op";
+
+const source = signal(0);
+const first3 = source.pipe(take(3));
+
+source.set(1); // first3 = 1
+source.set(2); // first3 = 2
+source.set(3); // first3 = 3
+source.set(4); // first3 = 3 (stopped)
+```
+
+---
+
+### `takeWhile()` - Take While Predicate True
+
+Takes emissions while predicate returns true, then stops.
+
+```tsx
+import { signal } from "rextive";
+import { takeWhile } from "rextive/op";
+
+const source = signal(0);
+const underFive = source.pipe(takeWhile((x) => x < 5));
+
+source.set(3); // underFive = 3
+source.set(5); // underFive = 3 (stopped, predicate failed)
+
+// With inclusive option - includes failing value
+const inclusive = source.pipe(takeWhile((x) => x < 5, { inclusive: true }));
+```
+
+---
+
+### `takeLast()` - Keep Last N Values
+
+Maintains a buffer of the last N values as an array.
+
+```tsx
+import { signal } from "rextive";
+import { takeLast } from "rextive/op";
+
+const source = signal(0);
+const last3 = source.pipe(takeLast(3));
+
+source.set(1); // last3 = [0, 1]
+source.set(2); // last3 = [0, 1, 2]
+source.set(3); // last3 = [1, 2, 3]
+source.set(4); // last3 = [2, 3, 4]
+```
+
+---
+
+### `takeUntil()` - Take Until Notifier Emits
+
+Takes emissions until a notifier signal changes.
+
+```tsx
+import { signal } from "rextive";
+import { takeUntil } from "rextive/op";
+
+const source = signal(0);
+const stop = signal(false);
+const taken = source.pipe(takeUntil(stop));
+
+source.set(1); // taken = 1
+stop.set(true); // Triggers stop
+source.set(2); // taken = 1 (stopped)
+
+// With multiple notifiers - stops when ANY changes
+const cancel = signal(false);
+const timeout = signal(false);
+const result = source.pipe(takeUntil([cancel, timeout]));
+```
+
+---
+
+### `skip()` - Skip First N Values
+
+Skips the first N emissions, then passes through all subsequent values.
+
+```tsx
+import { signal } from "rextive";
+import { skip } from "rextive/op";
+
+const source = signal(0);
+const skipped = source.pipe(skip(2));
+
+source.set(1); // Skipped
+source.set(2); // Skipped
+source.set(3); // skipped = 3
+source.set(4); // skipped = 4
+```
+
+---
+
+### `skipWhile()` - Skip While Predicate True
+
+Skips emissions while predicate returns true, then passes through all subsequent values.
+
+```tsx
+import { signal } from "rextive";
+import { skipWhile } from "rextive/op";
+
+const source = signal(0);
+const skipped = source.pipe(skipWhile((x) => x < 3));
+
+source.set(1); // Skipped (1 < 3)
+source.set(2); // Skipped (2 < 3)
+source.set(3); // skipped = 3 (predicate failed, start emitting)
+source.set(1); // skipped = 1 (no longer skipping)
+```
+
+---
+
+### `skipLast()` - Skip Last N Values
+
+Skips the last N values by maintaining a buffer.
+
+```tsx
+import { signal } from "rextive";
+import { skipLast } from "rextive/op";
+
+const source = signal(0);
+const skipped = source.pipe(skipLast(2));
+
+// skipped = undefined (buffer: [0])
+source.set(1); // skipped = undefined (buffer: [0, 1])
+source.set(2); // skipped = 0 (buffer: [1, 2])
+source.set(3); // skipped = 1 (buffer: [2, 3])
+```
+
+---
+
+### `skipUntil()` - Skip Until Notifier Emits
+
+Skips emissions until a notifier signal changes.
+
+```tsx
+import { signal } from "rextive";
+import { skipUntil } from "rextive/op";
+
+const source = signal(0);
+const start = signal(false);
+const skipped = source.pipe(skipUntil(start));
+
+source.set(1); // Skipped
+source.set(2); // Skipped
+start.set(true); // Start emitting
+source.set(3); // skipped = 3
+
+// With multiple notifiers - starts when ANY changes
+const ready = signal(false);
+const timeout = signal(false);
+const result = source.pipe(skipUntil([ready, timeout]));
+```
+
+---
+
+### `min()` / `max()` - Track Minimum/Maximum
+
+Emits the minimum or maximum value seen so far.
+
+```tsx
+import { signal } from "rextive";
+import { min, max } from "rextive/op";
+
+const source = signal(5);
+
+const minimum = source.pipe(min());
+const maximum = source.pipe(max());
+
+source.set(3); // minimum = 3, maximum = 5
+source.set(7); // minimum = 3, maximum = 7
+source.set(1); // minimum = 1, maximum = 7
+
+// With custom comparer for objects
+const users = signal({ id: 1, score: 50 });
+const topScorer = users.pipe(max((a, b) => a.score - b.score));
+const lowestScorer = users.pipe(min((a, b) => a.score - b.score));
+```
+
+---
+
+### `count()` - Count Emissions
+
+Counts the number of emissions, optionally filtered by a predicate.
+
+```tsx
+import { signal } from "rextive";
+import { count } from "rextive/op";
+
+const source = signal(0);
+const total = source.pipe(count());
+
+source.set(1); // total = 1
+source.set(2); // total = 2
+source.set(3); // total = 3
+
+// Count only values matching predicate
+const evenCount = source.pipe(count((x) => x % 2 === 0));
+
+source.set(4); // evenCount = 1 (4 is even)
+source.set(5); // evenCount = 1 (5 is odd, not counted)
+source.set(6); // evenCount = 2 (6 is even)
+```
+
+---
+
+### `distinct()` - All-Time Unique Values
+
+Only emits values that have never been seen before.
+
+```tsx
+import { signal } from "rextive";
+import { distinct } from "rextive/op";
+
+const source = signal(1);
+const unique = source.pipe(distinct());
+
+source.set(2); // unique = 2 (new)
+source.set(1); // No emit (seen before)
+source.set(3); // unique = 3 (new)
+source.set(2); // No emit (seen before)
+
+// With key selector for objects
+const users = signal({ id: 1, name: "Alice" });
+const uniqueById = users.pipe(distinct((u) => u.id));
+```
+
+---
+
+### `distinctUntilChanged()` - Consecutive Unique Values
+
+Only emits when value differs from the previous value.
+
+```tsx
+import { signal } from "rextive";
+import { distinctUntilChanged } from "rextive/op";
+
+const source = signal(1);
+const changed = source.pipe(distinctUntilChanged());
+
+source.set(1); // No emit (same as previous)
+source.set(2); // changed = 2
+source.set(2); // No emit (same as previous)
+source.set(1); // changed = 1 (different from previous)
+
+// With custom comparer
+const users = signal({ id: 1, name: "Alice" });
+const byId = users.pipe(distinctUntilChanged((a, b) => a.id === b.id));
+
+// With key selector
+const byUserId = users.pipe(distinctUntilChanged(undefined, (u) => u.id));
+```
 
 ---
 

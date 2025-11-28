@@ -20,3 +20,16 @@ export { delay, delayScheduler } from "./delay";
 // Take operators
 export { take, takeWhile, takeLast, takeUntil } from "./take";
 export type { TakeWhileOptions } from "./take";
+
+// Skip operators
+export { skip, skipWhile, skipLast, skipUntil } from "./skip";
+
+// Min/Max operators
+export { min, max } from "./minmax";
+export type { Comparer } from "./minmax";
+
+// Count operator
+export { count } from "./count";
+
+// Distinct operators
+export { distinct, distinctUntilChanged } from "./distinct";
