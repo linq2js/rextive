@@ -1,3 +1,6 @@
+import { is } from "../is";
+import { AUTO_NAME_PREFIX } from "./nameGenerator";
+
 /**
  * Transform utility for chaining signal transformations
  *
@@ -24,11 +27,30 @@ export function pipeSignals(
 
   intermediates.delete(source);
 
-  // If no intermediates were created, return as-is
-  if (intermediates.size === 0 || result === source) return result;
+  // If result is unchanged, return as-is
+  if (result === source) return result;
 
+  // Rename auto-generated signal names to something more meaningful.
+  // This improves DevTools visibility by showing the source signal name.
+  //
+  // Before: #computed-42
+  // After:  pipe(count|#computed-42)
+  //
+  // Conditions for renaming:
+  // 1. is(result)           - Result is a valid signal (not a plain object)
+  // 2. startsWith(AUTO_NAME_PREFIX) - Only rename auto-generated names (#...),
+  //                                   preserve user-defined names
+  if (is(result) && result.displayName.startsWith(AUTO_NAME_PREFIX)) {
+    Object.assign(result, {
+      displayName: `pipe(${source.displayName}|${result.displayName})`,
+    });
+  }
+
+  // If no intermediates, no need for cleanup dispose
+  if (intermediates.size === 0) return result;
+
+  // Attach dispose that cleans up intermediates
   if (result && (typeof result === "object" || typeof result === "function")) {
-    // Attach dispose that cleans up intermediates
     const originalDispose = result.dispose;
     result.dispose = () => {
       for (const s of intermediates) {

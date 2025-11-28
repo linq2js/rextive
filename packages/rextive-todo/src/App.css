@@ -397,6 +397,33 @@ input {
   background: var(--bg-hover);
 }
 
+.search-wrapper {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.search-wrapper .search-box {
+  min-width: auto;
+}
+
+.search-input-error {
+  border-color: var(--accent-danger) !important;
+}
+
+.search-input-error:focus {
+  border-color: var(--accent-danger) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.search-error {
+  font-size: 0.75rem;
+  color: var(--accent-danger);
+  padding-left: 4px;
+}
+
 .filter-buttons {
   display: flex;
   gap: 6px;

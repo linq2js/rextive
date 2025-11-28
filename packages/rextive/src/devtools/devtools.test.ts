@@ -16,6 +16,9 @@ import {
   reset,
 } from "./index";
 
+// Helper to flush microtasks (signal registration is deferred via queueMicrotask)
+const flush = () => new Promise((resolve) => queueMicrotask(resolve));
+
 describe("rextive/devtools", () => {
   beforeEach(() => {
     disableDevTools();
@@ -72,28 +75,31 @@ describe("rextive/devtools", () => {
       enableDevTools();
     });
 
-    it("should track created signals", () => {
+    it("should track created signals", async () => {
       const sig = signal(0, { name: "counter" });
+      await flush();
 
       expect(getSignals().size).toBe(1);
       expect(getSignal("counter")).toBeDefined();
       expect(getSignal("counter")?.signal).toBe(sig);
     });
 
-    it("should track signal kind", () => {
+    it("should track signal kind", async () => {
       const mutable = signal(0, { name: "mutable" });
       const computed = signal(
         { mutable },
         ({ deps }) => deps.mutable * 2,
         { name: "computed" }
       );
+      await flush();
 
       expect(getSignal("mutable")?.kind).toBe("mutable");
       expect(getSignal("computed")?.kind).toBe("computed");
     });
 
-    it("should mark disposed signals", () => {
+    it("should mark disposed signals", async () => {
       const sig = signal(0, { name: "counter" });
+      await flush();
       expect(getSignals().size).toBe(1);
       expect(getSignal("counter")?.disposed).toBe(false);
 
@@ -105,14 +111,16 @@ describe("rextive/devtools", () => {
       expect(getSignal("counter")?.disposedAt).toBeDefined();
     });
 
-    it("should preserve disposed signal when new signal with same name is created", () => {
+    it("should preserve disposed signal when new signal with same name is created", async () => {
       // Create and dispose a signal
       const sig1 = signal(0, { name: "counter" });
+      await flush();
       sig1.dispose();
       expect(getSignal("counter")?.disposed).toBe(true);
 
       // Create a new signal with the same name
       const sig2 = signal(100, { name: "counter" });
+      await flush();
 
       // The old disposed signal should be renamed
       expect(getSignal("counter (disposed)")?.disposed).toBe(true);
@@ -127,8 +135,9 @@ describe("rextive/devtools", () => {
       expect(getSignals().size).toBe(2);
     });
 
-    it("should track value history", () => {
+    it("should track value history", async () => {
       const sig = signal(0, { name: "counter" });
+      await flush();
 
       sig.set(1);
       sig.set(2);
@@ -142,11 +151,12 @@ describe("rextive/devtools", () => {
       expect(info?.history[2].value).toBe(1);
     });
 
-    it("should limit history size", () => {
+    it("should limit history size", async () => {
       disableDevTools();
       enableDevTools({ maxHistory: 3 });
 
       const sig = signal(0, { name: "counter" });
+      await flush();
 
       sig.set(1);
       sig.set(2);
@@ -174,10 +184,11 @@ describe("rextive/devtools", () => {
       expect(getTag("myTag")?.tag).toBe(myTag);
     });
 
-    it("should track signals in tags", () => {
+    it("should track signals in tags", async () => {
       const myTag = tag<number>({ name: "myTag" });
       const sig1 = signal(1, { name: "sig1", use: [myTag] });
       const sig2 = signal(2, { name: "sig2", use: [myTag] });
+      await flush();
 
       const tagInfo = getTag("myTag");
       expect(tagInfo?.signals.size).toBe(2);
@@ -189,9 +200,10 @@ describe("rextive/devtools", () => {
       expect(sigInfo?.tags.has("myTag")).toBe(true);
     });
 
-    it("should update when signal removed from tag", () => {
+    it("should update when signal removed from tag", async () => {
       const myTag = tag<number>({ name: "myTag" });
       const sig = signal(1, { name: "sig", use: [myTag] });
+      await flush();
 
       myTag.delete(sig);
 
@@ -199,9 +211,10 @@ describe("rextive/devtools", () => {
       expect(getSignal("sig")?.tags.has("myTag")).toBe(false);
     });
 
-    it("should update when signal disposed", () => {
+    it("should update when signal disposed", async () => {
       const myTag = tag<number>({ name: "myTag" });
       const sig = signal(1, { name: "sig", use: [myTag] });
+      await flush();
 
       sig.dispose();
 
@@ -214,11 +227,12 @@ describe("rextive/devtools", () => {
       enableDevTools();
     });
 
-    it("should emit signal:create event", () => {
+    it("should emit signal:create event", async () => {
       const listener = vi.fn();
       onDevToolsEvent(listener);
 
       signal(0, { name: "counter" });
+      await flush();
 
       expect(listener).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -228,9 +242,10 @@ describe("rextive/devtools", () => {
       );
     });
 
-    it("should emit signal:change event", () => {
+    it("should emit signal:change event", async () => {
       const listener = vi.fn();
       const sig = signal(0, { name: "counter" });
+      await flush();
 
       onDevToolsEvent(listener);
       sig.set(5);
@@ -244,9 +259,10 @@ describe("rextive/devtools", () => {
       );
     });
 
-    it("should emit signal:dispose event", () => {
+    it("should emit signal:dispose event", async () => {
       const listener = vi.fn();
       const sig = signal(0, { name: "counter" });
+      await flush();
 
       onDevToolsEvent(listener);
       sig.dispose();
@@ -259,12 +275,13 @@ describe("rextive/devtools", () => {
       );
     });
 
-    it("should emit tag events", () => {
+    it("should emit tag events", async () => {
       const listener = vi.fn();
       onDevToolsEvent(listener);
 
       const myTag = tag<number>({ name: "myTag" });
       const sig = signal(1, { name: "sig", use: [myTag] });
+      await flush();
       myTag.delete(sig);
 
       const events = listener.mock.calls.map((call) => call[0].type);
@@ -273,15 +290,17 @@ describe("rextive/devtools", () => {
       expect(events).toContain("tag:remove");
     });
 
-    it("should support unsubscribe", () => {
+    it("should support unsubscribe", async () => {
       const listener = vi.fn();
       const unsubscribe = onDevToolsEvent(listener);
 
       signal(0, { name: "sig1" });
+      await flush();
       expect(listener).toHaveBeenCalledTimes(1);
 
       unsubscribe();
       signal(0, { name: "sig2" });
+      await flush();
       expect(listener).toHaveBeenCalledTimes(1); // Still 1, no new calls
     });
   });
@@ -291,11 +310,12 @@ describe("rextive/devtools", () => {
       enableDevTools();
     });
 
-    it("should return correct statistics", () => {
+    it("should return correct statistics", async () => {
       const m1 = signal(1, { name: "m1" });
       const m2 = signal(2, { name: "m2" });
       const c1 = signal({ m1 }, ({ deps }) => deps.m1 * 2, { name: "c1" });
       const t1 = tag<number>({ name: "t1" });
+      await flush();
 
       m1.set(10);
       m1.set(20);
@@ -314,22 +334,24 @@ describe("rextive/devtools", () => {
       enableDevTools();
     });
 
-    it("should return current values", () => {
+    it("should return current values", async () => {
       const count = signal(42, { name: "count" });
       const name = signal("Alice", { name: "name" });
+      await flush();
 
       const snapshot = getSnapshot();
       expect(snapshot.count).toBe(42);
       expect(snapshot.name).toBe("Alice");
     });
 
-    it("should handle errors gracefully", () => {
+    it("should handle errors gracefully", async () => {
       const failing = signal(
         () => {
           throw new Error("fail");
         },
         { name: "failing" }
       );
+      await flush();
 
       const snapshot = getSnapshot();
       expect(snapshot.failing).toBe("[error reading value]");
@@ -341,8 +363,9 @@ describe("rextive/devtools", () => {
       enableDevTools();
     });
 
-    it("should clear all signal history", () => {
+    it("should clear all signal history", async () => {
       const sig = signal(0, { name: "counter" });
+      await flush();
       sig.set(1);
       sig.set(2);
 
@@ -360,9 +383,10 @@ describe("rextive/devtools", () => {
       enableDevTools();
     });
 
-    it("should clear all tracked data but keep devtools enabled", () => {
+    it("should clear all tracked data but keep devtools enabled", async () => {
       signal(0, { name: "sig" });
       tag<number>({ name: "tag" });
+      await flush();
 
       expect(getSignals().size).toBe(1);
       expect(getTags().size).toBe(1);
@@ -376,11 +400,12 @@ describe("rextive/devtools", () => {
   });
 
   describe("logToConsole option", () => {
-    it("should log events when enabled", () => {
+    it("should log events when enabled", async () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
       enableDevTools({ logToConsole: true, name: "test-app" });
       signal(0, { name: "counter" });
+      await flush();
 
       expect(logSpy).toHaveBeenCalledWith(
         "[test-app]",

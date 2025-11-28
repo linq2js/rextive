@@ -72,6 +72,8 @@ export type ValidationResult<T, R> =
       success: boolean;
       /** The result returned by the validator */
       result: R;
+
+      error: undefined;
     };
 
 /**
@@ -216,6 +218,7 @@ export function validate<T, R>(
           success: result,
           value,
           result,
+          error: undefined,
         };
       }
 
@@ -234,6 +237,7 @@ export function validate<T, R>(
       return {
         value,
         result,
+        error: undefined,
         success: true,
       };
     } catch (error) {

@@ -1,5 +1,7 @@
-import { signal } from "rextive";
+import { signal, validate } from "rextive";
 import { persistor } from "rextive/plugins";
+import { debounce, select } from "rextive/operators";
+import { z } from "zod";
 import type { Todo, TodoFilter, OfflineChange } from "../types/todo";
 
 // Generate unique ID
@@ -65,6 +67,27 @@ export const filter = signal<TodoFilter>("all", { name: "filter" });
 
 // Search text
 export const searchText = signal("", { name: "searchText" });
+
+// Search text validation schema
+// - Empty string is valid (no error shown)
+// - Non-empty string must be at least 5 characters
+const searchTextSchema = z
+  .string()
+  .refine((val) => val === "" || val.length >= 5, {
+    message: "Search text must be at least 5 characters",
+  });
+
+// Validated search text - debounced and validated
+export const searchTextValidated = searchText.pipe(
+  debounce(300),
+  select(
+    validate(searchTextSchema.safeParse),
+    (x) => {
+      return x.error?.errors?.[0]?.message;
+    },
+    "shallow"
+  )
+);
 
 // Sync status
 export const syncStatus = signal<"idle" | "syncing" | "error">("idle", {

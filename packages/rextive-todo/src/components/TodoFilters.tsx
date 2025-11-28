@@ -4,6 +4,7 @@ import type { TodoFilter } from "../types/todo";
 import {
   filter,
   searchText,
+  searchTextValidated,
   activeCount,
   completedCount,
   totalCount,
@@ -20,30 +21,63 @@ export function TodoFilters() {
   return (
     <div className="todo-filters">
       <div className="filters-row">
-        <div className="search-box">
-          <svg className="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          {rx(() => (
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Search todos..."
-              value={searchText()}
-              onChange={(e) => searchText.set(e.target.value)}
-            />
-          ))}
-          {rx(() =>
-            searchText() ? (
-              <button className="search-clear" onClick={() => searchText.set("")}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            ) : null
-          )}
+        <div className="search-wrapper">
+          <div className="search-box">
+            <svg
+              className="search-icon"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            {rx(() => (
+              <input
+                type="text"
+                className={`search-input ${
+                  searchTextValidated() && searchText()
+                    ? "search-input-error"
+                    : ""
+                }`}
+                placeholder="Search todos..."
+                value={searchText()}
+                onChange={(e) => searchText.set(e.target.value)}
+              />
+            ))}
+            {rx(() =>
+              searchText() ? (
+                <button
+                  className="search-clear"
+                  onClick={() => searchText.set("")}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              ) : null
+            )}
+          </div>
+          {rx(() => {
+            // Only show error if input is not empty and validation failed
+            if (searchTextValidated() && searchText()) {
+              return (
+                <div className="search-error">{searchTextValidated()}</div>
+              );
+            }
+            return null;
+          })}
         </div>
 
         <div className="filter-buttons">
@@ -51,7 +85,9 @@ export function TodoFilters() {
             <Fragment key={f.value}>
               {rx(() => (
                 <button
-                  className={`filter-btn ${filter() === f.value ? "active" : ""}`}
+                  className={`filter-btn ${
+                    filter() === f.value ? "active" : ""
+                  }`}
                   onClick={() => filter.set(f.value)}
                 >
                   {f.label}
@@ -86,4 +122,3 @@ export function TodoFilters() {
     </div>
   );
 }
-

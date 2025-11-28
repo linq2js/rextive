@@ -52,6 +52,101 @@ describe("operators", () => {
 
       expect(listener).toHaveBeenCalledTimes(1);
     });
+
+    it("should chain multiple selectors", () => {
+      const user = signal({ name: "alice", age: 30 });
+      const greeting = user.pipe(
+        select(
+          (u) => u.name,
+          (name) => name.toUpperCase(),
+          (name) => `Hello, ${name}!`
+        )
+      );
+
+      expect(greeting()).toBe("Hello, ALICE!");
+    });
+
+    it("should chain 2 selectors with type transformation", () => {
+      const count = signal(5);
+      const result = count.pipe(
+        select(
+          (x) => x * 2,
+          (x) => `Value: ${x}`
+        )
+      );
+
+      expect(result()).toBe("Value: 10");
+
+      count.set(10);
+      expect(result()).toBe("Value: 20");
+    });
+
+    it("should pass SignalContext to selectors", () => {
+      const count = signal(5);
+      const ctxReceived: any[] = [];
+
+      const result = count.pipe(
+        select((value, ctx) => {
+          ctxReceived.push(ctx);
+          expect(ctx).toBeDefined();
+          expect(ctx.deps).toBeDefined();
+          return value * 2;
+        })
+      );
+
+      expect(result()).toBe(10);
+      expect(ctxReceived.length).toBeGreaterThan(0);
+    });
+
+    it("should pass SignalContext to all chained selectors", () => {
+      const count = signal(5);
+      const ctxReceived: any[] = [];
+
+      const result = count.pipe(
+        select(
+          (value, ctx) => {
+            ctxReceived.push({ selector: 1, ctx });
+            return value * 2;
+          },
+          (value, ctx) => {
+            ctxReceived.push({ selector: 2, ctx });
+            return value + 1;
+          }
+        )
+      );
+
+      expect(result()).toBe(11); // (5 * 2) + 1
+      expect(ctxReceived.length).toBe(2);
+      expect(ctxReceived[0].selector).toBe(1);
+      expect(ctxReceived[1].selector).toBe(2);
+    });
+
+    it("should support options with chained selectors", () => {
+      const user = signal({ name: "alice", age: 30 });
+      const profile = user.pipe(
+        select(
+          (u) => u.name,
+          (name) => ({ displayName: name.toUpperCase() }),
+          "shallow"
+        )
+      );
+
+      expect(profile()).toEqual({ displayName: "ALICE" });
+    });
+
+    it("should support options object with chained selectors", () => {
+      const count = signal(5);
+      const result = count.pipe(
+        select(
+          (x) => x * 2,
+          (x) => x + 1,
+          { name: "computed-result", equals: "strict" }
+        )
+      );
+
+      expect(result()).toBe(11);
+      expect(result.displayName).toBe("computed-result");
+    });
   });
 
   describe("scan", () => {

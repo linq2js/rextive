@@ -486,3 +486,51 @@ export const headerStatBadgeStyles = (
   fontSize: "10px",
   fontWeight: 500,
 });
+
+// Search box styles
+export const searchContainerStyles: React.CSSProperties = {
+  padding: "6px 8px",
+  borderBottom: `1px solid ${colors.border}`,
+  backgroundColor: colors.bg,
+  flexShrink: 0,
+};
+
+export const searchBoxStyles: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  backgroundColor: colors.bgLight,
+  borderRadius: "4px",
+  padding: "0 8px",
+  border: `1px solid ${colors.border}`,
+  transition: "border-color 0.2s ease",
+};
+
+export const searchIconStyles: React.CSSProperties = {
+  fontSize: "10px",
+  color: colors.textMuted,
+  marginRight: "6px",
+  flexShrink: 0,
+};
+
+export const searchInputStyles: React.CSSProperties = {
+  flex: 1,
+  backgroundColor: "transparent",
+  border: "none",
+  outline: "none",
+  color: colors.text,
+  fontSize: "11px",
+  padding: "6px 0",
+  fontFamily: "inherit",
+};
+
+export const searchClearStyles: React.CSSProperties = {
+  backgroundColor: "transparent",
+  border: "none",
+  color: colors.textMuted,
+  cursor: "pointer",
+  padding: "2px 4px",
+  fontSize: "10px",
+  borderRadius: "2px",
+  marginLeft: "4px",
+  transition: "all 0.15s ease",
+};

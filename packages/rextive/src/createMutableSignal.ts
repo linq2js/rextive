@@ -47,6 +47,7 @@ import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
 import { getCurrent } from "./contextDispatcher";
 import { nextName } from "./utils/nameGenerator";
+import { resolveSelectorsRequired } from "./operators/resolveSelectors";
 
 /**
  * Create a mutable signal instance
@@ -496,47 +497,16 @@ export function createMutableSignal(
     first: (value: any, context: SignalContext) => any,
     ...rest: any[]
   ): any {
-    // Check if last argument is options (not a function)
-    const lastArg = rest[rest.length - 1];
-    const hasOptions =
-      rest.length > 0 && lastArg !== undefined && typeof lastArg !== "function";
-    const opts = hasOptions ? resolveToOptions(lastArg) : {};
-    const selectors = hasOptions ? rest.slice(0, -1) : rest;
+    const [selector, options] = resolveSelectorsRequired([first, ...rest]);
 
-    if (selectors.length === 0) {
-      // Single selector - pass context
-      return createComputedSignal(
-        { source: instance } as any,
-        (ctx: any) => first(ctx.deps.source, ctx),
-        opts,
-        createSignalContext,
-        undefined
-      );
-    }
-
-    // Multiple selectors - chain them left-to-right, all receive context
     return createComputedSignal(
       { source: instance } as any,
-      (ctx: any) => {
-        let result = first(ctx.deps.source, ctx);
-        for (const selector of selectors) {
-          result = selector(result, ctx);
-        }
-        return result;
-      },
-      opts,
+      (ctx: any) => selector(ctx.deps.source, ctx),
+      options,
       createSignalContext,
       undefined
     );
   };
-
-  /** Convert ToOptions to SignalOptions */
-  function resolveToOptions(options: any): any {
-    if (typeof options === "string") {
-      return { equals: options };
-    }
-    return options || {};
-  }
 
   // ============================================================================
   // 7. REFRESH & STALE MANAGEMENT

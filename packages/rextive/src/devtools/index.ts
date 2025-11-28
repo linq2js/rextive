@@ -93,51 +93,56 @@ function getSignalKind(signal: Signal<any>): "mutable" | "computed" {
 
 const devToolsHooks: DevTools = {
   onSignalCreate(signal: Signal<any>): void {
-    let id = signal.displayName || "unnamed";
     const now = Date.now();
 
-    // If a signal with this ID exists and is disposed, rename the disposed one
-    // to preserve it in the history (e.g., "scopedCount-1" → "scopedCount-1 (disposed)")
-    const existingInfo = signals.get(id);
-    if (existingInfo && existingInfo.disposed) {
-      const disposedId = `${id} (disposed)`;
-      // Check if we already have too many disposed versions
-      let counter = 1;
-      let finalDisposedId = disposedId;
-      while (signals.has(finalDisposedId)) {
-        counter++;
-        finalDisposedId = `${id} (disposed ${counter})`;
+    // Defer registration to allow synchronous renames (e.g., from pipeSignals) to complete.
+    // This ensures we capture the final displayName, not the initial auto-generated one.
+    queueMicrotask(() => {
+      const id = signal.displayName || "unnamed";
+
+      // If a signal with this ID exists and is disposed, rename the disposed one
+      // to preserve it in the history (e.g., "scopedCount-1" → "scopedCount-1 (disposed)")
+      const existingInfo = signals.get(id);
+      if (existingInfo && existingInfo.disposed) {
+        const disposedId = `${id} (disposed)`;
+        // Check if we already have too many disposed versions
+        let counter = 1;
+        let finalDisposedId = disposedId;
+        while (signals.has(finalDisposedId)) {
+          counter++;
+          finalDisposedId = `${id} (disposed ${counter})`;
+        }
+        existingInfo.id = finalDisposedId;
+        signals.delete(id);
+        signals.set(finalDisposedId, existingInfo);
       }
-      existingInfo.id = finalDisposedId;
-      signals.delete(id);
-      signals.set(finalDisposedId, existingInfo);
-    }
 
-    // Check which tags already have this signal registered
-    // (onTagAdd may have been called before onSignalCreate during initialization)
-    const signalTags = new Set<string>();
-    for (const [tagId, tagInfo] of tags) {
-      if (tagInfo.signals.has(id)) {
-        signalTags.add(tagId);
+      // Check which tags already have this signal registered
+      // (onTagAdd may have been called before onSignalCreate during initialization)
+      const signalTags = new Set<string>();
+      for (const [tagId, tagInfo] of tags) {
+        if (tagInfo.signals.has(id)) {
+          signalTags.add(tagId);
+        }
       }
-    }
 
-    const info: SignalInfo = {
-      id,
-      kind: getSignalKind(signal),
-      signal,
-      createdAt: now,
-      updatedAt: now,
-      changeCount: 0,
-      history: [],
-      tags: signalTags,
-      errorCount: 0,
-      errors: [],
-      disposed: false,
-    };
+      const info: SignalInfo = {
+        id,
+        kind: getSignalKind(signal),
+        signal,
+        createdAt: now,
+        updatedAt: now,
+        changeCount: 0,
+        history: [],
+        tags: signalTags,
+        errorCount: 0,
+        errors: [],
+        disposed: false,
+      };
 
-    signals.set(id, info);
-    emit({ type: "signal:create", signal: info });
+      signals.set(id, info);
+      emit({ type: "signal:create", signal: info });
+    });
   },
 
   onSignalDispose(signal: Signal<any>): void {
@@ -540,4 +545,3 @@ export function clearDisposed(): void {
     }
   }
 }
-

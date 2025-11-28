@@ -1,13 +1,17 @@
-/**
- * Signal operators for transforming signals
- *
- * Operators are functions that take a signal and return a transformed signal.
- * They can be used with the `.pipe()` method for composing transformations.
- *
- * @module operators
- */
+// Types
+export type { Scheduler, Operator } from "./types";
+export type { SelectorFn, SelectorOptions, ResolvedSelectors } from "./resolveSelectors";
 
+// Utilities
+export { resolveSelectors, resolveSelectorsRequired } from "./resolveSelectors";
+
+// Existing operators
 export { select } from "./select";
 export { scan } from "./scan";
 export { filter } from "./filter";
-export { focus, type FocusOptions } from "./focus";
+export { focus } from "./focus";
+
+// Timing operators
+export { pace } from "./pace";
+export { debounce, debounceScheduler } from "./debounce";
+export { throttle, throttleScheduler } from "./throttle";

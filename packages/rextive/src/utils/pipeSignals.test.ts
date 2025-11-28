@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { pipeSignals } from "./pipeSignals";
 import { signal } from "../signal";
 import { select } from "../operators";
+import { is } from "../is";
 
 describe("pipeSignals", () => {
   it("should return source when no operators provided", () => {
@@ -125,6 +126,76 @@ describe("pipeSignals", () => {
 
     // Should not throw when disposing
     expect(() => result.dispose?.()).not.toThrow();
+  });
+
+  describe("displayName", () => {
+    it("should preserve user-defined name on result signal", () => {
+      const source = signal(5, { name: "myCount" });
+      const result = pipeSignals(source, [
+        (s) => select((x: number) => x * 2, { name: "userDefinedName" })(s),
+      ]);
+
+      // User-defined name should be preserved (doesn't start with #)
+      expect(result.displayName).toBe("userDefinedName");
+    });
+
+    it("should not rename when result is the same as source", () => {
+      const source = signal(5, { name: "myCount" });
+      const result = pipeSignals(source, [(s) => s]);
+
+      // Should return source as-is with original name
+      expect(result.displayName).toBe("myCount");
+      expect(result).toBe(source);
+    });
+
+    it("should not rename non-signal results", () => {
+      const source = signal(5, { name: "myCount" });
+      
+      // Operator that returns a non-signal object
+      const result = pipeSignals(source, [
+        (s) => ({ value: s() * 2 }),
+      ]);
+
+      // Result is not a signal, so no renaming
+      expect(result.displayName).toBeUndefined();
+      expect(result.value).toBe(10);
+    });
+
+    it("should rename auto-generated result to pipe(source|result)", () => {
+      const source = signal(5, { name: "myCount" });
+      const result = pipeSignals(source, [
+        (s) => select((x: number) => x * 2)(s),
+      ]);
+
+      // Verify result is a signal
+      expect(is(result)).toBe(true);
+      
+      // Result should have pipe(sourceName|autoName) format
+      // e.g., pipe(myCount|#computed-42)
+      expect(result.displayName).toMatch(/^pipe\(myCount\|#computed-\d+\)$/);
+    });
+
+    it("should verify rename logic triggers correctly", () => {
+      const source = signal(5, { name: "testSource" });
+      
+      // Create a signal with auto-generated name
+      const computed = select((x: number) => x * 2)(source);
+      
+      // Verify the computed signal has auto-generated name
+      expect(computed.displayName).toMatch(/^#computed-\d+$/);
+      expect(is(computed)).toBe(true);
+      
+      // Now pipe it
+      const result = pipeSignals(source, [
+        (s) => select((x: number) => x * 2)(s),
+      ]);
+      
+      // The rename should trigger because:
+      // 1. result !== source (true)
+      // 2. is(result) (true - it's a computed signal)
+      // 3. displayName starts with # (depends on implementation)
+      expect(is(result)).toBe(true);
+    });
   });
 });
 

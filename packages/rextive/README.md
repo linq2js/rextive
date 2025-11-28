@@ -3674,6 +3674,9 @@ Quick reference for all Rextive APIs.
 | `filter(predicate, equals?)` | Filter values (like `Array.filter`)            |
 | `scan(fn, initial, equals?)` | Accumulate values (like `Array.reduce`)        |
 | `focus(path, options?)`      | Bidirectional lens into nested mutable signals |
+| `debounce(ms)`               | Delay until value stops changing               |
+| `throttle(ms)`               | Rate limit updates to max once per interval    |
+| `pace(scheduler)`            | Custom timing control (low-level primitive)    |
 
 ---
 
@@ -5714,7 +5717,15 @@ Operators are composable, reusable functions for transforming signals. They work
 **Import from `rextive/op`:**
 
 ```tsx
-import { select, filter, scan } from "rextive/op";
+import {
+  select,
+  filter,
+  scan,
+  focus,
+  debounce,
+  throttle,
+  pace,
+} from "rextive/op";
 ```
 
 ---
@@ -6158,6 +6169,269 @@ interface FocusContext<T> {
 - ✅ **Immutable updates** - Source object is never mutated
 - ✅ **Type-safe paths** - Full TypeScript inference for nested paths
 - ⚠️ **Mutable signals only** - Throws if used with computed signals
+
+---
+
+### `debounce()` - Delay Until Settled
+
+Like lodash debounce but for signals - waits until value stops changing:
+
+```tsx
+import { signal } from "rextive";
+import { debounce } from "rextive/op";
+
+const searchInput = signal("");
+
+// Only updates after 300ms of no changes
+const debouncedSearch = searchInput.pipe(debounce(300));
+
+// User types: "h" → "he" → "hel" → "hello" (each within 300ms)
+// debouncedSearch only updates once with "hello" after 300ms pause
+```
+
+**Perfect for:**
+
+- Search input → API calls
+- Form validation
+- Auto-save features
+- Window resize handlers
+
+<details>
+<summary>📖 <strong>Advanced Usage</strong></summary>
+
+```tsx
+// Form validation - validate after user stops typing
+const email = signal("");
+const debouncedEmail = email.pipe(debounce(500));
+const emailError = signal({ email: debouncedEmail }, ({ deps }) =>
+  validateEmail(deps.email)
+);
+
+// Auto-save with debounce
+const formData = signal({ name: "", bio: "" });
+const debouncedForm = formData.pipe(debounce(1000));
+
+debouncedForm.on(() => {
+  // Only called 1 second after last change
+  saveToServer(debouncedForm());
+});
+
+// Chain with other operators
+const searchResults = searchInput.pipe(
+  debounce(300), // Wait for user to stop typing
+  select(async (query) => {
+    // Then fetch results
+    if (!query) return [];
+    const res = await fetch(`/api/search?q=${query}`);
+    return res.json();
+  })
+);
+```
+
+</details>
+
+**Signature:**
+
+```tsx
+debounce<T>(ms: number): (signal: Signal<T>) => Computed<T>
+```
+
+**Parameters:**
+
+- `ms` - Delay in milliseconds to wait after last change
+
+**Behavior:**
+
+- ✅ **Coalesces rapid changes** - Many inputs → one output
+- ✅ **Trailing edge** - Emits the last value after the delay
+- ✅ **Initial value** - Immediately available (no initial delay)
+- ✅ **Auto-cleanup** - Timers cleaned up on dispose
+
+---
+
+### `throttle()` - Rate Limit Updates
+
+Like lodash throttle but for signals - limits how often updates can occur:
+
+```tsx
+import { signal } from "rextive";
+import { throttle } from "rextive/op";
+
+const scrollY = signal(0);
+
+// Updates at most every 100ms
+const throttledScroll = scrollY.pipe(throttle(100));
+
+// Scroll events fire at 60fps (every ~16ms)
+// throttledScroll updates at most 10 times per second
+```
+
+**Perfect for:**
+
+- Scroll handlers
+- Mouse move tracking
+- Real-time data streams
+- Rate-limited API calls
+
+<details>
+<summary>📖 <strong>Advanced Usage</strong></summary>
+
+```tsx
+// Mouse tracking with throttle
+const mousePosition = signal({ x: 0, y: 0 });
+const throttledPosition = mousePosition.pipe(throttle(50));
+
+// Expensive computation only runs every 50ms max
+const heatmap = signal({ pos: throttledPosition }, ({ deps }) =>
+  expensiveHeatmapCalculation(deps.pos)
+);
+
+// Real-time analytics
+const userActions = signal<Action[]>([]);
+const throttledActions = userActions.pipe(throttle(1000));
+
+throttledActions.on(() => {
+  // Send to analytics at most once per second
+  sendToAnalytics(throttledActions());
+});
+
+// Chain with other operators
+const scrollProgress = scrollY.pipe(
+  throttle(100), // Rate limit
+  select((y) => y / document.body.scrollHeight), // Calculate %
+  select((pct) => Math.round(pct * 100)) // Round
+);
+```
+
+</details>
+
+**Signature:**
+
+```tsx
+throttle<T>(ms: number): (signal: Signal<T>) => Computed<T>
+```
+
+**Parameters:**
+
+- `ms` - Minimum interval between updates in milliseconds
+
+**Behavior:**
+
+- ✅ **Leading edge** - First change emits immediately
+- ✅ **Trailing edge** - Last change during throttle period also emits
+- ✅ **Consistent rate** - Predictable update frequency
+- ✅ **Auto-cleanup** - Timers cleaned up on dispose
+
+---
+
+### `pace()` - Custom Timing Control
+
+Low-level primitive for creating custom timing behaviors. Both `debounce` and `throttle` are built on top of `pace`.
+
+```tsx
+import { signal } from "rextive";
+import { pace } from "rextive/op";
+
+const count = signal(0);
+
+// Simple delay: emit 100ms after each change
+const delayed = count.pipe(pace((notify) => () => setTimeout(notify, 100)));
+
+// Identity (pass-through, for testing)
+const immediate = count.pipe(pace((notify) => notify));
+```
+
+**Use `pace` when you need:**
+
+- Custom scheduling logic
+- Batching strategies
+- Animation frame timing
+- Custom debounce/throttle variants
+
+<details>
+<summary>📖 <strong>Advanced Usage</strong></summary>
+
+```tsx
+// Animation frame scheduler
+const animationFrameScheduler = (notify) => {
+  let frameId;
+  return () => {
+    if (frameId) cancelAnimationFrame(frameId);
+    frameId = requestAnimationFrame(() => {
+      frameId = undefined;
+      notify();
+    });
+  };
+};
+
+const mousePosition = signal({ x: 0, y: 0 });
+const smoothPosition = mousePosition.pipe(pace(animationFrameScheduler));
+
+// Batching scheduler - collect changes, emit on idle
+const idleScheduler = (notify) => {
+  let scheduled = false;
+  return () => {
+    if (!scheduled) {
+      scheduled = true;
+      requestIdleCallback(() => {
+        scheduled = false;
+        notify();
+      });
+    }
+  };
+};
+
+const batchedUpdates = source.pipe(pace(idleScheduler));
+
+// Custom debounce with max wait
+const debounceWithMaxWait = (delay, maxWait) => (notify) => {
+  let timeoutId;
+  let lastCallTime = 0;
+
+  return () => {
+    const now = Date.now();
+    clearTimeout(timeoutId);
+
+    if (now - lastCallTime >= maxWait) {
+      // Max wait exceeded, emit immediately
+      lastCallTime = now;
+      notify();
+    } else {
+      // Schedule debounced call
+      timeoutId = setTimeout(() => {
+        lastCallTime = Date.now();
+        notify();
+      }, delay);
+    }
+  };
+};
+
+const search = searchInput.pipe(pace(debounceWithMaxWait(300, 1000)));
+// Debounces at 300ms, but always emits within 1 second
+```
+
+</details>
+
+**Signature:**
+
+```tsx
+pace<T>(scheduler: Scheduler): (signal: Signal<T>) => Computed<T>
+
+type Scheduler = (notify: () => void) => () => void;
+```
+
+**Parameters:**
+
+- `scheduler` - A function that wraps the notify callback to control timing
+  - Receives `notify` - call this to update the output signal
+  - Returns a function that will be called on each source change
+
+**Behavior:**
+
+- ✅ **Flexible** - Implement any timing pattern
+- ✅ **Composable** - Combine with other operators
+- ✅ **Auto-cleanup** - Unsubscribes and disposes on signal dispose
+- ✅ **Initial sync** - Output starts with source's current value
 
 ---
 
