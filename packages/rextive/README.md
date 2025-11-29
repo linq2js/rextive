@@ -83,13 +83,24 @@ const userData = signal({ userId }, async ({ deps, abortSignal }) => {
 
 **Suspense + ErrorBoundary with `wait()`** — Declarative async rendering using React's built-in patterns:
 
+wait() throws promises for Suspense during loading and errors for ErrorBoundary on rejection
+
 ```tsx
 <ErrorBoundary fallback={<div>Something went wrong</div>}>
   <Suspense fallback={<div>Loading...</div>}>
     {rx(() => (
-      // wait() throws promises for Suspense during loading and errors for ErrorBoundary on rejection
       <User data={wait(userData)} />
     ))}
+  </Suspense>
+</ErrorBoundary>
+```
+
+**Compact syntax with `rx(Component, props)`** — Pass signal props directly, auto-unwrapped and Suspense-ready:
+
+```tsx
+<ErrorBoundary fallback={<div>Something went wrong</div>}>
+  <Suspense fallback={<div>Loading...</div>}>
+    {rx(User, { data: userData })}
   </Suspense>
 </ErrorBoundary>
 ```
@@ -137,6 +148,8 @@ enableDevTools(); // Enable signal tracking
 // Render the DevTools panel in your app
 <DevToolsPanel position="bottom-right" />;
 ```
+
+<img src="https://raw.githubusercontent.com/linq2js/rextive/main/packages/rextive/src/devtools/screenshots/devtools.png"/>
 
 ---
 

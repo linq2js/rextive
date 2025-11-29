@@ -8,7 +8,7 @@ A powerful developer tool for debugging Rextive signals in real-time.
 
 </div>
 
-<img src="./screenshots/image.png"/>
+<img src="./screenshots/devtools.png"/>
 
 ---
 
