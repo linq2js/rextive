@@ -35,12 +35,13 @@ import { Listener, SingleOrMultipleListeners } from "../types";
  * eventEmitter.clear();
  * ```
  */
-export function emitter<T = void>() {
+export function emitter<T = void>(initialListeners?: Listener<T>[]) {
   /**
    * Set of registered listeners that will be notified when events are emitted.
    * Using a Set provides O(1) removal and prevents duplicate listeners.
    */
-  const listeners = new Set<Listener<T>>();
+  const listeners = new Set<Listener<T>>(initialListeners ?? []);
+
   const emit = (payload: T, clear: boolean) => {
     // Create snapshot - necessary because Set.forEach includes items added during iteration
     const copy = Array.from(listeners);

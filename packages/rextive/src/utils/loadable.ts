@@ -55,6 +55,9 @@ export function loadable<TValue>(
   ? Loadable<T>
   : Loadable<TValue> {
   if (is(value)) {
+    if (value.error()) {
+      return loadable.error(value.error()) as any;
+    }
     value = (value as Signal<any>)();
   }
   const l = toLoadableImpl(value) as any;

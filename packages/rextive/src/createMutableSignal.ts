@@ -48,6 +48,11 @@ import { attacher } from "./attacher";
 import { getCurrent } from "./contextDispatcher";
 import { nextName } from "./utils/nameGenerator";
 import { resolveSelectorsRequired } from "./operators/resolveSelectors";
+import {
+  trackAsyncError,
+  addErrorTrace,
+  type SignalErrorWhen,
+} from "./utils/errorTracking";
 
 /**
  * Create a mutable signal instance
@@ -119,17 +124,28 @@ export function createMutableSignal(
     });
   }
 
-  // Error emitter (passes error to listeners)
-  const onErrorValue = emitter<unknown>();
-  if (onErrorCallbacks) {
-    onErrorValue.on(onErrorCallbacks);
-  }
-  // Notify devtools on error (only subscribe if devtools is enabled)
-  if (globalThis.__REXTIVE_DEVTOOLS__) {
-    onErrorValue.on((error) => {
-      globalThis.__REXTIVE_DEVTOOLS__?.onSignalError?.(instanceRef!, error);
-    });
-  }
+  /**
+   * Handle error - add trace info, trigger callbacks and devtools notification
+   */
+  const throwError = (
+    error: unknown,
+    when: SignalErrorWhen,
+    async: boolean
+  ) => {
+    // Add trace info to error for debugging
+    addErrorTrace(error, { signal: displayName, when, async });
+
+    // Trigger user-provided onError callbacks
+    if (onErrorCallbacks) {
+      if (Array.isArray(onErrorCallbacks)) {
+        onErrorCallbacks.forEach((cb) => cb(error));
+      } else {
+        onErrorCallbacks(error);
+      }
+    }
+    // Notify devtools about error
+    globalThis.__REXTIVE_DEVTOOLS__?.onSignalError?.(instanceRef!, error);
+  };
 
   // Cleanup emitter (triggered on recomputation)
   const onCleanup = emitter<void>();
@@ -169,6 +185,29 @@ export function createMutableSignal(
    * Prevents multiple synchronous refresh() calls from triggering multiple recomputations
    */
   let refreshScheduled = false;
+
+  /**
+   * Track async errors for Promise values.
+   * When signal value is a Promise, this attaches a rejection handler.
+   * The error is only captured if the Promise is still current (not stale from refresh).
+   */
+  const handleAsyncError = (when: SignalErrorWhen) => {
+    trackAsyncError(
+      () => current,
+      (error) => {
+        // Update current with error (no need to keep Promise value since signal() throws anyway)
+        current = { value: undefined, error };
+
+        // Trigger error callbacks and devtools (async = true)
+        throwError(error, when, true);
+
+        // Notify subscribers that error state changed
+        scheduleNotification(() => {
+          onChange.emit();
+        });
+      }
+    );
+  };
 
   // ============================================================================
   // 4. LIFECYCLE METHODS
@@ -230,7 +269,7 @@ export function createMutableSignal(
    * - reset() after clearing to initial value
    * - context.refresh() and context.stale() callbacks
    */
-  const recompute = () => {
+  const recompute = (when: SignalErrorWhen) => {
     // Safety check - cannot recompute disposed signal
     if (disposed) {
       throw new Error("Cannot recompute disposed signal");
@@ -244,8 +283,14 @@ export function createMutableSignal(
     context = createContext(
       deps, // Empty {} for mutable signals
       onCleanup, // Cleanup emitter
-      recompute, // Called when deps change (never for mutable)
-      () => recompute(), // onRefresh callback
+      () => {
+        // Called when deps change (never for mutable, but needed for computed)
+        recompute("compute:dependency");
+      },
+      () => {
+        // onRefresh callback
+        recompute("compute:refresh");
+      },
       () => {
         current = undefined; // onStale callback - mark for lazy recompute
       }
@@ -262,6 +307,9 @@ export function createMutableSignal(
       // Update current state if changed
       if (changed) {
         current = { value: result };
+
+        // Track async errors for Promise values
+        handleAsyncError(when);
       }
 
       // Notify subscribers (batched)
@@ -272,8 +320,8 @@ export function createMutableSignal(
         });
       }
     } catch (error) {
-      // Emit error event for error handlers
-      onErrorValue.emit(error);
+      // Trigger error callbacks and devtools (sync error)
+      throwError(error, when, false);
 
       // Try fallback if provided
       if (fallback) {
@@ -325,7 +373,7 @@ export function createMutableSignal(
     // Lazy evaluation: compute on first access
     // Allow reading last value even after disposal (but don't recompute)
     if (!current && !disposed) {
-      recompute();
+      recompute("compute:initial");
     }
 
     // Throw error if signal has error state
@@ -361,7 +409,7 @@ export function createMutableSignal(
       hasBeenModified = false; // Clear modified flag (allows hydrate again)
 
       // Recompute to get new value from factory function
-      recompute();
+      recompute("compute:initial");
 
       // Notify only if value actually changed or there's an error
       if (!current || current.error || !equals(prevValue, current.value)) {
@@ -399,6 +447,9 @@ export function createMutableSignal(
 
       // Update current state
       current = { value: next };
+
+      // Track async errors for Promise values
+      handleAsyncError("set");
 
       // Notify subscribers (batched)
       scheduleNotification(() => {
@@ -534,7 +585,7 @@ export function createMutableSignal(
       queueMicrotask(() => {
         if (!refreshScheduled) return; // Already processed
         refreshScheduled = false;
-        recompute();
+        recompute("compute:refresh");
       });
     }
   );
@@ -587,6 +638,23 @@ export function createMutableSignal(
     on, // Subscribe to changes
     dispose, // Clean up resources
     disposed: isDisposed, // Check if disposed
+    error: () => {
+      getCurrent().trackSignal(instance);
+      // Ensure computation runs if lazy
+      if (!current && !disposed) {
+        recompute("compute:initial");
+      }
+      return current?.error;
+    },
+    tryGet: () => {
+      getCurrent().trackSignal(instance);
+      // Ensure computation runs if lazy
+      if (!current && !disposed) {
+        recompute("compute:initial");
+      }
+      // Return undefined if error, otherwise return value
+      return current?.error ? undefined : current?.value;
+    },
 
     // Mutable-specific methods
     set, // Update value

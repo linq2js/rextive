@@ -16,6 +16,10 @@ export const colors = {
   success: "#4ecca3",
   warning: "#ffc107",
   error: "#e94560",
+  errorBg: "rgba(233, 69, 96, 0.15)",
+  errorText: "#ff6b6b",
+  change: "#ffa502",
+  changeBg: "rgba(255, 165, 2, 0.15)",
   mutable: "#4ecca3",
   computed: "#7b68ee",
   tag: "#ffa502",
@@ -172,25 +176,40 @@ export type FlashType = "change" | "create" | null;
 
 export const itemStyles = (
   hovered: boolean,
-  flash: FlashType = null
+  flash: FlashType = null,
+  hasError: boolean = false
 ): React.CSSProperties => {
-  const flashColor = flash === "create" ? colors.success : colors.accent;
+  const flashColor = flash === "create" ? colors.success : colors.change;
   const isFlashing = flash !== null;
+
+  // Error state takes precedence over flash state for background
+  const bgColor = hasError
+    ? colors.errorBg
+    : isFlashing
+    ? flashColor + "33"
+    : hovered
+    ? colors.bgHover
+    : colors.bgLight;
+
+  // Error state takes precedence for border
+  const borderColor = hasError
+    ? colors.error
+    : isFlashing
+    ? flashColor
+    : "transparent";
 
   return {
     padding: "6px 8px",
-    backgroundColor: isFlashing
-      ? flashColor + "33"
-      : hovered
-      ? colors.bgHover
-      : colors.bgLight,
+    backgroundColor: bgColor,
     borderRadius: "4px",
     cursor: "pointer",
     transition: "all 0.25s ease",
-    boxShadow: isFlashing ? `0 0 8px ${flashColor}44` : "none",
-    borderLeft: isFlashing
-      ? `3px solid ${flashColor}`
-      : "3px solid transparent",
+    boxShadow: hasError
+      ? `0 0 8px ${colors.error}44`
+      : isFlashing
+      ? `0 0 8px ${flashColor}44`
+      : "none",
+    borderLeft: `3px solid ${borderColor}`,
   };
 };
 

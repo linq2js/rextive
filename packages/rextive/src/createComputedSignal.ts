@@ -18,6 +18,11 @@ import { attacher } from "./attacher";
 import { getCurrent } from "./contextDispatcher";
 import { nextName } from "./utils/nameGenerator";
 import { resolveSelectorsRequired } from "./operators/resolveSelectors";
+import {
+  trackAsyncError,
+  addErrorTrace,
+  type SignalErrorWhen,
+} from "./utils/errorTracking";
 
 /**
  * Create a computed signal (with dependencies)
@@ -70,16 +75,28 @@ export function createComputedSignal(
     });
   }
 
-  const onErrorValue = emitter<unknown>();
-  if (onErrorCallbacks) {
-    onErrorValue.on(onErrorCallbacks);
-  }
-  // Notify devtools on error (only subscribe if devtools is enabled)
-  if (globalThis.__REXTIVE_DEVTOOLS__) {
-    onErrorValue.on((error) => {
-      globalThis.__REXTIVE_DEVTOOLS__?.onSignalError?.(instanceRef!, error);
-    });
-  }
+  /**
+   * Handle error - add trace info, trigger callbacks and devtools notification
+   */
+  const throwError = (
+    error: unknown,
+    when: SignalErrorWhen,
+    async: boolean
+  ) => {
+    // Add trace info to error for debugging
+    addErrorTrace(error, { signal: displayName, when, async });
+
+    // Trigger user-provided onError callbacks
+    if (onErrorCallbacks) {
+      if (Array.isArray(onErrorCallbacks)) {
+        onErrorCallbacks.forEach((cb) => cb(error));
+      } else {
+        onErrorCallbacks(error);
+      }
+    }
+    // Notify devtools about error
+    globalThis.__REXTIVE_DEVTOOLS__?.onSignalError?.(instanceRef!, error);
+  };
 
   const onCleanup = emitter<void>();
 
@@ -91,6 +108,29 @@ export function createComputedSignal(
   let hasComputed = false; // Track if signal has been computed (for hydrate)
   let refreshScheduled = false; // Track if refresh is scheduled (for batching)
   const onDispose = emitter<void>();
+
+  /**
+   * Track async errors for Promise values.
+   * When signal value is a Promise, this attaches a rejection handler.
+   * The error is only captured if the Promise is still current (not stale from refresh).
+   */
+  const handleAsyncError = (when: SignalErrorWhen) => {
+    trackAsyncError(
+      () => current,
+      (error) => {
+        // Update current with error (no need to keep Promise value since signal() throws anyway)
+        current = { value: undefined, error };
+
+        // Trigger error callbacks and devtools (async = true)
+        throwError(error, when, true);
+
+        // Notify subscribers that error state changed
+        scheduleNotification(() => {
+          onChange.emit();
+        });
+      }
+    );
+  };
 
   const isDisposed = () => disposed;
 
@@ -107,7 +147,7 @@ export function createComputedSignal(
     globalThis.__REXTIVE_DEVTOOLS__?.onSignalDispose?.(instanceRef!);
   };
 
-  const recompute = () => {
+  const recompute = (when: SignalErrorWhen) => {
     if (disposed) {
       throw new Error("Cannot recompute disposed signal");
     }
@@ -119,11 +159,15 @@ export function createComputedSignal(
       deps,
       onCleanup,
       () => {
+        // Called when deps change
         if (!isPaused) {
-          recompute();
+          recompute("compute:dependency");
         }
       },
-      () => recompute(), // onRefresh
+      () => {
+        // onRefresh callback
+        recompute("compute:refresh");
+      },
       () => {
         current = undefined;
       } // onStale
@@ -139,6 +183,9 @@ export function createComputedSignal(
 
       if (changed) {
         current = { value: result };
+
+        // Track async errors for Promise values
+        handleAsyncError(when);
       }
 
       if (changed) {
@@ -148,7 +195,8 @@ export function createComputedSignal(
         });
       }
     } catch (error) {
-      onErrorValue.emit(error);
+      // Trigger error callbacks and devtools (sync error)
+      throwError(error, when, false);
 
       const hadValue = current && !current.error;
 
@@ -193,7 +241,7 @@ export function createComputedSignal(
     // Allow reading last value/error even after disposal
     // Only recompute if not disposed and no current value
     if (!current && !disposed) {
-      recompute();
+      recompute("compute:initial");
     }
 
     if (current?.error) {
@@ -209,7 +257,7 @@ export function createComputedSignal(
     () => {
       current = undefined;
       hasComputed = false;
-      recompute();
+      recompute("compute:initial");
 
       // Always notify on reset (value changed, error state changed, or recomputed)
       scheduleNotification(() => onChange.emit());
@@ -232,7 +280,7 @@ export function createComputedSignal(
     if (!isPaused) return;
     isPaused = false;
     // Recompute with latest dependencies
-    recompute();
+    recompute("compute:refresh");
     scheduleNotification(() => onChange.emit());
   };
 
@@ -247,6 +295,10 @@ export function createComputedSignal(
     // Set value without computing
     current = { value };
     hasComputed = true;
+
+    // Track async errors for Promise values (hydrate is like initial compute)
+    handleAsyncError("compute:initial");
+
     return "success" as const;
   };
 
@@ -281,7 +333,7 @@ export function createComputedSignal(
       queueMicrotask(() => {
         if (!refreshScheduled) return; // Already processed
         refreshScheduled = false;
-        recompute();
+        recompute("compute:refresh");
       });
     }
   );
@@ -302,6 +354,23 @@ export function createComputedSignal(
     on,
     dispose,
     disposed: isDisposed,
+    error: () => {
+      getCurrent().trackSignal(instance);
+      // Ensure computation runs if lazy
+      if (!current && !disposed) {
+        recompute("compute:initial");
+      }
+      return current?.error;
+    },
+    tryGet: () => {
+      getCurrent().trackSignal(instance);
+      // Ensure computation runs if lazy
+      if (!current && !disposed) {
+        recompute("compute:initial");
+      }
+      // Return undefined if error, otherwise return value
+      return current?.error ? undefined : current?.value;
+    },
     reset,
     toJSON: get,
     pause,

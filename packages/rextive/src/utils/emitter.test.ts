@@ -316,4 +316,84 @@ describe("emitter", () => {
       expect(() => unsubscribe()).not.toThrow();
     });
   });
+
+  describe("initialListeners", () => {
+    it("should create emitter with initial listeners", () => {
+      const listener1 = vi.fn();
+      const listener2 = vi.fn();
+
+      const eventEmitter = emitter<string>([listener1, listener2]);
+      eventEmitter.emit("test");
+
+      expect(listener1).toHaveBeenCalledWith("test");
+      expect(listener2).toHaveBeenCalledWith("test");
+    });
+
+    it("should allow adding more listeners after creation with initial listeners", () => {
+      const listener1 = vi.fn();
+      const listener2 = vi.fn();
+      const listener3 = vi.fn();
+
+      const eventEmitter = emitter<string>([listener1]);
+      eventEmitter.on(listener2);
+      eventEmitter.on(listener3);
+      eventEmitter.emit("test");
+
+      expect(listener1).toHaveBeenCalledWith("test");
+      expect(listener2).toHaveBeenCalledWith("test");
+      expect(listener3).toHaveBeenCalledWith("test");
+    });
+
+    it("should handle empty initial listeners array", () => {
+      const eventEmitter = emitter<string>([]);
+      const listener = vi.fn();
+
+      eventEmitter.on(listener);
+      eventEmitter.emit("test");
+
+      expect(listener).toHaveBeenCalledWith("test");
+    });
+
+    it("should handle undefined initial listeners", () => {
+      const eventEmitter = emitter<string>(undefined);
+      const listener = vi.fn();
+
+      eventEmitter.on(listener);
+      eventEmitter.emit("test");
+
+      expect(listener).toHaveBeenCalledWith("test");
+    });
+
+    it("should deduplicate initial listeners", () => {
+      const listener = vi.fn();
+
+      // Pass the same listener twice
+      const eventEmitter = emitter<string>([listener, listener]);
+      eventEmitter.emit("test");
+
+      // Should only be called once due to Set deduplication
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it("should allow clearing initial listeners", () => {
+      const listener1 = vi.fn();
+      const listener2 = vi.fn();
+
+      const eventEmitter = emitter<string>([listener1, listener2]);
+      eventEmitter.clear();
+      eventEmitter.emit("test");
+
+      expect(listener1).not.toHaveBeenCalled();
+      expect(listener2).not.toHaveBeenCalled();
+    });
+
+    it("should work with void payload and initial listeners", () => {
+      const listener = vi.fn();
+
+      const eventEmitter = emitter<void>([listener]);
+      eventEmitter.emit(undefined);
+
+      expect(listener).toHaveBeenCalledWith(undefined);
+    });
+  });
 });

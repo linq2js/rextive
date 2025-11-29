@@ -362,6 +362,517 @@ describe("signal", () => {
       source.set(5);
       expect(mayFail()).toBe(10); // Recovered
     });
+
+    describe("signal.error() method", () => {
+      it("should return undefined when no error", () => {
+        const count = signal(0);
+        expect(count.error()).toBeUndefined();
+
+        count.set(5);
+        expect(count.error()).toBeUndefined();
+      });
+
+      it("should return error when signal has error state", () => {
+        const failing = signal(() => {
+          throw new Error("Computation failed");
+        });
+
+        // Access to trigger computation
+        expect(() => failing()).toThrow();
+
+        const err = failing.error();
+        expect(err).toBeInstanceOf(Error);
+        expect((err as Error).message).toBe("Computation failed");
+      });
+
+      it("should return undefined after fallback recovers", () => {
+        const failing = signal(
+          () => {
+            throw new Error("oops");
+          },
+          { fallback: () => 42 }
+        );
+
+        expect(failing()).toBe(42);
+        expect(failing.error()).toBeUndefined();
+      });
+
+      it("should return error when both compute and fallback fail", () => {
+        const failing = signal(
+          () => {
+            throw new Error("Original");
+          },
+          {
+            fallback: () => {
+              throw new Error("Fallback failed");
+            },
+          }
+        );
+
+        expect(() => failing()).toThrow();
+        expect(failing.error()).toBeDefined();
+      });
+
+      it("should allow checking error without triggering throw", () => {
+        const source = signal(1);
+        const mayFail = signal({ source }, ({ deps }) => {
+          if (deps.source < 0) throw new Error("Negative");
+          return deps.source;
+        });
+
+        expect(mayFail.error()).toBeUndefined();
+        expect(mayFail()).toBe(1);
+
+        source.set(-1);
+        // Access triggers error
+        expect(() => mayFail()).toThrow();
+        // Can check error without throwing
+        expect(mayFail.error()).toBeInstanceOf(Error);
+      });
+
+      it("should clear error when computation succeeds", () => {
+        const source = signal(1);
+        const mayFail = signal({ source }, ({ deps }) => {
+          if (deps.source < 0) throw new Error("Negative");
+          return deps.source;
+        });
+
+        source.set(-1);
+        expect(() => mayFail()).toThrow();
+        expect(mayFail.error()).toBeDefined();
+
+        source.set(5);
+        expect(mayFail()).toBe(5);
+        expect(mayFail.error()).toBeUndefined();
+      });
+    });
+
+    describe("signal.tryGet() method", () => {
+      it("should return value when no error", () => {
+        const count = signal(42);
+        expect(count.tryGet()).toBe(42);
+
+        count.set(100);
+        expect(count.tryGet()).toBe(100);
+      });
+
+      it("should return undefined when signal has error", () => {
+        const failing = signal(() => {
+          throw new Error("Computation failed");
+        });
+
+        expect(failing.tryGet()).toBeUndefined();
+        expect(failing.error()).toBeInstanceOf(Error);
+      });
+
+      it("should not throw on error state", () => {
+        const failing = signal(() => {
+          throw new Error("boom");
+        });
+
+        // Should not throw
+        expect(() => failing.tryGet()).not.toThrow();
+        expect(failing.tryGet()).toBeUndefined();
+      });
+
+      it("should return value after fallback recovers", () => {
+        const failing = signal(
+          () => {
+            throw new Error("oops");
+          },
+          { fallback: () => 42 }
+        );
+
+        expect(failing.tryGet()).toBe(42);
+        expect(failing.error()).toBeUndefined();
+      });
+
+      it("should return undefined when both compute and fallback fail", () => {
+        const failing = signal(
+          () => {
+            throw new Error("Original");
+          },
+          {
+            fallback: () => {
+              throw new Error("Fallback failed");
+            },
+          }
+        );
+
+        expect(failing.tryGet()).toBeUndefined();
+        expect(failing.error()).toBeDefined();
+      });
+
+      it("should work with computed signals", () => {
+        const source = signal(1);
+        const mayFail = signal({ source }, ({ deps }) => {
+          if (deps.source < 0) throw new Error("Negative");
+          return deps.source * 2;
+        });
+
+        expect(mayFail.tryGet()).toBe(2);
+
+        source.set(-1);
+        expect(mayFail.tryGet()).toBeUndefined();
+        expect(mayFail.error()).toBeDefined();
+
+        source.set(5);
+        expect(mayFail.tryGet()).toBe(10);
+        expect(mayFail.error()).toBeUndefined();
+      });
+
+      it("should trigger lazy computation", () => {
+        let computed = false;
+        const lazy = signal(() => {
+          computed = true;
+          return 42;
+        });
+
+        expect(computed).toBe(false);
+        expect(lazy.tryGet()).toBe(42);
+        expect(computed).toBe(true);
+      });
+    });
+
+    describe("async error handling", () => {
+      it("should capture error when async signal Promise rejects", async () => {
+        const asyncSignal = signal(async () => {
+          throw new Error("Async error");
+        });
+
+        // Trigger lazy computation
+        asyncSignal();
+
+        // Initially no error (Promise hasn't rejected yet)
+        expect(asyncSignal.error()).toBeUndefined();
+
+        // Wait for Promise to reject
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        // Now error should be captured
+        expect(asyncSignal.error()).toBeInstanceOf(Error);
+        expect((asyncSignal.error() as Error).message).toBe("Async error");
+      });
+
+      it("should return undefined from tryGet when async error occurs", async () => {
+        const asyncSignal = signal(async () => {
+          throw new Error("Async error");
+        });
+
+        // Trigger lazy computation - initially returns the Promise
+        expect(asyncSignal.tryGet()).toBeInstanceOf(Promise);
+
+        // Wait for Promise to reject
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        // Now tryGet should return undefined due to error
+        expect(asyncSignal.tryGet()).toBeUndefined();
+        expect(asyncSignal.error()).toBeDefined();
+      });
+
+      it("should notify subscribers when async error occurs", async () => {
+        const asyncSignal = signal(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          throw new Error("Async error");
+        });
+
+        // Trigger lazy computation first
+        asyncSignal();
+
+        const listener = vi.fn();
+        asyncSignal.on(listener);
+
+        // Wait for Promise to reject
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        // Should be notified when error is captured
+        expect(listener).toHaveBeenCalled();
+        expect(asyncSignal.error()).toBeDefined();
+      });
+
+      it("should call onError callback when async error occurs", async () => {
+        const onError = vi.fn();
+        const asyncSignal = signal(
+          async () => {
+            throw new Error("Async error");
+          },
+          { onError }
+        );
+
+        // Trigger computation
+        asyncSignal();
+
+        // Wait for Promise to reject
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      });
+
+      it("should clear error when async signal is refreshed and new Promise resolves", async () => {
+        let shouldError = true;
+        const asyncSignal = signal(async () => {
+          if (shouldError) {
+            throw new Error("Async error");
+          }
+          return 42;
+        });
+
+        // Trigger computation
+        asyncSignal();
+
+        // Wait for Promise to reject
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        expect(asyncSignal.error()).toBeDefined();
+
+        // Refresh without error
+        shouldError = false;
+        asyncSignal.refresh();
+
+        // Wait for new Promise to resolve
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        // Error should be cleared after new computation succeeds
+        expect(asyncSignal.error()).toBeUndefined();
+      });
+
+      it("should not capture error from stale Promise after refresh", async () => {
+        let rejectPromise: (error: Error) => void;
+        let callCount = 0;
+
+        const asyncSignal = signal(async () => {
+          callCount++;
+          if (callCount === 1) {
+            // First call - create a slow rejecting promise
+            return new Promise<number>((_, reject) => {
+              rejectPromise = reject;
+            });
+          }
+          // Second call - resolve immediately
+          return 42;
+        });
+
+        // Trigger first computation
+        asyncSignal();
+
+        // Refresh before first promise rejects
+        asyncSignal.refresh();
+
+        // Wait a bit for second computation to start
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        // Now reject the first (stale) promise
+        rejectPromise!(new Error("Stale error"));
+
+        // Wait for rejection to process
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        // Error should NOT be captured because it's from a stale promise
+        expect(asyncSignal.error()).toBeUndefined();
+        // Value is still a Promise (the second one)
+        expect(asyncSignal.tryGet()).toBeInstanceOf(Promise);
+      });
+
+      it("should work with computed async signals", async () => {
+        const trigger = signal(true);
+        const asyncComputed = signal({ trigger }, async ({ deps }) => {
+          if (deps.trigger) {
+            throw new Error("Computed async error");
+          }
+          return "success";
+        });
+
+        // Trigger computation
+        asyncComputed();
+
+        // Wait for Promise to reject
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        expect(asyncComputed.error()).toBeDefined();
+
+        // Fix the error by changing trigger
+        trigger.set(false);
+
+        // Wait for new computation
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        expect(asyncComputed.error()).toBeUndefined();
+      });
+    });
+
+    describe("signal.trace() - error tracing", () => {
+      it("should return trace info for sync error in mutable signal", () => {
+        const failing = signal(() => {
+          throw new Error("sync error");
+        });
+
+        let caughtError: Error | undefined;
+        try {
+          failing();
+        } catch (e) {
+          caughtError = e as Error;
+        }
+
+        expect(caughtError).toBeDefined();
+        const traces = signal.trace(caughtError!);
+        expect(traces).toBeDefined();
+        expect(traces!.length).toBeGreaterThanOrEqual(1);
+        expect(traces![0].when).toBe("compute:initial");
+        expect(traces![0].async).toBe(false);
+      });
+
+      it("should return trace info for sync error in computed signal", () => {
+        const source = signal(5);
+        const computed = signal({ source }, ({ deps }) => {
+          if (deps.source < 0) throw new Error("negative");
+          return deps.source * 2;
+        });
+
+        expect(computed()).toBe(10);
+
+        source.set(-1);
+
+        let caughtError: Error | undefined;
+        try {
+          computed();
+        } catch (e) {
+          caughtError = e as Error;
+        }
+
+        expect(caughtError).toBeDefined();
+        const traces = signal.trace(caughtError!);
+        expect(traces).toBeDefined();
+        expect(traces![0].when).toBe("compute:dependency");
+        expect(traces![0].async).toBe(false);
+      });
+
+      it("should return trace info for async error", async () => {
+        const asyncSignal = signal(async () => {
+          throw new Error("async error");
+        });
+
+        // Trigger computation
+        asyncSignal.tryGet();
+
+        // Wait for Promise to reject
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const error = asyncSignal.error();
+        expect(error).toBeDefined();
+
+        const traces = signal.trace(error!);
+        expect(traces).toBeDefined();
+        expect(traces![0].async).toBe(true);
+        expect(traces![0].when).toBe("compute:initial");
+      });
+
+      it("should accumulate traces through dependency chain (initial)", () => {
+        const source = signal(() => {
+          throw new Error("source error");
+        });
+
+        const middle = signal({ source }, ({ deps }) => {
+          return deps.source * 2;
+        });
+
+        const final = signal({ middle }, ({ deps }) => {
+          return deps.middle + 1;
+        });
+
+        let caughtError: Error | undefined;
+        try {
+          final();
+        } catch (e) {
+          caughtError = e as Error;
+        }
+
+        expect(caughtError).toBeDefined();
+        const traces = signal.trace(caughtError!);
+        expect(traces).toBeDefined();
+        expect(traces!.length).toBe(3);
+
+        // Error path: source → middle → final
+        const signals = traces!.map((t) => t.signal);
+        expect(signals[0]).toContain("mutable"); // source
+        expect(signals[1]).toContain("computed"); // middle
+        expect(signals[2]).toContain("computed"); // final
+
+        // All are compute:initial because all computed for first time (lazy)
+        expect(traces![0].when).toBe("compute:initial");
+        expect(traces![1].when).toBe("compute:initial");
+        expect(traces![2].when).toBe("compute:initial");
+      });
+
+      it("should track dependency change errors", () => {
+        const source = signal(5);
+
+        const middle = signal({ source }, ({ deps }) => {
+          if (deps.source < 0) throw new Error("negative");
+          return deps.source * 2;
+        });
+
+        const final = signal({ middle }, ({ deps }) => {
+          return deps.middle + 1;
+        });
+
+        // Initial computation succeeds
+        expect(final()).toBe(11); // (5 * 2) + 1
+
+        // Trigger error via dependency change
+        source.set(-1);
+
+        let caughtError: Error | undefined;
+        try {
+          final();
+        } catch (e) {
+          caughtError = e as Error;
+        }
+
+        expect(caughtError).toBeDefined();
+        const traces = signal.trace(caughtError!);
+        expect(traces).toBeDefined();
+        expect(traces!.length).toBe(2); // middle + final
+
+        // Error originated in middle (dependency change), propagated to final
+        expect(traces![0].when).toBe("compute:dependency");
+        expect(traces![1].when).toBe("compute:dependency");
+      });
+
+      it("should track error on refresh", async () => {
+        let shouldFail = false;
+        const refreshable = signal(() => {
+          if (shouldFail) throw new Error("refresh error");
+          return 42;
+        });
+
+        expect(refreshable()).toBe(42);
+
+        shouldFail = true;
+        refreshable.refresh();
+
+        // Wait for microtask
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        const error = refreshable.error();
+        expect(error).toBeDefined();
+
+        const traces = signal.trace(error!);
+        expect(traces).toBeDefined();
+        expect(traces![0].when).toBe("compute:refresh");
+      });
+
+      it("should return undefined for errors without traces", () => {
+        const randomError = new Error("not from signal");
+        expect(signal.trace(randomError)).toBeUndefined();
+      });
+
+      it("should return undefined for non-object errors", () => {
+        expect(signal.trace("string error")).toBeUndefined();
+        expect(signal.trace(123)).toBeUndefined();
+        expect(signal.trace(null)).toBeUndefined();
+        expect(signal.trace(undefined)).toBeUndefined();
+      });
+    });
   });
 
   describe("signal.reset", () => {

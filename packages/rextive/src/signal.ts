@@ -13,9 +13,13 @@ import { createSignalContext } from "./createSignalContext";
 import { EqualsStrategy } from "./utils/resolveEquals";
 import { signalOn } from "./signal.on";
 import { signalFrom } from "./signal.from";
+import { getErrorTrace } from "./utils/errorTracking";
 
 // Re-export signal.on types
 export type { SignalOnControl } from "./signal.on";
+
+// Re-export error trace types
+export type { SignalErrorTrace, SignalErrorWhen } from "./utils/errorTracking";
 
 /**
  * Check if value looks like a dependencies object (for computed signals)
@@ -229,3 +233,4 @@ export function signal(...args: any[]): any {
 // Attach namespace methods to signal function
 signal.on = signalOn;
 signal.from = signalFrom;
+signal.trace = getErrorTrace;

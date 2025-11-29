@@ -164,6 +164,80 @@ export type Signal<TValue, TInit = TValue> = Observable &
     disposed(): boolean;
 
     /**
+     * Get the current error state of the signal.
+     *
+     * Returns undefined if the signal is not in an error state.
+     * Use this to check for errors without triggering a throw when reading the value.
+     *
+     * @returns The error if signal is in error state, undefined otherwise
+     *
+     * @example
+     * ```ts
+     * const data = signal({ userId }, async ({ deps }) => {
+     *   const res = await fetch(`/user/${deps.userId}`);
+     *   if (!res.ok) throw new Error("Not found");
+     *   return res.json();
+     * });
+     *
+     * // Check error state without throwing
+     * if (data.error()) {
+     *   console.error("Signal has error:", data.error());
+     * } else {
+     *   console.log("Value:", data());
+     * }
+     *
+     * // Or use in reactive context
+     * data.on(() => {
+     *   const err = data.error();
+     *   if (err) {
+     *     showErrorToast(err);
+     *   }
+     * });
+     * ```
+     */
+    error(): unknown | undefined;
+
+    /**
+     * Safely get the signal value without throwing.
+     *
+     * Returns the value if successful, or undefined if the signal is in an error state.
+     * This is useful when you want to access the value without try-catch and handle
+     * errors separately via `error()`.
+     *
+     * @returns The value if no error, undefined otherwise
+     *
+     * @example
+     * ```ts
+     * const data = signal({ userId }, async ({ deps }) => {
+     *   const res = await fetch(`/user/${deps.userId}`);
+     *   if (!res.ok) throw new Error("Not found");
+     *   return res.json();
+     * });
+     *
+     * // Safe access - never throws
+     * const value = data.tryGet();
+     * if (value !== undefined) {
+     *   console.log("Got value:", value);
+     * } else if (data.error()) {
+     *   console.error("Error:", data.error());
+     * }
+     *
+     * // In React render
+     * function Component() {
+     *   return rx(() => {
+     *     const user = data.tryGet();
+     *     const err = data.error();
+     *
+     *     if (err) return <Error error={err} />;
+     *     if (!user) return <Loading />;
+     *     return <div>{user.name}</div>;
+     *   });
+     * }
+     * ```
+     */
+    tryGet(): TValue | TInit | undefined;
+
+    /**
      * Reset the signal to its initial value
      * Also clears the modification flag, allowing hydration again
      */

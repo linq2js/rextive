@@ -14,6 +14,7 @@ import { tag as tagImpl } from "./tag";
 import { signalOn } from "./signal.on";
 import { signalUse } from "./signal.use";
 import { signalFrom } from "./signal.from";
+import { getErrorTrace } from "./utils/errorTracking";
 
 // Augment signal with utility methods
 export const signal = Object.assign(signalBase, {
@@ -23,6 +24,7 @@ export const signal = Object.assign(signalBase, {
   on: signalOn,
   use: signalUse,
   from: signalFrom,
+  trace: getErrorTrace,
 });
 
 export const $ = signal;
