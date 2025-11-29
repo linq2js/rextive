@@ -22,7 +22,7 @@ import { isPromiseLike } from "../../utils/isPromiseLike";
 import * as styles from "./styles";
 import type { PanelPosition } from "./styles";
 
-type Tab = "signals" | "tags" | "errors" | "events" | "stats";
+type Tab = "signals" | "tags" | "events";
 
 const STORAGE_KEY = "rextive-devtools-config";
 
@@ -83,6 +83,7 @@ const clearConfig = () => {
 type EventLogEntry = DevToolsEvent & {
   id: number;
   timestamp: number;
+  isError?: boolean;
 };
 
 export function DevToolsPanel(): React.ReactElement | null {
@@ -130,7 +131,7 @@ export function DevToolsPanel(): React.ReactElement | null {
   const [editError, setEditError] = useState<string | null>(null);
   const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
   const [signalKindFilter, setSignalKindFilter] = useState<
-    "all" | "mutable" | "computed"
+    "all" | "mutable" | "computed" | "error" | "disposed"
   >("all");
   const eventIdRef = useRef(0);
   const flashTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -299,10 +300,20 @@ export function DevToolsPanel(): React.ReactElement | null {
     if (!enabled) return;
 
     const unsubscribe = onDevToolsEvent((event) => {
+      // Check if this is an error event (signal has error after change)
+      let isError = false;
+      if (event.type === "signal:change" && "signalId" in event) {
+        const signalInfo = getSignals().get(event.signalId);
+        if (signalInfo?.signal?.error?.()) {
+          isError = true;
+        }
+      }
+
       const entry: EventLogEntry = {
         ...event,
         id: eventIdRef.current++,
         timestamp: Date.now(),
+        isError,
       };
       setEvents((prev) => [entry, ...prev].slice(0, 100));
 
@@ -378,7 +389,13 @@ export function DevToolsPanel(): React.ReactElement | null {
     // Filter by search query
     if (searchLower && !s.id.toLowerCase().includes(searchLower)) return false;
     // Filter by kind
-    if (signalKindFilter !== "all" && s.kind !== signalKindFilter) return false;
+    if (signalKindFilter === "error") {
+      if (s.errorCount === 0) return false;
+    } else if (signalKindFilter === "disposed") {
+      if (!s.disposed) return false;
+    } else if (signalKindFilter !== "all" && s.kind !== signalKindFilter) {
+      return false;
+    }
     return true;
   });
 
@@ -508,6 +525,21 @@ export function DevToolsPanel(): React.ReactElement | null {
                   >
                     {info.id}
                   </span>
+                  <span
+                    style={{
+                      color: info.disposed ? "#888" : styles.colors.textDim,
+                      fontSize: "9px",
+                      marginLeft: "6px",
+                      flexShrink: 0,
+                      ...(info.disposed && {
+                        backgroundColor: "#333",
+                        padding: "1px 4px",
+                        borderRadius: "3px",
+                      }),
+                    }}
+                  >
+                    {info.disposed ? "disposed" : `×${info.changeCount}`}
+                  </span>
                 </span>
                 <div style={styles.signalActionsContainerStyles}>
                   {/* Copy JSON button */}
@@ -555,6 +587,18 @@ export function DevToolsPanel(): React.ReactElement | null {
                       ✏️
                     </button>
                   )}
+                  {/* View events button */}
+                  <button
+                    style={styles.signalActionButtonStyles}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSearchQuery(info.id);
+                      updateActiveTab("events");
+                    }}
+                    title="View events for this signal"
+                  >
+                    📜
+                  </button>
                   {/* Reset button for mutable signals */}
                   {!info.disposed && info.kind === "mutable" && (
                     <button
@@ -572,7 +616,7 @@ export function DevToolsPanel(): React.ReactElement | null {
                       ↺
                     </button>
                   )}
-                  {/* Resume button for paused computed signals */}
+                  {/* Refresh button for computed signals */}
                   {!info.disposed && info.kind === "computed" && (
                     <button
                       style={styles.signalActionButtonStyles}
@@ -595,19 +639,6 @@ export function DevToolsPanel(): React.ReactElement | null {
                       ⟳
                     </button>
                   )}
-                  <span
-                    style={{
-                      color: info.disposed ? "#888" : styles.colors.textDim,
-                      fontSize: "9px",
-                      ...(info.disposed && {
-                        backgroundColor: "#333",
-                        padding: "1px 4px",
-                        borderRadius: "3px",
-                      }),
-                    }}
-                  >
-                    {info.disposed ? "disposed" : `×${info.changeCount}`}
-                  </span>
                 </div>
               </div>
               <div
@@ -871,6 +902,10 @@ export function DevToolsPanel(): React.ReactElement | null {
                     cursor: hasLongValue ? "pointer" : "default",
                     flexDirection: isEventExpanded ? "column" : "row",
                     alignItems: isEventExpanded ? "flex-start" : "center",
+                    ...(event.isError && {
+                      backgroundColor: `${styles.colors.error}15`,
+                      borderLeft: `3px solid ${styles.colors.error}`,
+                    }),
                   }}
                   onClick={() => {
                     if (hasLongValue) {
@@ -1015,165 +1050,6 @@ export function DevToolsPanel(): React.ReactElement | null {
     );
   };
 
-  const renderStats = () => (
-    <div style={styles.statsGridStyles}>
-      <div style={styles.statBoxStyles}>
-        <div style={styles.statValueStyles}>{stats.signalCount}</div>
-        <div style={styles.statLabelStyles}>Signals</div>
-      </div>
-      <div style={styles.statBoxStyles}>
-        <div
-          style={{ ...styles.statValueStyles, color: styles.colors.mutable }}
-        >
-          {stats.mutableCount}
-        </div>
-        <div style={styles.statLabelStyles}>Mutable</div>
-      </div>
-      <div style={styles.statBoxStyles}>
-        <div
-          style={{ ...styles.statValueStyles, color: styles.colors.computed }}
-        >
-          {stats.computedCount}
-        </div>
-        <div style={styles.statLabelStyles}>Computed</div>
-      </div>
-      <div style={styles.statBoxStyles}>
-        <div style={{ ...styles.statValueStyles, color: styles.colors.tag }}>
-          {stats.tagCount}
-        </div>
-        <div style={styles.statLabelStyles}>Tags</div>
-      </div>
-      <div style={styles.statBoxStyles}>
-        <div style={styles.statValueStyles}>{stats.totalChanges}</div>
-        <div style={styles.statLabelStyles}>Changes</div>
-      </div>
-      <div style={styles.statBoxStyles}>
-        <div style={styles.statValueStyles}>{events.length}</div>
-        <div style={styles.statLabelStyles}>Events</div>
-      </div>
-      <div style={styles.statBoxStyles}>
-        <div
-          style={{
-            ...styles.statValueStyles,
-            color:
-              stats.totalErrors > 0
-                ? styles.colors.error
-                : styles.colors.textDim,
-          }}
-        >
-          {stats.totalErrors}
-        </div>
-        <div style={styles.statLabelStyles}>Errors</div>
-      </div>
-    </div>
-  );
-
-  // Get signals with errors (filtered by showAutoGenerated and search)
-  const signalsWithErrors = Array.from(signals.values()).filter((s) => {
-    if (s.errorCount === 0) return false;
-    if (!showAutoGenerated && isAutoGeneratedName(s.id)) return false;
-    if (searchLower && !s.id.toLowerCase().includes(searchLower)) return false;
-    return true;
-  });
-
-  const renderErrors = () => {
-    if (signalsWithErrors.length === 0) {
-      if (searchLower) {
-        return (
-          <div style={styles.emptyStateStyles}>
-            No errors match "{searchQuery}"
-          </div>
-        );
-      }
-      return (
-        <div style={styles.emptyStateStyles}>
-          <div style={{ color: styles.colors.success }}>✓ No errors</div>
-          <div style={{ fontSize: "9px", marginTop: "4px", opacity: 0.7 }}>
-            Signals are running without errors
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div>
-        {signalsWithErrors.map((info) => (
-          <div
-            key={info.id}
-            style={{
-              ...styles.itemStyles(hoveredItem === `error-${info.id}`),
-              borderLeft: `3px solid ${styles.colors.error}`,
-            }}
-            onMouseEnter={() => setHoveredItem(`error-${info.id}`)}
-            onMouseLeave={() => setHoveredItem(null)}
-          >
-            <div style={styles.itemHeaderStyles}>
-              <span style={styles.itemNameStyles}>
-                <span style={styles.badgeStyles(info.kind)}>
-                  {info.kind === "mutable" ? "M" : "C"}
-                </span>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {info.id}
-                </span>
-              </span>
-              <span
-                style={{
-                  color: styles.colors.error,
-                  fontSize: "9px",
-                  fontWeight: 600,
-                }}
-              >
-                {info.errorCount} error{info.errorCount !== 1 ? "s" : ""}
-              </span>
-            </div>
-
-            {/* Show recent errors */}
-            {info.errors.slice(0, 3).map((err, i) => (
-              <div
-                key={i}
-                style={{
-                  marginTop: i === 0 ? "6px" : "3px",
-                  padding: "4px 6px",
-                  backgroundColor: `${styles.colors.error}15`,
-                  borderRadius: "3px",
-                  fontSize: "9px",
-                }}
-              >
-                <div
-                  style={{
-                    color: styles.colors.error,
-                    fontWeight: 500,
-                    marginBottom: "2px",
-                  }}
-                >
-                  {err.message.length > 60
-                    ? err.message.slice(0, 60) + "…"
-                    : err.message}
-                </div>
-                <div
-                  style={{ color: styles.colors.textMuted, fontSize: "8px" }}
-                >
-                  {formatTime(err.timestamp)}
-                </div>
-              </div>
-            ))}
-            {info.errors.length > 3 && (
-              <div
-                style={{
-                  marginTop: "3px",
-                  fontSize: "8px",
-                  color: styles.colors.textMuted,
-                }}
-              >
-                +{info.errors.length - 3} more errors
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   const renderContent = () => {
     if (!enabled) {
       return (
@@ -1201,16 +1077,14 @@ export function DevToolsPanel(): React.ReactElement | null {
         return renderSignals();
       case "tags":
         return renderTags();
-      case "errors":
-        return renderErrors();
       case "events":
         return renderEvents();
-      case "stats":
-        return renderStats();
     }
   };
 
   // Calculate counts for tabs
+  const errorEventsCount = events.filter((e) => e.isError).length;
+
   const getTabCount = (tab: Tab): string => {
     if (!enabled) return "";
     if (tab === "signals") {
@@ -1221,9 +1095,31 @@ export function DevToolsPanel(): React.ReactElement | null {
       const count = filteredTags.length;
       return count !== tags.size ? `${count}/${tags.size}` : `${count}`;
     }
-    if (tab === "errors") return `${signalsWithErrors.length}`;
-    if (tab === "events") return `${events.length}`;
+    // Events tab count is handled separately in renderTabLabel
+    if (tab === "events") return "";
     return "";
+  };
+
+  const renderTabLabel = (tab: Tab) => {
+    const label = tab.charAt(0).toUpperCase() + tab.slice(1);
+    const count = getTabCount(tab);
+
+    if (tab === "events" && enabled) {
+      return (
+        <>
+          {label} (
+          {errorEventsCount > 0 && (
+            <span style={{ color: styles.colors.error }}>
+              {errorEventsCount}
+            </span>
+          )}
+          {errorEventsCount > 0 && "/"}
+          {events.length})
+        </>
+      );
+    }
+
+    return count ? `${label} (${count})` : label;
   };
 
   const isLeftCollapsed = position === "left" && !isExpanded;
@@ -1329,18 +1225,15 @@ export function DevToolsPanel(): React.ReactElement | null {
         {isExpanded && (
           <>
             <div style={styles.tabsContainerStyles}>
-              {(["signals", "tags", "errors", "events", "stats"] as Tab[]).map(
-                (tab) => (
-                  <button
-                    key={tab}
-                    style={styles.tabStyles(activeTab === tab)}
-                    onClick={() => updateActiveTab(tab)}
-                  >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                    {getTabCount(tab) && ` (${getTabCount(tab)})`}
-                  </button>
-                )
-              )}
+              {(["signals", "tags", "events"] as Tab[]).map((tab) => (
+                <button
+                  key={tab}
+                  style={styles.tabStyles(activeTab === tab)}
+                  onClick={() => updateActiveTab(tab)}
+                >
+                  {renderTabLabel(tab)}
+                </button>
+              ))}
 
               {/* Reset config button */}
               <button
@@ -1355,138 +1248,172 @@ export function DevToolsPanel(): React.ReactElement | null {
               </button>
             </div>
 
-            {/* Search box - shown for searchable tabs */}
-            {activeTab !== "stats" && (
-              <div style={styles.searchContainerStyles}>
-                <div style={styles.searchBoxStyles}>
-                  <span style={styles.searchIconStyles}>🔍</span>
-                  <input
-                    type="text"
-                    placeholder={`Search ${activeTab}...`}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    style={styles.searchInputStyles}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  {searchQuery && (
-                    <button
-                      style={styles.searchClearStyles}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSearchQuery("");
-                      }}
-                      title="Clear search"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-
-                {/* Signal filters - only shown on signals tab */}
-                {activeTab === "signals" && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      marginTop: "6px",
-                      flexWrap: "wrap",
+            {/* Search box */}
+            <div style={styles.searchContainerStyles}>
+              <div style={styles.searchBoxStyles}>
+                <span style={styles.searchIconStyles}>🔍</span>
+                <input
+                  type="text"
+                  placeholder={`Search ${activeTab}...`}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={styles.searchInputStyles}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {searchQuery && (
+                  <button
+                    style={styles.searchClearStyles}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSearchQuery("");
                     }}
+                    title="Clear search"
                   >
-                    {/* Kind filter buttons */}
-                    <div style={{ display: "flex", gap: "2px" }}>
-                      {(["all", "mutable", "computed"] as const).map((kind) => {
-                        const isActive = signalKindFilter === kind;
-                        const label =
-                          kind === "all" ? "A" : kind === "mutable" ? "M" : "C";
-                        const color =
-                          kind === "mutable"
-                            ? styles.colors.mutable
-                            : kind === "computed"
-                            ? styles.colors.computed
-                            : styles.colors.text;
-                        const count =
-                          kind === "all"
-                            ? signals.size
-                            : kind === "mutable"
-                            ? stats.mutableCount
-                            : stats.computedCount;
-
-                        return (
-                          <button
-                            key={kind}
-                            style={{
-                              padding: "3px 8px",
-                              fontSize: "10px",
-                              fontWeight: 600,
-                              backgroundColor: isActive
-                                ? color + "33"
-                                : styles.colors.bgHover,
-                              border: `1px solid ${
-                                isActive ? color : styles.colors.border
-                              }`,
-                              borderRadius: "4px",
-                              color: isActive ? color : styles.colors.textMuted,
-                              cursor: "pointer",
-                              fontFamily: "inherit",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                            }}
-                            onClick={() => setSignalKindFilter(kind)}
-                            title={`Show ${kind} signals`}
-                          >
-                            {label}
-                            <span
-                              style={{
-                                fontWeight: 400,
-                                fontSize: "9px",
-                                opacity: 0.8,
-                              }}
-                            >
-                              {count}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* User/All toggle */}
-                    <button
-                      style={{
-                        padding: "3px 8px",
-                        fontSize: "10px",
-                        backgroundColor: showAutoGenerated
-                          ? styles.colors.accent + "33"
-                          : styles.colors.bgHover,
-                        border: `1px solid ${
-                          showAutoGenerated
-                            ? styles.colors.accent
-                            : styles.colors.border
-                        }`,
-                        borderRadius: "4px",
-                        color: showAutoGenerated
-                          ? styles.colors.accent
-                          : styles.colors.textMuted,
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                        marginLeft: "auto",
-                      }}
-                      onClick={() =>
-                        updateShowAutoGenerated(!showAutoGenerated)
-                      }
-                      title={
-                        showAutoGenerated
-                          ? "Hide auto-generated signals"
-                          : "Show all signals (including #auto)"
-                      }
-                    >
-                      {showAutoGenerated ? "#auto" : "user"}
-                    </button>
-                  </div>
+                    ✕
+                  </button>
                 )}
               </div>
-            )}
+
+              {/* Signal filters - only shown on signals tab */}
+              {activeTab === "signals" && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    marginTop: "6px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {/* Kind filter buttons */}
+                  <div style={{ display: "flex", gap: "2px" }}>
+                    {(
+                      [
+                        "all",
+                        "mutable",
+                        "computed",
+                        "error",
+                        "disposed",
+                      ] as const
+                    ).map((kind) => {
+                      const isActive = signalKindFilter === kind;
+                      const label =
+                        kind === "all"
+                          ? "A"
+                          : kind === "mutable"
+                          ? "M"
+                          : kind === "computed"
+                          ? "C"
+                          : kind === "error"
+                          ? "E"
+                          : "D";
+                      const color =
+                        kind === "mutable"
+                          ? styles.colors.mutable
+                          : kind === "computed"
+                          ? styles.colors.computed
+                          : kind === "error"
+                          ? styles.colors.error
+                          : kind === "disposed"
+                          ? "#666"
+                          : styles.colors.text;
+                      const count =
+                        kind === "all"
+                          ? signals.size
+                          : kind === "mutable"
+                          ? stats.mutableCount
+                          : kind === "computed"
+                          ? stats.computedCount
+                          : kind === "error"
+                          ? stats.signalsWithErrors
+                          : stats.disposedCount;
+
+                      // Emphasize E filter when there are errors
+                      const hasErrors =
+                        kind === "error" && stats.signalsWithErrors > 0;
+
+                      return (
+                        <button
+                          key={kind}
+                          style={{
+                            padding: "3px 8px",
+                            fontSize: "10px",
+                            fontWeight: 600,
+                            backgroundColor:
+                              isActive || hasErrors
+                                ? color + "33"
+                                : styles.colors.bgHover,
+                            border: `1px solid ${
+                              isActive || hasErrors
+                                ? color
+                                : styles.colors.border
+                            }`,
+                            borderRadius: "4px",
+                            color:
+                              isActive || hasErrors
+                                ? color
+                                : styles.colors.textMuted,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            ...(hasErrors &&
+                              !isActive && {
+                                animation: "pulse 2s infinite",
+                              }),
+                          }}
+                          onClick={() => setSignalKindFilter(kind)}
+                          title={`Show ${kind} signals`}
+                        >
+                          {label}
+                          <span
+                            style={{
+                              fontWeight: 400,
+                              fontSize: "9px",
+                              opacity: 0.8,
+                            }}
+                          >
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* User/All toggle */}
+                  <button
+                    style={{
+                      padding: "3px 8px",
+                      fontSize: "10px",
+                      backgroundColor: showAutoGenerated
+                        ? styles.colors.accent + "33"
+                        : styles.colors.bgHover,
+                      border: `1px solid ${
+                        showAutoGenerated
+                          ? styles.colors.accent
+                          : styles.colors.border
+                      }`,
+                      borderRadius: "4px",
+                      color: showAutoGenerated
+                        ? styles.colors.accent
+                        : styles.colors.textMuted,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      marginLeft: "auto",
+                    }}
+                    onClick={() => updateShowAutoGenerated(!showAutoGenerated)}
+                    title={
+                      showAutoGenerated
+                        ? "Hide auto-generated signals"
+                        : "Show all signals (including #auto)"
+                    }
+                  >
+                    {showAutoGenerated ? "#auto" : "user"}
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div style={styles.contentStyles}>{renderContent()}</div>
           </>
