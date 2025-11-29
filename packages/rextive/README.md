@@ -116,9 +116,9 @@ yarn add rextive
 **Deno (JSR):**
 
 ```ts
-import { signal } from "jsr:@rextive/core";
+import { signal } from "jsr:@ging/rextive";
 // or in deno.json
-// "imports": { "rextive": "jsr:@rextive/core" }
+// "imports": { "rextive": "jsr:@ging/rextive" }
 ```
 
 **Deno (npm compatibility):**
