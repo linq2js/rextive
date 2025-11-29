@@ -165,6 +165,14 @@ input {
   animation: fadeInUp 0.6s ease 0.1s both;
 }
 
+.todo-card-title {
+  margin: 0;
+  padding: 20px 20px 0;
+  color: #e0e7ff;
+  font-size: 18px;
+  font-weight: 600;
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -181,7 +189,6 @@ input {
 ======================================== */
 .sync-controls {
   padding: 16px 20px;
-  background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;

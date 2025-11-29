@@ -41,12 +41,13 @@ export function App() {
                 </linearGradient>
               </defs>
             </svg>
-            <h1>Rextive Todo</h1>
+            <h1>Reactive Live Demo</h1>
           </div>
           <span className="subtitle">Offline-first • Signal-powered</span>
         </header>
 
         <div className="todo-card">
+          <h3 className="todo-card-title">📝 Todo Demo</h3>
           <SyncControls />
           <TodoInput />
           <TodoFilters />
