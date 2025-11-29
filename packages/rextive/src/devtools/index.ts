@@ -569,3 +569,19 @@ export function clearDisposed(): void {
     }
   }
 }
+
+/**
+ * Delete a single signal from the registry by ID.
+ * Only works for disposed signals.
+ *
+ * @param id - Signal displayName to delete
+ * @returns true if signal was deleted, false otherwise
+ */
+export function deleteSignal(id: string): boolean {
+  const info = signals.get(id);
+  if (info && info.disposed) {
+    signals.delete(id);
+    return true;
+  }
+  return false;
+}

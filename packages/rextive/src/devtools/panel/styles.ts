@@ -31,7 +31,7 @@ export const PANEL_SIZE_EXPANDED_BOTTOM = 280;
 export const PANEL_SIZE_EXPANDED_LEFT = 320;
 export const PANEL_MIN_SIZE_BOTTOM = 150;
 export const PANEL_MAX_SIZE_BOTTOM = 600;
-export const PANEL_MIN_SIZE_LEFT = 200;
+export const PANEL_MIN_SIZE_LEFT = 340;
 export const PANEL_MAX_SIZE_LEFT = 500;
 
 export type PanelPosition = "bottom" | "left";
