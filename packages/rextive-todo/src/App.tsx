@@ -6,6 +6,7 @@ import { TodoFilters } from "./components/TodoFilters";
 import { SyncControls } from "./components/SyncControls";
 import { ScopeTest } from "./components/ScopeTest";
 import { ErrorDemo } from "./components/ErrorDemo";
+import { CounterDemo } from "./components/CounterDemo";
 import { initializeStore } from "./store/todoStore";
 import "./App.css";
 
@@ -52,6 +53,8 @@ export function App() {
           <TodoList />
         </div>
         <ErrorDemo />
+
+        <CounterDemo />
 
         <ScopeTest />
 
