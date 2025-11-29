@@ -43,7 +43,7 @@ export function App() {
             </svg>
             <h1>Reactive Live Demo</h1>
           </div>
-          <span className="subtitle">Offline-first • Signal-powered</span>
+          <span className="subtitle">Signal-powered</span>
         </header>
 
         <div className="todo-card">
@@ -60,7 +60,7 @@ export function App() {
         <ScopeTest />
 
         <footer className="app-footer">
-          <p>Double-click to edit • Built with Rextive signals</p>
+          <p>Built with Rextive signals</p>
         </footer>
       </main>
 

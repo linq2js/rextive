@@ -5,7 +5,8 @@
 
 // Font families
 export const fontUI = '"Roboto", "Helvetica", "Arial", sans-serif';
-export const fontMono = '"JetBrains Mono", "Fira Code", "SF Mono", Monaco, Consolas, monospace';
+export const fontMono =
+  '"JetBrains Mono", "Fira Code", "SF Mono", Monaco, Consolas, monospace';
 
 export const colors = {
   bg: "#1a1a2e",
@@ -40,7 +41,9 @@ export const PANEL_MAX_SIZE_LEFT = 500;
 
 export type PanelPosition = "bottom" | "left";
 
-export const panelContainerStyles = (position: PanelPosition): React.CSSProperties => ({
+export const panelContainerStyles = (
+  position: PanelPosition
+): React.CSSProperties => ({
   position: "fixed",
   ...(position === "bottom"
     ? { bottom: 0, left: 0, right: 0 }
@@ -58,9 +61,11 @@ export const panelStyles = (
   isResizing?: boolean
 ): React.CSSProperties => {
   const isBottom = position === "bottom";
-  const defaultSize = isBottom ? PANEL_SIZE_EXPANDED_BOTTOM : PANEL_SIZE_EXPANDED_LEFT;
+  const defaultSize = isBottom
+    ? PANEL_SIZE_EXPANDED_BOTTOM
+    : PANEL_SIZE_EXPANDED_LEFT;
   const expandedSize = customSize ?? defaultSize;
-  
+
   return {
     backgroundColor: colors.bg,
     ...(isBottom
@@ -77,21 +82,29 @@ export const panelStyles = (
           height: "100%",
         }),
     // Disable transition while resizing for smooth drag
-    transition: isResizing ? "none" : (isBottom ? "height 0.2s ease-out" : "width 0.2s ease-out"),
+    transition: isResizing
+      ? "none"
+      : isBottom
+      ? "height 0.2s ease-out"
+      : "width 0.2s ease-out",
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
   };
 };
 
-export const headerStyles = (position: PanelPosition, isExpanded: boolean): React.CSSProperties => {
+export const headerStyles = (
+  position: PanelPosition,
+  isExpanded: boolean
+): React.CSSProperties => {
   const isBottom = position === "bottom";
   const isLeftCollapsed = position === "left" && !isExpanded;
-  
+
   return {
     padding: isLeftCollapsed ? "12px 8px" : "8px 12px",
     backgroundColor: colors.bgLight,
-    borderBottom: isBottom || isExpanded ? `1px solid ${colors.border}` : "none",
+    borderBottom:
+      isBottom || isExpanded ? `1px solid ${colors.border}` : "none",
     borderRight: isLeftCollapsed ? `1px solid ${colors.border}` : "none",
     display: "flex",
     flexDirection: isLeftCollapsed ? "column" : "row",
@@ -107,7 +120,9 @@ export const headerStyles = (position: PanelPosition, isExpanded: boolean): Reac
   };
 };
 
-export const titleStyles = (vertical: boolean = false): React.CSSProperties => ({
+export const titleStyles = (
+  vertical: boolean = false
+): React.CSSProperties => ({
   margin: 0,
   fontSize: vertical ? "11px" : "13px",
   fontWeight: 600,
@@ -122,7 +137,6 @@ export const titleStyles = (vertical: boolean = false): React.CSSProperties => (
 export const headerRightStyles: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: "12px",
 };
 
 export const tabsContainerStyles: React.CSSProperties = {
@@ -156,12 +170,15 @@ export const contentStyles: React.CSSProperties = {
   padding: "6px 8px",
 };
 
-export const contentGridStyles = (position: PanelPosition = "left"): React.CSSProperties => ({
+export const contentGridStyles = (
+  position: PanelPosition = "left"
+): React.CSSProperties => ({
   display: "grid",
   // When at bottom, use wider min-width (320px) for better readability in horizontal layout
-  gridTemplateColumns: position === "bottom" 
-    ? "repeat(auto-fill, minmax(320px, 1fr))"
-    : "repeat(auto-fill, minmax(200px, 1fr))",
+  gridTemplateColumns:
+    position === "bottom"
+      ? "repeat(auto-fill, minmax(320px, 1fr))"
+      : "repeat(auto-fill, minmax(200px, 1fr))",
   gap: "6px",
 });
 
@@ -345,13 +362,16 @@ export const toggleButtonStyles: React.CSSProperties = {
   border: "none",
   color: colors.textMuted,
   cursor: "pointer",
-  padding: "4px 8px",
+  padding: 0,
   borderRadius: "4px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   transition: "all 0.15s ease",
-  fontSize: "16px",
+  fontSize: "20px",
+  width: "32px",
+  height: "32px",
+  flexShrink: 0,
 };
 
 export const positionButtonStyles: React.CSSProperties = {
@@ -359,14 +379,17 @@ export const positionButtonStyles: React.CSSProperties = {
   border: "none",
   color: colors.textMuted,
   cursor: "pointer",
-  padding: "4px",
+  padding: 0,
   borderRadius: "4px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   transition: "all 0.15s ease",
-  fontSize: "12px",
+  fontSize: "20px",
   opacity: 0.7,
+  width: "32px",
+  height: "32px",
+  flexShrink: 0,
 };
 
 export const resetButtonStyles: React.CSSProperties = {
@@ -386,9 +409,12 @@ export const resetButtonStyles: React.CSSProperties = {
   fontFamily: fontUI,
 };
 
-export const resizeHandleStyles = (position: PanelPosition, isResizing: boolean): React.CSSProperties => {
+export const resizeHandleStyles = (
+  position: PanelPosition,
+  isResizing: boolean
+): React.CSSProperties => {
   const isBottom = position === "bottom";
-  
+
   return {
     position: "absolute",
     ...(isBottom
@@ -410,17 +436,21 @@ export const resizeHandleStyles = (position: PanelPosition, isResizing: boolean)
     transition: "background-color 0.15s ease",
     zIndex: 10,
     // Hover effect
-    ...(isResizing ? {} : {
-      "&:hover": {
-        backgroundColor: colors.border,
-      },
-    }),
+    ...(isResizing
+      ? {}
+      : {
+          "&:hover": {
+            backgroundColor: colors.border,
+          },
+        }),
   };
 };
 
-export const resizeHandleGripStyles = (position: PanelPosition): React.CSSProperties => {
+export const resizeHandleGripStyles = (
+  position: PanelPosition
+): React.CSSProperties => {
   const isBottom = position === "bottom";
-  
+
   return {
     position: "absolute",
     ...(isBottom
@@ -575,14 +605,17 @@ export const signalActionButtonStyles: React.CSSProperties = {
   border: `1px solid ${colors.border}`,
   color: colors.textMuted,
   cursor: "pointer",
-  padding: "2px 6px",
-  fontSize: "9px",
-  borderRadius: "3px",
+  padding: 0,
+  fontSize: "11px",
+  borderRadius: "4px",
   transition: "all 0.15s ease",
   fontFamily: fontUI,
   display: "inline-flex",
   alignItems: "center",
-  gap: "2px",
+  justifyContent: "center",
+  width: "22px",
+  height: "22px",
+  flexShrink: 0,
 };
 
 export const signalActionsContainerStyles: React.CSSProperties = {
