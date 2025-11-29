@@ -103,12 +103,28 @@ enableDevTools();
 
 ## 📦 Install
 
+**npm / pnpm / yarn:**
+
 ```bash
 npm install rextive
 # or
 pnpm add rextive
 # or
 yarn add rextive
+```
+
+**Deno (JSR):**
+
+```ts
+import { signal } from "jsr:@rextive/core";
+// or in deno.json
+// "imports": { "rextive": "jsr:@rextive/core" }
+```
+
+**Deno (npm compatibility):**
+
+```ts
+import { signal } from "npm:rextive";
 ```
 
 ---

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://jsr.io/schema/config-file.v1.json",
+  "name": "@rextive/core",
+  "version": "2.27.1",
+  "license": "MIT",
+  "description": "A reactive state management library with explicit dependencies - works with React, Deno, and vanilla JS",
+  "imports": {
+    "lodash/isEqual": "npm:lodash@4/isEqual",
+    "lodash/debounce": "npm:lodash@4/debounce",
+    "react": "npm:react@18",
+    "immer": "npm:immer@10"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react/index.ts",
+    "./immer": "./src/immer/index.ts",
+    "./op": "./src/op.ts",
+    "./cache": "./src/cache/index.ts",
+    "./plugins": "./src/plugins/index.ts",
+    "./devtools": "./src/devtools/index.ts",
+    "./devtools/panel": "./src/devtools/panel/index.tsx",
+    "./operators": "./src/operators/index.ts"
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "README.md",
+    "LICENSE"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/typeCheck.tsx"
+  ],
+  "publish": {
+    "include": [
+      "src/**/*.ts",
+      "src/**/*.tsx",
+      "README.md",
+      "LICENSE"
+    ],
+    "exclude": [
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+      "src/**/*.spec.ts",
+      "src/**/*.spec.tsx",
+      "src/typeCheck.tsx"
+    ]
+  }
+}

@@ -60,12 +60,15 @@
     "version:patch": "npm version patch -m \"chore: bump version to %s\"",
     "version:minor": "npm version minor -m \"chore: bump version to %s\"",
     "version:major": "npm version major -m \"chore: bump version to %s\"",
-    "postversion": "git push && git push --tags",
+    "postversion": "npm run sync:jsr-version && git add jsr.json && git commit --amend --no-edit && git push && git push --tags",
     "prepublishOnly": "npm run build",
-    "postpublish": "git diff --quiet || (git add -A && git commit -m \"chore: post-publish updates\" && git push)",
+    "postpublish": "npm run jsr:publish && (git diff --quiet || (git add -A && git commit -m \"chore: post-publish updates\" && git push))",
+    "sync:jsr-version": "node -e \"const pkg=require('./package.json');const jsr=require('./jsr.json');jsr.version=pkg.version;require('fs').writeFileSync('./jsr.json',JSON.stringify(jsr,null,2)+'\\n')\"",
     "pu:pa": "npm run version:patch && npm publish",
     "pu:mi": "npm run version:minor && npm publish",
-    "pu:ma": "npm run version:major && npm publish"
+    "pu:ma": "npm run version:major && npm publish",
+    "jsr:publish": "npx jsr publish --allow-slow-types --allow-dirty",
+    "jsr:publish:dry": "npx jsr publish --dry-run --allow-slow-types --allow-dirty"
   },
   "keywords": [
     "state",
