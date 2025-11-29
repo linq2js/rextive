@@ -1,6 +1,6 @@
 {
   "name": "rextive",
-  "version": "2.27.3",
+  "version": "2.27.4",
   "description": "A reactive state management library for React with explicit dependencies",
   "type": "module",
   "main": "./dist/rextive.js",
@@ -63,10 +63,10 @@
     "postversion": "npm run sync:jsr-version && git add jsr.json && git commit --amend --no-edit && git push && git push --tags",
     "prepublishOnly": "npm run build",
     "sync:jsr-version": "node -e \"const pkg=require('./package.json');const jsr=require('./jsr.json');jsr.version=pkg.version;require('fs').writeFileSync('./jsr.json',JSON.stringify(jsr,null,2)+'\\n')\"",
-    "pu:pa": "npm run version:patch && npm publish && npm run jsr:publish",
-    "pu:mi": "npm run version:minor && npm publish && npm run jsr:publish",
-    "pu:ma": "npm run version:major && npm publish && npm run jsr:publish",
-    "jsr:publish": "npx jsr publish"
+    "pu:pa": "npm run version:patch && npm publish",
+    "pu:mi": "npm run version:minor && npm publish",
+    "pu:ma": "npm run version:major && npm publish",
+    "jsr:publish": "npx jsr publish --allow-dirty"
   },
   "keywords": [
     "state",
