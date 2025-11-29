@@ -16,15 +16,17 @@ One concept. Zero complexity. Pure power.
 
 ## ✨ Why Developers Love Rextive
 
+Create reactive state with `signal()`, derive computed values with `.to()` or explicit dependencies, and render reactively with `rx()` — all with zero boilerplate:
+
 ```tsx
 import { signal, rx } from "rextive/react";
 
 // 🎯 One concept for everything
-const count = signal(0);
-const doubled = count.to((x) => x * 2);
-const tripled = signal({ count }, ({ deps }) => deps.count * 3);
+const count = signal(0); // Mutable state
+const doubled = count.to((x) => x * 2); // Derived value
+const tripled = signal({ count }, ({ deps }) => deps.count * 3); // Explicit deps
 
-// 🔥 Zero boilerplate React
+// 🔥 Zero boilerplate React — rx() makes any signal reactive
 const App = () => (
   <div>
     Count: {rx(count)} | Doubled: {rx(doubled)}
@@ -38,24 +40,30 @@ const App = () => (
 
 ### **Unified API** — One `signal()` for state, computed, and async
 
+No need to learn different APIs for different use cases. `signal()` handles mutable state, computed values, and async data fetching with the same intuitive interface:
+
 ```tsx
-const user = signal({ name: "Alice" }); // State
-const greeting = user.to((u) => `Hello, ${u.name}!`); // Computed
-const data = signal(async () => fetch("/api")); // Async
+const user = signal({ name: "Alice" }); // Mutable state
+const greeting = user.to((u) => `Hello, ${u.name}!`); // Computed from state
+const data = signal(async () => fetch("/api")); // Async data fetching
 ```
 
 ### **First-Class Async** — Promises just work
 
 ```tsx
+// Async signals automatically handle promises and cancellation
 const userData = signal({ userId }, async ({ deps, abortSignal }) => {
   const res = await fetch(`/users/${deps.userId}`, { signal: abortSignal });
   return res.json();
 });
+```
 
-// Automatic loading states
+**Manual loading states with `loadable()`** — Full control over loading, error, and success states:
+
+```tsx
 {
   rx(() => {
-    const state = loadable(userData());
+    const state = loadable(userData);
     if (state.status === "loading") return <Spinner />;
     if (state.status === "error") return <Error error={state.error} />;
     return <User data={state.value} />;
@@ -63,19 +71,38 @@ const userData = signal({ userId }, async ({ deps, abortSignal }) => {
 }
 ```
 
+**Suspense + ErrorBoundary with `wait()`** — Declarative async rendering using React's built-in patterns:
+
+```tsx
+<ErrorBoundary fallback={<div>Something went wrong</div>}>
+  <Suspense fallback={<div>Loading...</div>}>
+    {rx(() => (
+      // wait() throws promises for Suspense during loading and errors for ErrorBoundary on rejection
+      <User data={wait(userData)} />
+    ))}
+  </Suspense>
+</ErrorBoundary>
+```
+
 ### **Powerful Operators** — RxJS-inspired pipelines
+
+Chain operators to build complex data flows. Debounce user input, filter invalid values, and transform results — all in a clean, readable pipeline:
 
 ```tsx
 import { debounce, distinct, filter, to } from "rextive/op";
 
+const searchTerm = signal("");
+
 const searchResults = searchTerm.pipe(
-  debounce(300),
-  filter((term) => term.length > 2),
-  to((term) => fetchResults(term))
+  debounce(300), // Wait 300ms after typing stops
+  filter((term) => term.length > 2), // Only search if 3+ characters
+  to((term) => fetchResults(term)) // Transform to async search results
 );
 ```
 
 ### **Error Tracing** — Debug errors across signal chains
+
+When errors occur in complex signal chains, `signal.trace()` shows the complete propagation path — which signal failed, when it failed, and how the error bubbled up through dependencies:
 
 ```tsx
 try {
@@ -90,12 +117,14 @@ try {
 
 ### **Built-in DevTools** — Visual debugging panel
 
+Enable the built-in DevTools to inspect all signals in real-time. See current values, track changes, and debug your reactive state with a collapsible panel:
+
 ```tsx
 import { enableDevTools, DevToolsPanel } from "rextive/devtools";
 
-enableDevTools();
+enableDevTools(); // Enable signal tracking
 
-// Renders a collapsible panel showing all signals, values, and events
+// Render the DevTools panel in your app
 <DevToolsPanel position="bottom-right" />;
 ```
 
