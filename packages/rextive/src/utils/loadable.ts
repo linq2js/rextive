@@ -8,7 +8,7 @@ import {
   type Loadable,
   Signal,
 } from "../types";
-import { getCurrent } from "../contextDispatcher";
+import { getRenderHooks } from "../hooks";
 import { is } from "../is";
 
 // Re-export types
@@ -62,7 +62,7 @@ export function loadable<TValue>(
   }
   const l = toLoadableImpl(value) as any;
 
-  getCurrent().trackLoadable(l);
+  getRenderHooks().onLoadableAccess(l);
 
   return l;
 }

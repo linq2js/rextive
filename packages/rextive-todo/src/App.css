@@ -355,7 +355,7 @@ input {
   border-bottom: 1px solid var(--border-color);
 }
 
-.filters-row {
+.search-row {
   display: flex;
   gap: 12px;
   margin-bottom: 14px;
@@ -708,12 +708,18 @@ input {
     font-size: 1.6rem;
   }
   
-  .filters-row {
+  .search-row {
     flex-direction: column;
   }
   
+  .filters-footer {
+    flex-wrap: wrap;
+  }
+  
   .filter-buttons {
+    order: -1;
     width: 100%;
+    margin-bottom: 8px;
   }
   
   .filter-btn {

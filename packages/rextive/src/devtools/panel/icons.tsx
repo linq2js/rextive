@@ -1,5 +1,3 @@
-import React from "react";
-
 // SVG Icons for consistent sizing in DevTools panel
 
 interface IconProps {

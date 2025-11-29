@@ -4,7 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { act } from "react";
 import { signal } from "../signal";
 import { useRx } from "./useRx";
-import { getCurrent } from "../contextDispatcher";
+import { getRenderHooks } from "../hooks";
 import "@testing-library/jest-dom/vitest";
 
 describe("useRx", () => {
@@ -178,13 +178,13 @@ describe("useRx", () => {
     });
   });
 
-  describe("context dispatcher", () => {
-    it("should set up dispatcher context during function execution", () => {
-      let capturedDispatcher: any = null;
+  describe("render hooks", () => {
+    it("should set up render hooks context during function execution", () => {
+      let capturedHooks: any = null;
 
       const TestComponent = () => {
         useRx(() => {
-          capturedDispatcher = getCurrent();
+          capturedHooks = getRenderHooks();
           return "test";
         });
         return <div>Test</div>;
@@ -192,13 +192,13 @@ describe("useRx", () => {
 
       render(<TestComponent />);
 
-      expect(capturedDispatcher).toBeDefined();
-      expect(typeof capturedDispatcher.trackSignal).toBe("function");
-      expect(typeof capturedDispatcher.trackLoadable).toBe("function");
+      expect(capturedHooks).toBeDefined();
+      expect(typeof capturedHooks.onSignalAccess).toBe("function");
+      expect(typeof capturedHooks.onLoadableAccess).toBe("function");
     });
 
-    it("should restore previous dispatcher after execution", () => {
-      const originalDispatcher = getCurrent();
+    it("should restore previous hooks after execution", () => {
+      const originalHooks = getRenderHooks();
 
       const TestComponent = () => {
         useRx(() => "test");
@@ -207,8 +207,8 @@ describe("useRx", () => {
 
       render(<TestComponent />);
 
-      // After render, dispatcher should be restored
-      expect(getCurrent()).toBe(originalDispatcher);
+      // After render, hooks should be restored
+      expect(getRenderHooks()).toBe(originalHooks);
     });
   });
 

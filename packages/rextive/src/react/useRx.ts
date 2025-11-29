@@ -1,20 +1,20 @@
 import { useLayoutEffect, useState } from "react";
-import { ContextDispatcher, withDispatcher } from "../contextDispatcher";
+import { RenderHooks, withRenderHooks } from "../hooks";
 import { AnySignal, Loadable } from "../types";
 import { emitter } from "../utils/emitter";
 
 /**
  * Internal controller for tracking signals accessed within useRx.
  *
- * Implements ContextDispatcher to integrate with the signal system's
+ * Implements RenderHooks to integrate with the signal system's
  * automatic tracking mechanism. When signals are read via get(), they
- * call getCurrent().trackSignal() which adds them to this controller.
+ * call getRenderHooks().onSignalAccess() which adds them to this controller.
  *
  * **Important**: Methods are defined as arrow function class properties
  * (not prototype methods) to ensure they work correctly when spread by
- * `withDispatcher`. Prototype methods are NOT copied during object spread.
+ * `withRenderHooks`. Prototype methods are NOT copied during object spread.
  */
-class RxController implements ContextDispatcher {
+class RxController implements RenderHooks {
   /** Set of signals accessed during the current render */
   signals = new Set<AnySignal<any>>();
 
@@ -27,9 +27,9 @@ class RxController implements ContextDispatcher {
 
   /**
    * Track a signal for subscription.
-   * Called automatically by signals when read via get() during withDispatcher context.
+   * Called automatically by signals when read via get() during withRenderHooks context.
    */
-  trackSignal = (signal: AnySignal<any>) => {
+  onSignalAccess = (signal: AnySignal<any>) => {
     this.signals.add(signal);
   };
 
@@ -37,7 +37,7 @@ class RxController implements ContextDispatcher {
    * Track a loadable and trigger rerender when it resolves/rejects.
    * Used for async signals to re-render when the promise settles.
    */
-  trackLoadable = (loadable: Loadable<any>) => {
+  onLoadableAccess = (loadable: Loadable<any>) => {
     if (loadable.status === "loading") {
       loadable.promise.then(
         () => this.rerender(),
@@ -139,7 +139,7 @@ export function useRx<T>(fn: () => T): T {
     };
   });
 
-  // Run fn within dispatcher context
-  // Any signal.get() calls will trigger controller.trackSignal()
-  return withDispatcher(controller, fn);
+  // Run fn within render hooks context
+  // Any signal.get() calls will trigger controller.onSignalAccess()
+  return withRenderHooks(controller, fn);
 }

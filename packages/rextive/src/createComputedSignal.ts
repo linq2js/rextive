@@ -15,7 +15,7 @@ import { resolveEquals } from "./utils/resolveEquals";
 import { pipeSignals } from "./utils/pipeSignals";
 import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
-import { getCurrent } from "./contextDispatcher";
+import { getRenderHooks } from "./hooks";
 import { nextName } from "./utils/nameGenerator";
 import { resolveSelectorsRequired } from "./operators/resolveSelectors";
 import {
@@ -237,7 +237,7 @@ export function createComputedSignal(
   };
 
   const get = () => {
-    getCurrent().trackSignal(instance);
+    getRenderHooks().onSignalAccess(instance);
     // Allow reading last value/error even after disposal
     // Only recompute if not disposed and no current value
     if (!current && !disposed) {
@@ -355,7 +355,7 @@ export function createComputedSignal(
     dispose,
     disposed: isDisposed,
     error: () => {
-      getCurrent().trackSignal(instance);
+      getRenderHooks().onSignalAccess(instance);
       // Ensure computation runs if lazy
       if (!current && !disposed) {
         recompute("compute:initial");
@@ -363,7 +363,7 @@ export function createComputedSignal(
       return current?.error;
     },
     tryGet: () => {
-      getCurrent().trackSignal(instance);
+      getRenderHooks().onSignalAccess(instance);
       // Ensure computation runs if lazy
       if (!current && !disposed) {
         recompute("compute:initial");

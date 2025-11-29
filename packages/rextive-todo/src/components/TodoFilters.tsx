@@ -20,7 +20,7 @@ const FILTERS: { value: TodoFilter; label: string }[] = [
 export function TodoFilters() {
   return (
     <div className="todo-filters">
-      <div className="filters-row">
+      <div className="search-row">
         <div className="search-wrapper">
           <div className="search-box">
             <svg
@@ -79,6 +79,14 @@ export function TodoFilters() {
             return null;
           })}
         </div>
+      </div>
+
+      <div className="filters-footer">
+        {rx(() => (
+          <span className="items-count">
+            {activeCount()} item{activeCount() !== 1 ? "s" : ""} left
+          </span>
+        ))}
 
         <div className="filter-buttons">
           {FILTERS.map((f) => (
@@ -103,14 +111,7 @@ export function TodoFilters() {
             </Fragment>
           ))}
         </div>
-      </div>
 
-      <div className="filters-footer">
-        {rx(() => (
-          <span className="items-count">
-            {activeCount()} item{activeCount() !== 1 ? "s" : ""} left
-          </span>
-        ))}
         {rx(() =>
           completedCount() > 0 ? (
             <button className="clear-completed-btn" onClick={clearCompleted}>
