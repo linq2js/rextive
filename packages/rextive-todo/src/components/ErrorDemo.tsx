@@ -86,23 +86,23 @@ export const ErrorDemo = () => {
 
       <style>{`
         .error-demo {
-          margin-top: 1.5rem;
-          padding: 1.25rem;
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+          border-radius: 16px;
+          padding: 24px;
+          margin-top: 24px;
+          border: 1px solid rgba(99, 102, 241, 0.3);
         }
 
         .error-demo h3 {
-          margin: 0 0 0.5rem 0;
-          font-size: 1.1rem;
-          color: #e2e8f0;
+          margin: 0 0 8px 0;
+          color: #e0e7ff;
+          font-size: 18px;
         }
 
         .demo-description {
-          margin: 0 0 1rem 0;
-          font-size: 0.875rem;
-          color: #94a3b8;
+          margin: 0 0 20px 0;
+          color: #a5b4fc;
+          font-size: 13px;
         }
 
         .demo-content {

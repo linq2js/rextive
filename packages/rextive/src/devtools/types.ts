@@ -106,3 +106,55 @@ export type DevToolsOptions = {
   /** Log events to console */
   logToConsole?: boolean;
 };
+
+// ============================================================================
+// CHAIN REACTION TYPES
+// ============================================================================
+
+/**
+ * A single occurrence of a chain reaction.
+ */
+export type ChainOccurrence = {
+  /** When the chain started */
+  startTime: number;
+  /** When the chain ended (undefined if still pending) */
+  endTime?: number;
+  /** Duration in ms (undefined if still pending) */
+  duration?: number;
+  /** Status of this occurrence */
+  status: "complete" | "interrupted" | "pending";
+};
+
+/**
+ * A chain reaction pattern (grouped occurrences of the same path).
+ */
+export type ChainReaction = {
+  /** Unique ID based on path hash */
+  id: string;
+  /** Ordered signal IDs in the chain */
+  path: string[];
+  /** Signals in the path that are async (computed with promises) */
+  asyncSignals: Set<string>;
+  /** All occurrences of this chain pattern */
+  occurrences: ChainOccurrence[];
+  /** Last time this chain was triggered */
+  lastTriggered: number;
+};
+
+/**
+ * Chain tracking state.
+ */
+export type ChainTrackingState = {
+  /** Whether chain tracking is currently active */
+  enabled: boolean;
+  /** Current chain being built (null if no chain in progress) */
+  currentChain: string[] | null;
+  /** Start time of current chain */
+  currentChainStartTime: number | null;
+  /** Timeout for detecting end of sync chain */
+  chainTimeout: ReturnType<typeof setTimeout> | null;
+  /** All detected chain reactions (keyed by path hash) */
+  chains: Map<string, ChainReaction>;
+  /** Minimum chain length to track */
+  minChainLength: number;
+};

@@ -12,7 +12,7 @@ export { filter } from "./filter";
 export { focus } from "./focus";
 
 // Timing operators
-export { pace } from "./pace";
+export { pace, type PaceOptions } from "./pace";
 export { debounce, debounceScheduler } from "./debounce";
 export { throttle, throttleScheduler } from "./throttle";
 export { delay, delayScheduler } from "./delay";

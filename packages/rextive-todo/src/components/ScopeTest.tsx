@@ -26,41 +26,45 @@ function ScopedCounter({ id }: { id: string }) {
   return (
     <div
       style={{
-        padding: "12px",
-        backgroundColor: "#16213e",
-        borderRadius: "8px",
+        padding: "16px",
+        backgroundColor: "rgba(0, 0, 0, 0.3)",
+        borderRadius: "12px",
         marginBottom: "8px",
       }}
     >
-      <div style={{ fontSize: "12px", color: "#8892b0", marginBottom: "8px" }}>
+      <div style={{ fontSize: "11px", color: "#a5b4fc", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "1px" }}>
         Instance #{id}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
         <button
           onClick={decrement}
           style={{
-            padding: "4px 12px",
-            backgroundColor: "#e94560",
+            width: "36px",
+            height: "36px",
+            backgroundColor: "#6366f1",
             border: "none",
-            borderRadius: "4px",
+            borderRadius: "8px",
             color: "white",
             cursor: "pointer",
+            fontSize: "18px",
           }}
         >
-          -
+          −
         </button>
-        <span style={{ minWidth: "60px", textAlign: "center" }}>
-          {rx(count)} (×2 = {rx(doubled)})
+        <span style={{ minWidth: "100px", textAlign: "center", color: "#fff" }}>
+          {rx(count)} <span style={{ color: "#a78bfa" }}>(×2 = {rx(doubled)})</span>
         </span>
         <button
           onClick={increment}
           style={{
-            padding: "4px 12px",
-            backgroundColor: "#4ecca3",
+            width: "36px",
+            height: "36px",
+            backgroundColor: "#6366f1",
             border: "none",
-            borderRadius: "4px",
+            borderRadius: "8px",
             color: "white",
             cursor: "pointer",
+            fontSize: "18px",
           }}
         >
           +
@@ -92,11 +96,11 @@ export function ScopeTest() {
   return (
     <div
       style={{
-        padding: "16px",
-        backgroundColor: "#1a1a2e",
-        borderRadius: "12px",
-        marginTop: "16px",
-        border: "1px solid #2a2a4a",
+        background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)",
+        borderRadius: "16px",
+        padding: "24px",
+        marginTop: "24px",
+        border: "1px solid rgba(99, 102, 241, 0.3)",
       }}
     >
       <div
@@ -107,20 +111,20 @@ export function ScopeTest() {
           marginBottom: "12px",
         }}
       >
-        <h3 style={{ margin: 0, fontSize: "14px", color: "#eaeaea" }}>
+        <h3 style={{ margin: 0, fontSize: "18px", color: "#e0e7ff" }}>
           🧪 useScope Test
         </h3>
         <div style={{ display: "flex", gap: "8px" }}>
           <button
             onClick={addInstance}
             style={{
-              padding: "6px 12px",
-              backgroundColor: "#4ecca3",
+              padding: "8px 16px",
+              backgroundColor: "#6366f1",
               border: "none",
-              borderRadius: "6px",
+              borderRadius: "8px",
               color: "white",
               cursor: "pointer",
-              fontSize: "12px",
+              fontSize: "13px",
             }}
           >
             + Add Instance
@@ -129,13 +133,13 @@ export function ScopeTest() {
             <button
               onClick={removeAll}
               style={{
-                padding: "6px 12px",
-                backgroundColor: "#e94560",
+                padding: "8px 16px",
+                backgroundColor: "rgba(255, 255, 255, 0.1)",
                 border: "none",
-                borderRadius: "6px",
-                color: "white",
+                borderRadius: "8px",
+                color: "#e0e7ff",
                 cursor: "pointer",
-                fontSize: "12px",
+                fontSize: "13px",
               }}
             >
               Remove All
@@ -144,7 +148,7 @@ export function ScopeTest() {
         </div>
       </div>
 
-      <div style={{ fontSize: "11px", color: "#5a6987", marginBottom: "12px" }}>
+      <div style={{ fontSize: "13px", color: "#a5b4fc", marginBottom: "20px" }}>
         Each instance creates 2 signals (count + doubled). Watch DevTools to see
         signals created/disposed when mounting/unmounting.
       </div>
@@ -154,8 +158,8 @@ export function ScopeTest() {
           style={{
             textAlign: "center",
             padding: "24px",
-            color: "#5a6987",
-            fontSize: "12px",
+            color: "#a5b4fc",
+            fontSize: "13px",
           }}
         >
           Click "+ Add Instance" to create scoped signals

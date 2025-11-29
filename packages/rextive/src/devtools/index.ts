@@ -31,6 +31,9 @@ import type {
   DevToolsEventListener,
   DevToolsOptions,
   SourceLocation,
+  ChainReaction,
+  ChainOccurrence,
+  ChainTrackingState,
 } from "./types";
 
 // Re-export types
@@ -42,6 +45,9 @@ export type {
   DevToolsEventListener,
   DevToolsOptions,
   SourceLocation,
+  ChainReaction,
+  ChainOccurrence,
+  ChainTrackingState,
 };
 
 // ============================================================================
@@ -69,6 +75,16 @@ let config: Required<DevToolsOptions> = {
 
 /** Whether devtools is enabled */
 let enabled = false;
+
+/** Chain tracking state */
+const chainState: ChainTrackingState = {
+  enabled: false,
+  currentChain: null,
+  currentChainStartTime: null,
+  chainTimeout: null,
+  chains: new Map(),
+  minChainLength: 2,
+};
 
 // ============================================================================
 // INTERNAL HELPERS
@@ -183,6 +199,118 @@ function captureSourceLocation(): SourceLocation | undefined {
   }
 
   return undefined;
+}
+
+// ============================================================================
+// CHAIN TRACKING HELPERS
+// ============================================================================
+
+/**
+ * Generate a hash for a chain path to group identical chains.
+ */
+function hashChainPath(path: string[]): string {
+  return path.join(" → ");
+}
+
+/**
+ * Finalize the current chain if it meets minimum length.
+ */
+function finalizeCurrentChain(): void {
+  if (!chainState.currentChain || !chainState.currentChainStartTime) {
+    chainState.currentChain = null;
+    chainState.currentChainStartTime = null;
+    return;
+  }
+
+  const path = chainState.currentChain;
+  const startTime = chainState.currentChainStartTime;
+  const endTime = Date.now();
+
+  // Only save chains with minimum length
+  if (path.length >= chainState.minChainLength) {
+    const id = hashChainPath(path);
+
+    let chain = chainState.chains.get(id);
+    if (!chain) {
+      // Determine which signals are async (computed signals)
+      const asyncSignals = new Set<string>();
+      for (const signalId of path) {
+        const info = signals.get(signalId);
+        if (info && info.kind === "computed") {
+          // Check if signal has async value (promise)
+          try {
+            const value = info.signal.tryGet?.() ?? info.signal();
+            if (value && typeof value === "object" && "then" in value) {
+              asyncSignals.add(signalId);
+            }
+          } catch {
+            // Ignore errors
+          }
+        }
+      }
+
+      chain = {
+        id,
+        path: [...path],
+        asyncSignals,
+        occurrences: [],
+        lastTriggered: startTime,
+      };
+      chainState.chains.set(id, chain);
+    }
+
+    // Add occurrence
+    const occurrence: ChainOccurrence = {
+      startTime,
+      endTime,
+      duration: endTime - startTime,
+      status: "complete",
+    };
+    chain.occurrences.unshift(occurrence);
+    chain.lastTriggered = startTime;
+
+    // Limit occurrences to prevent memory bloat
+    if (chain.occurrences.length > 100) {
+      chain.occurrences.pop();
+    }
+  }
+
+  // Reset current chain
+  chainState.currentChain = null;
+  chainState.currentChainStartTime = null;
+}
+
+/**
+ * Add a signal to the current chain.
+ */
+function addToChain(signalId: string): void {
+  if (!chainState.enabled) return;
+
+  const now = Date.now();
+
+  if (chainState.currentChain === null) {
+    // Start a new chain
+    chainState.currentChain = [signalId];
+    chainState.currentChainStartTime = now;
+  } else {
+    // Add to existing chain (avoid duplicates in sequence)
+    const lastSignal =
+      chainState.currentChain[chainState.currentChain.length - 1];
+    if (lastSignal !== signalId) {
+      chainState.currentChain.push(signalId);
+    }
+  }
+
+  // Clear existing timeout and set new one
+  if (chainState.chainTimeout) {
+    clearTimeout(chainState.chainTimeout);
+  }
+
+  // Use setTimeout(0) to detect end of synchronous chain
+  chainState.chainTimeout = setTimeout(() => {
+    finalizeCurrentChain();
+    chainState.chainTimeout = null;
+  }, 0);
 }
 
 // ============================================================================
@@ -304,6 +432,9 @@ const devToolsHooks: DevTools = {
         info.history.pop();
       }
     }
+
+    // Track chain reactions
+    addToChain(id);
 
     emit({ type: "signal:change", signalId: id, value, timestamp: now });
   },
@@ -680,4 +811,71 @@ export function deleteSignal(id: string): boolean {
     return true;
   }
   return false;
+}
+
+// ============================================================================
+// CHAIN TRACKING API
+// ============================================================================
+
+/**
+ * Enable chain reaction tracking.
+ * Call this when the Chains tab becomes active.
+ */
+export function enableChainTracking(): void {
+  chainState.enabled = true;
+}
+
+/**
+ * Disable chain reaction tracking.
+ * Call this when the Chains tab becomes inactive.
+ */
+export function disableChainTracking(): void {
+  chainState.enabled = false;
+  // Clear any pending chain
+  if (chainState.chainTimeout) {
+    clearTimeout(chainState.chainTimeout);
+    chainState.chainTimeout = null;
+  }
+  chainState.currentChain = null;
+  chainState.currentChainStartTime = null;
+}
+
+/**
+ * Check if chain tracking is enabled.
+ */
+export function isChainTrackingEnabled(): boolean {
+  return chainState.enabled;
+}
+
+/**
+ * Get all tracked chain reactions.
+ * @returns Map of chain ID to ChainReaction
+ */
+export function getChains(): ReadonlyMap<string, ChainReaction> {
+  return chainState.chains;
+}
+
+/**
+ * Get chains as an array sorted by last triggered time (most recent first).
+ */
+export function getChainsList(): ChainReaction[] {
+  return Array.from(chainState.chains.values()).sort(
+    (a, b) => b.lastTriggered - a.lastTriggered
+  );
+}
+
+/**
+ * Clear all tracked chain reactions.
+ */
+export function clearChains(): void {
+  chainState.chains.clear();
+}
+
+/**
+ * Delete a specific chain by ID.
+ * @param id - Chain ID (path hash)
+ * @returns true if chain was deleted
+ */
+export function deleteChain(id: string): boolean {
+  return chainState.chains.delete(id);
 }

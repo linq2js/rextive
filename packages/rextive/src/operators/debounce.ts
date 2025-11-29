@@ -53,7 +53,6 @@ export function debounceScheduler(ms: number): Scheduler {
  */
 export function debounce<T>(ms: number): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
-    return pace<T>(debounceScheduler(ms))(source);
+    return pace<T>(debounceScheduler(ms), { name: "debounce" })(source);
   };
 }
-

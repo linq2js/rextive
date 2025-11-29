@@ -72,33 +72,33 @@ const Counter = <h1 onClick={increment}>{rx(count)}</h1>;
 
 ## 📚 Documentation
 
-| Guide | Description |
-|-------|-------------|
+| Guide                                       | Description                               |
+| ------------------------------------------- | ----------------------------------------- |
 | **[Getting Started](./GETTING_STARTED.md)** | Quick start, counter examples, vanilla JS |
-| **[Core Concepts](./CORE_CONCEPTS.md)** | Transform, equality, dependencies, async |
-| **[Examples](./EXAMPLES.md)** | 10 real-world examples with code |
-| **[Patterns](./PATTERNS.md)** | Advanced patterns & best practices |
-| **[Error Handling](./ERROR_HANDLING.md)** | Error handling & tracing |
-| **[API Reference](./API_REFERENCE.md)** | Complete API documentation |
-| **[React Integration](./REACT.md)** | rx(), useScope(), provider() |
-| **[Operators](./OPERATORS.md)** | debounce, throttle, filter, etc. |
-| **[Integrations](./INTEGRATIONS.md)** | Immer, Cache, DevTools |
-| **[Comparison](./COMPARISON.md)** | vs Zustand, React Query, Jotai, Redux |
+| **[Core Concepts](./CORE_CONCEPTS.md)**     | Transform, equality, dependencies, async  |
+| **[Examples](./EXAMPLES.md)**               | 10 real-world examples with code          |
+| **[Patterns](./PATTERNS.md)**               | Advanced patterns & best practices        |
+| **[Error Handling](./ERROR_HANDLING.md)**   | Error handling & tracing                  |
+| **[API Reference](./API_REFERENCE.md)**     | Complete API documentation                |
+| **[React Integration](./REACT.md)**         | rx(), useScope(), provider()              |
+| **[Operators](./OPERATORS.md)**             | debounce, throttle, filter, etc.          |
+| **[Integrations](./INTEGRATIONS.md)**       | Immer, Cache, DevTools                    |
+| **[Comparison](./COMPARISON.md)**           | vs Zustand, React Query, Jotai, Redux     |
 
 ---
 
 ## ✨ Key Features
 
-| Feature | Description |
-|---------|-------------|
-| **`signal()`** | Unified primitive for state, computed, and async |
-| **`rx()`** | React integration — makes components reactive |
-| **`.to()`** | Transform values with chained selectors |
-| **`.pipe()`** | Compose operators for complex data flows |
-| **`wait()`** | Suspense-ready async handling |
-| **`loadable()`** | Manual loading/error/success states |
-| **`signal.trace()`** | Error debugging across signal chains |
-| **DevTools** | Visual debugging panel |
+| Feature              | Description                                      |
+| -------------------- | ------------------------------------------------ |
+| **`signal()`**       | Unified primitive for state, computed, and async |
+| **`rx()`**           | React integration — makes components reactive    |
+| **`.to()`**          | Transform values with chained selectors          |
+| **`.pipe()`**        | Compose operators for complex data flows         |
+| **`wait()`**         | Suspense-ready async handling                    |
+| **`loadable()`**     | Manual loading/error/success states              |
+| **`signal.trace()`** | Error debugging across signal chains             |
+| **DevTools**         | Visual debugging panel                           |
 
 ---
 
@@ -150,4 +150,3 @@ If Rextive helps you build better apps:
 - 📖 Improve docs
 
 **[GitHub Repository](https://github.com/linq2js/rextive)**
-

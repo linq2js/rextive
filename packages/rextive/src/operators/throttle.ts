@@ -80,6 +80,6 @@ export function throttleScheduler(ms: number): Scheduler {
  */
 export function throttle<T>(ms: number): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
-    return pace<T>(throttleScheduler(ms))(source);
+    return pace<T>(throttleScheduler(ms), { name: "throttle" })(source);
   };
 }
