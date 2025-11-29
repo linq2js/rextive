@@ -106,6 +106,9 @@ export function DevToolsPanel(): React.ReactElement | null {
     initialConfig.sizeLeft
   );
   const [isResizing, setIsResizing] = useState(false);
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth <= 768
+  );
 
   const [signals, setSignals] = useState<Map<string, SignalInfo>>(new Map());
   const [tags, setTags] = useState<Map<string, TagInfo>>(new Map());
@@ -131,12 +134,33 @@ export function DevToolsPanel(): React.ReactElement | null {
   const [editValue, setEditValue] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
+  const [expandedTag, setExpandedTag] = useState<string | null>(null);
   const [signalKindFilter, setSignalKindFilter] = useState<
     "all" | "mutable" | "computed" | "error" | "disposed"
+  >("all");
+  const [recentActivitySort, setRecentActivitySort] = useState(true);
+  const [eventKindFilter, setEventKindFilter] = useState<
+    "all" | "error" | "change" | "create" | "dispose"
   >("all");
   const eventIdRef = useRef(0);
   const flashTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Mobile mode detection - force bottom position on small screens
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      // Force bottom position in mobile mode
+      if (mobile && position !== "bottom") {
+        setPosition("bottom");
+      }
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, [position]);
 
   // Persist config changes
   const togglePosition = useCallback(() => {
@@ -167,24 +191,34 @@ export function DevToolsPanel(): React.ReactElement | null {
     setSizeLeft(DEFAULT_CONFIG.sizeLeft);
   }, []);
 
-  // Resize handlers
+  // Resize handlers - supports both mouse and touch events
   const handleResizeStart = useCallback(
-    (e: React.MouseEvent) => {
+    (e: React.MouseEvent | React.TouchEvent) => {
       e.preventDefault();
       e.stopPropagation();
       setIsResizing(true);
 
-      const startY = e.clientY;
-      const startX = e.clientX;
+      // Get initial position from mouse or touch event
+      const isTouch = "touches" in e;
+      const startY = isTouch ? e.touches[0].clientY : e.clientY;
+      const startX = isTouch ? e.touches[0].clientX : e.clientX;
       const startSize =
         position === "bottom"
           ? sizeBottom ?? styles.PANEL_SIZE_EXPANDED_BOTTOM
           : sizeLeft ?? styles.PANEL_SIZE_EXPANDED_LEFT;
 
-      const handleMouseMove = (e: MouseEvent) => {
+      const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
+        const isTouchMove = "touches" in moveEvent;
+        const currentY = isTouchMove
+          ? moveEvent.touches[0].clientY
+          : moveEvent.clientY;
+        const currentX = isTouchMove
+          ? moveEvent.touches[0].clientX
+          : moveEvent.clientX;
+
         if (position === "bottom") {
           // For bottom panel, dragging up increases size
-          const delta = startY - e.clientY;
+          const delta = startY - currentY;
           const newSize = Math.max(
             styles.PANEL_MIN_SIZE_BOTTOM,
             Math.min(styles.PANEL_MAX_SIZE_BOTTOM, startSize + delta)
@@ -192,7 +226,7 @@ export function DevToolsPanel(): React.ReactElement | null {
           setSizeBottom(newSize);
         } else {
           // For left panel, dragging right increases size
-          const delta = e.clientX - startX;
+          const delta = currentX - startX;
           const newSize = Math.max(
             styles.PANEL_MIN_SIZE_LEFT,
             Math.min(styles.PANEL_MAX_SIZE_LEFT, startSize + delta)
@@ -201,10 +235,13 @@ export function DevToolsPanel(): React.ReactElement | null {
         }
       };
 
-      const handleMouseUp = () => {
+      const handleEnd = () => {
         setIsResizing(false);
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
+        document.removeEventListener("mousemove", handleMove);
+        document.removeEventListener("mouseup", handleEnd);
+        document.removeEventListener("touchmove", handleMove);
+        document.removeEventListener("touchend", handleEnd);
+        document.removeEventListener("touchcancel", handleEnd);
         document.body.style.cursor = "";
         document.body.style.userSelect = "";
 
@@ -216,8 +253,12 @@ export function DevToolsPanel(): React.ReactElement | null {
         }
       };
 
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
+      // Add both mouse and touch event listeners
+      document.addEventListener("mousemove", handleMove);
+      document.addEventListener("mouseup", handleEnd);
+      document.addEventListener("touchmove", handleMove, { passive: false });
+      document.addEventListener("touchend", handleEnd);
+      document.addEventListener("touchcancel", handleEnd);
       document.body.style.cursor =
         position === "bottom" ? "ns-resize" : "ew-resize";
       document.body.style.userSelect = "none";
@@ -301,9 +342,13 @@ export function DevToolsPanel(): React.ReactElement | null {
     if (!enabled) return;
 
     const unsubscribe = onDevToolsEvent((event) => {
-      // Check if this is an error event (signal has error after change)
+      // Check if this is an error event
       let isError = false;
-      if (event.type === "signal:change" && "signalId" in event) {
+      if (event.type === "signal:error") {
+        // Explicit error event
+        isError = true;
+      } else if (event.type === "signal:change" && "signalId" in event) {
+        // Change event where signal has error
         const signalInfo = getSignals().get(event.signalId);
         if (signalInfo?.signal?.error?.()) {
           isError = true;
@@ -383,10 +428,14 @@ export function DevToolsPanel(): React.ReactElement | null {
 
   // Filter signals/tags based on showAutoGenerated and search query
   const searchLower = searchQuery.toLowerCase().trim();
+  // When search starts with '#', automatically include auto-generated names
+  const searchingAutoGenerated = searchLower.startsWith("#");
+  const effectiveShowAutoGenerated =
+    showAutoGenerated || searchingAutoGenerated;
 
   const filteredSignals = Array.from(signals.values()).filter((s) => {
-    // Filter by auto-generated
-    if (!showAutoGenerated && isAutoGeneratedName(s.id)) return false;
+    // Filter by auto-generated (skip if searching for auto-generated names)
+    if (!effectiveShowAutoGenerated && isAutoGeneratedName(s.id)) return false;
     // Filter by search query
     if (searchLower && !s.id.toLowerCase().includes(searchLower)) return false;
     // Filter by kind
@@ -401,26 +450,40 @@ export function DevToolsPanel(): React.ReactElement | null {
   });
 
   const filteredTags = Array.from(tags.values()).filter((t) => {
-    // Filter by auto-generated
-    if (!showAutoGenerated && isAutoGeneratedName(t.id)) return false;
+    // Filter by auto-generated (skip if searching for auto-generated names)
+    if (!effectiveShowAutoGenerated && isAutoGeneratedName(t.id)) return false;
     // Filter by search query
     if (searchLower && !t.id.toLowerCase().includes(searchLower)) return false;
     return true;
   });
 
-  // Filter events by search query
-  const filteredEvents = searchLower
-    ? events.filter((e) => {
-        const signalId = "signalId" in e ? String(e.signalId) : "";
-        const tagId = "tagId" in e ? String(e.tagId) : "";
-        const type = e.type;
-        return (
-          signalId.toLowerCase().includes(searchLower) ||
-          tagId.toLowerCase().includes(searchLower) ||
-          type.toLowerCase().includes(searchLower)
-        );
-      })
-    : events;
+  // Filter events by search query and kind filter
+  const filteredEvents = events.filter((e) => {
+    // Filter by search query
+    if (searchLower) {
+      const signalId = "signalId" in e ? String(e.signalId) : "";
+      const tagId = "tagId" in e ? String(e.tagId) : "";
+      const type = e.type;
+      if (
+        !signalId.toLowerCase().includes(searchLower) &&
+        !tagId.toLowerCase().includes(searchLower) &&
+        !type.toLowerCase().includes(searchLower)
+      ) {
+        return false;
+      }
+    }
+    // Filter by event kind
+    if (eventKindFilter === "error") {
+      return e.isError || e.type === "signal:error";
+    } else if (eventKindFilter === "change") {
+      return e.type === "signal:change";
+    } else if (eventKindFilter === "create") {
+      return e.type === "signal:create" || e.type === "tag:create";
+    } else if (eventKindFilter === "dispose") {
+      return e.type === "signal:dispose";
+    }
+    return true; // "all"
+  });
 
   const renderSignals = () => {
     if (signals.size === 0) {
@@ -445,14 +508,19 @@ export function DevToolsPanel(): React.ReactElement | null {
       );
     }
 
-    // Sort: active signals first, then disposed
+    // Sort signals based on mode
     const sortedSignals = [...filteredSignals].sort((a, b) => {
+      if (recentActivitySort) {
+        // Sort by last activity time (updatedAt), latest first
+        return b.updatedAt - a.updatedAt;
+      }
+      // Default: active signals first, then disposed
       if (a.disposed !== b.disposed) return a.disposed ? 1 : -1;
       return 0;
     });
 
     return (
-      <div style={styles.contentGridStyles}>
+      <div style={styles.contentGridStyles(position)}>
         {sortedSignals.map((info) => {
           let currentValue: unknown;
           let signalError: unknown = undefined;
@@ -594,6 +662,7 @@ export function DevToolsPanel(): React.ReactElement | null {
                     onClick={(e) => {
                       e.stopPropagation();
                       setSearchQuery(info.id);
+                      setEventKindFilter("all");
                       updateActiveTab("events");
                     }}
                     title="View events for this signal"
@@ -771,7 +840,7 @@ export function DevToolsPanel(): React.ReactElement | null {
                 </div>
               )}
 
-              {isExpanded && info.history.length > 0 && (
+              {isExpanded && (info.source || info.history.length > 0) && (
                 <div
                   style={{
                     marginTop: "6px",
@@ -779,6 +848,31 @@ export function DevToolsPanel(): React.ReactElement | null {
                     borderTop: `1px solid ${styles.colors.border}`,
                   }}
                 >
+                  {/* Source location */}
+                  {info.source && (
+                    <div
+                      style={{
+                        fontSize: "9px",
+                        color: styles.colors.textMuted,
+                        marginBottom: info.history.length > 0 ? "6px" : 0,
+                      }}
+                    >
+                      <span style={{ opacity: 0.6 }}>📍</span>{" "}
+                      <span
+                        style={{ color: styles.colors.textDim }}
+                        title={info.source.functionName || undefined}
+                      >
+                        {info.source.file}:{info.source.line}
+                      </span>
+                      {info.source.functionName && (
+                        <span style={{ opacity: 0.6 }}>
+                          {" "}
+                          ({info.source.functionName})
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {/* History */}
                   {info.history.slice(0, 5).map((entry, i) => (
                     <div
                       key={i}
@@ -828,9 +922,11 @@ export function DevToolsPanel(): React.ReactElement | null {
     }
 
     return (
-      <div style={styles.contentGridStyles}>
+      <div style={styles.contentGridStyles(position)}>
         {filteredTags.map((info) => {
           const isHovered = hoveredItem === `tag-${info.id}`;
+          const isExpanded = expandedTag === info.id;
+          const signalIds = Array.from(info.signals);
 
           return (
             <div
@@ -838,6 +934,7 @@ export function DevToolsPanel(): React.ReactElement | null {
               style={styles.itemStyles(isHovered)}
               onMouseEnter={() => setHoveredItem(`tag-${info.id}`)}
               onMouseLeave={() => setHoveredItem(null)}
+              onClick={() => setExpandedTag(isExpanded ? null : info.id)}
             >
               <div style={styles.itemHeaderStyles}>
                 <span style={styles.itemNameStyles}>
@@ -848,14 +945,151 @@ export function DevToolsPanel(): React.ReactElement | null {
                     {info.id}
                   </span>
                 </span>
-                <span style={{ color: styles.colors.textDim, fontSize: "9px" }}>
-                  {info.signals.size} sig
-                </span>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                >
+                  <span
+                    style={{ color: styles.colors.textDim, fontSize: "9px" }}
+                  >
+                    {info.signals.size} sig
+                  </span>
+                  <span
+                    style={{
+                      color: styles.colors.textMuted,
+                      fontSize: "8px",
+                      transition: "transform 0.2s",
+                      transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                    }}
+                  >
+                    ▶
+                  </span>
+                </div>
               </div>
-              {info.signals.size > 0 && (
+
+              {/* Collapsed preview */}
+              {!isExpanded && info.signals.size > 0 && (
                 <div style={styles.valueStyles}>
-                  {Array.from(info.signals).slice(0, 3).join(", ")}
+                  {signalIds.slice(0, 3).join(", ")}
                   {info.signals.size > 3 && ` +${info.signals.size - 3}`}
+                </div>
+              )}
+
+              {/* Expanded details box */}
+              {isExpanded && (
+                <div
+                  style={{
+                    marginTop: "8px",
+                    paddingTop: "8px",
+                    borderTop: `1px solid ${styles.colors.border}`,
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div
+                    style={{
+                      fontSize: "9px",
+                      color: styles.colors.textMuted,
+                      marginBottom: "6px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Signals ({info.signals.size})
+                  </div>
+                  {info.signals.size === 0 ? (
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: styles.colors.textDim,
+                        fontStyle: "italic",
+                      }}
+                    >
+                      No signals in this tag
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "4px",
+                        maxHeight: "200px",
+                        overflowY: "auto",
+                      }}
+                    >
+                      {signalIds.map((signalId) => {
+                        const signalInfo = signals.get(signalId);
+                        const isDisposed = signalInfo?.disposed;
+
+                        return (
+                          <div
+                            key={signalId}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              padding: "4px 6px",
+                              backgroundColor: styles.colors.bgHover,
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                              ...(isDisposed && {
+                                opacity: 0.5,
+                                textDecoration: "line-through",
+                              }),
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSearchQuery(signalId);
+                              setSignalKindFilter("all");
+                              updateActiveTab("signals");
+                            }}
+                            title={`Go to signal: ${signalId}`}
+                          >
+                            <span
+                              style={{
+                                ...styles.badgeStyles(
+                                  signalInfo?.kind || "mutable"
+                                ),
+                                ...(isDisposed && {
+                                  backgroundColor: "#444",
+                                  color: "#888",
+                                }),
+                              }}
+                            >
+                              {isDisposed
+                                ? "✕"
+                                : signalInfo?.kind === "computed"
+                                ? "C"
+                                : "M"}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                color: styles.colors.text,
+                                flex: 1,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {signalId}
+                            </span>
+                            {signalInfo && !isDisposed && (
+                              <span
+                                style={{
+                                  fontSize: "9px",
+                                  color: styles.colors.textDim,
+                                  maxWidth: "100px",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {formatValue(signalInfo.signal.tryGet())}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -872,33 +1106,6 @@ export function DevToolsPanel(): React.ReactElement | null {
   const renderEvents = () => {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-        {/* Clear button */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            padding: "4px 8px",
-            borderBottom: `1px solid ${styles.colors.border}`,
-            flexShrink: 0,
-          }}
-        >
-          <button
-            onClick={clearEvents}
-            style={{
-              padding: "2px 8px",
-              fontSize: "10px",
-              backgroundColor: styles.colors.bgHover,
-              border: `1px solid ${styles.colors.border}`,
-              borderRadius: "4px",
-              color: styles.colors.textMuted,
-              cursor: "pointer",
-            }}
-            disabled={events.length === 0}
-          >
-            Clear ({events.length})
-          </button>
-        </div>
-
         {filteredEvents.length === 0 ? (
           <div style={styles.emptyStateStyles}>
             {events.length === 0 ? "No events yet" : "No matching events"}
@@ -967,7 +1174,9 @@ export function DevToolsPanel(): React.ReactElement | null {
                     >
                       {formatTime(event.timestamp)}
                     </span>
-                    <span style={styles.eventTypeStyles(event.type)}>
+                    <span
+                      style={styles.eventTypeStyles(event.type, event.isError)}
+                    >
                       {event.type.split(":")[1]}
                     </span>
                     <span
@@ -989,6 +1198,7 @@ export function DevToolsPanel(): React.ReactElement | null {
                           onClick={(e) => {
                             e.stopPropagation();
                             setSearchQuery(signalId);
+                            setSignalKindFilter("all");
                             updateActiveTab("signals");
                           }}
                           title={`Go to signal: ${signalId}`}
@@ -1171,6 +1381,7 @@ export function DevToolsPanel(): React.ReactElement | null {
           <div
             style={styles.resizeHandleStyles(position, isResizing)}
             onMouseDown={handleResizeStart}
+            onTouchStart={handleResizeStart}
           >
             <div style={styles.resizeHandleGripStyles(position)} />
           </div>
@@ -1192,17 +1403,35 @@ export function DevToolsPanel(): React.ReactElement | null {
               flexDirection: isLeftCollapsed ? "column" : "row",
             }}
           >
-            {/* Position toggle */}
-            <button
-              style={styles.positionButtonStyles}
-              onClick={(e) => {
-                e.stopPropagation();
-                togglePosition();
-              }}
-              title={position === "bottom" ? "Move to left" : "Move to bottom"}
-            >
-              {position === "bottom" ? "◀" : "▼"}
-            </button>
+            {/* Reset config button */}
+            {!isLeftCollapsed && (
+              <button
+                style={styles.positionButtonStyles}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  resetConfig();
+                }}
+                title="Reset DevTools settings"
+              >
+                ↺
+              </button>
+            )}
+
+            {/* Position toggle - hidden in mobile mode */}
+            {!isMobile && (
+              <button
+                style={styles.positionButtonStyles}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePosition();
+                }}
+                title={
+                  position === "bottom" ? "Move to left" : "Move to bottom"
+                }
+              >
+                {position === "bottom" ? "◀" : "▼"}
+              </button>
+            )}
 
             {/* Expand/Collapse toggle */}
             <button
@@ -1237,18 +1466,6 @@ export function DevToolsPanel(): React.ReactElement | null {
                   {renderTabLabel(tab)}
                 </button>
               ))}
-
-              {/* Reset config button */}
-              <button
-                style={styles.resetButtonStyles}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  resetConfig();
-                }}
-                title="Reset DevTools settings"
-              >
-                ↺
-              </button>
             </div>
 
             {/* Search box */}
@@ -1416,35 +1633,205 @@ export function DevToolsPanel(): React.ReactElement | null {
                     })}
                   </div>
 
-                  {/* User/All toggle */}
+                  {/* Sort & Filter toggles */}
+                  <div
+                    style={{ display: "flex", gap: "6px", marginLeft: "auto" }}
+                  >
+                    {/* Recent activity sort toggle */}
+                    <button
+                      style={{
+                        padding: "3px 8px",
+                        fontSize: "10px",
+                        backgroundColor: recentActivitySort
+                          ? styles.colors.warning + "33"
+                          : styles.colors.bgHover,
+                        border: `1px solid ${
+                          recentActivitySort
+                            ? styles.colors.warning
+                            : styles.colors.border
+                        }`,
+                        borderRadius: "4px",
+                        color: recentActivitySort
+                          ? styles.colors.warning
+                          : styles.colors.textMuted,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                      onClick={() => setRecentActivitySort(!recentActivitySort)}
+                      title={
+                        recentActivitySort
+                          ? "Sort by default (active first)"
+                          : "Sort by recent activity"
+                      }
+                    >
+                      🕐
+                    </button>
+
+                    {/* User/All toggle */}
+                    <button
+                      style={{
+                        padding: "3px 8px",
+                        fontSize: "10px",
+                        backgroundColor: showAutoGenerated
+                          ? styles.colors.accent + "33"
+                          : styles.colors.bgHover,
+                        border: `1px solid ${
+                          showAutoGenerated
+                            ? styles.colors.accent
+                            : styles.colors.border
+                        }`,
+                        borderRadius: "4px",
+                        color: showAutoGenerated
+                          ? styles.colors.accent
+                          : styles.colors.textMuted,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                      onClick={() =>
+                        updateShowAutoGenerated(!showAutoGenerated)
+                      }
+                      title={
+                        showAutoGenerated
+                          ? "Hide auto-generated signals"
+                          : "Show all signals (including #auto)"
+                      }
+                    >
+                      {showAutoGenerated ? "#auto" : "user"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Event filters - only shown on events tab */}
+              {activeTab === "events" && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    marginTop: "6px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: "2px" }}>
+                    {(
+                      ["all", "error", "change", "create", "dispose"] as const
+                    ).map((kind) => {
+                      const isActive = eventKindFilter === kind;
+                      const label =
+                        kind === "all"
+                          ? "A"
+                          : kind === "error"
+                          ? "E"
+                          : kind === "change"
+                          ? "C"
+                          : kind === "create"
+                          ? "+"
+                          : "D";
+                      const color =
+                        kind === "error"
+                          ? styles.colors.error
+                          : kind === "change"
+                          ? styles.colors.warning
+                          : kind === "create"
+                          ? styles.colors.success
+                          : kind === "dispose"
+                          ? "#666"
+                          : styles.colors.text;
+                      const count =
+                        kind === "all"
+                          ? events.length
+                          : kind === "error"
+                          ? events.filter(
+                              (e) => e.isError || e.type === "signal:error"
+                            ).length
+                          : kind === "change"
+                          ? events.filter((e) => e.type === "signal:change")
+                              .length
+                          : kind === "create"
+                          ? events.filter(
+                              (e) =>
+                                e.type === "signal:create" ||
+                                e.type === "tag:create"
+                            ).length
+                          : events.filter((e) => e.type === "signal:dispose")
+                              .length;
+
+                      // Emphasize error filter when there are errors
+                      const hasErrors =
+                        kind === "error" &&
+                        events.some(
+                          (e) => e.isError || e.type === "signal:error"
+                        );
+
+                      return (
+                        <button
+                          key={kind}
+                          style={{
+                            padding: "3px 8px",
+                            fontSize: "10px",
+                            fontWeight: 600,
+                            backgroundColor:
+                              isActive || hasErrors
+                                ? color + "33"
+                                : styles.colors.bgHover,
+                            border: `1px solid ${
+                              isActive || hasErrors
+                                ? color
+                                : styles.colors.border
+                            }`,
+                            borderRadius: "4px",
+                            color:
+                              isActive || hasErrors
+                                ? color
+                                : styles.colors.textMuted,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            ...(hasErrors &&
+                              !isActive && {
+                                animation: "pulse 2s infinite",
+                              }),
+                          }}
+                          onClick={() => setEventKindFilter(kind)}
+                          title={`Show ${kind} events`}
+                        >
+                          {label}
+                          <span
+                            style={{
+                              fontWeight: 400,
+                              fontSize: "9px",
+                              opacity: 0.8,
+                            }}
+                          >
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Clear button */}
                   <button
                     style={{
                       padding: "3px 8px",
                       fontSize: "10px",
-                      backgroundColor: showAutoGenerated
-                        ? styles.colors.accent + "33"
-                        : styles.colors.bgHover,
-                      border: `1px solid ${
-                        showAutoGenerated
-                          ? styles.colors.accent
-                          : styles.colors.border
-                      }`,
+                      backgroundColor: styles.colors.bgHover,
+                      border: `1px solid ${styles.colors.border}`,
                       borderRadius: "4px",
-                      color: showAutoGenerated
-                        ? styles.colors.accent
-                        : styles.colors.textMuted,
-                      cursor: "pointer",
+                      color: styles.colors.textMuted,
+                      cursor: events.length === 0 ? "not-allowed" : "pointer",
+                      opacity: events.length === 0 ? 0.5 : 1,
                       fontFamily: "inherit",
                       marginLeft: "auto",
                     }}
-                    onClick={() => updateShowAutoGenerated(!showAutoGenerated)}
-                    title={
-                      showAutoGenerated
-                        ? "Hide auto-generated signals"
-                        : "Show all signals (including #auto)"
-                    }
+                    onClick={clearEvents}
+                    disabled={events.length === 0}
+                    title="Clear all events"
                   >
-                    {showAutoGenerated ? "#auto" : "user"}
+                    Clear
                   </button>
                 </div>
               )}

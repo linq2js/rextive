@@ -13,6 +13,20 @@ export type SignalError = {
 };
 
 /**
+ * Source location where a signal was declared.
+ */
+export type SourceLocation = {
+  /** File path (may be full URL or relative path) */
+  file: string;
+  /** Line number */
+  line: number;
+  /** Column number (if available) */
+  column?: number;
+  /** Function name (if available) */
+  functionName?: string;
+};
+
+/**
  * Metadata for a tracked signal.
  */
 export type SignalInfo = {
@@ -40,6 +54,8 @@ export type SignalInfo = {
   disposed: boolean;
   /** Disposal timestamp */
   disposedAt?: number;
+  /** Source location where signal was declared */
+  source?: SourceLocation;
 };
 
 /**

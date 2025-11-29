@@ -11,6 +11,8 @@ const generateId = () =>
 // ==================== PERSISTOR ====================
 
 const STORAGE_KEY = "rextive-todo";
+const numberTag = signal.tag<number>({ name: "numbers" });
+const stringTag = signal.tag<string>({ name: "strings" });
 
 type PersistedData = {
   offlineChanges: OfflineChange[];
@@ -46,8 +48,8 @@ const persist = persistor<PersistedData>({
 
 // Test signals without names (auto-generated) - for testing DevTools "Show all" toggle
 // These will appear as #mutable-X in devtools
-const _tempSignal1 = signal(0); // #mutable-X
-const _tempSignal2 = signal("test"); // #mutable-X
+const _tempSignal1 = signal(0, { use: [numberTag] }); // #mutable-X
+const _tempSignal2 = signal("test", { use: [stringTag] }); // #mutable-X
 const _tempComputed = signal(
   { _tempSignal1 },
   ({ deps }) => deps._tempSignal1 * 2
@@ -63,10 +65,12 @@ export const offlineChanges = signal<OfflineChange[]>([], {
 });
 
 // Current filter
-export const filter = signal<TodoFilter>("all", { name: "filter" });
+export const filter = signal<TodoFilter>("all", {
+  name: "filter",
+});
 
 // Search text
-export const searchText = signal("", { name: "searchText" });
+export const searchText = signal("", { name: "searchText", use: [stringTag] });
 
 // Search text validation schema
 // - Empty string is valid (no error shown)

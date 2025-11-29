@@ -153,11 +153,14 @@ export const contentStyles: React.CSSProperties = {
   padding: "8px 12px",
 };
 
-export const contentGridStyles: React.CSSProperties = {
+export const contentGridStyles = (position: PanelPosition = "left"): React.CSSProperties => ({
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+  // When at bottom, use wider min-width (320px) for better readability in horizontal layout
+  gridTemplateColumns: position === "bottom" 
+    ? "repeat(auto-fill, minmax(320px, 1fr))"
+    : "repeat(auto-fill, minmax(200px, 1fr))",
   gap: "6px",
-};
+});
 
 export const sectionStyles: React.CSSProperties = {
   marginBottom: "12px",
@@ -307,18 +310,25 @@ export const eventItemStyles: React.CSSProperties = {
   gap: "6px",
 };
 
-export const eventTypeStyles = (type: string): React.CSSProperties => ({
+export const eventTypeStyles = (
+  type: string,
+  isError?: boolean
+): React.CSSProperties => ({
   fontSize: "8px",
   padding: "1px 4px",
   borderRadius: "2px",
   fontWeight: 600,
   flexShrink: 0,
-  backgroundColor: type.includes("create")
+  backgroundColor: isError
+    ? `${colors.error}22`
+    : type.includes("create")
     ? `${colors.success}22`
     : type.includes("dispose") || type.includes("remove")
     ? `${colors.error}22`
     : `${colors.warning}22`,
-  color: type.includes("create")
+  color: isError
+    ? colors.error
+    : type.includes("create")
     ? colors.success
     : type.includes("dispose") || type.includes("remove")
     ? colors.error

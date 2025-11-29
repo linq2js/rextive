@@ -30,6 +30,7 @@ import type {
   DevToolsEvent,
   DevToolsEventListener,
   DevToolsOptions,
+  SourceLocation,
 } from "./types";
 
 // Re-export types
@@ -40,6 +41,7 @@ export type {
   DevToolsEvent,
   DevToolsEventListener,
   DevToolsOptions,
+  SourceLocation,
 };
 
 // ============================================================================
@@ -90,6 +92,99 @@ function getSignalKind(signal: Signal<any>): "mutable" | "computed" {
   return "set" in signal ? "mutable" : "computed";
 }
 
+/**
+ * Parse a stack trace line to extract source location.
+ * Handles various browser formats:
+ * - Chrome/V8: "    at functionName (file:line:col)" or "    at file:line:col"
+ * - Firefox: "functionName@file:line:col"
+ * - Safari: similar to Firefox
+ */
+function parseStackLine(line: string): SourceLocation | null {
+  // Skip empty lines
+  if (!line.trim()) return null;
+
+  // Chrome/V8 format: "    at functionName (file:line:col)"
+  const chromeMatch = line.match(
+    /^\s*at\s+(?:(.+?)\s+\()?(.+?):(\d+):(\d+)\)?$/
+  );
+  if (chromeMatch) {
+    return {
+      functionName: chromeMatch[1] || undefined,
+      file: chromeMatch[2],
+      line: parseInt(chromeMatch[3], 10),
+      column: parseInt(chromeMatch[4], 10),
+    };
+  }
+
+  // Firefox/Safari format: "functionName@file:line:col"
+  const firefoxMatch = line.match(/^(.+?)@(.+?):(\d+):(\d+)$/);
+  if (firefoxMatch) {
+    return {
+      functionName: firefoxMatch[1] || undefined,
+      file: firefoxMatch[2],
+      line: parseInt(firefoxMatch[3], 10),
+      column: parseInt(firefoxMatch[4], 10),
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Capture source location from current call stack.
+ * Skips internal rextive frames to find user code.
+ */
+function captureSourceLocation(): SourceLocation | undefined {
+  try {
+    const stack = new Error().stack;
+    if (!stack) return undefined;
+
+    const lines = stack.split("\n");
+
+    // Skip frames that are internal to rextive
+    // Look for the first frame that's NOT in rextive/src or node_modules
+    for (const line of lines) {
+      // Skip the "Error" line
+      if (line.trim().startsWith("Error")) continue;
+
+      // Skip internal rextive frames
+      if (
+        line.includes("/rextive/src/") ||
+        line.includes("/rextive/dist/") ||
+        line.includes("node_modules")
+      ) {
+        continue;
+      }
+
+      const location = parseStackLine(line);
+      if (location) {
+        // Simplify file path for display
+        // Convert full URLs to relative paths
+        let file = location.file;
+
+        // Remove webpack/vite prefixes
+        file = file.replace(/^webpack-internal:\/\/\//, "");
+        file = file.replace(/^vite:\/\/\//, "");
+
+        // Try to get just the filename and parent folder
+        const parts = file.split("/");
+        if (parts.length > 2) {
+          file = parts.slice(-2).join("/");
+        }
+
+        return {
+          ...location,
+          file,
+        };
+      }
+    }
+  } catch {
+    // Ignore errors in stack parsing
+  }
+
+  return undefined;
+}
+
 // ============================================================================
 // DEVTOOLS HOOKS
 // ============================================================================
@@ -137,6 +232,7 @@ const devToolsHooks: DevTools = {
       errorCount: 0,
       errors: [],
       disposed: false,
+      source: captureSourceLocation(),
     };
 
     signals.set(id, info);
