@@ -25,10 +25,11 @@ import { signal, rx } from "rextive/react";
 const count = signal(0); // Mutable state
 const doubled = count.to((x) => x * 2); // Derived value
 const tripled = signal({ count }, ({ deps }) => deps.count * 3); // Explicit deps
+const increment = () => count.set((prev) => prev + 1); // Update signal
 
 // 🔥 Zero boilerplate React — rx() makes any signal reactive
 const App = () => (
-  <div>
+  <div onClick={increment}>
     Count: {rx(count)} | Doubled: {rx(doubled)}
   </div>
 );
