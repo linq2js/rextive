@@ -35,6 +35,8 @@ import type {
   SignalKind,
   UseList,
   AnySignal,
+  MutableWhenAction,
+  ComputedWhenAction,
 } from "./types";
 
 declare function define<T>(): T;
@@ -2891,6 +2893,382 @@ function signalFromTests() {
     fromComputed;
 }
 
+// =============================================================================
+// signal.when() Instance Method Type Tests
+// =============================================================================
+
+function signalWhenTests() {
+  // -----------------------------------------------------------------------------
+  // Setup - Create test signals
+  // -----------------------------------------------------------------------------
+
+  const notifier = signal(0);
+  const notifier2 = signal(0);
+  const stringNotifier = signal("");
+
+  // -----------------------------------------------------------------------------
+  // Test 1: Mutable signal with action (single notifier)
+  // -----------------------------------------------------------------------------
+
+  const mutableCount = signal(10);
+
+  // "reset" action
+  const afterReset = mutableCount.when(notifier, "reset");
+  expectType<Mutable<number>>(afterReset);
+
+  // "refresh" action
+  const afterRefresh = mutableCount.when(notifier, "refresh");
+  expectType<Mutable<number>>(afterRefresh);
+
+  // Action type should be MutableWhenAction
+  const validActions: MutableWhenAction[] = ["reset", "refresh"];
+  void validActions;
+
+  // -----------------------------------------------------------------------------
+  // Test 2: Mutable signal with action (array of notifiers)
+  // -----------------------------------------------------------------------------
+
+  const afterMultiNotifier = mutableCount.when([notifier, notifier2], "reset");
+  expectType<Mutable<number>>(afterMultiNotifier);
+
+  // Mixed notifier types in array
+  const afterMixedNotifiers = mutableCount.when(
+    [notifier, stringNotifier],
+    "refresh"
+  );
+  expectType<Mutable<number>>(afterMixedNotifiers);
+
+  // -----------------------------------------------------------------------------
+  // Test 3: Mutable signal with action and filter
+  // -----------------------------------------------------------------------------
+
+  // Filter function receives (self, notifier)
+  const withFilter = mutableCount.when(
+    notifier,
+    "reset",
+    (self, notifierSig) => {
+      // self should be Mutable<number>
+      expectType<Mutable<number>>(self);
+      // notifier should match the notifier type
+      expectType<Mutable<number>>(notifierSig);
+      // Can access values
+      return self() > 5 && notifierSig() > 0;
+    }
+  );
+  expectType<Mutable<number>>(withFilter);
+
+  // Filter with string notifier
+  const withStringFilter = mutableCount.when(
+    stringNotifier,
+    "refresh",
+    (self, notifierSig) => {
+      expectType<Mutable<number>>(self);
+      expectType<Mutable<string>>(notifierSig);
+      return notifierSig().length > 0;
+    }
+  );
+  expectType<Mutable<number>>(withStringFilter);
+
+  // Filter with array of notifiers
+  const withArrayFilter = mutableCount.when(
+    [notifier, notifier2],
+    "reset",
+    (self, notifierSig) => {
+      expectType<Mutable<number>>(self);
+      // notifier is one of the array elements
+      expectType<Mutable<number>>(notifierSig);
+      return notifierSig() > 5;
+    }
+  );
+  expectType<Mutable<number>>(withArrayFilter);
+
+  // -----------------------------------------------------------------------------
+  // Test 4: Mutable signal with reducer (single notifier)
+  // -----------------------------------------------------------------------------
+
+  // Basic accumulator pattern
+  const total = signal(0).when(notifier, (self, notifierSig) => {
+    expectType<Mutable<number>>(self);
+    expectType<Mutable<number>>(notifierSig);
+    return self() + notifierSig();
+  });
+  expectType<Mutable<number>>(total);
+
+  // Reducer with different notifier type
+  const strLength = signal(0).when(stringNotifier, (self, notifierSig) => {
+    expectType<Mutable<number>>(self);
+    expectType<Mutable<string>>(notifierSig);
+    return self() + notifierSig().length;
+  });
+  expectType<Mutable<number>>(strLength);
+
+  // -----------------------------------------------------------------------------
+  // Test 5: Mutable signal with reducer (array of notifiers)
+  // -----------------------------------------------------------------------------
+
+  const multiReducer = signal(0).when([notifier, notifier2], (self, n) => {
+    expectType<Mutable<number>>(self);
+    expectType<Mutable<number>>(n);
+    return self() + n();
+  });
+  expectType<Mutable<number>>(multiReducer);
+
+  // -----------------------------------------------------------------------------
+  // Test 6: Mutable signal chaining
+  // -----------------------------------------------------------------------------
+
+  const resetTrigger = signal(false);
+  const refreshTrigger = signal(0);
+
+  const chained = signal(100)
+    .when(resetTrigger, "reset")
+    .when(refreshTrigger, "refresh")
+    .when(notifier, (self, n) => self() + n());
+
+  expectType<Mutable<number>>(chained);
+
+  // -----------------------------------------------------------------------------
+  // Test 7: Computed signal with action (single notifier)
+  // -----------------------------------------------------------------------------
+
+  const dep = signal(5);
+  const computed = signal({ dep }, ({ deps }) => deps.dep * 2);
+
+  // "refresh" action
+  const computedRefresh = computed.when(notifier, "refresh");
+  expectType<Computed<number>>(computedRefresh);
+
+  // "stale" action
+  const computedStale = computed.when(notifier, "stale");
+  expectType<Computed<number>>(computedStale);
+
+  // Action type should be ComputedWhenAction
+  const validComputedActions: ComputedWhenAction[] = ["refresh", "stale"];
+  void validComputedActions;
+
+  // -----------------------------------------------------------------------------
+  // Test 8: Computed signal with action (array of notifiers)
+  // -----------------------------------------------------------------------------
+
+  const computedMulti = computed.when([notifier, notifier2], "refresh");
+  expectType<Computed<number>>(computedMulti);
+
+  // -----------------------------------------------------------------------------
+  // Test 9: Computed signal with action and filter
+  // -----------------------------------------------------------------------------
+
+  const computedWithFilter = computed.when(
+    notifier,
+    "refresh",
+    (self, notifierSig) => {
+      // self should be Computed<number>
+      expectType<Computed<number>>(self);
+      // notifier should match the notifier type
+      expectType<Mutable<number>>(notifierSig);
+      return notifierSig() > 5;
+    }
+  );
+  expectType<Computed<number>>(computedWithFilter);
+
+  // Filter with string notifier
+  const computedStringFilter = computed.when(
+    stringNotifier,
+    "stale",
+    (self, notifierSig) => {
+      expectType<Computed<number>>(self);
+      expectType<Mutable<string>>(notifierSig);
+      return notifierSig().length > 0;
+    }
+  );
+  expectType<Computed<number>>(computedStringFilter);
+
+  // -----------------------------------------------------------------------------
+  // Test 10: Computed signal chaining
+  // -----------------------------------------------------------------------------
+
+  const staleTrigger = signal(0);
+
+  const computedChained = signal({ dep }, ({ deps }) => deps.dep * 3)
+    .when(refreshTrigger, "refresh")
+    .when(staleTrigger, "stale", (_, n) => n() > 0);
+
+  expectType<Computed<number>>(computedChained);
+
+  // -----------------------------------------------------------------------------
+  // Test 11: Computed signal should NOT support "reset" action
+  // -----------------------------------------------------------------------------
+
+  // @ts-expect-error - Computed signals do not support "reset" action
+  computed.when(notifier, "reset");
+
+  // @ts-expect-error - "reset" is not a valid ComputedWhenAction
+  const invalidAction: ComputedWhenAction = "reset";
+  void invalidAction;
+
+  // -----------------------------------------------------------------------------
+  // Test 12: Mutable signal should NOT support "stale" action
+  // -----------------------------------------------------------------------------
+
+  // @ts-expect-error - Mutable signals do not support "stale" action
+  mutableCount.when(notifier, "stale");
+
+  // @ts-expect-error - "stale" is not a valid MutableWhenAction
+  const invalidMutableAction: MutableWhenAction = "stale";
+  void invalidMutableAction;
+
+  // -----------------------------------------------------------------------------
+  // Test 13: Invalid action strings
+  // -----------------------------------------------------------------------------
+
+  // @ts-expect-error - Invalid action string
+  mutableCount.when(notifier, "invalid");
+
+  // @ts-expect-error - Invalid action string for computed
+  computed.when(notifier, "invalid");
+
+  // -----------------------------------------------------------------------------
+  // Test 14: Type inference with generic signals
+  // -----------------------------------------------------------------------------
+
+  interface User {
+    id: number;
+    name: string;
+  }
+
+  const userSignal = signal<User | null>(null);
+  const logout = signal(0);
+
+  // Reset user on logout
+  const userWithReset = userSignal.when(logout, "reset");
+  expectType<Mutable<User | null>>(userWithReset);
+
+  // Reducer with complex type
+  const updateUser = signal<Partial<User>>({});
+  const userWithReducer = userSignal.when(updateUser, (self, n) => {
+    expectType<Mutable<User | null, null>>(self);
+    expectType<Mutable<Partial<User>>>(n);
+    const current = self();
+    const updates = n();
+    if (!current) return null;
+    return { ...current, ...updates };
+  });
+  expectType<Mutable<User | null, null>>(userWithReducer);
+
+  // -----------------------------------------------------------------------------
+  // Test 15: Filter function return type must be boolean
+  // -----------------------------------------------------------------------------
+
+  // @ts-expect-error - Filter must return boolean, not number
+  mutableCount.when(notifier, "reset", () => 42);
+
+  // @ts-expect-error - Filter must return boolean, not string
+  computed.when(notifier, "refresh", () => "true");
+
+  // -----------------------------------------------------------------------------
+  // Test 16: Reducer must return correct type
+  // -----------------------------------------------------------------------------
+
+  // @ts-expect-error - Reducer must return number, not string
+  signal(0).when(notifier, () => "wrong type");
+
+  // @ts-expect-error - Reducer must return number, not void
+  signal(0).when(notifier, () => {});
+
+  // -----------------------------------------------------------------------------
+  // Test 17: State machine pattern
+  // -----------------------------------------------------------------------------
+
+  type State = "idle" | "loading" | "done" | "error";
+  type Event = { type: "START" | "COMPLETE" | "FAIL" };
+
+  const events = signal<Event | null>(null);
+  const state = signal<State>("idle").when(events, (self, notifierSig) => {
+    expectType<Mutable<State>>(self);
+    expectType<Mutable<Event | null>>(notifierSig);
+
+    const event = notifierSig();
+    if (!event) return self();
+
+    switch (event.type) {
+      case "START":
+        return "loading";
+      case "COMPLETE":
+        return "done";
+      case "FAIL":
+        return "error";
+      default:
+        return self();
+    }
+  });
+  expectType<Mutable<State>>(state);
+
+  // -----------------------------------------------------------------------------
+  // Test 18: Readonly array of notifiers
+  // -----------------------------------------------------------------------------
+
+  const notifiers = [notifier, notifier2] as const;
+  const withReadonlyArray = mutableCount.when(notifiers, "reset");
+  expectType<Mutable<number>>(withReadonlyArray);
+
+  const computedReadonly = computed.when(notifiers, "refresh");
+  expectType<Computed<number>>(computedReadonly);
+
+  // -----------------------------------------------------------------------------
+  // Test 19: AnySignal as notifier
+  // -----------------------------------------------------------------------------
+
+  function setupWhen<T>(s: Mutable<T>, n: AnySignal<number>, action: MutableWhenAction) {
+    return s.when(n, action);
+  }
+
+  const result = setupWhen(signal(10), notifier, "reset");
+  expectType<Mutable<number>>(result);
+
+  // Also works with computed notifier
+  const computedNotifier = signal({ dep }, ({ deps }) => deps.dep);
+  const withComputedNotifier = mutableCount.when(computedNotifier, "refresh");
+  expectType<Mutable<number>>(withComputedNotifier);
+
+  // -----------------------------------------------------------------------------
+  // Test 20: Empty array of notifiers (edge case)
+  // -----------------------------------------------------------------------------
+
+  // TypeScript allows empty array but it's a no-op at runtime
+  const emptyNotifiers: readonly Mutable<number>[] = [];
+  const withEmptyArray = mutableCount.when(emptyNotifiers, "reset");
+  expectType<Mutable<number>>(withEmptyArray);
+
+  // -----------------------------------------------------------------------------
+  // Cleanup - suppress unused variable warnings
+  // -----------------------------------------------------------------------------
+
+  void afterReset,
+    afterRefresh,
+    afterMultiNotifier,
+    afterMixedNotifiers,
+    withFilter,
+    withStringFilter,
+    withArrayFilter,
+    total,
+    strLength,
+    multiReducer,
+    chained,
+    computedRefresh,
+    computedStale,
+    computedMulti,
+    computedWithFilter,
+    computedStringFilter,
+    computedChained,
+    userWithReset,
+    userWithReducer,
+    state,
+    withReadonlyArray,
+    computedReadonly,
+    result,
+    withComputedNotifier,
+    withEmptyArray;
+}
+
 export {
   signalTests,
   loadableTests,
@@ -2908,4 +3286,5 @@ export {
   pathTypeTests,
   focusOperatorTests,
   signalFromTests,
+  signalWhenTests,
 };
