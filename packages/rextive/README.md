@@ -26,6 +26,15 @@ const count = signal(0); // Mutable state
 const doubled = count.to((x) => x * 2); // Derived value
 const tripled = signal({ count }, ({ deps }) => deps.count * 3); // Explicit deps
 const increment = () => count.set((prev) => prev + 1); // Update signal
+// Effect signal: runs immediately (lazy: false), re-runs when refresh() is called
+signal(
+  ({ refresh }) => {
+    count.set((prev) => prev + 1); // Increment count
+    setTimeout(refresh, 5000); // Schedule next refresh in 5 seconds
+    return count(); // Signals must return a value
+  },
+  { lazy: false }
+);
 
 // 🔥 Zero boilerplate React — rx() makes any signal reactive
 const App = () => (

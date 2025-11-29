@@ -426,6 +426,69 @@ describe("signal.refresh() and signal.stale()", () => {
     });
   });
 
+  describe("effect signal pattern (lazy: false)", () => {
+    it("should auto-increment a counter every interval using refresh()", async () => {
+      const count = signal(0);
+      const incrementCount = vi.fn();
+
+      // Effect signal: runs immediately (lazy: false), re-runs when refresh() is called
+      const effectSignal = signal(
+        ({ refresh }) => {
+          count.set((prev) => prev + 1);
+          incrementCount();
+          setTimeout(refresh, 5000); // Schedule next refresh in 5 seconds
+          return count(); // Return current count value
+        },
+        { lazy: false }
+      );
+
+      // Should run immediately due to lazy: false
+      expect(count()).toBe(1);
+      expect(incrementCount).toHaveBeenCalledTimes(1);
+
+      // Advance time by 5 seconds - should trigger refresh
+      vi.advanceTimersByTime(5000);
+      await Promise.resolve(); // Flush microtask queue
+      expect(count()).toBe(2);
+      expect(incrementCount).toHaveBeenCalledTimes(2);
+
+      // Advance another 5 seconds
+      vi.advanceTimersByTime(5000);
+      await Promise.resolve();
+      expect(count()).toBe(3);
+      expect(incrementCount).toHaveBeenCalledTimes(3);
+
+      // Cleanup
+      effectSignal.dispose();
+      count.dispose();
+    });
+
+    it("should stop auto-refresh when effect signal is disposed", async () => {
+      const count = signal(0);
+
+      const effectSignal = signal(
+        ({ refresh }) => {
+          count.set((prev) => prev + 1);
+          setTimeout(refresh, 1000);
+          return count(); // Return current count value
+        },
+        { lazy: false }
+      );
+
+      expect(count()).toBe(1);
+
+      // Dispose the effect signal
+      effectSignal.dispose();
+
+      // Advance time - should NOT increment anymore
+      vi.advanceTimersByTime(5000);
+      await Promise.resolve();
+      expect(count()).toBe(1); // Still 1, no more increments
+
+      count.dispose();
+    });
+  });
+
   describe("real-world patterns", () => {
     it("should support polling pattern with context.refresh()", async () => {
       let fetchCount = 0;
