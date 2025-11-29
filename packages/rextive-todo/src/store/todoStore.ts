@@ -296,6 +296,9 @@ export function clearCompleted() {
 // Storage key for random modifiedAt values
 const MODIFIED_AT_KEY = "rextive-todo:modified-at";
 
+// MirageJS server storage key
+const SERVER_STORAGE_KEY = "rextive-todo:server-data";
+
 // Load stored modifiedAt values
 function loadModifiedAtMap(): Record<string, number> {
   try {
@@ -420,26 +423,16 @@ export async function syncPush() {
 
 // Reset server to initial state
 export async function resetServer() {
-  try {
-    syncStatus.set("syncing");
-    syncError.set(null);
+  // Clear all persisted data
+  localStorage.removeItem(STORAGE_KEY);
 
-    const response = await fetch("/api/reset", { method: "POST" });
-    if (!response.ok) throw new Error("Failed to reset server");
+  // Clear stored modifiedAt values (will regenerate on pull)
+  localStorage.removeItem(MODIFIED_AT_KEY);
 
-    // Clear local offline changes
-    offlineChanges.set([]);
+  // Clear MirageJS server data (will regenerate seed data)
+  localStorage.removeItem(SERVER_STORAGE_KEY);
 
-    // Clear stored modifiedAt values (will regenerate on pull)
-    localStorage.removeItem(MODIFIED_AT_KEY);
-
-    // Pull fresh data from server
-    await syncPull();
-  } catch (error) {
-    syncStatus.set("error");
-    syncError.set(error instanceof Error ? error.message : "Unknown error");
-    throw error;
-  }
+  location.reload();
 }
 
 // Initial pull on app start

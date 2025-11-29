@@ -96,11 +96,11 @@ export function ScopeTest() {
   return (
     <div
       style={{
-        background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)",
-        borderRadius: "16px",
+        background: "#1c2128",
+        borderRadius: "12px",
         padding: "24px",
         marginTop: "24px",
-        border: "1px solid rgba(99, 102, 241, 0.3)",
+        border: "1px solid #30363d",
       }}
     >
       <div

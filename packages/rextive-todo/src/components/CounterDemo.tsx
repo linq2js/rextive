@@ -77,11 +77,11 @@ export function CounterDemo() {
 
       <style>{`
         .counter-demo {
-          background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
-          border-radius: 16px;
+          background: #1c2128;
+          border-radius: 12px;
           padding: 24px;
           margin-top: 24px;
-          border: 1px solid rgba(99, 102, 241, 0.3);
+          border: 1px solid #30363d;
         }
         .counter-demo h3 {
           margin: 0 0 8px 0;

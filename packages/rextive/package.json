@@ -67,7 +67,7 @@
     "pu:pa": "npm run version:patch && npm publish",
     "pu:mi": "npm run version:minor && npm publish",
     "pu:ma": "npm run version:major && npm publish",
-    "jsr:publish": "npx jsr publish --allow-dirty"
+    "jsr:publish": "deno publish --allow-dirty"
   },
   "keywords": [
     "state",

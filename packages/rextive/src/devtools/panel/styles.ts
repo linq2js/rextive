@@ -3,6 +3,10 @@
  * Bottom drawer layout - responsive for mobile
  */
 
+// Font families
+export const fontUI = '"Roboto", "Helvetica", "Arial", sans-serif';
+export const fontMono = '"JetBrains Mono", "Fira Code", "SF Mono", Monaco, Consolas, monospace';
+
 export const colors = {
   bg: "#1a1a2e",
   bgLight: "#16213e",
@@ -42,8 +46,7 @@ export const panelContainerStyles = (position: PanelPosition): React.CSSProperti
     ? { bottom: 0, left: 0, right: 0 }
     : { top: 0, left: 0, bottom: 0 }),
   zIndex: 99999,
-  fontFamily:
-    "'JetBrains Mono', 'Fira Code', 'SF Mono', Monaco, Consolas, monospace",
+  fontFamily: fontUI,
   fontSize: "12px",
   color: colors.text,
 });
@@ -125,7 +128,7 @@ export const headerRightStyles: React.CSSProperties = {
 export const tabsContainerStyles: React.CSSProperties = {
   display: "flex",
   gap: "2px",
-  padding: "6px 12px",
+  padding: "6px 8px",
   backgroundColor: colors.bgLight,
   borderBottom: `1px solid ${colors.border}`,
   flexShrink: 0,
@@ -142,7 +145,7 @@ export const tabStyles = (active: boolean): React.CSSProperties => ({
   cursor: "pointer",
   fontSize: "11px",
   fontWeight: 500,
-  fontFamily: "inherit",
+  fontFamily: fontUI,
   transition: "all 0.15s ease",
   whiteSpace: "nowrap",
 });
@@ -150,7 +153,7 @@ export const tabStyles = (active: boolean): React.CSSProperties => ({
 export const contentStyles: React.CSSProperties = {
   flex: 1,
   overflow: "auto",
-  padding: "8px 12px",
+  padding: "6px 8px",
 };
 
 export const contentGridStyles = (position: PanelPosition = "left"): React.CSSProperties => ({
@@ -224,6 +227,7 @@ export const itemHeaderStyles: React.CSSProperties = {
 };
 
 export const itemNameStyles: React.CSSProperties = {
+  fontFamily: fontMono,
   fontWeight: 500,
   display: "flex",
   alignItems: "center",
@@ -257,7 +261,7 @@ export const badgeStyles = (
 });
 
 export const valueStyles: React.CSSProperties = {
-  fontFamily: "inherit",
+  fontFamily: fontMono,
   color: colors.textDim,
   fontSize: "10px",
   wordBreak: "break-all",
@@ -281,6 +285,7 @@ export const statBoxStyles: React.CSSProperties = {
 };
 
 export const statValueStyles: React.CSSProperties = {
+  fontFamily: fontMono,
   fontSize: "18px",
   fontWeight: 700,
   color: colors.text,
@@ -378,7 +383,7 @@ export const resetButtonStyles: React.CSSProperties = {
   fontSize: "14px",
   opacity: 0.6,
   marginLeft: "auto",
-  fontFamily: "inherit",
+  fontFamily: fontUI,
 };
 
 export const resizeHandleStyles = (position: PanelPosition, isResizing: boolean): React.CSSProperties => {
@@ -549,7 +554,7 @@ export const searchInputStyles: React.CSSProperties = {
   color: colors.text,
   fontSize: "11px",
   padding: "6px 0",
-  fontFamily: "inherit",
+  fontFamily: fontMono,
 };
 
 export const searchClearStyles: React.CSSProperties = {
@@ -574,7 +579,7 @@ export const signalActionButtonStyles: React.CSSProperties = {
   fontSize: "9px",
   borderRadius: "3px",
   transition: "all 0.15s ease",
-  fontFamily: "inherit",
+  fontFamily: fontUI,
   display: "inline-flex",
   alignItems: "center",
   gap: "2px",

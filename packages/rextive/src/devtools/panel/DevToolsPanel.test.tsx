@@ -90,15 +90,13 @@ describe("DevToolsPanel", () => {
     expect(screen.getByText(/Signals/)).toBeInTheDocument();
     expect(screen.getByText(/Tags/)).toBeInTheDocument();
     expect(screen.getByText(/Events/)).toBeInTheDocument();
-    expect(screen.getByText(/Stats/)).toBeInTheDocument();
+    expect(screen.getByText(/Chains/)).toBeInTheDocument();
 
-    // Switch to stats tab
-    fireEvent.click(screen.getByText(/Stats/));
+    // Switch to Chains tab
+    fireEvent.click(screen.getByText(/Chains/));
 
-    // Should show stats content
-    expect(screen.getByText("Signals")).toBeInTheDocument();
-    expect(screen.getByText("Mutable")).toBeInTheDocument();
-    expect(screen.getByText("Computed")).toBeInTheDocument();
+    // Should show chains empty state
+    expect(screen.getByText("No chain reactions detected yet")).toBeInTheDocument();
   });
 
   it("should show filter buttons in signals tab when enabled and expanded", () => {
