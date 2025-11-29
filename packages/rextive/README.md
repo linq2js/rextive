@@ -31,7 +31,6 @@ signal(
   ({ refresh }) => {
     count.set((prev) => prev + 1); // Increment count
     setTimeout(refresh, 5000); // Schedule next refresh in 5 seconds
-    return count(); // Signals must return a value
   },
   { lazy: false }
 );
