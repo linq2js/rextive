@@ -1771,8 +1771,3 @@ export type DevTools = {
   /** Called when a signal is removed from a tag */
   onTagRemove?(tag: Tag<any, any>, signal: AnySignal<any>): void;
 };
-
-declare global {
-  // eslint-disable-next-line no-var
-  var __REXTIVE_DEVTOOLS__: DevTools | undefined;
-}

@@ -16,8 +16,19 @@ import { signalUse } from "./signal.use";
 import { signalFrom } from "./signal.from";
 import { getErrorTrace } from "./utils/errorTracking";
 
+/** Combined signal API type */
+export type SignalApi = typeof signalBase & {
+  is: typeof is;
+  batch: typeof batchImpl;
+  tag: typeof tagImpl;
+  on: typeof signalOn;
+  use: typeof signalUse;
+  from: typeof signalFrom;
+  trace: typeof getErrorTrace;
+};
+
 // Augment signal with utility methods
-export const signal = Object.assign(signalBase, {
+export const signal: SignalApi = Object.assign(signalBase, {
   is: is,
   batch: batchImpl,
   tag: tagImpl,
@@ -27,7 +38,7 @@ export const signal = Object.assign(signalBase, {
   trace: getErrorTrace,
 });
 
-export const $ = signal;
+export const $: SignalApi = signal;
 
 // Core utilities (no React)
 export { emitter } from "./utils/emitter";

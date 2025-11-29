@@ -1,6 +1,16 @@
 import { Listener, SingleOrMultipleListeners } from "../types";
 
 /**
+ * Type representing an emitter instance.
+ */
+export interface Emitter<T = void> {
+  on(newListeners: SingleOrMultipleListeners<T>): VoidFunction;
+  emit(payload: T): void;
+  clear(): void;
+  emitAndClear(payload: T): void;
+}
+
+/**
  * Creates an event emitter for managing and notifying listeners.
  *
  * An emitter provides a simple pub/sub pattern for managing event listeners.
@@ -35,7 +45,7 @@ import { Listener, SingleOrMultipleListeners } from "../types";
  * eventEmitter.clear();
  * ```
  */
-export function emitter<T = void>(initialListeners?: Listener<T>[]) {
+export function emitter<T = void>(initialListeners?: Listener<T>[]): Emitter<T> {
   /**
    * Set of registered listeners that will be notified when events are emitted.
    * Using a Set provides O(1) removal and prevents duplicate listeners.
@@ -124,11 +134,3 @@ export function emitter<T = void>(initialListeners?: Listener<T>[]) {
     },
   };
 }
-
-/**
- * Type representing an emitter instance.
- *
- * This is the return type of the `emitter()` function.
- * It provides type-safe access to the emitter's methods.
- */
-export type Emitter<T = void> = ReturnType<typeof emitter<T>>;

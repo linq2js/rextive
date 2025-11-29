@@ -200,7 +200,7 @@ export type ValidationResult<T, R> =
  */
 export function validate<T, R>(
   validator: ((value: NoInfer<T>) => R) | { isValid: (value: NoInfer<T>) => R }
-) {
+): (value: T) => ValidationResult<T, R> {
   return (value: T): ValidationResult<T, R> => {
     try {
       // Handle both function validators and object validators (like Yup schemas)

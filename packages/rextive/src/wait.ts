@@ -1164,7 +1164,17 @@ export function waitDelay(ms: number): Promise<void> {
  * - wait.all, wait.any, wait.race, wait.settled, wait.timeout, wait.delay
  *   provide Promise-based helpers for common coordination patterns
  */
-export const wait = Object.assign(waitAll, {
+/** Combined wait API type */
+export type WaitApi = typeof waitAll & {
+  all: typeof waitAll;
+  any: typeof waitAny;
+  race: typeof waitRace;
+  settled: typeof waitSettled;
+  timeout: typeof waitTimeout;
+  delay: typeof waitDelay;
+};
+
+export const wait: WaitApi = Object.assign(waitAll, {
   all: waitAll,
   any: waitAny,
   race: waitRace,
