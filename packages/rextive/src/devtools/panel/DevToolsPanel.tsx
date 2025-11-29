@@ -1201,8 +1201,20 @@ export function DevToolsPanel(): React.ReactElement | null {
                   : null;
               const tagId = "tagId" in event ? String(event.tagId) : null;
               const isEventExpanded = expandedEvents.has(event.id);
-              const valueStr =
-                "value" in event ? JSON.stringify(event.value, null, 2) : null;
+
+              // Handle both value and error events
+              let valueStr: string | null = null;
+              let errorContext: string | null = null;
+              if ("value" in event) {
+                valueStr = JSON.stringify(event.value, null, 2);
+              } else if ("error" in event && event.error) {
+                const err = event.error as any;
+                valueStr = err.message || String(err.error);
+                // Show error context (when/async)
+                if (err.context) {
+                  errorContext = `${err.context.when}${err.context.async ? " (async)" : ""}`;
+                }
+              }
 
               return (
                 <div
@@ -1260,6 +1272,21 @@ export function DevToolsPanel(): React.ReactElement | null {
                         ? "update"
                         : event.type.split(":")[1]}
                     </span>
+                    {errorContext && (
+                      <span
+                        style={{
+                          fontSize: "8px",
+                          padding: "1px 4px",
+                          borderRadius: "3px",
+                          backgroundColor: `${styles.colors.error}30`,
+                          color: styles.colors.errorText,
+                          fontFamily: styles.fontMono,
+                        }}
+                        title="Error context: when the error occurred"
+                      >
+                        {errorContext}
+                      </span>
+                    )}
                     <span
                       style={{
                         color: styles.colors.textDim,

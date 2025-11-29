@@ -34,11 +34,13 @@ function App() {
 // Consumers only re-render when they access signal values
 function Header() {
   const { theme, toggle } = useTheme();
-  
+
   // Only this rx() block re-renders on theme change
   return (
     <header>
-      {rx(() => <span>Theme: {theme()}</span>)}
+      {rx(() => (
+        <span>Theme: {theme()}</span>
+      ))}
       <button onClick={toggle}>Toggle</button>
     </header>
   );
@@ -244,9 +246,12 @@ signal.batch(() => {
 
 ```tsx
 // Only update when ID changes
-const user = signal({ id: 1, name: "Alice", lastSeen: Date.now() }, {
-  equals: (a, b) => a.id === b.id,
-});
+const user = signal(
+  { id: 1, name: "Alice", lastSeen: Date.now() },
+  {
+    equals: (a, b) => a.id === b.id,
+  }
+);
 
 // Deep equality for complex objects
 const config = signal(complexConfig, "deep");
@@ -316,19 +321,19 @@ describe("Counter", () => {
   it("should notify on change", () => {
     const count = signal(0);
     const listener = vi.fn();
-    
+
     count.on(listener);
     count.set(5);
-    
+
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it("should compute derived values", () => {
     const count = signal(5);
     const doubled = count.to((x) => x * 2);
-    
+
     expect(doubled()).toBe(10);
-    
+
     count.set(10);
     expect(doubled()).toBe(20);
   });
@@ -363,7 +368,7 @@ try {
   dashboard();
 } catch (error) {
   const traces = signal.trace(error);
-  console.log("Error path:", traces.map(t => t.signal).join(" → "));
+  console.log("Error path:", traces.map((t) => t.signal).join(" → "));
   console.log("Origin:", traces[0]);
   console.log("Full trace:", traces);
 }
@@ -388,10 +393,86 @@ function App() {
 
 ---
 
+## Internal Architecture
+
+### Hooks System (`src/hooks.ts`)
+
+The hooks system provides centralized integration points for render tracking and devtools. This is useful for contributors or those extending the library.
+
+#### Render Hooks (for `rx()` auto-tracking)
+
+```tsx
+import { RenderHooks, getRenderHooks, withRenderHooks } from "./hooks";
+
+// RenderHooks interface
+interface RenderHooks {
+  onSignalAccess: (signal: AnySignal<any>) => void;
+  onLoadableAccess: (loadable: Loadable<any>) => void;
+}
+
+// Get current render hooks
+const hooks = getRenderHooks();
+
+// Execute with custom render hooks (used by rx())
+withRenderHooks(
+  {
+    onSignalAccess: (signal) => accessedSignals.add(signal),
+  },
+  () => {
+    return renderFn();
+  }
+);
+```
+
+#### DevTools Hooks (for monitoring)
+
+```tsx
+import { DevToolsHooks, setDevToolsHooks, hasDevTools, emit } from "./hooks";
+
+// DevToolsHooks interface
+interface DevToolsHooks {
+  onSignalCreate: (signal: SignalRef) => void;
+  onSignalChange: (signal: SignalRef, value: unknown) => void;
+  onSignalError: (signal: SignalRef, error: unknown) => void;
+  onSignalDispose: (signal: SignalRef) => void;
+  onSignalRename: (signal: SignalRef) => void;
+  onTagCreate: (tag: TagRef) => void;
+  onTagAdd: (tag: TagRef, signal: AnySignal<any>) => void;
+  onTagRemove: (tag: TagRef, signal: AnySignal<any>) => void;
+}
+
+// Register devtools hooks (called by enableDevTools)
+setDevToolsHooks({
+  onSignalCreate: (signal) => {
+    /* track */
+  },
+  onSignalChange: (signal, value) => {
+    /* log */
+  },
+});
+
+// Emit events from core code
+emit.signalCreate(signalRef);
+emit.signalChange(signalRef, newValue);
+emit.signalError(signalRef, error);
+```
+
+#### Key Concepts
+
+| Export               | Purpose                                          |
+| -------------------- | ------------------------------------------------ |
+| `RenderHooks`        | Interface for render-time signal access tracking |
+| `getRenderHooks()`   | Get current render hooks                         |
+| `withRenderHooks()`  | Execute function with custom render hooks        |
+| `DevToolsHooks`      | Interface for devtools monitoring                |
+| `setDevToolsHooks()` | Register devtools hooks (called once)            |
+| `hasDevTools()`      | Check if devtools is enabled                     |
+| `emit`               | Object with methods to emit devtools events      |
+
+---
+
 ## Next Steps
 
 - **[API Reference](./API_REFERENCE.md)** - Complete API documentation
 - **[Examples](./EXAMPLES.md)** - Real-world examples
 - **[Patterns](./PATTERNS.md)** - Common patterns
-
-

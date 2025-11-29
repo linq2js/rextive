@@ -1,12 +1,65 @@
 import { Listener, SingleOrMultipleListeners } from "../types";
 
 /**
- * Type representing an emitter instance.
+ * Event emitter interface for pub/sub pattern.
+ *
+ * @template T - The type of payload emitted to listeners (defaults to void)
  */
 export interface Emitter<T = void> {
-  on(newListeners: SingleOrMultipleListeners<T>): VoidFunction;
+  /**
+   * Subscribe to events with one or more listeners.
+   *
+   * @param listeners - Single listener or array of listeners
+   * @returns Unsubscribe function (idempotent - safe to call multiple times)
+   */
+  on(listeners: SingleOrMultipleListeners<T>): VoidFunction;
+
+  /**
+   * Subscribe with a mapping function that filters and transforms events.
+   *
+   * The map function receives the emitted value and returns either:
+   * - `{ value: TValue }` - Listener is called with the transformed value
+   * - `undefined` - Listener is NOT called (event filtered out)
+   *
+   * @template TValue - The transformed value type passed to listeners
+   * @param map - Transform function that can filter (return undefined) or map values
+   * @param listeners - Single listener or array of listeners for transformed values
+   * @returns Unsubscribe function
+   *
+   * @example Filter and transform
+   * ```ts
+   * const emitter = emitter<{ type: string; data: number }>();
+   *
+   * // Only listen to 'success' events, extract just the data
+   * emitter.on(
+   *   (event) => event.type === 'success' ? { value: event.data } : undefined,
+   *   (data) => console.log('Success data:', data)
+   * );
+   * ```
+   */
+  on<TValue>(
+    map: (value: T) => { value: TValue } | undefined,
+    listeners: SingleOrMultipleListeners<TValue>
+  ): VoidFunction;
+
+  /**
+   * Emit an event to all registered listeners.
+   *
+   * @param payload - The value to pass to all listeners
+   */
   emit(payload: T): void;
+
+  /**
+   * Remove all registered listeners.
+   */
   clear(): void;
+
+  /**
+   * Emit an event to all listeners, then clear all listeners.
+   * Useful for one-time events like disposal.
+   *
+   * @param payload - The value to pass to all listeners
+   */
   emitAndClear(payload: T): void;
 }
 
@@ -45,7 +98,9 @@ export interface Emitter<T = void> {
  * eventEmitter.clear();
  * ```
  */
-export function emitter<T = void>(initialListeners?: Listener<T>[]): Emitter<T> {
+export function emitter<T = void>(
+  initialListeners?: Listener<T>[]
+): Emitter<T> {
   /**
    * Set of registered listeners that will be notified when events are emitted.
    * Using a Set provides O(1) removal and prevents duplicate listeners.
@@ -79,22 +134,36 @@ export function emitter<T = void>(initialListeners?: Listener<T>[]): Emitter<T> 
      * @param newListeners - Single listener or array of listeners to add
      * @returns An unsubscribe function that removes the listener(s)
      */
-    on(newListeners: SingleOrMultipleListeners<T>): VoidFunction {
-      if (Array.isArray(newListeners)) {
-        for (const listener of newListeners) {
-          listeners.add(listener);
-        }
-        return () => {
-          for (const listener of newListeners) {
-            listeners.delete(listener);
-          }
-        };
+    on(...args: any[]): VoidFunction {
+      let newListeners: Listener<T>[] = [];
+      if (args.length < 2) {
+        newListeners = Array.isArray(args[0]) ? args[0] : [args[0]];
+      } else {
+        const map = args[0] as (value: T) => { value: any } | undefined;
+        const sourceListeners: Listener<any>[] = Array.isArray(args[1])
+          ? args[1]
+          : [args[1]];
+        newListeners = [
+          (value) => {
+            const mappedValue = map(value);
+
+            if (mappedValue) {
+              for (const listener of sourceListeners) {
+                listener(mappedValue.value);
+              }
+            }
+          },
+        ];
       }
 
-      listeners.add(newListeners);
+      for (const listener of newListeners) {
+        listeners.add(listener);
+      }
 
       return () => {
-        listeners.delete(newListeners);
+        for (const listener of newListeners) {
+          listeners.delete(listener);
+        }
       };
     },
     /**

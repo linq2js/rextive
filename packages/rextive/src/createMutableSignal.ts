@@ -37,6 +37,7 @@ import {
   HydrateStatus,
   SIGNAL_TYPE,
   UseList,
+  SingleOrMultipleListeners,
 } from "./types";
 import { scheduleNotification } from "./batch";
 import { FallbackError } from "./common";
@@ -45,7 +46,7 @@ import { pipeSignals } from "./utils/pipeSignals";
 import { createComputedSignal } from "./createComputedSignal";
 import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
-import { getRenderHooks } from "./hooks";
+import { getRenderHooks, hasDevTools, emit } from "./hooks";
 import { nextName } from "./utils/nameGenerator";
 import { resolveSelectorsRequired } from "./operators/resolveSelectors";
 import {
@@ -112,15 +113,23 @@ export function createMutableSignal(
   // Core change notification emitter (no value passed)
   const onChange = emitter<void>();
 
-  // Value-specific change emitter (passes new value to listeners)
-  const onChangeValue = emitter<any>();
+  const mapValue = () => {
+    if (current && !current.error) {
+      return { value: current.value };
+    }
+    return undefined;
+  };
+  const onChangeValue = (listener: SingleOrMultipleListeners<any>) => {
+    return onChange.on(mapValue, listener);
+  };
+
   if (onChangeCallbacks) {
-    onChangeValue.on(onChangeCallbacks);
+    onChangeValue(onChangeCallbacks);
   }
   // Notify devtools on value change (only subscribe if devtools is enabled)
-  if (globalThis.__REXTIVE_DEVTOOLS__) {
-    onChangeValue.on((value) => {
-      globalThis.__REXTIVE_DEVTOOLS__?.onSignalChange?.(instanceRef!, value);
+  if (hasDevTools()) {
+    onChangeValue((value) => {
+      emit.signalChange(instanceRef!, value);
     });
   }
 
@@ -144,7 +153,7 @@ export function createMutableSignal(
       }
     }
     // Notify devtools about error
-    globalThis.__REXTIVE_DEVTOOLS__?.onSignalError?.(instanceRef!, error);
+    emit.signalError(instanceRef!, error);
   };
 
   // Cleanup emitter (triggered on recomputation)
@@ -250,7 +259,7 @@ export function createMutableSignal(
     onChange.clear();
 
     // Notify devtools
-    globalThis.__REXTIVE_DEVTOOLS__?.onSignalDispose?.(instanceRef!);
+    emit.signalDispose(instanceRef!);
   };
 
   /**
@@ -315,7 +324,6 @@ export function createMutableSignal(
       // Notify subscribers (batched)
       if (changed) {
         scheduleNotification(() => {
-          onChangeValue.emit(result);
           onChange.emit();
         });
       }
@@ -333,7 +341,6 @@ export function createMutableSignal(
           if (changed) {
             current = { value: fallbackValue };
             scheduleNotification(() => {
-              onChangeValue.emit(fallbackValue);
               onChange.emit();
             });
           }
@@ -436,26 +443,35 @@ export function createMutableSignal(
     isDisposed,
     "Cannot set value on disposed signal",
     (value: any) => {
-      // Handle updater function vs direct value
-      const next = typeof value === "function" ? value(get()) : value;
+      try {
+        // Handle updater function vs direct value
+        const next = typeof value === "function" ? value(get()) : value;
 
-      // Skip if value unchanged (optimization)
-      if (equals(current?.value, next)) return;
+        // Skip if value unchanged (optimization)
+        if (equals(current?.value, next)) return;
 
-      // Mark as modified (prevents future hydration)
-      hasBeenModified = true;
+        // Mark as modified (prevents future hydration)
+        hasBeenModified = true;
 
-      // Update current state
-      current = { value: next };
+        // Update current state
+        current = { value: next };
 
-      // Track async errors for Promise values
-      handleAsyncError("set");
+        // Track async errors for Promise values
+        handleAsyncError("set");
 
-      // Notify subscribers (batched)
-      scheduleNotification(() => {
-        onChangeValue.emit(next);
-        onChange.emit();
-      });
+        // Notify subscribers (batched)
+        scheduleNotification(() => {
+          onChange.emit();
+        });
+      } catch (error) {
+        current = { value: undefined, error };
+        throwError(error, "set", false);
+        // Notify subscribers (batched)
+        scheduleNotification(() => {
+          onChange.emit();
+        });
+        throw error;
+      }
     }
   );
 
@@ -616,6 +632,70 @@ export function createMutableSignal(
   // 8. REACTIVE RELATIONSHIPS (when)
   // ============================================================================
 
+  /**
+   * React to changes in notifier signal(s).
+   *
+   * Supports two overloads:
+   * 1. Action-based: when(notifier, "reset" | "refresh", filter?, options?)
+   * 2. Reducer-based: when(notifier, reducer, options?)
+   *
+   * @param notifier - Single signal or array of signals to watch
+   * @param actionOrReducer - Action string or reducer function
+   * @param filterOrOptions - Filter function (for action) or options (for reducer)
+   * @param options - Options (only for action overload)
+   * @returns this - for chaining
+   */
+  const when = (
+    notifier: any,
+    actionOrReducer: "reset" | "refresh" | ((self: any, notifier: any) => any),
+    filter?: (self: any, notifier: any) => boolean
+  ) => {
+    // Ensure instance is created (when is called after instance creation via Object.assign)
+    const self = instanceRef!;
+
+    // Normalize notifiers to array
+    const notifiers = Array.isArray(notifier) ? notifier : [notifier];
+
+    // Determine if this is action or reducer overload
+    const isActionOverload = typeof actionOrReducer === "string";
+
+    // Subscribe to each notifier
+    for (const n of notifiers) {
+      const unsubscribe = n.on(() => {
+        if (isActionOverload) {
+          // Action overload: run filter, then execute action
+          const action = actionOrReducer as "reset" | "refresh";
+
+          try {
+            // Run filter if provided - receives (self, notifier) signals
+            if (filter) {
+              const shouldProceed = filter(self, n);
+              if (!shouldProceed) return;
+            }
+
+            // Execute action
+            if (action === "reset") {
+              self.reset();
+            } else if (action === "refresh") {
+              self.refresh();
+            }
+          } catch (error) {
+            // Filter threw - route through signal's error handling, skip action
+            throwError(error, "when:filter", false);
+          }
+        } else {
+          // Reducer overload: apply reducer - receives (self, notifier) signals
+          const reducer = actionOrReducer as (self: any, notifier: any) => any;
+          self.set(() => reducer(self, n));
+        }
+      });
+
+      onDispose.on(unsubscribe);
+    }
+
+    return self;
+  };
+
   // ============================================================================
   // 9. SIGNAL INSTANCE CREATION
   // ============================================================================
@@ -673,6 +753,9 @@ export function createMutableSignal(
     // Lifecycle
     refresh, // Force recomputation
     stale, // Mark for lazy recomputation
+
+    // Reactive relationships
+    when, // React to notifier signal changes
   });
 
   // Store reference for use in methods above
@@ -687,7 +770,7 @@ export function createMutableSignal(
   attacher(instanceRef, onDispose).attach(use);
 
   // Notify devtools of signal creation
-  globalThis.__REXTIVE_DEVTOOLS__?.onSignalCreate?.(instanceRef);
+  emit.signalCreate(instanceRef);
 
   // Eager evaluation if not lazy
   if (!lazy) {

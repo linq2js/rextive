@@ -37,6 +37,7 @@ import {
 } from "./types";
 import { is } from "./is";
 import { nextName } from "./utils/nameGenerator";
+import { emit } from "./hooks";
 
 /**
  * Configuration options for creating a tag.
@@ -372,7 +373,7 @@ export function tag<TValue, TKind extends SignalKind = "any">(
       onChange?.("delete", signal, tagInstance);
 
       // Notify devtools
-      globalThis.__REXTIVE_DEVTOOLS__?.onTagRemove?.(tagInstance, signal);
+      emit.tagRemove(tagInstance, signal);
 
       // Step 3: Dispose signal if autoDispose is enabled
       // Do this last so callbacks can still access the signal
@@ -407,7 +408,7 @@ export function tag<TValue, TKind extends SignalKind = "any">(
         onChange?.("delete", signal, tagInstance);
 
         // Notify devtools
-        globalThis.__REXTIVE_DEVTOOLS__?.onTagRemove?.(tagInstance, signal);
+        emit.tagRemove(tagInstance, signal);
 
         // Dispose signal if autoDispose is enabled
         // Note: signal.dispose() will call _delete() on all its tags,
@@ -465,7 +466,7 @@ export function tag<TValue, TKind extends SignalKind = "any">(
       onChange?.("add", signal, tagInstance);
 
       // Notify devtools
-      globalThis.__REXTIVE_DEVTOOLS__?.onTagAdd?.(tagInstance, signal);
+      emit.tagAdd(tagInstance, signal);
     },
 
     _delete(signal: SignalOf<TValue, TKind>): void {
@@ -489,13 +490,13 @@ export function tag<TValue, TKind extends SignalKind = "any">(
         onChange?.("delete", signal, tagInstance);
 
         // Notify devtools
-        globalThis.__REXTIVE_DEVTOOLS__?.onTagRemove?.(tagInstance, signal);
+        emit.tagRemove(tagInstance, signal);
       }
     },
   };
 
   // Notify devtools of tag creation
-  globalThis.__REXTIVE_DEVTOOLS__?.onTagCreate?.(tagInstance);
+  emit.tagCreate(tagInstance);
 
   return tagInstance as Tag<TValue, TKind>;
 }

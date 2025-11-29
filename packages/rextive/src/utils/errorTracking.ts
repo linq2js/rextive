@@ -11,7 +11,9 @@ export type SignalErrorWhen =
   | "compute:initial" // First computation when signal is created
   | "compute:refresh" // When refresh() is called explicitly
   | "compute:dependency" // When dependency changes trigger recompute
-  | "set"; // When set() is called
+  | "set" // When set() is called
+  | "when:filter" // When .when() filter function throws
+  | "when:reducer"; // When .when() reducer function throws
 
 /**
  * Trace information attached to an error.

@@ -23,9 +23,12 @@
  */
 
 import type { Signal, Tag, DevTools } from "../types";
+import { setDevToolsHooks } from "../hooks";
+import { getErrorTrace } from "../utils/errorTracking";
 import type {
   SignalInfo,
   SignalError,
+  SignalErrorContext,
   TagInfo,
   DevToolsEvent,
   DevToolsEventListener,
@@ -40,6 +43,7 @@ import type {
 export type {
   SignalInfo,
   SignalError,
+  SignalErrorContext,
   TagInfo,
   DevToolsEvent,
   DevToolsEventListener,
@@ -445,10 +449,17 @@ const devToolsHooks: DevTools = {
     const info = signals.get(id);
     const now = Date.now();
 
+    // Extract trace info if available (from errorTracking)
+    const traces = getErrorTrace(error);
+    const latestTrace = traces?.[traces.length - 1];
+
     const signalError: SignalError = {
       message: error instanceof Error ? error.message : String(error),
       error,
       timestamp: now,
+      context: latestTrace
+        ? { when: latestTrace.when, async: latestTrace.async }
+        : undefined,
     };
 
     if (info) {
@@ -465,7 +476,13 @@ const devToolsHooks: DevTools = {
 
     // Always log errors to console for visibility
     if (config.logToConsole) {
-      console.error(`[${config.name}] Signal error in "${id}":`, error);
+      const contextInfo = signalError.context
+        ? ` (${signalError.context.when}${signalError.context.async ? ", async" : ""})`
+        : "";
+      console.error(
+        `[${config.name}] Signal error in "${id}"${contextInfo}:`,
+        error
+      );
     }
   },
 
@@ -558,7 +575,9 @@ export function enableDevTools(options: DevToolsOptions = {}): void {
     logToConsole: options.logToConsole ?? false,
   };
 
+  // Set hooks via both mechanisms for backwards compatibility
   globalThis.__REXTIVE_DEVTOOLS__ = devToolsHooks;
+  setDevToolsHooks(devToolsHooks);
   enabled = true;
 
   if (config.logToConsole) {
@@ -574,7 +593,9 @@ export function disableDevTools(): void {
     return;
   }
 
+  // Clear hooks via both mechanisms
   globalThis.__REXTIVE_DEVTOOLS__ = undefined;
+  setDevToolsHooks(null);
   enabled = false;
 
   // Clear registries

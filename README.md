@@ -66,23 +66,25 @@ const Counter = <h1 onClick={increment}>{rx(count)}</h1>;
 
 **That's it!** No providers. No hooks. No boilerplate.
 
+➡️ **[Full Getting Started Guide](./GETTING_STARTED.md)**
+
 ---
 
 ## 📚 Documentation
 
-| Guide                                            | Description                               |
-| ------------------------------------------------ | ----------------------------------------- |
-| **[Getting Started](./docs/GETTING_STARTED.md)** | Quick start, counter examples, vanilla JS |
-| **[Core Concepts](./docs/CORE_CONCEPTS.md)**     | Transform, equality, dependencies, async  |
-| **[Examples](./docs/EXAMPLES.md)**               | 10 real-world examples with code          |
-| **[Patterns](./docs/PATTERNS.md)**               | Advanced patterns & best practices        |
-| **[Error Handling](./docs/ERROR_HANDLING.md)**   | Error handling & tracing                  |
-| **[API Reference](./docs/API_REFERENCE.md)**     | Complete API documentation                |
-| **[React Integration](./docs/REACT.md)**         | rx(), useScope(), provider()              |
-| **[Operators](./docs/OPERATORS.md)**             | debounce, throttle, filter, etc.          |
-| **[Integrations](./docs/INTEGRATIONS.md)**       | Immer, Cache, DevTools                    |
-| **[Comparison](./docs/COMPARISON.md)**           | vs Zustand, React Query, Jotai, Redux     |
-| **[Advanced](./docs/ADVANCED.md)**               | Service pattern, testing, debugging       |
+| Guide                                       | Description                                |
+| ------------------------------------------- | ------------------------------------------ |
+| **[Getting Started](./GETTING_STARTED.md)** | Quick start, counter examples, vanilla JS  |
+| **[Core Concepts](./CORE_CONCEPTS.md)**     | Transform, equality, dependencies, async   |
+| **[Examples](./EXAMPLES.md)**               | 10 real-world examples with code           |
+| **[Patterns](./PATTERNS.md)**               | Advanced patterns & best practices         |
+| **[Error Handling](./ERROR_HANDLING.md)**   | Error handling & tracing                   |
+| **[API Reference](./API_REFERENCE.md)**     | Complete API documentation                 |
+| **[React Integration](./REACT.md)**         | rx(), useScope(), provider()               |
+| **[Operators](./OPERATORS.md)**             | debounce, throttle, filter, etc.           |
+| **[Integrations](./INTEGRATIONS.md)**       | Immer, Cache, DevTools                     |
+| **[Comparison](./COMPARISON.md)**           | vs Zustand, React Query, Jotai, Redux      |
+| **[Advanced Topics](./ADVANCED.md)**        | Services, custom operators, internal hooks |
 
 ---
 
@@ -101,7 +103,7 @@ const Counter = <h1 onClick={increment}>{rx(count)}</h1>;
 
 ---
 
-## 📦 Packages
+## 📦 What's Included
 
 ```
 rextive           Core signals (works anywhere)
@@ -109,7 +111,7 @@ rextive/react     React bindings (rx, useScope, provider)
 rextive/op        Operators (debounce, throttle, filter, etc.)
 rextive/immer     Immer integration for immutable updates
 rextive/cache     Data caching with strategies
-rextive/plugins   Plugins (persistor, when)
+rextive/plugins   Plugins (persistor)
 rextive/devtools  DevTools panel
 ```
 
@@ -130,19 +132,6 @@ yarn add rextive
 ```ts
 import { signal } from "jsr:@ging/rextive";
 ```
-
----
-
-## 🔥 Feature Comparison
-
-| Feature                   | Rextive                   | Others                |
-| ------------------------- | ------------------------- | --------------------- |
-| **Learning Curve**        | 🟢 One concept (`signal`) | 🟡 Multiple APIs      |
-| **Lazy Tracking**         | 🟢 Automatic              | 🔴 Manual selectors   |
-| **Async Support**         | 🟢 Built-in native        | 🟡 Separate libraries |
-| **Request Cancellation**  | 🟢 Automatic              | 🔴 Manual setup       |
-| **Framework Independent** | 🟢 Works everywhere       | 🔴 Often React-only   |
-| **Bundle Size**           | 🟢 Tiny (~5KB)            | 🟡 Often larger       |
 
 ---
 

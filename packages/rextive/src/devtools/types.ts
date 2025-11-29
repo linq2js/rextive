@@ -1,4 +1,15 @@
 import type { Signal, Tag } from "../types";
+import type { SignalErrorWhen } from "../utils/errorTracking";
+
+/**
+ * Context about when/how an error occurred.
+ */
+export type SignalErrorContext = {
+  /** When in the signal lifecycle the error occurred */
+  when: SignalErrorWhen;
+  /** true = Promise rejection, false = sync throw */
+  async: boolean;
+};
 
 /**
  * Metadata for a signal error.
@@ -10,6 +21,8 @@ export type SignalError = {
   error: unknown;
   /** When the error occurred */
   timestamp: number;
+  /** Context about when/how the error occurred (if available) */
+  context?: SignalErrorContext;
 };
 
 /**

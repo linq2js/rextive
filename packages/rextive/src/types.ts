@@ -796,6 +796,16 @@ export type TryInjectDispose<T> = T extends object
  * nullable.set(undefined); // ✅ OK
  * ```
  */
+/**
+ * Action types for mutable signal `.when()` method
+ */
+export type MutableWhenAction = "refresh" | "reset";
+
+/**
+ * Action types for computed signal `.when()` method
+ */
+export type ComputedWhenAction = "refresh" | "stale";
+
 export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
   /**
    * Update signal value via reducer function (returns new value)
@@ -808,6 +818,88 @@ export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    * @param value - New value (type: TValue, not TInit)
    */
   set(value: TValue): void;
+
+  /**
+   * React to changes in notifier signal(s) by executing an action.
+   *
+   * Does NOT create a new signal - just registers subscription on this signal.
+   * Auto-cleans up when this signal is disposed.
+   *
+   * If filter throws, error is routed through signal's error handling (onError callbacks, devtools).
+   * Action is NOT executed when filter throws.
+   *
+   * @param notifier - Single signal or array of signals to watch
+   * @param action - Action to execute: "refresh" (force recompute) or "reset" (return to initial value)
+   * @param filter - Optional filter function. Receives (self, notifierSignal).
+   *                 Both are signals - call them to get values if needed.
+   *                 Return true to execute action, false to skip.
+   * @returns this - for chaining
+   *
+   * @example Basic reset on trigger
+   * ```ts
+   * const logout = signal(0);
+   * const userData = signal<User | null>(null).when(logout, "reset");
+   *
+   * userData.set(someUser);
+   * logout.set(n => n + 1); // userData resets to null
+   * ```
+   *
+   * @example With filter
+   * ```ts
+   * const refreshTrigger = signal(0);
+   * const data = signal(fetchData).when(
+   *   refreshTrigger,
+   *   "refresh",
+   *   (self, notifier) => notifier() > 5 // Only refresh if trigger value > 5
+   * );
+   * ```
+   */
+  when<N extends AnySignal<any>>(
+    notifier: N | readonly N[],
+    action: MutableWhenAction,
+    filter?: (self: Mutable<TValue, TInit>, notifier: N) => boolean
+  ): Mutable<TValue, TInit>;
+
+  /**
+   * React to changes in notifier signal(s) by applying a reducer.
+   *
+   * Does NOT create a new signal - just registers subscription on this signal.
+   * Auto-cleans up when this signal is disposed.
+   *
+   * If reducer throws, the signal enters error state and subscribers are notified.
+   * Error is routed through signal's error handling (onError callbacks, devtools).
+   *
+   * @param notifier - Signal or array of signals to watch
+   * @param reducer - Function that receives (self, notifierSignal) and returns new value.
+   *                  Both are signals - call them to get values if needed.
+   * @returns this - for chaining
+   *
+   * @example Accumulator pattern
+   * ```ts
+   * const addAmount = signal(0);
+   * const total = signal(0).when(addAmount, (self, notifier) => {
+   *   return self() + notifier(); // Add notifier's value to current
+   * });
+   *
+   * addAmount.set(5);  // total = 5
+   * addAmount.set(10); // total = 15
+   * ```
+   *
+   * @example State machine
+   * ```ts
+   * const events = signal<Event | null>(null);
+   * const state = signal<"idle" | "loading" | "done">("idle").when(events, (self, notifier) => {
+   *   const event = notifier();
+   *   if (event?.type === "START") return "loading";
+   *   if (event?.type === "COMPLETE") return "done";
+   *   return self();
+   * });
+   * ```
+   */
+  when<N extends AnySignal<any>>(
+    notifier: N | readonly N[],
+    reducer: (self: Mutable<TValue, TInit>, notifier: N) => TValue
+  ): Mutable<TValue, TInit>;
 };
 
 /**
@@ -832,6 +924,52 @@ export type Computed<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    * Check if the signal is currently paused
    */
   paused(): boolean;
+
+  /**
+   * React to changes in notifier signal(s) by executing an action.
+   *
+   * Does NOT create a new signal - just registers subscription on this signal.
+   * Auto-cleans up when this signal is disposed.
+   *
+   * Note: Computed signals do NOT support "reset" action (they have no user-defined initial value).
+   * Use "refresh" for immediate recomputation or "stale" for lazy recomputation.
+   *
+   * If filter throws, error is routed through signal's error handling (onError callbacks, devtools).
+   * Action is NOT executed when filter throws.
+   *
+   * @param notifier - Single signal or array of signals to watch
+   * @param action - Action to execute: "refresh" (force recompute) or "stale" (mark for lazy recompute)
+   * @param filter - Optional filter function. Receives (self, notifierSignal).
+   *                 Both are signals - call them to get values if needed.
+   *                 Return true to execute action, false to skip.
+   * @returns this - for chaining
+   *
+   * @example Refresh on manual trigger
+   * ```ts
+   * const source = signal(10);
+   * const refreshTrigger = signal(0);
+   *
+   * const computed = signal({ source }, ({ deps }) => deps.source * 2)
+   *   .when(refreshTrigger, "refresh");
+   *
+   * refreshTrigger.set(n => n + 1); // Forces recomputation
+   * ```
+   *
+   * @example Mark stale (lazy)
+   * ```ts
+   * const invalidateTrigger = signal(0);
+   * const expensive = signal({ data }, ({ deps }) => heavyComputation(deps.data))
+   *   .when(invalidateTrigger, "stale", (self, notifier) => notifier() > 0);
+   *
+   * invalidateTrigger.set(1); // Won't recompute until accessed
+   * expensive(); // Now recomputes
+   * ```
+   */
+  when<N extends AnySignal<any>>(
+    notifier: N | readonly N[],
+    action: ComputedWhenAction,
+    filter?: (self: Computed<TValue, TInit>, notifier: N) => boolean
+  ): Computed<TValue, TInit>;
 };
 
 /**

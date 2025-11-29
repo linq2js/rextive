@@ -7,6 +7,7 @@ import {
   SignalOptions,
   HydrateStatus,
   UseList,
+  SingleOrMultipleListeners,
 } from "./types";
 import { scheduleNotification } from "./batch";
 import { SIGNAL_TYPE } from "./is";
@@ -15,7 +16,7 @@ import { resolveEquals } from "./utils/resolveEquals";
 import { pipeSignals } from "./utils/pipeSignals";
 import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
-import { getRenderHooks } from "./hooks";
+import { getRenderHooks, hasDevTools, emit } from "./hooks";
 import { nextName } from "./utils/nameGenerator";
 import { resolveSelectorsRequired } from "./operators/resolveSelectors";
 import {
@@ -64,14 +65,24 @@ export function createComputedSignal(
   const displayName = name ?? nextName("computed");
 
   const onChange = emitter<void>();
-  const onChangeValue = emitter<any>();
+
+  const mapValue = () => {
+    if (current && !current.error) {
+      return { value: current.value };
+    }
+    return undefined;
+  };
+  const onChangeValue = (listener: SingleOrMultipleListeners<any>) => {
+    return onChange.on(mapValue, listener);
+  };
+
   if (onChangeCallbacks) {
-    onChangeValue.on(onChangeCallbacks);
+    onChangeValue(onChangeCallbacks);
   }
   // Notify devtools on value change (only subscribe if devtools is enabled)
-  if (globalThis.__REXTIVE_DEVTOOLS__) {
-    onChangeValue.on((value) => {
-      globalThis.__REXTIVE_DEVTOOLS__?.onSignalChange?.(instanceRef!, value);
+  if (hasDevTools()) {
+    onChangeValue((value) => {
+      emit.signalChange(instanceRef!, value);
     });
   }
 
@@ -95,7 +106,7 @@ export function createComputedSignal(
       }
     }
     // Notify devtools about error
-    globalThis.__REXTIVE_DEVTOOLS__?.onSignalError?.(instanceRef!, error);
+    emit.signalError(instanceRef!, error);
   };
 
   const onCleanup = emitter<void>();
@@ -144,7 +155,7 @@ export function createComputedSignal(
     context = undefined;
 
     // Notify devtools
-    globalThis.__REXTIVE_DEVTOOLS__?.onSignalDispose?.(instanceRef!);
+    emit.signalDispose(instanceRef!);
   };
 
   const recompute = (when: SignalErrorWhen) => {
@@ -190,7 +201,6 @@ export function createComputedSignal(
 
       if (changed) {
         scheduleNotification(() => {
-          onChangeValue.emit(result);
           onChange.emit();
         });
       }
@@ -209,7 +219,6 @@ export function createComputedSignal(
           if (changed) {
             current = { value: fallbackValue };
             scheduleNotification(() => {
-              onChangeValue.emit(fallbackValue);
               onChange.emit();
             });
           }
@@ -347,7 +356,65 @@ export function createComputedSignal(
     }
   );
 
-  const instance = Object.assign(get, {
+  /**
+   * React to changes in notifier signal(s) by executing an action.
+   *
+   * For computed signals, only action-based overload is supported.
+   * Actions: "refresh" (immediate recompute) or "stale" (lazy recompute).
+   * "reset" is NOT supported for computed signals.
+   *
+   * @param notifier - Single signal or array of signals to watch
+   * @param action - "refresh" or "stale"
+   * @param filter - Optional filter function
+   * @param options - Optional configuration
+   * @returns this - for chaining
+   */
+  const when = (
+    notifier: any | readonly any[],
+    action: "refresh" | "stale",
+    filter?: (self: Computed<any>, notifier: any) => boolean
+  ) => {
+    // Ensure instance is created
+    const self = instanceRef!;
+
+    // Validate action - "reset" is not allowed for computed signals
+    if ((action as string) === "reset") {
+      throw new Error(
+        'Computed signals do not support "reset" action. Use "refresh" or "stale" instead.'
+      );
+    }
+
+    // Normalize notifiers to array
+    const notifiers = Array.isArray(notifier) ? notifier : [notifier];
+
+    for (const n of notifiers) {
+      const unsubscribe = n.on(() => {
+        try {
+          // Run filter if provided - receives (self, notifier) signals
+          if (filter) {
+            const shouldProceed = filter(self, n);
+            if (!shouldProceed) return;
+          }
+
+          // Execute action
+          if (action === "refresh") {
+            self.refresh();
+          } else if (action === "stale") {
+            self.stale();
+          }
+        } catch (error) {
+          // Filter threw - route through signal's error handling, skip action
+          throwError(error, "when:filter", false);
+        }
+      });
+
+      onDispose.on(unsubscribe);
+    }
+
+    return self;
+  };
+
+  const instance: Computed<any> = Object.assign(get, {
     [SIGNAL_TYPE]: true,
     displayName,
     get,
@@ -381,6 +448,7 @@ export function createComputedSignal(
     to,
     refresh,
     stale,
+    when,
   });
 
   instanceRef = instance as unknown as Computed<any>;
@@ -388,7 +456,7 @@ export function createComputedSignal(
   attacher(instanceRef, onDispose).attach(use);
 
   // Notify devtools of signal creation
-  globalThis.__REXTIVE_DEVTOOLS__?.onSignalCreate?.(instanceRef);
+  emit.signalCreate(instanceRef);
 
   if (!lazy) {
     try {

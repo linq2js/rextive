@@ -6,24 +6,11 @@
  * 2. DevTools hooks - for debugging/monitoring (used by DevTools)
  */
 
-import type { AnySignal, Loadable } from "./types";
+import type { AnySignal, Loadable, Tag } from "./types";
 
 // ============================================
 // Types
 // ============================================
-
-/** Signal info passed to devtools hooks */
-export interface SignalRef {
-  id: string;
-  kind: "mutable" | "computed";
-  signal: AnySignal<any>;
-}
-
-/** Tag info passed to devtools hooks */
-export interface TagRef {
-  id: string;
-  signals: Set<AnySignal<any>>;
-}
 
 /** Render-time hooks for tracking signal access */
 export interface RenderHooks {
@@ -33,14 +20,14 @@ export interface RenderHooks {
 
 /** DevTools hooks for monitoring signal lifecycle */
 export interface DevToolsHooks {
-  onSignalCreate: (signal: SignalRef) => void;
-  onSignalChange: (signal: SignalRef, value: unknown) => void;
-  onSignalError: (signal: SignalRef, error: unknown) => void;
-  onSignalDispose: (signal: SignalRef) => void;
-  onSignalRename: (signal: SignalRef) => void;
-  onTagCreate: (tag: TagRef) => void;
-  onTagAdd: (tag: TagRef, signal: AnySignal<any>) => void;
-  onTagRemove: (tag: TagRef, signal: AnySignal<any>) => void;
+  onSignalCreate: (signal: AnySignal<any>) => void;
+  onSignalChange: (signal: AnySignal<any>, value: unknown) => void;
+  onSignalError: (signal: AnySignal<any>, error: unknown) => void;
+  onSignalDispose: (signal: AnySignal<any>) => void;
+  onSignalRename: (signal: AnySignal<any>) => void;
+  onTagCreate: (tag: Tag<any, any>) => void;
+  onTagAdd: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
+  onTagRemove: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
 }
 
 // ============================================
@@ -84,30 +71,35 @@ export function setDevToolsHooks(hooks: Partial<DevToolsHooks> | null): void {
   devToolsHooks = hooks;
 }
 
+/** Check if devtools is enabled */
+export function hasDevTools(): boolean {
+  return devToolsHooks !== null;
+}
+
 /** Emit devtools events */
 export const emit = {
-  signalCreate: (signal: SignalRef) => {
+  signalCreate: (signal: AnySignal<any>) => {
     devToolsHooks?.onSignalCreate?.(signal);
   },
-  signalChange: (signal: SignalRef, value: unknown) => {
+  signalChange: (signal: AnySignal<any>, value: unknown) => {
     devToolsHooks?.onSignalChange?.(signal, value);
   },
-  signalError: (signal: SignalRef, error: unknown) => {
+  signalError: (signal: AnySignal<any>, error: unknown) => {
     devToolsHooks?.onSignalError?.(signal, error);
   },
-  signalDispose: (signal: SignalRef) => {
+  signalDispose: (signal: AnySignal<any>) => {
     devToolsHooks?.onSignalDispose?.(signal);
   },
-  signalRename: (signal: SignalRef) => {
+  signalRename: (signal: AnySignal<any>) => {
     devToolsHooks?.onSignalRename?.(signal);
   },
-  tagCreate: (tag: TagRef) => {
+  tagCreate: (tag: Tag<any, any>) => {
     devToolsHooks?.onTagCreate?.(tag);
   },
-  tagAdd: (tag: TagRef, signal: AnySignal<any>) => {
+  tagAdd: (tag: Tag<any, any>, signal: AnySignal<any>) => {
     devToolsHooks?.onTagAdd?.(tag, signal);
   },
-  tagRemove: (tag: TagRef, signal: AnySignal<any>) => {
+  tagRemove: (tag: Tag<any, any>, signal: AnySignal<any>) => {
     devToolsHooks?.onTagRemove?.(tag, signal);
   },
 };

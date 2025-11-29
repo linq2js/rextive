@@ -26,7 +26,7 @@ rextive/react     React bindings (rx, useScope, provider)
 rextive/op        Operators (to, filter, scan, debounce, throttle, etc.)
 rextive/immer     Immer integration for immutable updates
 rextive/cache     Data caching with strategies
-rextive/plugins   Plugins (persistor, when)
+rextive/plugins   Plugins (persistor)
 rextive/devtools  DevTools panel
 ```
 
@@ -447,6 +447,124 @@ count.dispose();
 ```
 
 **⚠️ Critical:** Always dispose signals you create to prevent memory leaks!
+
+---
+
+#### `.when()` - React to Other Signals ⭐ NEW
+
+React to changes in other signals by triggering actions or applying reducers.
+
+**For Mutable Signals - Action-based:**
+
+```tsx
+const refreshTrigger = signal(0);
+const userData = signal({ name: "John" });
+
+// Refresh when trigger changes
+userData.when(refreshTrigger, "refresh");
+
+// Reset when trigger changes
+userData.when(refreshTrigger, "reset");
+
+// With filter - only trigger when condition is met
+userData.when(refreshTrigger, "refresh", (self, notifier) => notifier() > 5);
+```
+
+**For Mutable Signals - Reducer-based:**
+
+```tsx
+const increment = signal(0);
+const counter = signal(0);
+
+// Update value based on notifier
+counter.when(increment, (self, notifier) => self() + notifier());
+```
+
+**For Computed Signals:**
+
+```tsx
+const refreshTrigger = signal(0);
+const fetchedData = signal({ userId }, async ({ deps }) => fetchUser(deps.userId));
+
+// Refresh (immediate recompute)
+fetchedData.when(refreshTrigger, "refresh");
+
+// Stale (lazy recompute on next access)
+fetchedData.when(refreshTrigger, "stale");
+
+// Note: "reset" is NOT supported for computed signals
+```
+
+**Multiple Notifiers:**
+
+```tsx
+const trigger1 = signal(0);
+const trigger2 = signal(0);
+
+// React to any of multiple signals
+userData.when([trigger1, trigger2], "refresh");
+
+// Filter receives the specific notifier that changed
+userData.when([trigger1, trigger2], "refresh", (self, notifier) => {
+  return notifier() > 0; // notifier is the one that triggered
+});
+```
+
+**Chaining:**
+
+```tsx
+// .when() returns this for chaining
+userData
+  .when(refreshTrigger, "refresh")
+  .when(resetTrigger, "reset");
+```
+
+**Cleanup:**
+
+Subscriptions created by `.when()` are automatically cleaned up when the signal is disposed.
+
+**⚠️ Error Handling:**
+
+```tsx
+// Filter errors - action is NOT executed, error routed to signal's onError
+userData.when(trigger, "refresh", (self, notifier) => {
+  if (notifier() < 0) throw new Error("Invalid"); // Action skipped, onError called
+  return true;
+});
+
+// Reducer errors - signal enters ERROR state
+counter.when(increment, (self, notifier) => {
+  if (notifier() < 0) throw new Error("Negative not allowed");
+  return self() + notifier();
+});
+// After error: counter.error() returns the error, counter() throws
+```
+
+**⚠️ Common Pitfalls:**
+
+```tsx
+// ❌ BAD - Accessing disposed signal in filter/reducer
+const data = signal([]);
+data.when(trigger, (self, notifier) => {
+  return self().concat(notifier()); // May throw if self is disposed
+});
+
+// ✅ GOOD - Check for disposal or use tryGet()
+data.when(trigger, (self, notifier) => {
+  const current = self.tryGet();
+  if (!current) return []; // Handle disposed/error state
+  return current.concat(notifier());
+});
+
+// ❌ BAD - Circular dependency
+const a = signal(0);
+const b = signal(0);
+a.when(b, (self, notifier) => notifier()); // a depends on b
+b.when(a, (self, notifier) => notifier()); // b depends on a - INFINITE LOOP!
+
+// ❌ BAD - "reset" on computed signals
+computed.when(trigger, "reset"); // Throws error! Use "refresh" or "stale"
+```
 
 ---
 
@@ -889,20 +1007,6 @@ const persist = persistor<{ theme: string; fontSize: number }>({
 const theme = signal("dark", { use: [persist("theme")] });
 ```
 
-#### `when` - React to Other Signals
-
-```tsx
-import { when } from "rextive/plugins";
-
-const refreshTrigger = signal(0);
-const userData = signal(async () => fetchUser(), {
-  use: [when(refreshTrigger, (sig) => sig.refresh())],
-});
-
-// Trigger refresh
-refreshTrigger.set((n) => n + 1);
-```
-
 ---
 
 ### 12. Immer Integration (`rextive/immer`) ⭐ NEW
@@ -1254,6 +1358,8 @@ function Component() {
 - `.error()` - Get error safely ⭐
 - `.tryGet()` - Get value safely ⭐
 - `.pause()` / `.resume()` / `.paused()` - Control (computed only)
+- `.when(notifier, action, filter?)` - React to other signals ⭐
+- `.when(notifier, reducer)` - Update value when notifier changes (mutable only) ⭐
 
 ### Static Methods
 
@@ -1301,13 +1407,83 @@ function Component() {
 ### Plugins (`rextive/plugins`) ⭐
 
 - `persistor(options)` - Auto-persistence
-- `when(signal, callback)` - React to other signals
 
 ### Utilities
 
 - `disposable(obj)` - Create disposable ⭐
 - `awaited(...selectors)` - Transform async ⭐
 - `emitter()` - Event emitter
+
+---
+
+## 🔧 Internal Architecture
+
+### Hooks System (`src/hooks.ts`)
+
+The hooks system provides centralized integration points for render tracking and devtools.
+
+#### Render Hooks (for `rx()` auto-tracking)
+
+```tsx
+import { RenderHooks, getRenderHooks, withRenderHooks } from "./hooks";
+
+// RenderHooks interface
+interface RenderHooks {
+  onSignalAccess: (signal: AnySignal<any>) => void;
+  onLoadableAccess: (loadable: Loadable<any>) => void;
+}
+
+// Get current render hooks
+const hooks = getRenderHooks();
+
+// Execute with custom render hooks (used by rx())
+withRenderHooks({
+  onSignalAccess: (signal) => accessedSignals.add(signal),
+}, () => {
+  return renderFn();
+});
+```
+
+#### DevTools Hooks (for monitoring)
+
+```tsx
+import { DevToolsHooks, setDevToolsHooks, hasDevTools, emit } from "./hooks";
+
+// DevToolsHooks interface
+interface DevToolsHooks {
+  onSignalCreate: (signal: SignalRef) => void;
+  onSignalChange: (signal: SignalRef, value: unknown) => void;
+  onSignalError: (signal: SignalRef, error: unknown) => void;
+  onSignalDispose: (signal: SignalRef) => void;
+  onSignalRename: (signal: SignalRef) => void;
+  onTagCreate: (tag: TagRef) => void;
+  onTagAdd: (tag: TagRef, signal: AnySignal<any>) => void;
+  onTagRemove: (tag: TagRef, signal: AnySignal<any>) => void;
+}
+
+// Register devtools hooks (called by enableDevTools)
+setDevToolsHooks({
+  onSignalCreate: (signal) => { /* track */ },
+  onSignalChange: (signal, value) => { /* log */ },
+});
+
+// Emit events from core code
+emit.signalCreate(signalRef);
+emit.signalChange(signalRef, newValue);
+emit.signalError(signalRef, error);
+```
+
+#### Migration from `contextDispatcher.ts`
+
+| Old (Removed) | New |
+|---------------|-----|
+| `contextDispatcher.ts` | `hooks.ts` |
+| `ContextDispatcher` | `RenderHooks` |
+| `getCurrent()` | `getRenderHooks()` |
+| `withDispatcher()` | `withRenderHooks()` |
+| `trackSignal()` | `onSignalAccess()` |
+| `trackLoadable()` | `onLoadableAccess()` |
+| `globalThis.__REXTIVE_DEVTOOLS__` | `setDevToolsHooks()` + `emit` |
 
 ---
 
