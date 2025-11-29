@@ -142,7 +142,7 @@ import { signal } from "npm:rextive";
 
 ## 📚 Full Documentation
 
-**[→ Read the complete documentation](https://github.com/linq2js/rextive/blob/main/README.md)**
+**[→ Read the complete documentation](https://github.com/linq2js/rextive)**
 
 The full docs include:
 
