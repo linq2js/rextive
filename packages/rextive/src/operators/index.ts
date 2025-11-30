@@ -1,3 +1,41 @@
+/**
+ * @module rextive/operators
+ *
+ * Signal operators for transforming and combining signals.
+ *
+ * Operators are composable, reusable functions that transform signals.
+ * Use them with `signal.pipe()` to create data pipelines.
+ *
+ * @example
+ * ```ts
+ * import { signal } from 'rextive';
+ * import { to, filter, scan, focus, debounce, throttle } from 'rextive/op';
+ *
+ * const count = signal(0);
+ *
+ * // Transform with operators
+ * const doubled = count.pipe(to(x => x * 2));
+ *
+ * // Chain multiple operators
+ * const result = count.pipe(
+ *   filter(x => x > 0),
+ *   to(x => x * 2),
+ *   scan((acc, x) => acc + x, 0)
+ * );
+ *
+ * // Focus on nested data
+ * const form = signal({ user: { name: 'John' } });
+ * const userName = form.pipe(focus('user.name'));
+ *
+ * // Lightweight lens (no signal created)
+ * const [getName, setName] = focus.lens(form, 'user.name');
+ *
+ * // Timing operators
+ * const debouncedSearch = searchInput.pipe(debounce(300));
+ * const throttledPosition = mousePos.pipe(throttle(100));
+ * ```
+ */
+
 // Types
 export type { Scheduler, Operator, OperatorNameOptions } from "./types";
 export type {

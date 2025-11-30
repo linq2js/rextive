@@ -4,6 +4,7 @@
   "version": "2.34.0",
   "license": "MIT",
   "description": "A reactive state management library with explicit dependencies - works with React, Deno, and vanilla JS",
+  "runtimes": ["deno", "node", "browser", "bun"],
   "imports": {
     "lodash/isEqual": "npm:lodash@4/isEqual",
     "lodash/debounce": "npm:lodash@4/debounce",
