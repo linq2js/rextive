@@ -4,23 +4,22 @@
  */
 
 import { useState } from "react";
-import { signal, rx, useScope, disposable } from "rextive/react";
+import { signal, rx, useScope } from "rextive/react";
 
 // Child component with useScope signals
 function ScopedCounter({ id }: { id: string }) {
   const { count, doubled, increment, decrement } = useScope(() => {
-    console.log("ScopedCounter scope created", id);
     const count = signal(0, { name: `scopedCount-${id}` });
     const doubled = signal({ count }, ({ deps }) => deps.count * 2, {
       name: `scopedDoubled-${id}`,
     });
 
-    return disposable({
+    return {
       count,
       doubled,
       increment: () => count.set((c) => c + 1),
       decrement: () => count.set((c) => c - 1),
-    });
+    };
   });
 
   return (

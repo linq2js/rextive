@@ -104,7 +104,10 @@ describe("useScope with args overload", () => {
 
       render(<TestComponent userId={1} />);
 
-      expect(init).toHaveBeenCalledWith({ data: expect.any(Function) });
+      // Scope is auto-wrapped with disposable(), so it includes dispose
+      expect(init).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.any(Function) })
+      );
     });
 
     it("should work with mount callback", async () => {

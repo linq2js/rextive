@@ -61,10 +61,7 @@ export interface FormConfig {
 // Default form values
 export const defaultFormModel: ComplexFormModel = {
   title: "",
-  description: "",
   status: "draft",
-  effectiveDate: "",
-  budget: 0,
   tags: [],
   contacts: [],
   settings: {
@@ -81,4 +78,3 @@ export const defaultFormConfig: FormConfig = {
   enableBudget: false,
   enableMetadata: false,
 };
-

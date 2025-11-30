@@ -1,7 +1,7 @@
 /**
  * Contacts editor - repeatable nested group using focus operator
  */
-import { disposable, rx, useScope } from "rextive/react";
+import { rx, useScope } from "rextive/react";
 import { focus } from "rextive/op";
 import { useFormContext } from "../../store/formStore";
 import type { Contact, Address } from "../../types/form";
@@ -14,9 +14,8 @@ export function ContactsEditor() {
   const { formData } = useFormContext();
 
   const scope = useScope(() => {
-    console.log("ContactsEditor scope created");
     const contacts = formData.pipe(focus("contacts"));
-    return disposable({
+    return {
       contacts,
       addContact() {
         const newContact: Contact = {
@@ -30,7 +29,7 @@ export function ContactsEditor() {
       },
       removeContact: (index: number) =>
         contacts.set((prev) => prev.filter((_, i) => i !== index)),
-    });
+    };
   });
 
   return (
@@ -74,7 +73,6 @@ function ContactItem({ index, onRemove }: ContactItemProps) {
 
   // Use watch to recreate scope when index changes (e.g., after removal of another item)
   const scope = useScope(() => {
-    console.log("ContactItem scope created");
     const firstName = formData.pipe(focus(`contacts.${index}.firstName`));
     const lastName = formData.pipe(focus(`contacts.${index}.lastName`));
     const email = formData.pipe(focus(`contacts.${index}.email`));
@@ -89,25 +87,19 @@ function ContactItem({ index, onRemove }: ContactItemProps) {
       phone,
       role,
       addresses,
-      dispose: [firstName, lastName, email, phone, role, addresses],
+      addAddress() {
+        const newAddress: Address = {
+          id: generateId(),
+          street: "",
+          city: "",
+          country: "",
+        };
+        addresses.set((prev) => [...prev, newAddress]);
+      },
+      removeAddress: (addrIndex: number) =>
+        addresses.set((prev) => prev.filter((_, i) => i !== addrIndex)),
     };
   });
-
-  const addAddress = () => {
-    const newAddress: Address = {
-      id: generateId(),
-      street: "",
-      city: "",
-      country: "",
-    };
-    scope.addresses.set((prev: Address[]) => [...prev, newAddress]);
-  };
-
-  const removeAddress = (addrIndex: number) => {
-    scope.addresses.set((prev: Address[]) =>
-      prev.filter((_, i) => i !== addrIndex)
-    );
-  };
 
   return (
     <div className="contact-item">
@@ -193,11 +185,15 @@ function ContactItem({ index, onRemove }: ContactItemProps) {
                 key={addr.id || addrIndex}
                 contactIndex={index}
                 addressIndex={addrIndex}
-                onRemove={() => removeAddress(addrIndex)}
+                onRemove={() => scope.removeAddress(addrIndex)}
               />
             ))
           )}
-          <button type="button" onClick={addAddress} className="btn-add-small">
+          <button
+            type="button"
+            onClick={() => scope.addAddress()}
+            className="btn-add-small"
+          >
             + Add Address
           </button>
         </div>
@@ -222,25 +218,16 @@ function AddressItem({
   const basePath = `contacts.${contactIndex}.addresses.${addressIndex}`;
 
   // Use watch to recreate scope when indices change
-  const scope = useScope(
-    () => {
-      return disposable({
-        street: formData.pipe(focus(`${basePath}.street` as any)),
-        city: formData.pipe(focus(`${basePath}.city` as any)),
-        state: formData.pipe(focus(`${basePath}.state` as any, () => "")),
-        postalCode: formData.pipe(
-          focus(`${basePath}.postalCode` as any, () => "")
-        ),
-        country: formData.pipe(focus(`${basePath}.country` as any)),
-        isPrimary: formData.pipe(
-          focus(`${basePath}.isPrimary` as any, () => false)
-        ),
-      });
-    },
-    {
-      watch: [contactIndex, addressIndex], // Recreate scope when indices change
-    }
-  );
+  const scope = useScope(() => ({
+    street: formData.pipe(focus(`${basePath}.street` as any)),
+    city: formData.pipe(focus(`${basePath}.city` as any)),
+    state: formData.pipe(focus(`${basePath}.state` as any, () => "")),
+    postalCode: formData.pipe(focus(`${basePath}.postalCode` as any, () => "")),
+    country: formData.pipe(focus(`${basePath}.country` as any)),
+    isPrimary: formData.pipe(
+      focus(`${basePath}.isPrimary` as any, () => false)
+    ),
+  }));
 
   return (
     <div className="address-item">

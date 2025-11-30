@@ -3,15 +3,14 @@
  */
 import { rx, useScope } from "rextive/react";
 import { focus } from "rextive/op";
-import { disposable } from "rextive";
 import { useFormContext } from "../../store/formStore";
 
 export function SettingsSection() {
   const { formData } = useFormContext();
 
   // Focus on nested settings properties
-  const { enableNotifications, notificationEmail, visibility } = useScope(() =>
-    disposable({
+  const { enableNotifications, notificationEmail, visibility } = useScope(
+    () => ({
       enableNotifications: formData.pipe(focus("settings.enableNotifications")),
       notificationEmail: formData.pipe(
         focus("settings.notificationEmail", () => "")

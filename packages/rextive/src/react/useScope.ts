@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { ExDisposable } from "../types";
-import { tryDispose } from "../disposable";
+import { tryDispose, disposable } from "../disposable";
 
 import {
   useLifecycle,
@@ -154,21 +154,25 @@ export function useScope<TTarget>(
 ): () => LifecyclePhase;
 
 // Overload 3: Factory mode (create scoped services)
-export function useScope<TScope>(
-  create: () => ExDisposable & TScope,
+// TScope can be any object - auto-wrapped with disposable() if no dispose prop
+export function useScope<TScope extends Record<string, any>>(
+  create: () => TScope,
   options?: UseScopeOptions<TScope>
 ): TScope;
 
 // Overload 4: Factory mode with args (args become watch dependencies)
-export function useScope<TScope, TArgs extends any[]>(
-  create: (...args: TArgs) => ExDisposable & TScope,
+export function useScope<
+  TScope extends Record<string, any>,
+  TArgs extends any[]
+>(
+  create: (...args: TArgs) => TScope,
   args: TArgs,
   options?: Omit<UseScopeOptions<TScope>, "watch">
 ): TScope;
 
 // Implementation
-export function useScope<TScope>(
-  createOrCallbacks: (() => ExDisposable & TScope) | LifecycleCallbacks<any>,
+export function useScope<TScope extends Record<string, any>>(
+  createOrCallbacks: (() => TScope) | LifecycleCallbacks<any>,
   argsOrOptions?: any[] | UseScopeOptions<TScope>,
   optionsIfArgs?: Omit<UseScopeOptions<TScope>, "watch">
 ): TScope | (() => LifecyclePhase) {
@@ -184,7 +188,7 @@ export function useScope<TScope>(
   // Detect if second arg is args array or options object
   const isArgsMode = Array.isArray(argsOrOptions);
 
-  const create = createOrCallbacks as (...args: any[]) => ExDisposable & TScope;
+  const create = createOrCallbacks as (...args: any[]) => TScope;
   const args = isArgsMode ? argsOrOptions : undefined;
   const options = isArgsMode
     ? optionsIfArgs
@@ -208,9 +212,13 @@ export function useScope<TScope>(
   // Use useSafeFactory for StrictMode-safe scope creation
   const controller = useSafeFactory(
     () => {
-      const scope = isArgsMode ? create(...(args || [])) : create();
+      let scope = isArgsMode ? create(...(args || [])) : create();
+      // Auto-wrap with disposable() if scope doesn't have dispose prop
+      if (!("dispose" in scope)) {
+        scope = disposable(scope) as TScope;
+      }
       init?.(scope);
-      return scope;
+      return scope as ExDisposable & TScope;
     },
     (scope) => {
       // Only called for orphaned scopes (StrictMode double-invoke)

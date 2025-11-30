@@ -2,7 +2,6 @@
  * FormEditor - Complex form editor demo using focus operator
  */
 import { rx, useScope } from "rextive/react";
-import { disposable } from "rextive";
 import { focus } from "rextive/op";
 import { FormContextProvider, useFormContext } from "../../store/formStore";
 import { defaultFormModel, defaultFormConfig } from "../../types/form";
@@ -16,15 +15,12 @@ function FormEditorContent() {
   const { formConfig } = useFormContext();
 
   // Focus on config options
-  const config = useScope(() => {
-    console.log("FormEditorContent scope created");
-    return disposable({
-      enableDescription: formConfig.pipe(focus("enableDescription")),
-      enableEffectiveDate: formConfig.pipe(focus("enableEffectiveDate")),
-      enableBudget: formConfig.pipe(focus("enableBudget")),
-      enableMetadata: formConfig.pipe(focus("enableMetadata")),
-    });
-  });
+  const config = useScope(() => ({
+    enableDescription: formConfig.pipe(focus("enableDescription")),
+    enableEffectiveDate: formConfig.pipe(focus("enableEffectiveDate")),
+    enableBudget: formConfig.pipe(focus("enableBudget")),
+    enableMetadata: formConfig.pipe(focus("enableMetadata")),
+  }));
 
   return (
     <div className="form-editor">
@@ -118,11 +114,9 @@ function FormEditorContent() {
 // Optional field components using focus
 function DescriptionField() {
   const { formData } = useFormContext();
-  const { description } = useScope(() =>
-    disposable({
-      description: formData.pipe(focus("description", () => "")),
-    })
-  );
+  const { description } = useScope(() => ({
+    description: formData.pipe(focus("description", () => "hello world")),
+  }));
 
   return (
     <div className="optional-field">
@@ -140,11 +134,9 @@ function DescriptionField() {
 
 function EffectiveDateField() {
   const { formData } = useFormContext();
-  const { effectiveDate } = useScope(() =>
-    disposable({
-      effectiveDate: formData.pipe(focus("effectiveDate", () => "")),
-    })
-  );
+  const { effectiveDate } = useScope(() => ({
+    effectiveDate: formData.pipe(focus("effectiveDate", () => "")),
+  }));
 
   return (
     <div className="optional-field">
@@ -161,11 +153,9 @@ function EffectiveDateField() {
 
 function BudgetField() {
   const { formData } = useFormContext();
-  const { budget } = useScope(() =>
-    disposable({
-      budget: formData.pipe(focus("budget", () => 0)),
-    })
-  );
+  const { budget } = useScope(() => ({
+    budget: formData.pipe(focus("budget", () => 0)),
+  }));
 
   return (
     <div className="optional-field">

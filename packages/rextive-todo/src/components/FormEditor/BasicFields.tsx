@@ -3,19 +3,16 @@
  */
 import { rx, useScope } from "rextive/react";
 import { focus } from "rextive/op";
-import { disposable } from "rextive";
 import { useFormContext } from "../../store/formStore";
 
 export function BasicFields() {
   const { formData } = useFormContext();
 
   // Create focused signals for each field (managed by useScope for cleanup)
-  const { title, status } = useScope(() =>
-    disposable({
-      title: formData.pipe(focus("title")),
-      status: formData.pipe(focus("status")),
-    })
-  );
+  const { title, status } = useScope(() => ({
+    title: formData.pipe(focus("title")),
+    status: formData.pipe(focus("status")),
+  }));
 
   return (
     <div className="basic-fields">
