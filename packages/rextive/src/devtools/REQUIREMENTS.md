@@ -269,6 +269,39 @@ interface ChainReaction {
 - [x] Applies to both Signals and Tags tabs
 - [x] Allows finding specific auto-generated signals without toggling the filter
 
+### REQ-052: Advanced Search Syntax ✨ NEW
+
+- [x] Support field-specific search with `field:value` syntax:
+  - `name:user` - Search by signal/tag name
+  - `value:42` - Search by signal value (stringified)
+  - `file:App.tsx` - Search by source file path
+  - `tag:form` - Search signals by tag membership
+  - `kind:mutable` - Filter by signal kind (mutable/computed)
+  - `error:true` - Show only signals with errors
+  - `disposed:true` - Show only disposed signals
+- [x] Support regex patterns when query is wrapped in `/` (e.g., `/user.*count/`)
+- [x] Support multiple field filters (e.g., `name:user kind:computed`)
+- [x] Default behavior: if no field prefix, search across name, value, and file path
+- [x] Show search syntax hint in placeholder or tooltip
+- [x] Help button (?) next to search box opens comprehensive search guide modal
+
+### REQ-053: Value Search Enhancement ✨ NEW
+
+- [x] Search signal values by:
+  - String representation (JSON.stringify for objects)
+  - Primitive value matching (numbers, strings, booleans)
+  - Object property names and values
+  - Array element matching
+- [ ] Highlight matching parts in value display (future enhancement)
+- [ ] Support deep object property search (e.g., `value:user.name`) (future enhancement)
+
+### REQ-054: Search History & Suggestions ✨ NEW
+
+- [ ] Store recent search queries in localStorage (last 10)
+- [ ] Show search suggestions dropdown when typing
+- [ ] Keyboard navigation (arrow keys, Enter to select)
+- [ ] Clear search history option
+
 ---
 
 ## Visual Feedback
@@ -331,6 +364,16 @@ interface ChainReaction {
 ---
 
 ## Change Log
+
+### 2024-XX-XX - Enhanced Search Functionality ✨ NEW
+
+- Added: REQ-052, REQ-053, REQ-054 - Advanced search with field-specific syntax
+- Support for `field:value` syntax (name, value, file, tag, kind, error, disposed)
+- Regex pattern support with `/pattern/` syntax
+- Multi-field filtering support
+- Value search across stringified content
+- Help button (?) next to search box with comprehensive search guide modal
+- Search history and suggestions (planned)
 
 ### 2024-XX-XX - Signal Details Full Display
 

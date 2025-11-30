@@ -624,3 +624,111 @@ export const signalActionsContainerStyles: React.CSSProperties = {
   gap: "4px",
   flexShrink: 0,
 };
+
+// Modal overlay styles
+export const modalOverlayStyles: React.CSSProperties = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0, 0, 0, 0.7)",
+  zIndex: 100000,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "20px",
+};
+
+// Modal container styles
+export const modalContainerStyles: React.CSSProperties = {
+  backgroundColor: colors.bg,
+  border: `1px solid ${colors.border}`,
+  borderRadius: "8px",
+  maxWidth: "600px",
+  maxHeight: "80vh",
+  width: "100%",
+  display: "flex",
+  flexDirection: "column",
+  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
+  overflow: "hidden",
+};
+
+// Modal header styles
+export const modalHeaderStyles: React.CSSProperties = {
+  padding: "16px 20px",
+  borderBottom: `1px solid ${colors.border}`,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+};
+
+// Modal title styles
+export const modalTitleStyles: React.CSSProperties = {
+  fontSize: "16px",
+  fontWeight: "600",
+  color: colors.text,
+  margin: 0,
+};
+
+// Modal close button styles
+export const modalCloseButtonStyles: React.CSSProperties = {
+  backgroundColor: "transparent",
+  border: "none",
+  color: colors.textMuted,
+  cursor: "pointer",
+  padding: "4px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "4px",
+  transition: "all 0.15s ease",
+};
+
+// Modal content styles
+export const modalContentStyles: React.CSSProperties = {
+  padding: "20px",
+  overflowY: "auto",
+  flex: 1,
+};
+
+// Help section styles
+export const helpSectionStyles: React.CSSProperties = {
+  marginBottom: "24px",
+};
+
+export const helpSectionTitleStyles: React.CSSProperties = {
+  fontSize: "14px",
+  fontWeight: "600",
+  color: colors.text,
+  marginBottom: "12px",
+  marginTop: 0,
+};
+
+export const helpExampleStyles: React.CSSProperties = {
+  backgroundColor: colors.bgLight,
+  border: `1px solid ${colors.border}`,
+  borderRadius: "4px",
+  padding: "12px",
+  fontFamily: fontMono,
+  fontSize: "12px",
+  color: colors.text,
+  marginBottom: "8px",
+  whiteSpace: "pre-wrap",
+  wordBreak: "break-word",
+};
+
+export const helpDescriptionStyles: React.CSSProperties = {
+  fontSize: "12px",
+  color: colors.textMuted,
+  lineHeight: "1.6",
+  marginBottom: "12px",
+};
+
+export const helpListStyles: React.CSSProperties = {
+  margin: 0,
+  paddingLeft: "20px",
+  color: colors.textMuted,
+  fontSize: "12px",
+  lineHeight: "1.8",
+};
