@@ -1,7 +1,6 @@
 import type { Signal, Computed, SignalOptions } from "../types";
 import type { Scheduler, Operator } from "./types";
 import { pace } from "./pace";
-import { autoPrefix } from "../utils/nameGenerator";
 
 /**
  * Creates a scheduler that delays notifications by a fixed duration or until a specific time.

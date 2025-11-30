@@ -214,9 +214,6 @@ export function focus<T extends object, P extends Path<T>>(
     // Reference to source (cleared when disposed)
     let sourceRef: Mutable<T> | undefined = source;
 
-    // Track previous value for context (used by set/validate callbacks)
-    let prevValue: V | undefined = undefined;
-
     // Memoized fallback (computed once on first use)
     const getFallbackValue = fallback ? memoize(fallback) : undefined;
 
@@ -284,9 +281,6 @@ export function focus<T extends object, P extends Path<T>>(
           isUpdating = false;
         }
 
-        // Update prevValue after successful write
-        prevValue = finalValue;
-
         return true;
       } catch (error) {
         onError?.(error, ctx);
@@ -296,7 +290,6 @@ export function focus<T extends object, P extends Path<T>>(
 
     // Create inner mutable signal with initial value from source
     const initialValue = readFromSource();
-    prevValue = initialValue; // Set initial prev
     const inner = signal<V>(initialValue, {
       equals,
       name:
@@ -318,7 +311,6 @@ export function focus<T extends object, P extends Path<T>>(
       try {
         const newValue = readFromSource();
         inner.set(newValue);
-        prevValue = newValue; // Update prev after sync
       } catch {
         // Error handled in readFromSource
       }
