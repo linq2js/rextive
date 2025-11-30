@@ -60,7 +60,7 @@
     "version:patch": "npm version patch -m \"chore: bump version to %s\"",
     "version:minor": "npm version minor -m \"chore: bump version to %s\"",
     "version:major": "npm version major -m \"chore: bump version to %s\"",
-    "postversion": "npm run sync:jsr-version && git add jsr.json && git commit --amend --no-edit && (git stash && git pull --rebase && git stash pop || true) && git push && git push --tags",
+    "postversion": "npm run sync:jsr-version && git add jsr.json && (git commit --amend --no-edit 2>/dev/null || git commit --no-edit -m \"chore: sync jsr version\") && (git stash && git pull --rebase && git stash pop || true) && git push && git push --tags",
     "prepublishOnly": "npm run build",
     "sync:jsr-version": "node -e \"const pkg=require('./package.json');const jsr=require('./jsr.json');jsr.version=pkg.version;require('fs').writeFileSync('./jsr.json',JSON.stringify(jsr,null,2)+'\\n')\"",
     "postpublish": "git add -A && (git diff --staged --quiet || git commit -m \"chore: post-publish sync\") && (git stash && git pull --rebase && git stash pop || true) && git push",
