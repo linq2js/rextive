@@ -153,6 +153,7 @@ export function createComputedSignal(
     onDispose.emitAndClear();
     disposed = true;
     context = undefined;
+    deps = undefined as any;
 
     // Notify devtools
     emit.signalDispose(instanceRef!);

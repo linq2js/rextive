@@ -115,6 +115,63 @@ function getSignalKind(signal: Signal<any>): "mutable" | "computed" {
   return "set" in signal ? "mutable" : "computed";
 }
 
+// Window error listeners
+let windowErrorHandler: ((event: ErrorEvent) => void) | null = null;
+let windowRejectionHandler: ((event: PromiseRejectionEvent) => void) | null = null;
+
+/**
+ * Set up window error and unhandled rejection listeners
+ */
+function setupWindowErrorListeners(): void {
+  if (typeof window === "undefined") return;
+
+  // Remove existing listeners if any
+  removeWindowErrorListeners();
+
+  // Window error handler
+  windowErrorHandler = (event: ErrorEvent) => {
+    emit({
+      type: "window:error",
+      message: event.message,
+      source: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+      error: event.error,
+      timestamp: Date.now(),
+    });
+  };
+
+  // Unhandled promise rejection handler
+  windowRejectionHandler = (event: PromiseRejectionEvent) => {
+    emit({
+      type: "window:unhandledrejection",
+      reason: event.reason,
+      promise: event.promise,
+      timestamp: Date.now(),
+    });
+  };
+
+  window.addEventListener("error", windowErrorHandler);
+  window.addEventListener("unhandledrejection", windowRejectionHandler);
+}
+
+/**
+ * Remove window error listeners
+ */
+function removeWindowErrorListeners(): void {
+  if (typeof window === "undefined") return;
+
+  if (windowErrorHandler) {
+    window.removeEventListener("error", windowErrorHandler);
+    windowErrorHandler = null;
+  }
+
+  if (windowRejectionHandler) {
+    window.removeEventListener("unhandledrejection", windowRejectionHandler);
+    windowRejectionHandler = null;
+  }
+}
+
 /**
  * Parse a stack trace line to extract source location.
  * Handles various browser formats:
@@ -594,6 +651,9 @@ export function enableDevTools(options: DevToolsOptions = {}): void {
   setDevToolsHooks(devToolsHooks);
   enabled = true;
 
+  // Set up window error listeners
+  setupWindowErrorListeners();
+
   if (config.logToConsole) {
     console.log(`[${config.name}] DevTools enabled`);
   }
@@ -611,6 +671,9 @@ export function disableDevTools(): void {
   globalThis.__REXTIVE_DEVTOOLS__ = undefined;
   setDevToolsHooks(null);
   enabled = false;
+
+  // Remove window error listeners
+  removeWindowErrorListeners();
 
   // Clear registries
   signals.clear();
@@ -922,3 +985,24 @@ export function clearChains(): void {
 export function deleteChain(id: string): boolean {
   return chainState.chains.delete(id);
 }
+
+/**
+ * Build dependency graph from tracked signals and chain reactions.
+ * 
+ * @returns Dependency graph with nodes and edges
+ * 
+ * @example
+ * ```ts
+ * import { buildDependencyGraph, getSignals, getChainsList } from "rextive/devtools";
+ * 
+ * const graph = buildDependencyGraph(getSignals(), getChainsList());
+ * console.log("Nodes:", graph.nodes.size);
+ * console.log("Edges:", graph.edges.length);
+ * ```
+ */
+export { buildDependencyGraph } from "./utils/buildDependencyGraph";
+export type {
+  DependencyGraph,
+  GraphNode,
+  GraphEdge,
+} from "./utils/buildDependencyGraph";

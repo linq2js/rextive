@@ -104,7 +104,22 @@ export type DevToolsEvent =
   | { type: "signals:forget"; signalIds: string[] }
   | { type: "tag:create"; tag: TagInfo }
   | { type: "tag:add"; tagId: string; signalId: string }
-  | { type: "tag:remove"; tagId: string; signalId: string };
+  | { type: "tag:remove"; tagId: string; signalId: string }
+  | {
+      type: "window:error";
+      message: string;
+      source?: string;
+      lineno?: number;
+      colno?: number;
+      error?: Error;
+      timestamp: number;
+    }
+  | {
+      type: "window:unhandledrejection";
+      reason: unknown;
+      promise: Promise<any>;
+      timestamp: number;
+    };
 
 /**
  * Listener for devtools events.
