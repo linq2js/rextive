@@ -15,14 +15,17 @@ import {
 export interface FormContextValue {
   formData: Mutable<ComplexFormModel>;
   formConfig: Mutable<FormConfig>;
+  updateId: (newId?: string) => void;
 }
 
-export const [useFormContext, FormContextProvider] = provider<
-  FormContextValue,
-  { formData?: ComplexFormModel; formConfig?: FormConfig }
->({
+export const [useFormContext, FormContextProvider] = provider({
   name: "FormContext",
-  create: (initialValue) => {
+  create: (initialValue: {
+    formData?: ComplexFormModel;
+    formConfig?: FormConfig;
+    id?: string;
+  }): FormContextValue => {
+    let id = initialValue.id;
     const formData = signal(initialValue.formData ?? defaultFormModel, {
       name: "formData",
     });
@@ -33,6 +36,16 @@ export const [useFormContext, FormContextProvider] = provider<
     return disposable({
       formData,
       formConfig,
+      updateId(newId?: string) {
+        if (newId !== id) {
+          id = newId;
+          formData.set(defaultFormModel);
+          formConfig.set(defaultFormConfig);
+        }
+      },
     });
+  },
+  update: (context, value) => {
+    context.updateId(value.id);
   },
 });

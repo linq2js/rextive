@@ -1,6 +1,7 @@
 /**
  * FormEditor - Complex form editor demo using focus operator
  */
+import { useState } from "react";
 import { rx, useScope } from "rextive/react";
 import { focus } from "rextive/op";
 import { FormContextProvider, useFormContext } from "../../store/formStore";
@@ -178,14 +179,52 @@ function BudgetField() {
 
 // Main export with provider wrapper
 export function FormEditor() {
+  // Key for hard reset (remounts entire form)
+  const [providerKey, setProviderKey] = useState(0);
+  // ID for soft reset (just resets values)
+  const [formId, setFormId] = useState<string | undefined>(undefined);
+
+  const hardReset = () => {
+    setProviderKey((k) => k + 1);
+  };
+
+  const softReset = () => {
+    setFormId(Date.now().toString());
+  };
+
   return (
     <div className="form-editor-card">
-      <h3 className="form-editor-title">📝 Complex Form Editor Demo</h3>
-      <p className="form-editor-subtitle">
-        Using <code>focus</code> operator with <code>provider</code> pattern
-      </p>
+      <div className="form-editor-header">
+        <h3 className="form-editor-title">📝 Complex Form Editor Demo</h3>
+        <p className="form-editor-subtitle">
+          Using <code>focus</code> operator with <code>provider</code> pattern
+        </p>
+        <div className="form-editor-actions">
+          <button
+            type="button"
+            onClick={softReset}
+            className="btn-reset btn-soft"
+            title="Reset values only (keeps components mounted)"
+          >
+            🔄 Soft Reset
+          </button>
+          <button
+            type="button"
+            onClick={hardReset}
+            className="btn-reset btn-hard"
+            title="Hard reset (remounts all components)"
+          >
+            💥 Hard Reset
+          </button>
+        </div>
+      </div>
       <FormContextProvider
-        value={{ formData: defaultFormModel, formConfig: defaultFormConfig }}
+        key={providerKey}
+        value={{
+          formData: defaultFormModel,
+          formConfig: defaultFormConfig,
+          id: formId,
+        }}
       >
         <FormEditorContent />
       </FormContextProvider>

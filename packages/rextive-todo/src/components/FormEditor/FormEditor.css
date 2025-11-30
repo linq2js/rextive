@@ -11,6 +11,10 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+.form-editor-header {
+  margin-bottom: 24px;
+}
+
 .form-editor-title {
   font-size: 1.5rem;
   font-weight: 700;
@@ -22,7 +26,47 @@
 .form-editor-subtitle {
   font-size: 0.9rem;
   color: #94a3b8;
-  margin: 0 0 24px 0;
+  margin: 0 0 4px 0;
+}
+
+.form-editor-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.btn-reset {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-soft {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.btn-soft:hover {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.btn-hard {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.btn-hard:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.5);
 }
 
 .form-editor-subtitle code {
