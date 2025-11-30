@@ -422,17 +422,16 @@ function isLens<T>(value: unknown): value is Lens<T> {
 
 // Overload 1: From Mutable signal
 export function lens<T extends object, P extends Path<T>>(
-  source: Mutable<T>,
-  path: P,
-  fallback?: () => PathValue<T, P>
+  source: Mutable<T> | Lens<T>,
+  path: P
 ): Lens<PathValue<T, P>>;
 
 // Overload 2: From another Lens
-export function lens<T extends object, P extends Path<T>>(
-  source: Lens<T>,
-  path: P,
-  fallback?: () => PathValue<T, P>
-): Lens<PathValue<T, P>>;
+export function lens<
+  T extends object,
+  P extends Path<T>,
+  F extends NonNullable<PathValue<T, P>>
+>(source: Lens<T> | Mutable<T>, path: P, fallback: FocusFallback<F>): Lens<F>;
 
 // Implementation
 export function lens<T extends object, P extends Path<T>>(
