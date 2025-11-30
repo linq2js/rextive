@@ -353,7 +353,6 @@ function applyModifiedAtValues(todos: Todo[]): Todo[] {
 
 export async function syncPull() {
   try {
-    console.log("syncPull");
     syncStatus.set("syncing");
     syncError.set(null);
 

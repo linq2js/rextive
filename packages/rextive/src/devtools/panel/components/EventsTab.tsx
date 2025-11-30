@@ -73,10 +73,13 @@ export function EventsTab({
             if (event.type === "window:error") {
               // Window error event
               const winError = event as any;
-              const errorMsg = winError.message || String(winError.error || "Unknown error");
+              const errorMsg =
+                winError.message || String(winError.error || "Unknown error");
               errorPreview = errorMsg; // Show in first line
               if (winError.source) {
-                errorContext = `${winError.source}:${winError.lineno || "?"}:${winError.colno || "?"}`;
+                errorContext = `${winError.source}:${winError.lineno || "?"}:${
+                  winError.colno || "?"
+                }`;
               }
               // Serialize full error object
               try {
@@ -108,20 +111,22 @@ export function EventsTab({
             } else if (event.type === "window:unhandledrejection") {
               // Unhandled promise rejection
               const rejection = event as any;
-              if (rejection.reason) {
-                if (rejection.reason instanceof Error) {
-                  errorPreview = rejection.reason.message;
+              // Access reason directly from event (it's at the top level)
+              const reason = rejection.reason ?? (event as any).reason;
+              if (reason !== undefined && reason !== null) {
+                if (reason instanceof Error) {
+                  errorPreview = reason.message || reason.toString();
                   try {
                     // Serialize Error object with all properties
                     const errorObj: any = {
-                      message: rejection.reason.message,
-                      name: rejection.reason.name,
-                      stack: rejection.reason.stack,
+                      message: reason.message,
+                      name: reason.name,
+                      stack: reason.stack,
                     };
-                    Object.getOwnPropertyNames(rejection.reason).forEach((key) => {
+                    Object.getOwnPropertyNames(reason).forEach((key) => {
                       if (!["message", "name", "stack"].includes(key)) {
                         try {
-                          errorObj[key] = (rejection.reason as any)[key];
+                          errorObj[key] = (reason as any)[key];
                         } catch {
                           // Skip non-serializable properties
                         }
@@ -129,19 +134,38 @@ export function EventsTab({
                     });
                     valueStr = JSON.stringify(errorObj, null, 2);
                   } catch {
-                    valueStr = JSON.stringify({ message: rejection.reason.message }, null, 2);
+                    valueStr = JSON.stringify(
+                      { message: reason.message || String(reason) },
+                      null,
+                      2
+                    );
                   }
                 } else {
-                  errorPreview = String(rejection.reason);
+                  // For non-Error reasons (strings, objects, etc.), show them directly
+                  errorPreview = String(reason);
                   try {
-                    valueStr = JSON.stringify(rejection.reason, null, 2);
+                    // For strings, just use the string directly (no JSON.stringify to avoid double quotes)
+                    if (typeof reason === "string") {
+                      valueStr = reason;
+                    } else {
+                      // For objects/arrays, stringify them
+                      valueStr = JSON.stringify(reason, null, 2);
+                    }
                   } catch {
-                    valueStr = JSON.stringify({ reason: String(rejection.reason) }, null, 2);
+                    // If stringification fails, just use the string representation
+                    valueStr = String(reason);
                   }
                 }
               } else {
-                errorPreview = "Unhandled promise rejection";
-                valueStr = JSON.stringify({ message: "Unhandled promise rejection" }, null, 2);
+                errorPreview =
+                  "Unhandled promise rejection (no reason provided)";
+                valueStr = JSON.stringify(
+                  {
+                    message: "Unhandled promise rejection (no reason provided)",
+                  },
+                  null,
+                  2
+                );
               }
             } else if ("value" in event) {
               valueStr = JSON.stringify(event.value, null, 2);
@@ -274,19 +298,44 @@ export function EventsTab({
                       </span>
                     )}
                     {/* Show error/reason preview for window errors and rejections */}
-                    {errorPreview && (event.type === "window:error" || event.type === "window:unhandledrejection") && (
-                      <span
-                        style={{
-                          color: styles.colors.errorText,
-                          fontFamily: styles.fontMono,
-                          fontSize: "9px",
-                          marginLeft: signalName || tagId ? "8px" : "0",
-                        }}
-                        title={errorPreview.length > 60 ? errorPreview : undefined}
-                      >
-                        {errorPreview.length > 60 ? errorPreview.slice(0, 57) + "..." : errorPreview}
-                      </span>
-                    )}
+                    {errorPreview &&
+                      (event.type === "window:error" ||
+                        event.type === "window:unhandledrejection") && (
+                        <span
+                          style={{
+                            color: styles.colors.errorText,
+                            fontFamily: styles.fontMono,
+                            fontSize: "9px",
+                            marginLeft: signalName || tagId ? "8px" : "0",
+                            fontWeight: 500,
+                          }}
+                          title={
+                            errorPreview.length > 60 ? errorPreview : undefined
+                          }
+                        >
+                          {errorPreview.length > 60
+                            ? errorPreview.slice(0, 57) + "..."
+                            : errorPreview}
+                        </span>
+                      )}
+                    {/* Always show reason for unhandled rejections, even if errorPreview wasn't set */}
+                    {event.type === "window:unhandledrejection" &&
+                      !errorPreview && (
+                        <span
+                          style={{
+                            color: styles.colors.errorText,
+                            fontFamily: styles.fontMono,
+                            fontSize: "9px",
+                            marginLeft: signalName || tagId ? "8px" : "0",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {(event as any).reason !== undefined &&
+                          (event as any).reason !== null
+                            ? String((event as any).reason)
+                            : "(no reason)"}
+                        </span>
+                      )}
                   </span>
                   {valueStr && (
                     <button
@@ -329,9 +378,11 @@ export function EventsTab({
                   <div
                     style={{
                       fontSize: "9px",
-                      color: event.type === "window:error" || event.type === "window:unhandledrejection"
-                        ? styles.colors.errorText
-                        : styles.colors.textMuted,
+                      color:
+                        event.type === "window:error" ||
+                        event.type === "window:unhandledrejection"
+                          ? styles.colors.errorText
+                          : styles.colors.textMuted,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
@@ -339,7 +390,8 @@ export function EventsTab({
                       fontFamily: styles.fontMono,
                     }}
                   >
-                    {event.type === "window:error" || event.type === "window:unhandledrejection"
+                    {event.type === "window:error" ||
+                    event.type === "window:unhandledrejection"
                       ? formatValue(valueStr, 100) // Longer preview for errors
                       : formatValue((event as any).value)}
                   </div>
@@ -371,4 +423,3 @@ export function EventsTab({
     </div>
   );
 }
-
