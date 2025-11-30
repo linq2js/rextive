@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { TodoInput } from "./components/TodoInput";
 import { TodoList } from "./components/TodoList";
 import { TodoFilters } from "./components/TodoFilters";
@@ -11,7 +11,12 @@ import { initializeStore } from "./store/todoStore";
 import "./App.css";
 
 export function App() {
+  const initializedRef = useRef(false);
+  
   useEffect(() => {
+    // Prevent double initialization in StrictMode
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     initializeStore();
   }, []);
 

@@ -100,6 +100,8 @@ This document captures all requirements for the DevTools panel. **All new featur
 - [x] Click on signal to expand/collapse details
 - [x] Show source location (file:line) if available
 - [x] Show value history (most recent 5 entries with timestamps)
+- [x] History entries have "Revert" button for mutable signals ✨ NEW
+- [x] History entries have "Compare" button to show diff modal ✨ NEW
 
 ### REQ-021a: Signal Details - Full Display ✨ NEW
 
@@ -116,6 +118,7 @@ This document captures all requirements for the DevTools panel. **All new featur
 - [x] Reset button (↺) - reset mutable signal to initial value
 - [x] Refresh button (⟳) - refresh/resume computed signal
 - [x] Delete button (🗑) - remove disposed signal from devtools
+- [x] Bookmark button (⭐) - bookmark/unbookmark signal for quick access ✨ NEW
 
 ### REQ-023: Signal Kind Filter
 
@@ -136,6 +139,14 @@ This document captures all requirements for the DevTools panel. **All new featur
 - [x] When inactive, use default sort (active signals first, then disposed)
 - [x] Visual indication when sort is active
 - [x] Toggle is ON by default
+
+### REQ-024b: Signal Bookmarks ✨ NEW
+
+- [x] Bookmark button (⭐) in signal actions to bookmark/unbookmark
+- [x] Bookmarked signals persist across sessions (localStorage)
+- [x] Bookmark filter toggle button to show only bookmarked signals
+- [x] Bookmark count displayed on filter button
+- [x] Visual indication (filled star) for bookmarked signals
 
 ### REQ-025: Disposed Signal Time Display ✨ NEW
 
@@ -364,6 +375,17 @@ interface ChainReaction {
 ---
 
 ## Change Log
+
+### 2024-XX-XX - Signal Bookmarks & History Actions ✨ NEW
+
+- Added: REQ-024b - Signal bookmarking functionality
+- Bookmark button in signal actions (star icon)
+- Bookmark filter toggle to show only bookmarked signals
+- Bookmarks persist across sessions
+- Added: History entry actions
+- "Revert to value" button for mutable signals in history
+- "Compare" button to show diff modal comparing history value with current value
+- Value diff modal with side-by-side comparison
 
 ### 2024-XX-XX - Enhanced Search Functionality ✨ NEW
 
