@@ -1,7 +1,8 @@
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useState, useRef } from "react";
 import { RenderHooks, withRenderHooks } from "../hooks";
 import { AnySignal, Loadable } from "../types";
 import { emitter } from "../utils/emitter";
+import { useSafeFactory } from "./useSafeFactory";
 
 /**
  * Internal controller for tracking signals accessed within useRx.
@@ -108,11 +109,24 @@ class RxController implements RenderHooks {
  * ```
  */
 export function useRx<T>(fn: () => T): T {
-  // use basic rerender to optimize speed and memory usage
-  const rerender = useState({})[1];
+  // Rerender trigger - use useState for forcing re-renders
+  const [, setRerenderState] = useState({});
+  const rerenderRef = useRef(() => setRerenderState({}));
+  rerenderRef.current = () => setRerenderState({});
 
-  // Controller persists across renders, created once on mount
-  const [controller] = useState(() => new RxController(() => rerender({})));
+  // Use useSafeFactory for StrictMode-safe controller creation
+  const factory = useSafeFactory(
+    () => new RxController(rerenderRef.current),
+    () => {
+      // No cleanup needed for orphaned RxController
+    },
+    [] // Empty deps - controller persists for component lifetime
+  );
+
+  const controller = factory.result;
+
+  // Update rerender function reference (in case it changed)
+  controller.rerender = rerenderRef.current;
 
   // Clear tracked signals at start of each render
   // This ensures we only subscribe to signals accessed in THIS render
@@ -121,21 +135,25 @@ export function useRx<T>(fn: () => T): T {
   // Set up subscriptions AFTER render completes
   // useLayoutEffect runs synchronously after DOM mutations but before paint
   useLayoutEffect(() => {
+    factory.commit();
+
     // Create cleanup emitter to collect unsubscribe functions
     const onCleanup = emitter();
-    const rerenderFn = () => rerender({});
 
     // Subscribe to each tracked signal
     // signal.on(rerender) returns an unsubscribe function
     // onCleanup.on() stores it for cleanup
     for (const signal of controller.signals) {
-      onCleanup.on(signal.on(rerenderFn));
+      onCleanup.on(signal.on(controller.rerender));
     }
 
     // Cleanup: unsubscribe from all signals when component unmounts
     // or when the effect re-runs (on each render)
     return () => {
       onCleanup.emitAndClear();
+      factory.scheduleDispose(() => {
+        // No additional cleanup needed - subscriptions already cleared above
+      });
     };
   });
 

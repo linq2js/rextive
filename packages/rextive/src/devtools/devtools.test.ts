@@ -104,23 +104,34 @@ describe("rextive/devtools", () => {
       expect(getSignal("counter")?.disposedAt).toBeDefined();
     });
 
-    it("should preserve disposed signal when new signal with same name is created", () => {
+    it("should allow multiple signals with same name (unique IDs)", () => {
       // Create and dispose a signal
       const sig1 = signal(0, { name: "counter" });
+      const sig1Id = getSignal("counter")!.id;
       sig1.dispose();
       expect(getSignal("counter")?.disposed).toBe(true);
 
       // Create a new signal with the same name
       const sig2 = signal(100, { name: "counter" });
 
-      // The old disposed signal should be renamed
-      expect(getSignal("counter (disposed)")?.disposed).toBe(true);
-      expect(getSignal("counter (disposed)")?.signal).toBe(sig1);
+      // Both signals exist with their unique IDs
+      // sig1 keeps its ID and is still disposed
+      expect(getSignals().get(sig1Id)?.disposed).toBe(true);
+      expect(getSignals().get(sig1Id)?.signal).toBe(sig1);
 
-      // The new signal should have the original name
-      expect(getSignal("counter")?.disposed).toBe(false);
-      expect(getSignal("counter")?.signal).toBe(sig2);
-      expect(getSignal("counter")?.signal()).toBe(100);
+      // sig2 has a different unique ID but same name
+      // getSignal("counter") returns the first match (sig1 since it was created first)
+      // But we can verify both exist
+      const allCounters = Array.from(getSignals().values()).filter(
+        (s) => s.name === "counter"
+      );
+      expect(allCounters.length).toBe(2);
+      expect(allCounters.some((s) => s.signal === sig1 && s.disposed)).toBe(
+        true
+      );
+      expect(
+        allCounters.some((s) => s.signal === sig2 && !s.disposed)
+      ).toBe(true);
 
       // Total should be 2
       expect(getSignals().size).toBe(2);
@@ -180,12 +191,15 @@ describe("rextive/devtools", () => {
 
       const tagInfo = getTag("myTag");
       expect(tagInfo?.signals.size).toBe(2);
-      expect(tagInfo?.signals.has("sig1")).toBe(true);
-      expect(tagInfo?.signals.has("sig2")).toBe(true);
+
+      // Tags now store unique IDs, not names
+      const sig1Info = getSignal("sig1");
+      const sig2Info = getSignal("sig2");
+      expect(tagInfo?.signals.has(sig1Info!.id)).toBe(true);
+      expect(tagInfo?.signals.has(sig2Info!.id)).toBe(true);
 
       // Signal should know about tag
-      const sigInfo = getSignal("sig1");
-      expect(sigInfo?.tags.has("myTag")).toBe(true);
+      expect(sig1Info?.tags.has("myTag")).toBe(true);
     });
 
     it("should update when signal removed from tag", () => {
@@ -222,7 +236,7 @@ describe("rextive/devtools", () => {
       expect(listener).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "signal:create",
-          signal: expect.objectContaining({ id: "counter" }),
+          signal: expect.objectContaining({ name: "counter" }),
         })
       );
     });
@@ -231,13 +245,17 @@ describe("rextive/devtools", () => {
       const listener = vi.fn();
       const sig = signal(0, { name: "counter" });
 
+      // Get the signal's unique ID
+      const sigInfo = getSignal("counter");
+      expect(sigInfo).toBeDefined();
+
       onDevToolsEvent(listener);
       sig.set(5);
 
       expect(listener).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "signal:change",
-          signalId: "counter",
+          signalId: sigInfo!.id,
           value: 5,
         })
       );
@@ -247,13 +265,17 @@ describe("rextive/devtools", () => {
       const listener = vi.fn();
       const sig = signal(0, { name: "counter" });
 
+      // Get the signal's unique ID
+      const sigInfo = getSignal("counter");
+      expect(sigInfo).toBeDefined();
+
       onDevToolsEvent(listener);
       sig.dispose();
 
       expect(listener).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "signal:dispose",
-          signalId: "counter",
+          signalId: sigInfo!.id,
         })
       );
     });

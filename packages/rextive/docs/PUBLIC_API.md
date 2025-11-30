@@ -373,7 +373,7 @@ rx(<MyComponent user={user} count={count} />);
 const { count, doubled } = useScope(
   () => {
     const count = signal(0);
-    const doubled = count.map((x) => x * 2);
+    const doubled = count.to((x) => x * 2);
     return {
       count,
       doubled,
@@ -381,8 +381,27 @@ const { count, doubled } = useScope(
     };
   },
   {
-    watch: [userId], // Optional: recreate when deps change
+    // Lifecycle callbacks
+    init: (scope) => {},      // Called when scope is created
+    mount: (scope) => {},     // Called after scope is mounted (alias: ready)
+    update: (scope) => {},    // Called after every render
+    cleanup: (scope) => {},   // Called during cleanup phase
+    dispose: (scope) => {},   // Called when scope is being disposed
+    
+    // Dependencies
+    watch: [userId],          // Recreate when deps change
   }
+);
+
+// Update with deps - only runs when deps change
+useScope(() => createScope(), {
+  update: [(scope) => scope.refresh(), dep1, dep2],
+});
+
+// Factory with args (type-safe, args become watch deps)
+const { userData } = useScope(
+  (userId, filter) => createUserScope(userId, filter),
+  [userId, filter]
 );
 ```
 
@@ -393,6 +412,7 @@ const getPhase = useScope({
   init: () => console.log("Before first render"),
   mount: () => console.log("After first paint"),
   render: () => console.log("Every render"),
+  update: () => console.log("After every render"),
   cleanup: () => console.log("React cleanup"),
   dispose: () => console.log("True unmount (StrictMode-aware)"),
 });
@@ -410,6 +430,7 @@ const getPhase = useScope({
   init: (user) => console.log("User activated:", user),
   mount: (user) => startTracking(user),
   render: (user) => console.log("Rendering", user),
+  update: (user) => console.log("After render", user),
   cleanup: (user) => pauseTracking(user),
   dispose: (user) => analytics.track("session-end", user),
 });

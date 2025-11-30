@@ -296,7 +296,12 @@ export function focus<T extends object, P extends Path<T>>(
         name ?? autoPrefix(`focus(${source.displayName}.${path as string})`),
     });
 
+    // Store original methods BEFORE creating subscriptions
+    const originalSet = inner.set.bind(inner);
+    const originalDispose = inner.dispose.bind(inner);
+
     // Source → Inner: sync when source changes
+    // IMPORTANT: Use originalSet to avoid writing back to source (would cause O(n²) updates)
     const unsubSource = source.on(() => {
       if (isUpdating) return;
 
@@ -310,15 +315,13 @@ export function focus<T extends object, P extends Path<T>>(
 
       try {
         const newValue = readFromSource();
-        inner.set(newValue);
+        // Use originalSet, NOT inner.set - we don't want to propagate back to source
+        // inner.set would call writeToSource, causing cascading updates
+        originalSet(newValue);
       } catch {
         // Error handled in readFromSource
       }
     });
-
-    // Store original methods
-    const originalSet = inner.set.bind(inner);
-    const originalDispose = inner.dispose.bind(inner);
 
     // Helper to dispose focus signal (lazy disposal)
     const disposeInner = () => {

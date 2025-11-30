@@ -25,6 +25,7 @@ export interface DevToolsHooks {
   onSignalError: (signal: AnySignal<any>, error: unknown) => void;
   onSignalDispose: (signal: AnySignal<any>) => void;
   onSignalRename: (signal: AnySignal<any>) => void;
+  onForgetSignals: (signals: AnySignal<any>[]) => void;
   onTagCreate: (tag: Tag<any, any>) => void;
   onTagAdd: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
   onTagRemove: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
@@ -76,6 +77,15 @@ export function hasDevTools(): boolean {
   return devToolsHooks !== null;
 }
 
+// ============================================
+// Forget Mode (for orphaned StrictMode scopes)
+// ============================================
+
+/** Signals collected during forget mode - null when not in forget mode */
+let forgetModeSignals: Set<AnySignal<any>> | null = null;
+/** Nesting depth for forgetDisposedSignals calls */
+let forgetModeDepth = 0;
+
 /** Emit devtools events */
 export const emit = {
   signalCreate: (signal: AnySignal<any>) => {
@@ -88,10 +98,46 @@ export const emit = {
     devToolsHooks?.onSignalError?.(signal, error);
   },
   signalDispose: (signal: AnySignal<any>) => {
-    devToolsHooks?.onSignalDispose?.(signal);
+    if (forgetModeSignals !== null) {
+      // In forget mode - collect for batch removal (Set prevents duplicates)
+      forgetModeSignals.add(signal);
+    } else {
+      // Normal mode - mark as disposed (keeps history)
+      devToolsHooks?.onSignalDispose?.(signal);
+    }
   },
   signalRename: (signal: AnySignal<any>) => {
     devToolsHooks?.onSignalRename?.(signal);
+  },
+  /**
+   * Execute disposal within "forget mode" - all signals disposed
+   * inside the callback will be completely removed from DevTools
+   * instead of being marked as "disposed".
+   *
+   * Supports nested calls - signals are only flushed when the
+   * outermost call completes.
+   *
+   * Used for orphaned scopes from React StrictMode that should
+   * never appear in DevTools.
+   */
+  forgetDisposedSignals: (fn: () => void) => {
+    // Initialize Set on first (outermost) call
+    if (forgetModeDepth === 0) {
+      forgetModeSignals = new Set();
+    }
+    forgetModeDepth++;
+    try {
+      fn();
+    } finally {
+      forgetModeDepth--;
+      // Only flush and reset when outermost call completes
+      if (forgetModeDepth === 0) {
+        if (forgetModeSignals && forgetModeSignals.size > 0) {
+          devToolsHooks?.onForgetSignals?.([...forgetModeSignals]);
+        }
+        forgetModeSignals = null;
+      }
+    }
   },
   tagCreate: (tag: Tag<any, any>) => {
     devToolsHooks?.onTagCreate?.(tag);

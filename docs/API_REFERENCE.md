@@ -349,24 +349,60 @@ Reactive rendering:
 
 ### `useScope()`
 
-Component-scoped signals:
+Component-scoped signals with three modes:
+
+**Factory Mode (most common):**
 
 ```tsx
-// Factory mode
+// Basic factory
 const { count } = useScope(() => ({
   count: signal(0),
   dispose: [count],
 }));
 
-// Lifecycle mode
-useScope({
-  init: () => console.log("Before render"),
-  mount: () => console.log("After paint"),
-  dispose: () => console.log("True unmount"),
+// With lifecycle callbacks
+useScope(() => createScope(), {
+  init: (scope) => {},      // Before commit
+  mount: (scope) => {},     // After mount (alias: ready)
+  update: (scope) => {},    // After every render
+  cleanup: (scope) => {},   // During cleanup
+  dispose: (scope) => {},   // Before disposal
+  watch: [dep1, dep2],      // Recreate when deps change
 });
 
-// With watch
-useScope(() => createQuery(), { watch: [userId] });
+// Update with deps - only runs when deps change
+useScope(() => createQuery(), {
+  update: [(scope) => scope.refresh(), userId],
+});
+
+// With args (type-safe, args become watch deps)
+const { userData } = useScope(
+  (userId, filter) => createUserScope(userId, filter),
+  [userId, filter]
+);
+```
+
+**Lifecycle Mode:**
+
+```tsx
+const getPhase = useScope({
+  init: () => console.log("Before render"),
+  mount: () => console.log("After paint"),
+  render: () => console.log("Every render"),
+  update: () => console.log("After render"),
+  cleanup: () => console.log("React cleanup"),
+  dispose: () => console.log("True unmount"),
+});
+```
+
+**Object Tracking Mode:**
+
+```tsx
+useScope({
+  for: user,
+  init: (user) => analytics.track("start", user),
+  dispose: (user) => analytics.track("end", user),
+});
 ```
 
 ### `provider()`

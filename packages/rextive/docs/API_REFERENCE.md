@@ -588,12 +588,13 @@ const getPhase = useScope({
 function useScope<TScope>(
   create: () => ExDisposable & TScope,
   options?: {
-    watch?: unknown[];
-    init?: (scope: TScope) => void;
-    mount?: (scope: TScope) => void;
-    render?: (scope: TScope) => void;
-    cleanup?: (scope: TScope) => void;
-    dispose?: (scope: TScope) => void;
+    init?: (scope: TScope) => void;      // Called when scope is created
+    mount?: (scope: TScope) => void;     // Called after scope is mounted (alias: ready)
+    ready?: (scope: TScope) => void;     // Alias for mount
+    update?: ((scope: TScope) => void) | [(scope: TScope) => void, ...deps]; // After render
+    cleanup?: (scope: TScope) => void;   // During cleanup phase
+    dispose?: (scope: TScope) => void;   // When scope is being disposed
+    watch?: unknown[];                    // Recreate when deps change
   }
 ): Omit<TScope, "dispose">
 ```
@@ -622,9 +623,42 @@ const { store } = useScope(
   {
     init: (store) => console.log('Store created', store),
     mount: (store) => store.connect(),
+    update: (store) => store.sync(), // Called after every render
     cleanup: (store) => store.disconnect(),
     dispose: (store) => store.destroy()
   }
+);
+
+// Update with deps - only runs when deps change
+const { query } = useScope(
+  () => createQuery(),
+  {
+    update: [(scope) => scope.refresh(), userId, filter] // Only when userId or filter changes
+  }
+);
+```
+
+---
+
+#### Overload 4: Factory with args
+
+```ts
+function useScope<TScope, TArgs extends any[]>(
+  create: (...args: TArgs) => ExDisposable & TScope,
+  args: TArgs,
+  options?: Omit<UseScopeOptions<TScope>, "watch">
+): TScope
+```
+
+**Example:**
+```ts
+// Type-safe: args match factory params & become watch deps
+const { userData } = useScope(
+  (userId, filter) => {
+    const userData = signal(fetchUser(userId, filter));
+    return { userData };
+  },
+  [userId, filter] // Args passed to factory & used as watch deps
 );
 ```
 

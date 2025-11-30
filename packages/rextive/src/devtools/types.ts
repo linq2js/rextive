@@ -43,8 +43,10 @@ export type SourceLocation = {
  * Metadata for a tracked signal.
  */
 export type SignalInfo = {
-  /** Unique identifier (displayName) */
+  /** Unique identifier (auto-generated, not the display name) */
   id: string;
+  /** Display name for UI (may not be unique) */
+  name: string;
   /** Signal kind */
   kind: "mutable" | "computed";
   /** The signal instance */
@@ -99,6 +101,7 @@ export type DevToolsEvent =
     }
   | { type: "signal:error"; signalId: string; error: SignalError }
   | { type: "signal:rename"; oldId: string; newId: string }
+  | { type: "signals:forget"; signalIds: string[] }
   | { type: "tag:create"; tag: TagInfo }
   | { type: "tag:add"; tagId: string; signalId: string }
   | { type: "tag:remove"; tagId: string; signalId: string };

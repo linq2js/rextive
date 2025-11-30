@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { ExDisposable } from "../types";
 import { tryDispose } from "../disposable";
 
@@ -7,11 +7,40 @@ import {
   LifecycleCallbacks,
   LifecyclePhase,
 } from "./useLifecycle";
+import { emit } from "../hooks";
+import { useSafeFactory } from "./useSafeFactory";
 
 /**
  * Options for useScope hook (factory mode only)
  */
-export type UseScopeOptions<TScope = any> = LifecycleCallbacks<TScope> & {
+export type UseScopeOptions<TScope = any> = {
+  /**
+   * Called when scope is created (before first render commit)
+   */
+  init?: (scope: TScope) => void;
+  /**
+   * Called after scope is mounted/ready (after first commit)
+   * Alias: `ready`
+   */
+  mount?: (scope: TScope) => void;
+  /**
+   * Alias for `mount` - called after scope is mounted/ready
+   */
+  ready?: (scope: TScope) => void;
+  /**
+   * Called after render (after DOM updates) - use to update/sync scope state
+   * - Simple form: `(scope) => void` - runs after every render
+   * - With deps: `[(scope) => void, dep1, dep2]` - runs when deps change
+   */
+  update?: ((scope: TScope) => void) | [(scope: TScope) => void, ...any[]];
+  /**
+   * Called during cleanup phase (before dispose)
+   */
+  cleanup?: (scope: TScope) => void;
+  /**
+   * Called when scope is being disposed
+   */
+  dispose?: (scope: TScope) => void;
   /**
    * Watch these values - recreates scope when they change
    * Similar to React useEffect deps array
@@ -41,7 +70,7 @@ export type UseScopeOptions<TScope = any> = LifecycleCallbacks<TScope> & {
  *   init: () => console.log('Component initializing'),
  *   mount: () => console.log('Component mounted'),
  *   render: () => console.log('Component rendering'),
- *   update: () => console.log('After every render'), // Runs after each render
+ *   update: () => console.log('After every render'),
  *   cleanup: () => console.log('Component cleaning up'),
  *   dispose: () => console.log('Component disposed'),
  * });
@@ -78,35 +107,27 @@ export type UseScopeOptions<TScope = any> = LifecycleCallbacks<TScope> & {
  * });
  * ```
  *
- * @example Factory mode with watch (recreate on prop change)
+ * @example Factory mode with lifecycle callbacks
  * ```tsx
- * const { userData } = useScope(
+ * const { size, ref } = useScope(
  *   () => {
- *     const userData = signal(fetchUser(userId));
- *     return { userData, dispose: [userData] };
+ *     const size = signal({ width: 0, height: 0 });
+ *     const ref = createRef<HTMLDivElement>();
+ *     return { size, ref };
  *   },
- *   { watch: [userId] } // Recreate when userId changes
+ *   {
+ *     ready: (scope) => console.log('Scope is ready'),
+ *     update: (scope) => {
+ *       // Sync DOM measurements after each render
+ *       if (scope.ref.current) {
+ *         const rect = scope.ref.current.getBoundingClientRect();
+ *         scope.size.set({ width: rect.width, height: rect.height });
+ *       }
+ *     },
+ *     // Or with deps - only run when specific values change
+ *     // update: [(scope) => scope.refetch(), userId],
+ *   }
  * );
- * ```
- *
- * @example Factory mode with update callback (sync after render)
- * ```tsx
- * const { size, updateSize } = useScope(() => {
- *   const size = signal({ width: 0, height: 0 });
- *   const ref = createRef();
- *
- *   return { size, ref };
- * }, {
- *   // Update runs after every render - measure DOM and sync to signal
- *   update: (scope) => {
- *     if (scope.ref.current) {
- *       const { width, height } = scope.ref.current.getBoundingClientRect();
- *       scope.size.set({ width, height });
- *     }
- *   },
- *   // Or with deps - only run when userId changes
- *   // update: [(scope) => scope.refetch(), userId],
- * });
  * ```
  *
  * @example Factory mode with args (args become watch dependencies)
@@ -118,15 +139,6 @@ export type UseScopeOptions<TScope = any> = LifecycleCallbacks<TScope> & {
  *     return { userData };
  *   },
  *   [userId, filter] // Args passed to factory & used as watch deps
- * );
- *
- * // Compare to manual watch (less type-safe):
- * const { userData } = useScope(
- *   () => {
- *     const userData = signal(fetchUser(userId, filter));
- *     return { userData };
- *   },
- *   { watch: [userId, filter] } // Easy to forget to update
  * );
  * ```
  */
@@ -165,7 +177,6 @@ export function useScope<TScope>(
 
   if (isLifecycleMode) {
     // Mode 1 or 2: Lifecycle mode (component or object)
-    // Need to check if it's object lifecycle (has 'for' property) or component lifecycle
     return useLifecycle(createOrCallbacks as LifecycleCallbacks<any>);
   }
 
@@ -179,46 +190,66 @@ export function useScope<TScope>(
     ? optionsIfArgs
     : (argsOrOptions as UseScopeOptions<TScope> | undefined);
 
-  const {
-    watch = undefined,
-    init,
-    mount,
-    render,
-    update,
-    cleanup,
-    dispose: disposeCallback,
-  } = (options || {}) as UseScopeOptions<TScope>;
+  const { init, update } = options || {};
+  const watch = (options as UseScopeOptions<TScope>)?.watch;
+
+  // Parse update callback and deps
+  const updateCallback = Array.isArray(update) ? update[0] : update;
+  const updateDeps = Array.isArray(update) ? update.slice(1) : undefined;
 
   // Recreate scope when watch dependencies change
   // In args mode, args become the watch dependencies
   const watchDeps = isArgsMode ? args || [] : watch || [];
 
-  const scope = useMemo(() => {
-    const newScope = isArgsMode ? create(...(args || [])) : create();
+  // Keep options ref for callbacks (they may change between renders)
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
-    // Call init after scope is created (once per scope instance)
-    init?.(newScope);
-
-    return newScope;
-  }, watchDeps);
-
-  // Use useLifecycle to manage scope object lifecycle (StrictMode-safe)
-  useLifecycle({
-    for: scope, // Track this scope object
-    // Note: init already called in useMemo above, so we skip it here
-    mount,
-    render,
-    update,
-    cleanup,
-    dispose: (s) => {
-      // Call user's dispose callback
-      disposeCallback?.(s);
-      // Dispose scope resources
-      tryDispose(s);
+  // Use useSafeFactory for StrictMode-safe scope creation
+  const controller = useSafeFactory(
+    () => {
+      const scope = isArgsMode ? create(...(args || [])) : create();
+      init?.(scope);
+      return scope;
     },
-  });
+    (scope) => {
+      // Only called for orphaned scopes (StrictMode double-invoke)
+      // Forget signals from DevTools completely
+      emit.forgetDisposedSignals(() => {
+        tryDispose(scope);
+      });
+    },
+    watchDeps
+  );
 
-  // we return fully scoped object, Typescript will omit the dispose property
-  // why? if users create a scope with some methods and its methods are not binded to the scope, Invoking those methods will throw an error
+  const { result: scope } = controller;
+
+  // Commit on mount, schedule dispose on cleanup
+  useLayoutEffect(() => {
+    controller.commit();
+
+    // Call mount/ready callback after commit
+    const opts = optionsRef.current;
+    (opts?.mount || opts?.ready)?.(scope);
+
+    return () => {
+      // Call cleanup callback
+      optionsRef.current?.cleanup?.(scope);
+      // Call user's dispose callback
+      optionsRef.current?.dispose?.(scope);
+      // Schedule scope disposal (normal disposal - keeps signals in DevTools as "disposed")
+      controller.scheduleDispose(() => {
+        tryDispose(scope);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controller]);
+
+  // Call update callback after render (with optional deps)
+  useLayoutEffect(() => {
+    updateCallback?.(scope);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, updateDeps);
+
   return scope;
 }

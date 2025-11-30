@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { DevToolsPanel } from "rextive/devtools/panel";
 import { TodoInput } from "./components/TodoInput";
 import { TodoList } from "./components/TodoList";
 import { TodoFilters } from "./components/TodoFilters";
@@ -7,6 +6,7 @@ import { SyncControls } from "./components/SyncControls";
 import { ScopeTest } from "./components/ScopeTest";
 import { ErrorDemo } from "./components/ErrorDemo";
 import { CounterDemo } from "./components/CounterDemo";
+import { FormEditor } from "./components/FormEditor";
 import { initializeStore } from "./store/todoStore";
 import "./App.css";
 
@@ -57,6 +57,8 @@ export function App() {
 
         <CounterDemo />
 
+        <FormEditor />
+
         <ScopeTest />
 
         <footer className="app-footer">
@@ -64,8 +66,7 @@ export function App() {
         </footer>
       </main>
 
-      {/* DevTools Panel - only in development */}
-      {import.meta.env.DEV && <DevToolsPanel />}
+      {/* DevTools rendered in separate root - see main.tsx */}
     </div>
   );
 }

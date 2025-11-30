@@ -101,6 +101,13 @@ This document captures all requirements for the DevTools panel. **All new featur
 - [x] Show source location (file:line) if available
 - [x] Show value history (most recent 5 entries with timestamps)
 
+### REQ-021a: Signal Details - Full Display ✨ NEW
+
+- [x] Show full signal name (not truncated, word-break: break-all)
+- [x] Show full stringified signal value in scrollable pre-formatted block
+- [x] Value block is scrollable with max-height 150px
+- [x] Error values shown in red color
+
 ### REQ-022: Signal Actions
 
 - [x] Copy button (📋) - copy JSON value to clipboard
@@ -324,6 +331,10 @@ interface ChainReaction {
 ---
 
 ## Change Log
+
+### 2024-XX-XX - Signal Details Full Display
+
+- Added: REQ-021a - Show full signal name and full value in scrollable details
 
 ### 2024-XX-XX - Chain Reactions Tab ✅ IMPLEMENTED
 

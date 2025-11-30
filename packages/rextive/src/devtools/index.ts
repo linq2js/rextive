@@ -58,11 +58,14 @@ export type {
 // STATE
 // ============================================================================
 
-/** Registry of all tracked signals */
+/** Registry of all tracked signals (keyed by unique ID, not name) */
 const signals = new Map<string, SignalInfo>();
 
-/** Reverse lookup: signal reference → current ID (for rename tracking) */
+/** Reverse lookup: signal reference → unique ID */
 const signalToId = new WeakMap<Signal<any>, string>();
+
+/** Counter for generating unique signal IDs */
+let signalIdCounter = 0;
 
 /** Registry of all tracked tags */
 const tags = new Map<string, TagInfo>();
@@ -323,37 +326,27 @@ function addToChain(signalId: string): void {
 
 const devToolsHooks: DevTools = {
   onSignalCreate(signal: Signal<any>): void {
-    const id = signal.displayName;
+    // Generate unique ID for this signal object
+    const id = `signal-${++signalIdCounter}`;
+    const name = signal.displayName || "unnamed";
     const now = Date.now();
 
-    // If a signal with this ID exists and is disposed, rename the disposed one
-    // to preserve it in the history (e.g., "scopedCount-1" → "scopedCount-1 (disposed)")
-    const existingInfo = signals.get(id);
-    if (existingInfo && existingInfo.disposed) {
-      const disposedId = `${id} (disposed)`;
-      // Check if we already have too many disposed versions
-      let counter = 1;
-      let finalDisposedId = disposedId;
-      while (signals.has(finalDisposedId)) {
-        counter++;
-        finalDisposedId = `${id} (disposed ${counter})`;
-      }
-      existingInfo.id = finalDisposedId;
-      signals.delete(id);
-      signals.set(finalDisposedId, existingInfo);
-    }
-
-    // Check which tags already have this signal registered
+    // Check which tags already have this signal registered by NAME
     // (onTagAdd may have been called before onSignalCreate during initialization)
+    // Update tag's signals set to use unique ID instead of name
     const signalTags = new Set<string>();
     for (const [tagId, tagInfo] of tags) {
-      if (tagInfo.signals.has(id)) {
+      if (tagInfo.signals.has(name)) {
+        // Replace name with unique ID in tag's signals set
+        tagInfo.signals.delete(name);
+        tagInfo.signals.add(id);
         signalTags.add(tagId);
       }
     }
 
     const info: SignalInfo = {
       id,
+      name, // Display name (may not be unique)
       kind: getSignalKind(signal),
       signal,
       createdAt: now,
@@ -368,7 +361,7 @@ const devToolsHooks: DevTools = {
     };
 
     signals.set(id, info);
-    signalToId.set(signal, id); // Track signal → ID mapping
+    signalToId.set(signal, id); // Track signal → unique ID mapping
     emit({ type: "signal:create", signal: info });
   },
 
@@ -396,26 +389,43 @@ const devToolsHooks: DevTools = {
     emit({ type: "signal:dispose", signalId: id });
   },
 
+  onForgetSignals(signalsToForget: Signal<any>[]): void {
+    // Completely remove signals from registry (for orphaned StrictMode scopes)
+    const forgottenIds: string[] = [];
+
+    for (const signal of signalsToForget) {
+      const id = signalToId.get(signal);
+      if (id) {
+        signals.delete(id);
+        signalToId.delete(signal);
+        forgottenIds.push(id);
+      }
+    }
+
+    // Emit event so DevToolsPanel can clean up related events
+    if (forgottenIds.length > 0) {
+      emit({ type: "signals:forget", signalIds: forgottenIds });
+    }
+  },
+
   onSignalRename(signal: Signal<any>): void {
-    // Look up current ID by signal reference
-    const oldId = signalToId.get(signal);
-    const newId = signal.displayName || "unnamed";
+    // Look up by signal reference (ID is unique per object, never changes)
+    const id = signalToId.get(signal);
+    if (!id) return;
 
-    // Skip if signal not tracked or ID unchanged
-    if (!oldId || oldId === newId) return;
-
-    const info = signals.get(oldId);
+    const info = signals.get(id);
     if (!info) return;
 
-    // Update the registry
-    signals.delete(oldId);
-    info.id = newId;
-    signals.set(newId, info);
+    const newName = signal.displayName || "unnamed";
+    const oldName = info.name;
 
-    // Update reverse mapping
-    signalToId.set(signal, newId);
+    // Skip if name unchanged
+    if (oldName === newName) return;
 
-    emit({ type: "signal:rename", oldId, newId });
+    // Update the display name
+    info.name = newName;
+
+    emit({ type: "signal:rename", oldId: oldName, newId: newName });
   },
 
   onSignalChange(signal: Signal<any>, value: unknown): void {
@@ -477,7 +487,9 @@ const devToolsHooks: DevTools = {
     // Always log errors to console for visibility
     if (config.logToConsole) {
       const contextInfo = signalError.context
-        ? ` (${signalError.context.when}${signalError.context.async ? ", async" : ""})`
+        ? ` (${signalError.context.when}${
+            signalError.context.async ? ", async" : ""
+          })`
         : "";
       console.error(
         `[${config.name}] Signal error in "${id}"${contextInfo}:`,
@@ -503,7 +515,8 @@ const devToolsHooks: DevTools = {
 
   onTagAdd(tag: Tag<any>, signal: Signal<any>): void {
     const tagId = tag.displayName;
-    const signalId = signal.displayName || "unnamed";
+    // Use unique ID from WeakMap, fall back to display name if signal not yet tracked
+    const signalId = signalToId.get(signal) || signal.displayName || "unnamed";
 
     const tagInfo = tags.get(tagId);
     if (tagInfo) {
@@ -523,7 +536,8 @@ const devToolsHooks: DevTools = {
 
   onTagRemove(tag: Tag<any>, signal: Signal<any>): void {
     const tagId = tag.displayName;
-    const signalId = signal.displayName || "unnamed";
+    // Use unique ID from WeakMap
+    const signalId = signalToId.get(signal) || signal.displayName || "unnamed";
 
     const tagInfo = tags.get(tagId);
     const signalInfo = signals.get(signalId);
@@ -625,13 +639,20 @@ export function getSignals(): ReadonlyMap<string, SignalInfo> {
 }
 
 /**
- * Get a specific signal by ID.
+ * Get a specific signal by name or ID.
  *
- * @param id - Signal displayName
+ * @param nameOrId - Signal display name or unique ID
  * @returns SignalInfo or undefined
  */
-export function getSignal(id: string): SignalInfo | undefined {
-  return signals.get(id);
+export function getSignal(nameOrId: string): SignalInfo | undefined {
+  // First try exact ID match
+  const byId = signals.get(nameOrId);
+  if (byId) return byId;
+  // Then search by name
+  for (const info of signals.values()) {
+    if (info.name === nameOrId) return info;
+  }
+  return undefined;
 }
 
 /**
@@ -735,15 +756,16 @@ export function getStats(): {
 /**
  * Get current value of all signals as a plain object.
  * Useful for debugging and snapshots.
+ * Keys are signal display names (may have duplicates overwritten).
  */
 export function getSnapshot(): Record<string, unknown> {
   const snapshot: Record<string, unknown> = {};
 
-  for (const [id, info] of signals) {
+  for (const [, info] of signals) {
     try {
-      snapshot[id] = info.signal();
+      snapshot[info.name] = info.signal();
     } catch {
-      snapshot[id] = "[error reading value]";
+      snapshot[info.name] = "[error reading value]";
     }
   }
 

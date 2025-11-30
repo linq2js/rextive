@@ -1987,6 +1987,9 @@ export type DevTools = {
   /** Called when a signal's displayName is updated (e.g., by pipeSignals) */
   onSignalRename?(signal: AnySignal<any>): void;
 
+  /** Called to completely remove signals from registry (for orphaned StrictMode scopes) */
+  onForgetSignals?(signals: AnySignal<any>[]): void;
+
   /** Called when a tag is created */
   onTagCreate?(tag: Tag<any, any>): void;
 

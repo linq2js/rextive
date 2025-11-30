@@ -4,23 +4,23 @@
  */
 
 import { useState } from "react";
-import { signal, rx, useScope } from "rextive/react";
+import { signal, rx, useScope, disposable } from "rextive/react";
 
 // Child component with useScope signals
 function ScopedCounter({ id }: { id: string }) {
   const { count, doubled, increment, decrement } = useScope(() => {
+    console.log("ScopedCounter scope created", id);
     const count = signal(0, { name: `scopedCount-${id}` });
     const doubled = signal({ count }, ({ deps }) => deps.count * 2, {
       name: `scopedDoubled-${id}`,
     });
 
-    return {
+    return disposable({
       count,
       doubled,
       increment: () => count.set((c) => c + 1),
       decrement: () => count.set((c) => c - 1),
-      dispose: [count, doubled],
-    };
+    });
   });
 
   return (
@@ -32,7 +32,15 @@ function ScopedCounter({ id }: { id: string }) {
         marginBottom: "8px",
       }}
     >
-      <div style={{ fontSize: "11px", color: "#a5b4fc", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "1px" }}>
+      <div
+        style={{
+          fontSize: "11px",
+          color: "#a5b4fc",
+          marginBottom: "8px",
+          textTransform: "uppercase",
+          letterSpacing: "1px",
+        }}
+      >
         Instance #{id}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -52,7 +60,8 @@ function ScopedCounter({ id }: { id: string }) {
           −
         </button>
         <span style={{ minWidth: "100px", textAlign: "center", color: "#fff" }}>
-          {rx(count)} <span style={{ color: "#a78bfa" }}>(×2 = {rx(doubled)})</span>
+          {rx(count)}{" "}
+          <span style={{ color: "#a78bfa" }}>(×2 = {rx(doubled)})</span>
         </span>
         <button
           onClick={increment}

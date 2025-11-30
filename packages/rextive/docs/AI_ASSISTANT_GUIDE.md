@@ -294,6 +294,7 @@ rx({ user, posts }, (awaited, loadable) => (
 ### useScope
 
 ```tsx
+// Factory mode with all options
 const scope = useScope(
   () => ({
     signal1: signal(0),
@@ -302,13 +303,27 @@ const scope = useScope(
     dispose: [signal1, signal2], // Explicit disposal
   }),
   {
-    watch: [userId], // Recreate when userId changes
-    onUpdate: [
-      (scope) => scope.signal1.set(value),
-      value, // Re-run when value changes
-    ],
-    onDispose: (scope) => console.log("cleaning up"),
+    // Lifecycle callbacks
+    init: (scope) => {},      // Called when scope is created
+    mount: (scope) => {},     // Called after scope is mounted (alias: ready)
+    update: (scope) => {},    // Called after every render
+    cleanup: (scope) => {},   // Called during cleanup phase
+    dispose: (scope) => {},   // Called when scope is being disposed
+    
+    // Dependencies
+    watch: [userId],          // Recreate when userId changes
   }
+);
+
+// Update with deps - only runs when deps change
+useScope(() => createScope(), {
+  update: [(scope) => scope.signal1.set(value), value],
+});
+
+// Factory with args (type-safe, args become watch deps)
+const { userData } = useScope(
+  (userId, filter) => createUserScope(userId, filter),
+  [userId, filter]
 );
 ```
 

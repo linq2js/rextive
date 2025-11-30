@@ -129,6 +129,45 @@ function TodoList() {
 }
 ```
 
+#### Factory Mode Options
+
+```tsx
+useScope(factory, {
+  // Lifecycle callbacks
+  init: (scope) => {},      // Called when scope is created (before commit)
+  mount: (scope) => {},     // Called after scope is mounted (alias: ready)
+  ready: (scope) => {},     // Alias for mount
+  update: (scope) => {},    // Called after every render
+  cleanup: (scope) => {},   // Called during cleanup phase (before dispose)
+  dispose: (scope) => {},   // Called when scope is being disposed
+  
+  // Dependencies
+  watch: [dep1, dep2],      // Recreate scope when deps change
+});
+```
+
+#### Update with Dependencies
+
+```tsx
+// Run update only when specific deps change
+useScope(factory, {
+  update: [(scope) => scope.refresh(), dep1, dep2],
+});
+```
+
+#### Factory with Args
+
+```tsx
+// Type-safe: args match factory params & become watch deps
+const { userData } = useScope(
+  (userId, filter) => {
+    const userData = signal(fetchUser(userId, filter));
+    return { userData };
+  },
+  [userId, filter] // Args passed to factory & used as watch deps
+);
+```
+
 ### Mode 2: Lifecycle
 
 Track component lifecycle phases:
@@ -139,6 +178,7 @@ function Component() {
     init: () => console.log("Before first render"),
     mount: () => console.log("After first paint"),
     render: () => console.log("Every render"),
+    update: () => console.log("After every render"),
     cleanup: () => console.log("React cleanup"),
     dispose: () => console.log("True unmount"),
   });
@@ -156,6 +196,8 @@ function UserAnalytics({ user }) {
   useScope({
     for: user,
     init: (user) => analytics.track("session-start", user),
+    mount: (user) => startTracking(user),
+    cleanup: (user) => pauseTracking(user),
     dispose: (user) => analytics.track("session-end", user),
   });
 
@@ -168,19 +210,11 @@ function UserAnalytics({ user }) {
 | Phase | When | Runs in StrictMode | Use For |
 |-------|------|-------------------|---------|
 | **init** | Before first render | Once | Signal creation |
-| **mount** | After first paint | Once | DOM measurements |
+| **mount/ready** | After first paint | Once | DOM measurements |
 | **render** | Every render | Every render | Tracking |
+| **update** | After every render | Every render | DOM sync |
 | **cleanup** | React cleanup | 2-3 times | Pause (not final) |
 | **dispose** | True unmount | Once | Final cleanup |
-
-### Options
-
-```tsx
-useScope(factory, {
-  watch: [dep1, dep2], // Recreate when deps change
-  update: [(scope) => scope.refresh(), dep], // Run effect on deps change
-});
-```
 
 ---
 

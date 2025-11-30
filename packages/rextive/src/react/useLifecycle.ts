@@ -100,68 +100,53 @@ export function useLifecycle(
   // Create stable ref object using useState (created once, never recreated)
   // Run init callback during initialization (before first render)
   const [ref] = useState(() => {
-    let currentOptions = options;
+    let phase: LifecyclePhase = "render";
+    let pendingDispose: { target: any; shouldRun: boolean } | null = null;
     let isFirstMount = true;
+    let currentOptions = options;
 
-    // Call init with target if present
+    // Call init with target (runs before first render)
     if (hasTarget) {
       (currentOptions.init as any)?.(target);
     } else {
       (currentOptions.init as VoidFunction)?.();
     }
 
-    let phase: LifecyclePhase = "render";
-    let pendingDispose: { target: any; shouldRun: boolean } | null = null;
-
     const dispose = (targetToDispose: any) => {
       if (phase === "disposed") return;
       phase = "disposed";
 
-      if (hasTarget) {
-        (currentOptions.dispose as any)?.(targetToDispose);
-      } else {
-        (currentOptions.dispose as VoidFunction)?.();
+      try {
+        if (hasTarget) {
+          (currentOptions.dispose as any)?.(targetToDispose);
+        } else {
+          (currentOptions.dispose as VoidFunction)?.();
+        }
+      } catch (error) {
+        console.error("Error in dispose callback:", error);
       }
       tryDispose(targetToDispose);
     };
 
     return {
-      /**
-       * Returns the current lifecycle phase
-       * Allows calling code to dynamically check component state
-       *
-       * @returns Current phase: "render" | "mount" | "cleanup" | "disposed"
-       */
-      getPhase() {
-        return phase;
+      getPhase: () => phase,
+      setPhase: (p: LifecyclePhase) => {
+        phase = p;
       },
-      onRender(nextOptions: InternalLifecycleOptions, nextTarget: any) {
-        currentOptions = nextOptions;
-        phase = "render";
-
-        // Call render with target if present
-        if (hasTarget) {
-          (currentOptions.render as any)?.(nextTarget);
-        } else {
-          (currentOptions.render as VoidFunction)?.();
-        }
+      setOptions: (opts: InternalLifecycleOptions) => {
+        currentOptions = opts;
       },
-      onMount(targetForMount: any) {
-        // If there's a pending dispose for a DIFFERENT target, run it now (target changed)
-        // If it's the SAME target, cancel it (StrictMode remount)
+      onMount(mountTarget: any) {
+        // Handle pending dispose from previous target
         if (pendingDispose) {
-          if (pendingDispose.target === targetForMount) {
+          if (pendingDispose.target === mountTarget) {
             // StrictMode remount: cancel the dispose
             pendingDispose.shouldRun = false;
           } else {
             // Target changed: run dispose for old target synchronously
             if (pendingDispose.shouldRun) {
-              try {
-                dispose(pendingDispose.target);
-                pendingDispose.shouldRun = false; // Prevent double-dispose
-              } catch (error) {
-                console.error("Error in dispose callback:", error);
-              }
+              dispose(pendingDispose.target);
+              pendingDispose.shouldRun = false;
             }
           }
           pendingDispose = null;
@@ -169,25 +154,25 @@ export function useLifecycle(
 
         // Call init for new target (except first mount, already called in useState)
         if (!isFirstMount && hasTarget) {
-          (currentOptions.init as any)?.(targetForMount);
+          (currentOptions.init as any)?.(mountTarget);
         }
         isFirstMount = false;
 
         phase = "mount";
 
-        // Call mount with target if present
+        // Call mount callback
         if (hasTarget) {
-          (currentOptions.mount as any)?.(targetForMount);
+          (currentOptions.mount as any)?.(mountTarget);
         } else {
           (currentOptions.mount as VoidFunction)?.();
         }
 
         // Return cleanup function that captures THIS target
-        const capturedTarget = targetForMount;
+        const capturedTarget = mountTarget;
         return () => {
           phase = "cleanup";
 
-          // Call cleanup with captured target
+          // Call cleanup callback
           if (hasTarget) {
             (currentOptions.cleanup as any)?.(capturedTarget);
           } else {
@@ -196,30 +181,20 @@ export function useLifecycle(
 
           if (currentOptions.dispose) {
             if (dev()) {
-              /**
-               * Defer dispose callback to microtask for StrictMode safety
-               * Use a flag to track if dispose should run (can be canceled if remounting same target)
-               */
+              // Dev mode: defer dispose for StrictMode handling
               const disposeTask = { target: capturedTarget, shouldRun: true };
               pendingDispose = disposeTask;
 
               Promise.resolve().then(() => {
-                if (phase !== "cleanup") {
-                  return;
-                }
                 if (disposeTask.shouldRun) {
-                  try {
-                    dispose(capturedTarget);
-                  } catch (error) {
-                    console.error("Error in dispose callback:", error);
-                  }
+                  dispose(capturedTarget);
                 }
                 if (pendingDispose === disposeTask) {
                   pendingDispose = null;
                 }
               });
             } else {
-              // Production: call dispose synchronously
+              // Production: dispose immediately
               dispose(capturedTarget);
             }
           }
@@ -228,17 +203,16 @@ export function useLifecycle(
     };
   });
 
-  // Update options on every render and call render callback
-  ref.onRender(options, target);
+  // Update options on every render
+  ref.setOptions(options);
+  ref.setPhase("render");
 
-  // Setup mount/cleanup lifecycle
-  // Re-run when target changes (only in object lifecycle mode)
-  useLayoutEffect(
-    () => {
-      return ref.onMount(target);
-    },
-    hasTarget ? [target] : []
-  ); // Re-mount when target changes, or empty deps for component lifecycle
+  // Call render callback
+  if (hasTarget) {
+    (options.render as any)?.(target);
+  } else {
+    (options.render as VoidFunction)?.();
+  }
 
   // Parse update callback and deps
   const updateCallback = Array.isArray(options.update)
@@ -247,6 +221,15 @@ export function useLifecycle(
   const updateDeps = Array.isArray(options.update)
     ? options.update.slice(1)
     : undefined;
+
+  // Setup mount/cleanup lifecycle
+  // Re-run when target changes (only in object lifecycle mode)
+  useLayoutEffect(
+    () => {
+      return ref.onMount(target);
+    },
+    hasTarget ? [target] : []
+  );
 
   // Call update callback after render (with optional deps)
   useLayoutEffect(() => {
@@ -257,17 +240,7 @@ export function useLifecycle(
         (updateCallback as VoidFunction)();
       }
     }
-  }, updateDeps); // No deps = every render, with deps = when deps change
+  }, updateDeps);
 
-  /**
-   * Return getPhase function for dynamic phase inspection
-   *
-   * This allows calling code to check component state at any time:
-   * - Guard async operations (prevent setState after unmount)
-   * - Conditional logic based on lifecycle phase
-   * - Debugging and logging
-   *
-   * @returns Function that returns current phase when called
-   */
   return ref.getPhase;
 }

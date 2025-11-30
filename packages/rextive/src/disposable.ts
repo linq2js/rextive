@@ -190,7 +190,7 @@ export function disposable<
     for (let i = serviceEntries.length - 1; i >= 0; i--) {
       const [key, service] = serviceEntries[i];
 
-      if (!service || typeof service !== "object") continue;
+      if (!service) continue;
 
       try {
         tryDispose(service);
@@ -349,22 +349,28 @@ export const noop: VoidFunction = () => {};
  * ```
  */
 export function tryDispose(disposable: unknown) {
-  if (
-    (typeof disposable === "object" || typeof disposable === "function") &&
-    disposable &&
-    "dispose" in disposable
-  ) {
-    if (typeof disposable.dispose === "function") {
-      // Pattern: { dispose(): void }
-      disposable.dispose();
-    } else if (Array.isArray(disposable.dispose)) {
-      // Pattern: { dispose: Disposable[] }
-      for (const item of disposable.dispose) {
-        tryDispose(item);
+  const disposedObjects = new Set<object>();
+  const dispose = (d: unknown) => {
+    if (
+      (typeof d === "object" || typeof d === "function") &&
+      d &&
+      "dispose" in d
+    ) {
+      if (typeof d.dispose === "function") {
+        // Pattern: { dispose(): void }
+        d.dispose();
+        disposedObjects.add(d);
+      } else if (Array.isArray(d.dispose)) {
+        // Pattern: { dispose: Disposable[] }
+        for (const item of d.dispose) {
+          dispose(item);
+        }
+      } else {
+        // Pattern: { dispose: Disposable }
+        dispose(d.dispose);
       }
-    } else {
-      // Pattern: { dispose: Disposable }
-      tryDispose(disposable.dispose);
     }
-  }
+  };
+  dispose(disposable);
+  return Array.from(disposedObjects);
 }
