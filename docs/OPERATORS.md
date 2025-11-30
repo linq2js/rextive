@@ -3,7 +3,7 @@
 Operators are composable, reusable functions for transforming signals. Import from `rextive/op`:
 
 ```tsx
-import { to, filter, scan, focus, debounce, throttle, pace } from "rextive/op";
+import { to, filter, scan, focus, lens, debounce, throttle, pace } from "rextive/op";
 ```
 
 ---
@@ -249,6 +249,104 @@ name.set("X"); // silently fails, calls onError if provided
 
 ---
 
+## `focus.lens()` - Lightweight Getter/Setter
+
+Create a lightweight `[getter, setter]` tuple without creating a reactive signal. Perfect for on-demand read/write operations.
+
+### Basic Usage
+
+```tsx
+import { focus } from "rextive/op";
+
+const form = signal({
+  user: { name: "John", age: 30 },
+});
+
+// Create lens - returns [getter, setter] tuple
+const [getName, setName] = focus.lens(form, "user.name");
+
+// Read
+console.log(getName()); // "John"
+
+// Write
+setName("Jane");
+console.log(form().user.name); // "Jane"
+
+// Updater function
+setName((prev) => prev.toUpperCase());
+console.log(getName()); // "JANE"
+```
+
+### With Fallback
+
+```tsx
+const user = signal<{ nickname?: string }>({});
+
+const [getNickname, setNickname] = focus.lens(
+  user,
+  "nickname",
+  () => "Anonymous"
+);
+
+console.log(getNickname()); // "Anonymous"
+
+setNickname("Ali");
+console.log(user().nickname); // "Ali"
+```
+
+### Composable - Lens from Lens
+
+Lenses can be composed from other lenses:
+
+```tsx
+const form = signal({
+  contacts: [
+    { name: "John", address: { city: "NYC" } },
+  ],
+});
+
+// Chain of lenses
+const contactsLens = focus.lens(form, "contacts");
+const firstContactLens = focus.lens(contactsLens, "0");
+const addressLens = focus.lens(firstContactLens, "address");
+const [getCity, setCity] = focus.lens(addressLens, "city");
+
+console.log(getCity()); // "NYC"
+setCity("LA");
+console.log(form().contacts[0].address.city); // "LA"
+```
+
+### Standalone Import
+
+```tsx
+import { lens, type Lens } from "rextive/op";
+
+const [getValue, setValue] = lens(signal, "path");
+```
+
+### focus() vs focus.lens()
+
+| Feature | `focus()` | `focus.lens()` |
+|---------|-----------|----------------|
+| Returns | `Mutable<T>` signal | `[getter, setter]` tuple |
+| Reactive | ✅ Auto-updates when source changes | ❌ On-demand only |
+| Subscribable | ✅ `.on()` for changes | ❌ No subscriptions |
+| Use case | Reactive UI bindings | Form handlers, one-off updates |
+| Overhead | Creates signal + subscription | Minimal (just functions) |
+
+**Use `focus()` when:**
+- You need reactive updates in UI
+- You want to subscribe to changes
+- You need a signal to pass around
+
+**Use `focus.lens()` when:**
+- You just need to get/set values
+- You don't need reactivity
+- You want minimal overhead
+- In event handlers or callbacks
+
+---
+
 ## `debounce()` - Debounce Updates
 
 Wait for a pause before emitting:
@@ -369,9 +467,14 @@ filter<T>(predicate: (value: T) => boolean, options?): Operator<T, T>
 
 scan<T, U>(fn: (acc: U, value: T) => U, initial: U, options?): Operator<T, U>
 
-// focus overloads
+// focus - creates reactive signal
 focus<T, P>(path: P, options?): Operator<Mutable<T>, Mutable<PathValue<T, P>>>
 focus<T, P, F>(path: P, fallback: () => F, options?): Operator<Mutable<T>, Mutable<F>>
+
+// focus.lens - lightweight getter/setter (no signal created)
+focus.lens<T, P>(source: Mutable<T>, path: P, fallback?): Lens<PathValue<T, P>>
+focus.lens<T, P>(source: Lens<T>, path: P, fallback?): Lens<PathValue<T, P>>
+// Lens<T> = [() => T, (value: T | ((prev: T) => T)) => void]
 
 debounce<T>(ms: number, options?): Operator<T, T>
 

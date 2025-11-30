@@ -365,3 +365,124 @@ export function focus<T extends object, P extends Path<T>>(
     return inner;
   };
 }
+
+// ============================================================================
+// LENS - Lightweight getter/setter without creating a signal
+// ============================================================================
+
+/**
+ * A lens is a getter/setter tuple for accessing nested data.
+ * Unlike focus(), lens() doesn't create a reactive signal - just on-demand read/write.
+ *
+ * @template T - The value type
+ */
+export type Lens<T> = [
+  /** Get the current value */
+  () => T,
+  /** Set a new value (supports updater function) */
+  (value: T | ((prev: T) => T)) => void
+];
+
+/**
+ * Type guard to check if a value is a Lens tuple
+ */
+function isLens<T>(value: unknown): value is Lens<T> {
+  return (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    typeof value[0] === "function" &&
+    typeof value[1] === "function"
+  );
+}
+
+/**
+ * Create a lightweight lens (getter/setter) for a path in a signal or another lens.
+ * Unlike focus(), this doesn't create a reactive signal - just on-demand read/write.
+ *
+ * @example From a signal
+ * ```ts
+ * const [getFirstName, setFirstName] = focus.lens(formData, "contacts.0.firstName");
+ * console.log(getFirstName()); // "John"
+ * setFirstName("Jane");
+ * setFirstName(prev => prev.toUpperCase());
+ * ```
+ *
+ * @example Composable - lens from another lens
+ * ```ts
+ * const contactsLens = focus.lens(formData, "contacts");
+ * const firstContactLens = focus.lens(contactsLens, "0");
+ * const [getFirstName, setFirstName] = focus.lens(firstContactLens, "firstName");
+ * ```
+ *
+ * @example With fallback
+ * ```ts
+ * const [getNickname, setNickname] = focus.lens(user, "nickname", () => "Anonymous");
+ * ```
+ */
+
+// Overload 1: From Mutable signal
+export function lens<T extends object, P extends Path<T>>(
+  source: Mutable<T>,
+  path: P,
+  fallback?: () => PathValue<T, P>
+): Lens<PathValue<T, P>>;
+
+// Overload 2: From another Lens
+export function lens<T extends object, P extends Path<T>>(
+  source: Lens<T>,
+  path: P,
+  fallback?: () => PathValue<T, P>
+): Lens<PathValue<T, P>>;
+
+// Implementation
+export function lens<T extends object, P extends Path<T>>(
+  source: Mutable<T> | Lens<T>,
+  path: P,
+  fallback?: () => PathValue<T, P>
+): Lens<PathValue<T, P>> {
+  type V = PathValue<T, P>;
+
+  // Memoize fallback if provided
+  const getFallbackValue = fallback ? memoize(fallback) : undefined;
+
+  // Determine if source is a lens or a mutable signal
+  const isSourceLens = isLens(source);
+
+  const getter = (): V => {
+    const rootValue = isSourceLens ? source[0]() : (source as Mutable<T>)();
+    const value = get(rootValue, path as string) as V | null | undefined;
+
+    // Return fallback if value is nullish
+    if ((value === null || value === undefined) && getFallbackValue) {
+      return getFallbackValue();
+    }
+
+    return value as V;
+  };
+
+  const setter = (valueOrUpdater: V | ((prev: V) => V)): void => {
+    const currentValue = getter();
+    const newValue =
+      typeof valueOrUpdater === "function"
+        ? (valueOrUpdater as (prev: V) => V)(currentValue)
+        : valueOrUpdater;
+
+    if (isSourceLens) {
+      // Update through parent lens
+      source[1]((root: T) => setAtPath(root, path, newValue));
+    } else {
+      // Update signal directly
+      (source as Mutable<T>).set((root: T) => setAtPath(root, path, newValue));
+    }
+  };
+
+  return [getter, setter];
+}
+
+// Declare the static lens property on focus function
+export namespace focus {
+  export const lens: typeof import("./focus").lens = undefined as any;
+}
+
+// Attach lens as a static method on focus for convenient access
+(focus as any).lens = lens;

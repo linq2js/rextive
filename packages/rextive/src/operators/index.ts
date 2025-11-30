@@ -13,7 +13,7 @@ export { resolveSelectors, resolveSelectorsRequired } from "./resolveSelectors";
 export { to, type ToOperatorOptions } from "./to";
 export { scan } from "./scan";
 export { filter } from "./filter";
-export { focus } from "./focus";
+export { focus, lens, type Lens } from "./focus";
 export type {
   FocusOptions,
   FocusBaseOptions,
