@@ -259,6 +259,33 @@ formTag.map((s) => s.get());       // Collect values
 formTag.size;                       // Count
 ```
 
+#### Tag Batch Methods
+
+Perform operations on all signals in a tag:
+
+```tsx
+const dataTag = signal.tag();
+
+// Force recomputation on all signals
+dataTag.refreshAll();
+
+// Reset all mutable signals to initial values
+dataTag.resetAll();
+
+// Mark all computed signals as stale (lazy recompute)
+dataTag.staleAll();
+
+// Dispose all signals (destructive!)
+dataTag.disposeAll();
+```
+
+| Method | Description | Affects |
+|--------|-------------|---------|
+| `refreshAll()` | Force immediate recomputation | All signals |
+| `resetAll()` | Reset to initial values | Mutable signals only |
+| `staleAll()` | Mark for lazy recompute | Computed signals only |
+| `disposeAll()` | Dispose all signals | All signals |
+
 ### `signal.from(signals)`
 
 Combine signals:

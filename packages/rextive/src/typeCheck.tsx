@@ -20,7 +20,31 @@ import { wait, type Awaitable, type AwaitedFromAwaitable } from "./wait";
 import { awaited } from "./awaited";
 import { compose } from "./utils/compose";
 // Operators imported when needed for type checking
-import { to } from "./operators";
+import {
+  to,
+  skip,
+  skipWhile,
+  skipLast,
+  skipUntil,
+  take,
+  takeWhile,
+  takeLast,
+  takeUntil,
+  count,
+  max,
+  min,
+  distinct,
+  filter,
+  scan,
+  debounce,
+  throttle,
+  delay,
+  type OperatorNameOptions,
+  type DistinctOptions,
+  type CountOptions,
+  type MinMaxOptions,
+  type TakeWhileOptions,
+} from "./operators";
 import type {
   Signal,
   Mutable,
@@ -2806,11 +2830,10 @@ function focusOperatorTests() {
   const firstItemText = form.pipe(focus("items.0.text"));
   expectType<Mutable<string>>(firstItemText);
 
-  // Options should work
+  // Options should work (without fallback)
   const userNameWithOptions = user.pipe(
     focus("name", {
       equals: "shallow",
-      fallback: () => "default",
       name: "userName",
       get: (v) => v.toUpperCase(),
       set: (v) => v.trim(),
@@ -2819,6 +2842,63 @@ function focusOperatorTests() {
     })
   );
   expectType<Mutable<string>>(userNameWithOptions);
+
+  // -----------------------------------------------------------------------------
+  // Focus overload tests - with/without fallback
+  // -----------------------------------------------------------------------------
+
+  // Type with optional property
+  type UserWithOptional = {
+    name: string;
+    nickname?: string;
+    address?: {
+      street: string;
+      city: string;
+    };
+  };
+
+  const userOptional = signal<UserWithOptional>({
+    name: "Alice",
+  });
+
+  // Without fallback - type includes undefined from optional property
+  const nickname = userOptional.pipe(focus("nickname"));
+  expectType<Mutable<string | undefined>>(nickname);
+
+  // With fallback (factory function) - type is guaranteed non-nullable
+  const nicknameWithFallback = userOptional.pipe(
+    focus("nickname", () => "Anonymous")
+  );
+  expectType<Mutable<string>>(nicknameWithFallback);
+
+  // Nested optional path without fallback
+  const street = userOptional.pipe(focus("address.street" as any));
+  // Note: Due to path typing limitations, this is `any` but in practice would be string | undefined
+
+  // Nested optional path with fallback
+  const streetWithFallback = userOptional.pipe(
+    focus("address.street" as any, () => "Unknown")
+  );
+
+  // Non-optional property - both overloads work the same
+  const name1 = userOptional.pipe(focus("name"));
+  expectType<Mutable<string>>(name1);
+
+  const name2 = userOptional.pipe(focus("name", () => "Default"));
+  expectType<Mutable<string>>(name2);
+
+  // Fallback with options
+  const nicknameAllOptions = userOptional.pipe(
+    focus("nickname", () => "Guest", {
+      equals: "strict",
+      name: "userNickname",
+      get: (v) => v.toUpperCase(),
+      set: (v) => v.trim(),
+      validate: (v) => v.length > 0,
+      onError: (e) => console.error(e),
+    })
+  );
+  expectType<Mutable<string>>(nicknameAllOptions);
 
   // Should have disposed() method
   expectType<() => boolean>(user.disposed);
@@ -2841,7 +2921,14 @@ function focusOperatorTests() {
     firstItemId,
     firstItemText,
     userNameWithOptions,
-    doubled;
+    doubled,
+    nickname,
+    nicknameWithFallback,
+    street,
+    streetWithFallback,
+    name1,
+    name2,
+    nicknameAllOptions;
 }
 
 // =============================================================================
@@ -3145,14 +3232,14 @@ function signalWhenTests() {
   // Reducer with complex type
   const updateUser = signal<Partial<User>>({});
   const userWithReducer = userSignal.when(updateUser, (self, n) => {
-    expectType<Mutable<User | null, null>>(self);
+    expectType<Mutable<User | null>>(self);
     expectType<Mutable<Partial<User>>>(n);
     const current = self();
     const updates = n();
     if (!current) return null;
     return { ...current, ...updates };
   });
-  expectType<Mutable<User | null, null>>(userWithReducer);
+  expectType<Mutable<User | null>>(userWithReducer);
 
   // -----------------------------------------------------------------------------
   // Test 15: Filter function return type must be boolean
@@ -3217,7 +3304,11 @@ function signalWhenTests() {
   // Test 19: AnySignal as notifier
   // -----------------------------------------------------------------------------
 
-  function setupWhen<T>(s: Mutable<T>, n: AnySignal<number>, action: MutableWhenAction) {
+  function setupWhen<T>(
+    s: Mutable<T>,
+    n: AnySignal<number>,
+    action: MutableWhenAction
+  ) {
     return s.when(n, action);
   }
 
@@ -3269,6 +3360,292 @@ function signalWhenTests() {
     withEmptyArray;
 }
 
+// =============================================================================
+// OPERATOR OPTIONS TYPE CHECKS
+// =============================================================================
+
+function operatorOptionsTests() {
+  const source = signal(0);
+  const strSource = signal("hello");
+  const objSource = signal({ id: 1, name: "Alice" });
+
+  // -----------------------------------------------------------------------------
+  // Test 1: OperatorNameOptions interface
+  // -----------------------------------------------------------------------------
+
+  const nameOpts: OperatorNameOptions = { name: "custom" };
+  const emptyOpts: OperatorNameOptions = {};
+  void nameOpts, emptyOpts;
+
+  // -----------------------------------------------------------------------------
+  // Test 2: skip operators with options - verify options are accepted
+  // -----------------------------------------------------------------------------
+
+  // skip with name option
+  const skipped = skip<number>(2, { name: "skipFirst2" })(source);
+  expectType<Computed<number>>(skipped);
+
+  // skipWhile with name option
+  const skippedWhile = skipWhile<number>((x) => x < 5, { name: "skipSmall" })(
+    source
+  );
+  expectType<Computed<number>>(skippedWhile);
+
+  // skipLast with name option
+  const skippedLast = skipLast<number>(2, { name: "skipLast2" })(source);
+  expectType<Computed<number | undefined>>(skippedLast);
+
+  // skipUntil with name option
+  const trigger = signal(false);
+  const skippedUntil = skipUntil<number>(trigger, { name: "skipUntilReady" })(
+    source
+  );
+  expectType<Computed<number>>(skippedUntil);
+
+  // -----------------------------------------------------------------------------
+  // Test 3: take operators with options
+  // -----------------------------------------------------------------------------
+
+  // take with name option
+  const taken = take<number>(3, { name: "takeFirst3" })(source);
+  expectType<Computed<number>>(taken);
+
+  // takeWhile with options (extends OperatorNameOptions)
+  const takeWhileOpts: TakeWhileOptions = {
+    inclusive: true,
+    name: "takeSmall",
+  };
+  void takeWhileOpts;
+
+  const takenWhile = takeWhile<number>((x) => x < 5, {
+    inclusive: true,
+    name: "takeSmall",
+  })(source);
+  expectType<Computed<number>>(takenWhile);
+
+  // takeLast with name option
+  const takenLast = takeLast<number>(3, { name: "takeLast3" })(source);
+  expectType<Computed<number[]>>(takenLast);
+
+  // takeUntil with name option
+  const takenUntil = takeUntil<number>(trigger, { name: "takeUntilStop" })(
+    source
+  );
+  expectType<Computed<number>>(takenUntil);
+
+  // -----------------------------------------------------------------------------
+  // Test 4: count operator with options
+  // -----------------------------------------------------------------------------
+
+  const countOpts: CountOptions = { predicate: (x) => x > 0, name: "positive" };
+  void countOpts;
+
+  // count without predicate
+  const counted = count<number>()(source);
+  expectType<Computed<number>>(counted);
+
+  // count with predicate and name
+  const countedWithPred = count<number>({
+    predicate: (x) => x % 2 === 0,
+    name: "evenCount",
+  })(source);
+  expectType<Computed<number>>(countedWithPred);
+
+  // -----------------------------------------------------------------------------
+  // Test 5: min/max operators with options
+  // -----------------------------------------------------------------------------
+
+  const minMaxOpts: MinMaxOptions<number> = {
+    comparer: (a, b) => a - b,
+    name: "custom",
+  };
+  void minMaxOpts;
+
+  // max with name option
+  const maxVal = max<number>({ name: "maximum" })(source);
+  expectType<Computed<number>>(maxVal);
+
+  // max with comparer and name (type matches source)
+  type ObjType = { id: number; name: string };
+  const maxObj = max<ObjType>({
+    comparer: (a, b) => a.id - b.id,
+    name: "maxById",
+  })(objSource);
+  expectType<Computed<ObjType>>(maxObj);
+
+  // min with name option
+  const minVal = min<number>({ name: "minimum" })(source);
+  expectType<Computed<number>>(minVal);
+
+  // min with comparer and name
+  const minObj = min<ObjType>({
+    comparer: (a, b) => a.id - b.id,
+    name: "minById",
+  })(objSource);
+  expectType<Computed<ObjType>>(minObj);
+
+  // -----------------------------------------------------------------------------
+  // Test 6: distinct operator with unified options
+  // -----------------------------------------------------------------------------
+
+  const distinctOpts: DistinctOptions<number> = {
+    mode: "consecutive",
+    name: "unique",
+  };
+  void distinctOpts;
+
+  // distinct consecutive mode (default)
+  const distinctConsec = distinct<number>()(source);
+  expectType<Computed<number>>(distinctConsec);
+
+  // distinct all mode
+  const distinctAll = distinct<number>({ mode: "all", name: "allUnique" })(
+    source
+  );
+  expectType<Computed<number>>(distinctAll);
+
+  // distinct with getKey
+  const distinctByKey = distinct<ObjType, number>({
+    getKey: (x) => x.id,
+    name: "uniqueById",
+  })(objSource);
+  expectType<Computed<ObjType>>(distinctByKey);
+
+  // distinct with equals
+  const distinctWithEquals = distinct<number>({
+    equals: (a, b) => a === b,
+    name: "customEquals",
+  })(source);
+  expectType<Computed<number>>(distinctWithEquals);
+
+  // -----------------------------------------------------------------------------
+  // Test 7: filter operator with SignalOptions (includes name)
+  // -----------------------------------------------------------------------------
+
+  const filtered = filter<number>((x) => x > 0, { name: "positive" })(source);
+  expectType<Computed<number>>(filtered);
+
+  // filter with equality string
+  const filteredShallow = filter<number>((x) => x > 0, "shallow")(source);
+  expectType<Computed<number>>(filteredShallow);
+
+  // -----------------------------------------------------------------------------
+  // Test 8: scan operator with SignalOptions (includes name)
+  // -----------------------------------------------------------------------------
+
+  const scanned = scan<number, number>((acc, curr) => acc + curr, 0, {
+    name: "sum",
+  })(source);
+  expectType<Computed<number>>(scanned);
+
+  // scan with equality string
+  const scannedShallow = scan<number, number>(
+    (acc, curr) => acc + curr,
+    0,
+    "shallow"
+  )(source);
+  expectType<Computed<number>>(scannedShallow);
+
+  // -----------------------------------------------------------------------------
+  // Test 9: to operator with name in options
+  // -----------------------------------------------------------------------------
+
+  const transformed = to<number, number>((x) => x * 2, { name: "doubled" })(
+    source
+  );
+  expectType<Computed<number>>(transformed);
+
+  // to with chained selectors and name
+  const chained = to<number, number, string>(
+    (x) => x * 2,
+    (x) => `Value: ${x}`,
+    { name: "chainedTransform" }
+  )(source);
+  expectType<Computed<string>>(chained);
+
+  // -----------------------------------------------------------------------------
+  // Test 10: debounce/throttle/delay with SignalOptions
+  // -----------------------------------------------------------------------------
+
+  const debounced = debounce<string>(300, { name: "debouncedSearch" })(
+    strSource
+  );
+  expectType<Computed<string>>(debounced);
+
+  const throttled = throttle<number>(100, { name: "throttledScroll" })(source);
+  expectType<Computed<number>>(throttled);
+
+  const delayed = delay<number>(500, { name: "delayedValue" })(source);
+  expectType<Computed<number>>(delayed);
+
+  // -----------------------------------------------------------------------------
+  // Test 11: Verify options types are correct
+  // -----------------------------------------------------------------------------
+
+  // OperatorNameOptions only requires name
+  const justName: OperatorNameOptions = { name: "test" };
+
+  // TakeWhileOptions extends OperatorNameOptions
+  const takeWhileAllOpts: TakeWhileOptions = {
+    inclusive: true,
+    name: "takeOpts",
+  };
+
+  // CountOptions extends OperatorNameOptions
+  const countAllOpts: CountOptions = {
+    predicate: () => true,
+    name: "countOpts",
+  };
+
+  // MinMaxOptions extends OperatorNameOptions
+  const minMaxAllOpts: MinMaxOptions<number> = {
+    comparer: (a, b) => a - b,
+    name: "minMaxOpts",
+  };
+
+  // DistinctOptions extends OperatorNameOptions
+  const distinctAllOpts: DistinctOptions<number> = {
+    mode: "all",
+    getKey: (x) => x,
+    equals: (a, b) => a === b,
+    name: "distinctOpts",
+  };
+
+  void justName, takeWhileAllOpts, countAllOpts, minMaxAllOpts, distinctAllOpts;
+
+  // -----------------------------------------------------------------------------
+  // Cleanup - suppress unused variable warnings
+  // -----------------------------------------------------------------------------
+
+  void skipped,
+    skippedWhile,
+    skippedLast,
+    skippedUntil,
+    taken,
+    takenWhile,
+    takenLast,
+    takenUntil,
+    counted,
+    countedWithPred,
+    maxVal,
+    maxObj,
+    minVal,
+    minObj,
+    distinctConsec,
+    distinctAll,
+    distinctByKey,
+    distinctWithEquals,
+    filtered,
+    filteredShallow,
+    scanned,
+    scannedShallow,
+    transformed,
+    chained,
+    debounced,
+    throttled,
+    delayed;
+}
+
 export {
   signalTests,
   loadableTests,
@@ -3287,4 +3664,22 @@ export {
   focusOperatorTests,
   signalFromTests,
   signalWhenTests,
+  operatorOptionsTests,
 };
+
+// =============================================================================
+// PathValue with optional/nullable properties tests
+// =============================================================================
+
+type OptionalPropsTest = {
+  user?: { name: string };
+  items?: [{ name?: string } | undefined | null];
+};
+
+// PathValue should include undefined for optional parent property
+type OptionalUserName = PathValue<OptionalPropsTest, "user.name">;
+expectType<OptionalUserName>("" as string | undefined);
+
+// PathValue should include undefined and null for nullable array items
+type NullableItemName = PathValue<OptionalPropsTest, "items.0.name">;
+expectType<NullableItemName>("" as string | undefined | null);

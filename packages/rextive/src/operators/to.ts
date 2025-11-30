@@ -5,12 +5,13 @@
  * with SignalContext available as second argument.
  */
 
-import type { Signal, Computed, Selector } from "../types";
+import type { Signal, Computed, Selector, SignalOptions } from "../types";
 import { signal } from "../signal";
 import {
   resolveSelectorsRequired,
   type SelectorOptions,
 } from "./resolveSelectors";
+import { autoPrefix } from "../utils/nameGenerator";
 
 /**
  * Options for to operator
@@ -196,11 +197,15 @@ export function to(
   const [selector, options] = resolveSelectorsRequired([first, ...rest]);
 
   return (source: Signal<any>) => {
+    const signalOptions: SignalOptions<any> = {
+      ...options,
+      name: options.name ?? autoPrefix(`to(${source.displayName})`),
+    };
+
     return signal(
       { source: source as any },
       (ctx: any) => selector(ctx.deps.source, ctx),
-      options
+      signalOptions
     );
   };
 }
-

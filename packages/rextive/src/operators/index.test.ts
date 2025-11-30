@@ -150,6 +150,13 @@ describe("operators", () => {
   });
 
   describe("scan", () => {
+    it("should use custom name when provided", () => {
+      const count = signal(1);
+      const sum = count.pipe(scan((acc, curr) => acc + curr, 0, { name: "customSum" }));
+
+      expect(sum.displayName).toMatch(/^#customSum-\d+$/);
+    });
+
     it("should accumulate values", () => {
       const count = signal(1);
       const sum = count.pipe(scan((acc, curr) => acc + curr, 0));
@@ -208,6 +215,13 @@ describe("operators", () => {
   });
 
   describe("filter", () => {
+    it("should use custom name when provided", () => {
+      const count = signal(1);
+      const filtered = count.pipe(filter((x) => x > 0, { name: "customFilter" }));
+
+      expect(filtered.displayName).toMatch(/^#customFilter-\d+$/);
+    });
+
     it("should filter values based on predicate", () => {
       const count = signal(1);
       const evenOnly = count.pipe(filter((x) => x % 2 === 0));

@@ -110,33 +110,141 @@ const lastThree = count.pipe(
 
 ---
 
-## `focus()` - Deep Object Access
+## `focus()` - Bidirectional Lens for Nested Properties
 
-Safely access deeply nested properties:
+Create a **bidirectional** mutable signal that reads and writes to a nested path.
+
+### Basic Usage
 
 ```tsx
-const user = signal({
-  profile: {
-    name: { first: "John", last: "Doe" },
-    address: { city: "NYC" },
-  },
+const form = signal({
+  user: { name: "Alice", age: 30 },
 });
 
-// Access nested properties
-const firstName = user.pipe(focus("profile", "name", "first"));
-console.log(firstName()); // "John"
+// Create focused signal with dot-notation path
+const userName = form.pipe(focus("user.name"));
 
-// Updates when source changes
-user.set({
-  profile: {
-    name: { first: "Jane", last: "Doe" },
-    address: { city: "LA" },
-  },
-});
-console.log(firstName()); // "Jane"
+// Read
+console.log(userName()); // "Alice"
 
-// Deep nesting
-const city = user.pipe(focus("profile", "address", "city"));
+// Write - updates source immutably
+userName.set("Bob");
+console.log(form().user.name); // "Bob"
+
+// Sync both ways
+form.set({ user: { name: "Charlie", age: 25 } });
+console.log(userName()); // "Charlie"
+```
+
+### With Fallback (for Optional Properties)
+
+When the path value is `null` or `undefined`, use a fallback:
+
+```tsx
+type User = {
+  name: string;
+  nickname?: string;
+  settings?: { theme: string };
+};
+
+const user = signal<User>({ name: "Alice" });
+
+// Without fallback - type is `string | undefined`
+const nickname = user.pipe(focus("nickname"));
+console.log(nickname()); // undefined
+
+// With fallback - type is `string` (guaranteed non-nullable)
+const nicknameWithDefault = user.pipe(focus("nickname", () => "Guest"));
+console.log(nicknameWithDefault()); // "Guest"
+
+// Set updates the source
+nicknameWithDefault.set("Ali");
+console.log(user().nickname); // "Ali"
+```
+
+**Fallback behaviors:**
+- Called only for `null` or `undefined` values
+- **Memoized** - factory called only once
+- `0`, `""`, `false` are NOT nullish (no fallback used)
+
+### With Options
+
+```tsx
+const form = signal({ price: 100 });
+
+const price = form.pipe(
+  focus("price", {
+    equals: "shallow",     // Equality comparison
+    name: "formPrice",     // Debug name
+
+    // Transform on read (applied to both source and fallback)
+    get: (value) => value * 1.1,
+
+    // Transform on write
+    set: (value, ctx) => Math.round(value / 1.1),
+
+    // Validation
+    validate: (value, ctx) => {
+      if (value < 0) throw new Error("Cannot be negative");
+      return true;
+    },
+
+    // Error handling
+    onError: (error, ctx) => console.error(error),
+  })
+);
+```
+
+### Combining Fallback with Options
+
+```tsx
+// fallback as second arg, options as third
+const theme = user.pipe(
+  focus("settings.theme", () => "light", {
+    get: (v) => v.toUpperCase(),
+    name: "userTheme",
+  })
+);
+```
+
+### Overloads
+
+```tsx
+// Without fallback - may return undefined
+focus(path)
+focus(path, options)
+// → Mutable<PathValue<T, P>>
+
+// With fallback - guaranteed non-nullable
+focus(path, fallback)
+focus(path, fallback, options)
+// → Mutable<F> where F = ReturnType<fallback>
+```
+
+### FocusOptions<T>
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `equals` | `"strict" \| "shallow" \| "deep" \| EqualsFn<T>` | Equality comparison |
+| `name` | `string` | Debug name for devtools |
+| `get` | `(value: T) => T` | Transform on read |
+| `set` | `(value: T, ctx: FocusContext<T>) => T` | Transform on write |
+| `validate` | `(value: T, ctx: FocusContext<T>) => boolean` | Validate before write |
+| `onError` | `(error, ctx?) => void` | Error handler |
+
+### Disposal
+
+Focused signals perform **lazy disposal** when source is disposed:
+
+```tsx
+const source = signal({ name: "Alice" });
+const name = source.pipe(focus("name"));
+
+source.dispose();
+// name is not immediately disposed
+
+name();        // throws DisposedError, then disposes itself
+name.set("X"); // silently fails, calls onError if provided
 ```
 
 ---
@@ -255,19 +363,21 @@ const createPositiveDoubleSum = (source: Signal<number>) => {
 ## Operator Signatures
 
 ```tsx
-to<T, U>(fn: (value: T) => U, equals?): Operator<T, U>
+to<T, U>(fn: (value: T) => U, options?): Operator<T, U>
 
-filter<T>(predicate: (value: T) => boolean, equals?): Operator<T, T>
+filter<T>(predicate: (value: T) => boolean, options?): Operator<T, T>
 
-scan<T, U>(fn: (acc: U, value: T) => U, initial: U, equals?): Operator<T, U>
+scan<T, U>(fn: (acc: U, value: T) => U, initial: U, options?): Operator<T, U>
 
-focus<T, K1, K2, ...>(...keys: [K1, K2, ...]): Operator<T, DeepValue>
+// focus overloads
+focus<T, P>(path: P, options?): Operator<Mutable<T>, Mutable<PathValue<T, P>>>
+focus<T, P, F>(path: P, fallback: () => F, options?): Operator<Mutable<T>, Mutable<F>>
 
-debounce<T>(ms: number): Operator<T, T>
+debounce<T>(ms: number, options?): Operator<T, T>
 
-throttle<T>(ms: number): Operator<T, T>
+throttle<T>(ms: number, options?): Operator<T, T>
 
-pace<T>(ms: number): Operator<T, T>
+pace<T>(ms: number, options?): Operator<T, T>
 ```
 
 ---
@@ -276,5 +386,4 @@ pace<T>(ms: number): Operator<T, T>
 
 - **[Examples](./EXAMPLES.md)** - Real-world examples using operators
 - **[API Reference](./API_REFERENCE.md)** - Complete API documentation
-
 

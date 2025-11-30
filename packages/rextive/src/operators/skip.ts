@@ -1,6 +1,6 @@
 import { signal } from "../signal";
 import type { Signal, Computed } from "../types";
-import type { Operator } from "./types";
+import type { Operator, OperatorNameOptions } from "./types";
 import { autoPrefix } from "../utils/nameGenerator";
 import { wrapDispose } from "../disposable";
 import { emitter } from "../utils/emitter";
@@ -10,6 +10,7 @@ import { emitter } from "../utils/emitter";
  * After `count` emissions are skipped, all subsequent values pass through.
  *
  * @param count - The number of emissions to skip
+ * @param options - Optional configuration
  * @returns An operator function
  *
  * @example
@@ -21,14 +22,19 @@ import { emitter } from "../utils/emitter";
  * source.set(3); // skipped = 3
  * source.set(4); // skipped = 4
  */
-export function skip<T>(count: number): Operator<T> {
+export function skip<T>(
+  count: number,
+  options: OperatorNameOptions = {}
+): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
+    const baseName = options.name ?? `skip(${source.displayName})`;
+
     const internal = signal(source(), {
-      name: autoPrefix(`skip_internal(${source.displayName})`),
+      name: autoPrefix(`${baseName}_internal`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: autoPrefix(`skip(${source.displayName})`),
+      name: autoPrefix(baseName),
     });
 
     let skipped = 0;
@@ -60,6 +66,7 @@ export function skip<T>(count: number): Operator<T> {
  * Once the predicate returns false, all subsequent values pass through.
  *
  * @param predicate - Function to test each value (receives value and index)
+ * @param options - Optional configuration
  * @returns An operator function
  *
  * @example
@@ -72,15 +79,18 @@ export function skip<T>(count: number): Operator<T> {
  * source.set(1); // skipped = 1 (no longer skipping)
  */
 export function skipWhile<T>(
-  predicate: (value: T, index: number) => boolean
+  predicate: (value: T, index: number) => boolean,
+  options: OperatorNameOptions = {}
 ): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
+    const baseName = options.name ?? `skipWhile(${source.displayName})`;
+
     const internal = signal(source(), {
-      name: autoPrefix(`skipWhile_internal(${source.displayName})`),
+      name: autoPrefix(`${baseName}_internal`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: autoPrefix(`skipWhile(${source.displayName})`),
+      name: autoPrefix(baseName),
     });
 
     let index = 0;
@@ -120,6 +130,7 @@ export function skipWhile<T>(
  * Maintains a buffer and only emits values that have "aged out" of the buffer.
  *
  * @param count - The number of values to skip from the end
+ * @param options - Optional configuration
  * @returns An operator function that may return undefined until enough values arrive
  *
  * @example
@@ -132,17 +143,20 @@ export function skipWhile<T>(
  * source.set(3); // skipped = 1 (buffer: [2, 3])
  */
 export function skipLast<T>(
-  count: number
+  count: number,
+  options: OperatorNameOptions = {}
 ): (source: Signal<T>) => Computed<T | undefined> {
   return (source: Signal<T>): Computed<T | undefined> => {
+    const baseName = options.name ?? `skipLast(${source.displayName})`;
+
     if (count === 0) {
       // Special case: skip nothing, just pass through
       const internal = signal<T | undefined>(source(), {
-        name: autoPrefix(`skipLast_internal(${source.displayName})`),
+        name: autoPrefix(`${baseName}_internal`),
       });
 
       const result = signal({ internal }, ({ deps }) => deps.internal, {
-        name: autoPrefix(`skipLast(${source.displayName})`),
+        name: autoPrefix(baseName),
       });
 
       const cleanup = emitter();
@@ -166,11 +180,11 @@ export function skipLast<T>(
     const buffer: T[] = [source()];
 
     const internal = signal<T | undefined>(undefined, {
-      name: autoPrefix(`skipLast_internal(${source.displayName})`),
+      name: autoPrefix(`${baseName}_internal`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: autoPrefix(`skipLast(${source.displayName})`),
+      name: autoPrefix(baseName),
     });
 
     const cleanup = emitter();
@@ -203,6 +217,7 @@ export function skipLast<T>(
  * Once any notifier changes, all subsequent source values pass through.
  *
  * @param notifier - A signal or array of signals that trigger the start of emissions
+ * @param options - Optional configuration
  * @returns An operator function
  *
  * @example
@@ -223,17 +238,20 @@ export function skipLast<T>(
  * // Starts emitting when either ready or timeout changes
  */
 export function skipUntil<T>(
-  notifier: Signal<unknown> | Signal<unknown>[]
+  notifier: Signal<unknown> | Signal<unknown>[],
+  options: OperatorNameOptions = {}
 ): Operator<T> {
   const notifiers = Array.isArray(notifier) ? notifier : [notifier];
 
   return (source: Signal<T>): Computed<T> => {
+    const baseName = options.name ?? `skipUntil(${source.displayName})`;
+
     const internal = signal(source(), {
-      name: autoPrefix(`skipUntil_internal(${source.displayName})`),
+      name: autoPrefix(`${baseName}_internal`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: autoPrefix(`skipUntil(${source.displayName})`),
+      name: autoPrefix(baseName),
     });
 
     let skipping = true;

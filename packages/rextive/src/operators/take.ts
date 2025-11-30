@@ -1,6 +1,6 @@
 import { signal } from "../signal";
 import type { Signal, Computed } from "../types";
-import type { Operator } from "./types";
+import type { Operator, OperatorNameOptions } from "./types";
 import { autoPrefix } from "../utils/nameGenerator";
 import { wrapDispose } from "../disposable";
 import { emitter } from "../utils/emitter";
@@ -10,6 +10,7 @@ import { emitter } from "../utils/emitter";
  * After `count` emissions, the derived signal stops updating.
  *
  * @param count - The maximum number of emissions to take
+ * @param options - Optional configuration
  * @returns An operator function
  *
  * @example
@@ -21,14 +22,19 @@ import { emitter } from "../utils/emitter";
  * source.set(3); // first3 = 3
  * source.set(4); // first3 = 3 (stopped)
  */
-export function take<T>(count: number): Operator<T> {
+export function take<T>(
+  count: number,
+  options: OperatorNameOptions = {}
+): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
+    const baseName = options.name ?? `take(${source.displayName})`;
+
     const internal = signal(source(), {
-      name: autoPrefix(`take_internal(${source.displayName})`),
+      name: autoPrefix(`${baseName}_internal`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: autoPrefix(`take(${source.displayName})`),
+      name: autoPrefix(baseName),
     });
 
     let emissions = 0;
@@ -55,7 +61,7 @@ export function take<T>(count: number): Operator<T> {
 /**
  * Options for takeWhile operator.
  */
-export interface TakeWhileOptions {
+export interface TakeWhileOptions extends OperatorNameOptions {
   /**
    * If true, includes the value that caused the predicate to return false.
    * @default false
@@ -85,17 +91,19 @@ export interface TakeWhileOptions {
  */
 export function takeWhile<T>(
   predicate: (value: T, index: number) => boolean,
-  options?: TakeWhileOptions
+  options: TakeWhileOptions = {}
 ): Operator<T> {
-  const { inclusive = false } = options ?? {};
+  const { inclusive = false, name } = options;
 
   return (source: Signal<T>): Computed<T> => {
+    const baseName = name ?? `takeWhile(${source.displayName})`;
+
     const internal = signal(source(), {
-      name: autoPrefix(`takeWhile_internal(${source.displayName})`),
+      name: autoPrefix(`${baseName}_internal`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: autoPrefix(`takeWhile(${source.displayName})`),
+      name: autoPrefix(baseName),
     });
 
     let index = 0;
@@ -136,6 +144,7 @@ export function takeWhile<T>(
  * Returns an array of the most recent values.
  *
  * @param count - The number of values to keep
+ * @param options - Optional configuration
  * @returns An operator function that returns an array of the last N values
  *
  * @example
@@ -148,18 +157,20 @@ export function takeWhile<T>(
  * source.set(4); // last3 = [2, 3, 4]
  */
 export function takeLast<T>(
-  count: number
+  count: number,
+  options: OperatorNameOptions = {}
 ): (source: Signal<T>) => Computed<T[]> {
   return (source: Signal<T>): Computed<T[]> => {
+    const baseName = options.name ?? `takeLast(${source.displayName})`;
     const buffer: T[] = [source()];
 
     const internal = signal<T[]>([...buffer], {
-      name: autoPrefix(`takeLast_internal(${source.displayName})`),
+      name: autoPrefix(`${baseName}_internal`),
       equals: "shallow",
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: autoPrefix(`takeLast(${source.displayName})`),
+      name: autoPrefix(baseName),
     });
 
     const cleanup = emitter();
@@ -191,6 +202,7 @@ export function takeLast<T>(
  * Once any notifier changes, the derived signal stops updating.
  *
  * @param notifier - A signal or array of signals that trigger completion
+ * @param options - Optional configuration
  * @returns An operator function
  *
  * @example
@@ -210,17 +222,20 @@ export function takeLast<T>(
  * // Stops when either cancel or timeout changes
  */
 export function takeUntil<T>(
-  notifier: Signal<unknown> | Signal<unknown>[]
+  notifier: Signal<unknown> | Signal<unknown>[],
+  options: OperatorNameOptions = {}
 ): Operator<T> {
   const notifiers = Array.isArray(notifier) ? notifier : [notifier];
 
   return (source: Signal<T>): Computed<T> => {
+    const baseName = options.name ?? `takeUntil(${source.displayName})`;
+
     const internal = signal(source(), {
-      name: autoPrefix(`takeUntil_internal(${source.displayName})`),
+      name: autoPrefix(`${baseName}_internal`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: autoPrefix(`takeUntil(${source.displayName})`),
+      name: autoPrefix(baseName),
     });
 
     let stopped = false;

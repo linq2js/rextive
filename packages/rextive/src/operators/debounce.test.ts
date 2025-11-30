@@ -12,6 +12,13 @@ describe("debounce operator", () => {
     vi.useRealTimers();
   });
 
+  it("should use custom name when provided", () => {
+    const source = signal("test");
+    const debounced = debounce(300, { name: "customDebounce" })(source);
+
+    expect(debounced.displayName).toMatch(/^#customDebounce-\d+$/);
+  });
+
   it("should create a debounced signal with initial value", () => {
     const source = signal("initial");
     const debounced = debounce(300)(source);

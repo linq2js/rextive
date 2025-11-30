@@ -24,7 +24,9 @@ describe("max", () => {
 
   it("should work with custom comparer", () => {
     const source = signal({ value: 5 });
-    const maximum = max<{ value: number }>((a, b) => a.value - b.value)(source);
+    const maximum = max<{ value: number }>({
+      comparer: (a, b) => a.value - b.value,
+    })(source);
 
     expect(maximum().value).toBe(5);
 
@@ -71,6 +73,13 @@ describe("max", () => {
 
     // After dispose, just verify no errors during dispose
   });
+
+  it("should use custom name", () => {
+    const source = signal(5);
+    const maximum = max<number>({ name: "myMax" })(source);
+
+    expect(maximum.displayName).toMatch(/^#myMax-\d+$/);
+  });
 });
 
 describe("min", () => {
@@ -95,7 +104,9 @@ describe("min", () => {
 
   it("should work with custom comparer", () => {
     const source = signal({ value: 5 });
-    const minimum = min<{ value: number }>((a, b) => a.value - b.value)(source);
+    const minimum = min<{ value: number }>({
+      comparer: (a, b) => a.value - b.value,
+    })(source);
 
     expect(minimum().value).toBe(5);
 
@@ -142,5 +153,11 @@ describe("min", () => {
 
     // After dispose, just verify no errors during dispose
   });
-});
 
+  it("should use custom name", () => {
+    const source = signal(5);
+    const minimum = min<number>({ name: "myMin" })(source);
+
+    expect(minimum.displayName).toMatch(/^#myMin-\d+$/);
+  });
+});

@@ -5,8 +5,11 @@
  * Changes flow bidirectionally: source → focused and focused → source.
  */
 
+import get from "lodash/get.js";
+import fpSet from "lodash/fp/set";
+import memoize from "lodash/memoize";
+
 import type {
-  Signal,
   Mutable,
   Path,
   PathValue,
@@ -14,6 +17,8 @@ import type {
   EqualsFn,
 } from "../types";
 import { signal } from "../signal";
+import { is } from "../is";
+import { autoPrefix } from "../utils/nameGenerator";
 
 /**
  * Context passed to focus callbacks (set, validate, onError)
@@ -26,25 +31,14 @@ export interface FocusContext<T> {
 }
 
 /**
- * Options for the focus operator
+ * Base options for the focus operator (without fallback)
  */
-export interface FocusOptions<T> {
+export interface FocusBaseOptions<T> {
   /**
    * Equality strategy for the focused value
    * @default "strict"
    */
   equals?: PredefinedEquals | EqualsFn<T>;
-
-  /**
-   * Fallback value factory when initial read fails.
-   * If not provided, errors will be thrown.
-   *
-   * Note: After successful creation, the inner signal caches the value,
-   * so later read errors won't need fallback.
-   *
-   * @param error - The error that occurred
-   */
-  fallback?: (error: unknown) => T;
 
   /**
    * Debug name for the focused signal
@@ -86,51 +80,24 @@ export interface FocusOptions<T> {
 }
 
 /**
- * Get value at a nested path
+ * Fallback factory function type
  */
-function getAtPath<T extends object, P extends Path<T>>(
-  obj: T,
-  path: P
-): PathValue<T, P> {
-  const keys = (path as string).split(".");
-  let current: any = obj;
-
-  for (const key of keys) {
-    if (current === null || current === undefined) {
-      throw new Error(`Cannot read property '${key}' of ${current}`);
-    }
-    current = current[key];
-  }
-
-  return current;
-}
+export type FocusFallback<T> = () => T;
 
 /**
- * Set value at a nested path (immutable update)
+ * Options for the focus operator (alias for FocusBaseOptions)
+ */
+export type FocusOptions<T> = FocusBaseOptions<T>;
+
+/**
+ * Set value at a nested path (immutable update) using lodash/fp/set
  */
 function setAtPath<T extends object, P extends Path<T>>(
   obj: T,
   path: P,
   value: PathValue<T, P>
 ): T {
-  const keys = (path as string).split(".");
-
-  if (keys.length === 0) {
-    return value as unknown as T;
-  }
-
-  const result = Array.isArray(obj) ? [...obj] : { ...obj };
-  let current: any = result;
-
-  for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i];
-    const next = current[key];
-    current[key] = Array.isArray(next) ? [...next] : { ...next };
-    current = current[key];
-  }
-
-  current[keys[keys.length - 1]] = value;
-  return result as T;
+  return fpSet(path as string, value, obj) as T;
 }
 
 /**
@@ -175,80 +142,111 @@ function setAtPath<T extends object, P extends Path<T>>(
  * }));
  * ```
  *
- * @example With fallback
+ * @example With fallback (guarantees non-nullable return type)
  * ```ts
- * const nickname = form.pipe(focus("user.nickname", {
- *   fallback: () => "Anonymous",
- * }));
+ * // Fallback factory - Type is Mutable<string> (not string | undefined)
+ * const nickname = form.pipe(focus("user.nickname", () => "Anonymous"));
+ *
+ * // Factory for expensive defaults
+ * const config = form.pipe(focus("user.config", () => createDefaultConfig()));
+ *
+ * // With fallback and options
+ * const name = form.pipe(focus("user.name", () => "Guest", { equals: "shallow" }));
  * ```
  */
+// Overload 1: With fallback factory - T is fallback type F
+export function focus<
+  T extends object,
+  P extends Path<T>,
+  F extends NonNullable<PathValue<T, P>>
+>(
+  path: P,
+  fallback: FocusFallback<F>,
+  options?: FocusOptions<F>
+): (source: Mutable<T>) => Mutable<F>;
+
+// Overload 2: Without fallback - T is PathValue<T, P>
 export function focus<T extends object, P extends Path<T>>(
   path: P,
   options?: FocusOptions<PathValue<T, P>>
-): (source: Signal<T>) => Mutable<PathValue<T, P>> {
+): (source: Mutable<T>) => Mutable<PathValue<T, P>>;
+
+// Implementation
+export function focus<T extends object, P extends Path<T>>(
+  path: P,
+  fallbackOrOptions?:
+    | FocusFallback<PathValue<T, P>>
+    | FocusOptions<PathValue<T, P>>,
+  options?: FocusOptions<PathValue<T, P>>
+): (source: Mutable<T>) => Mutable<PathValue<T, P>> {
   type V = PathValue<T, P>;
 
-  return (source: Signal<T>): Mutable<V> => {
+  // Determine if second arg is fallback (function) or options (object)
+  const isFallbackArg = typeof fallbackOrOptions === "function";
+
+  const fallback = isFallbackArg
+    ? (fallbackOrOptions as FocusFallback<V>)
+    : undefined;
+  const resolvedOptions = isFallbackArg
+    ? options
+    : (fallbackOrOptions as FocusOptions<V> | undefined);
+
+  return (source: Mutable<T>): Mutable<V> => {
     // Runtime check: focus requires a mutable signal
-    if (!("set" in source) || typeof (source as any).set !== "function") {
+    if (!is(source, "mutable")) {
       throw new Error(
         "focus() requires a mutable signal. Use .to() for computed signals."
       );
     }
-    const mutableSource = source as Mutable<T>;
 
     const {
       equals,
-      fallback,
       name,
       get: getFn,
       set: setFn,
       validate,
       onError,
-    } = options ?? {};
+    } = resolvedOptions ?? {};
 
     // Prevent circular updates
     let isUpdating = false;
 
     // Reference to source (cleared when disposed)
-    let sourceRef: Mutable<T> | undefined = mutableSource;
+    let sourceRef: Mutable<T> | undefined = source;
 
-    // Track previous value for context (set after initial read)
+    // Track previous value for context (used by set/validate callbacks)
     let prevValue: V | undefined = undefined;
 
-    /**
-     * Create context object for callbacks (only when prev is available)
-     */
-    const createContext = (): FocusContext<V> | undefined =>
-      prevValue !== undefined ? { prev: prevValue } : undefined;
+    // Memoized fallback (computed once on first use)
+    const getFallbackValue = fallback ? memoize(fallback) : undefined;
 
     /**
-     * Read value from source at path
+     * Apply get transform if provided
+     */
+    const applyGetTransform = (value: V): V => (getFn ? getFn(value) : value);
+
+    /**
+     * Read value from source at path using lodash get (nullish → fallback)
      */
     const readFromSource = (): V => {
+      // Check if source is disposed
       if (!sourceRef || sourceRef.disposed()) {
         sourceRef = undefined;
-        const error = new Error("Source signal is disposed");
-        onError?.(error, createContext());
-        if (fallback) {
-          return fallback(error);
+        if (getFallbackValue) {
+          return applyGetTransform(getFallbackValue());
         }
-        throw error;
+        throw new Error("Source signal is disposed");
       }
 
-      try {
-        let value = getAtPath(sourceRef(), path);
-        if (getFn) {
-          value = getFn(value);
-        }
-        return value;
-      } catch (error) {
-        onError?.(error, createContext());
-        if (fallback) {
-          return fallback(error);
-        }
-        throw error;
+      // Use lodash get - returns undefined for invalid paths (doesn't throw)
+      const value = get(sourceRef(), path as string) as V | null | undefined;
+
+      // If value is nullish and we have fallback, use memoized fallback
+      if ((value === null || value === undefined) && getFallbackValue) {
+        return applyGetTransform(getFallbackValue());
       }
+
+      return applyGetTransform(value as V);
     };
 
     /**
@@ -259,7 +257,9 @@ export function focus<T extends object, P extends Path<T>>(
 
       if (!sourceRef || sourceRef.disposed()) {
         sourceRef = undefined;
-        const error = new Error("Source signal is disposed");
+        const error = new Error(
+          `Source signal (${source.displayName}) is disposed`
+        );
         onError?.(error, ctx);
         return false;
       }
@@ -299,14 +299,19 @@ export function focus<T extends object, P extends Path<T>>(
     prevValue = initialValue; // Set initial prev
     const inner = signal<V>(initialValue, {
       equals,
-      name: name ?? `focus(${path as string})`,
+      name:
+        name ?? autoPrefix(`focus(${source.displayName}.${path as string})`),
     });
 
     // Source → Inner: sync when source changes
-    const unsubSource = mutableSource.on(() => {
+    const unsubSource = source.on(() => {
       if (isUpdating) return;
+
+      // Cascade disposal when source disposes
       if (!sourceRef || sourceRef.disposed()) {
         sourceRef = undefined;
+        unsubSource(); // Stop listening to disposed source
+        inner.dispose(); // Dispose focus signal too
         return;
       }
 
@@ -323,6 +328,15 @@ export function focus<T extends object, P extends Path<T>>(
     const originalSet = inner.set.bind(inner);
     const originalDispose = inner.dispose.bind(inner);
 
+    // Helper to dispose focus signal (lazy disposal)
+    const disposeInner = () => {
+      if (!inner.disposed()) {
+        sourceRef = undefined;
+        unsubSource();
+        originalDispose();
+      }
+    };
+
     // Override set to propagate to source FIRST
     inner.set = ((valueOrUpdater: V | ((prev: V) => V)) => {
       if (isUpdating) return;
@@ -334,11 +348,15 @@ export function focus<T extends object, P extends Path<T>>(
           : valueOrUpdater;
 
       // Write to source (this will set isUpdating = true)
+      // writeToSource handles disposal detection and calls onError
       const success = writeToSource(next, prev);
 
       if (success) {
         // Update inner signal (source already updated)
         originalSet(next);
+      } else if (!sourceRef || sourceRef.disposed()) {
+        // Source was disposed - lazy dispose focus signal too
+        disposeInner();
       }
     }) as typeof inner.set;
 

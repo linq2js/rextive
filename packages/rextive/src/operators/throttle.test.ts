@@ -11,6 +11,13 @@ describe("throttle operator", () => {
     vi.useRealTimers();
   });
 
+  it("should use custom name when provided", () => {
+    const source = signal("test");
+    const throttled = throttle(300, { name: "customThrottle" })(source);
+
+    expect(throttled.displayName).toMatch(/^#customThrottle-\d+$/);
+  });
+
   it("should create a throttled signal with initial value", () => {
     const source = signal("initial");
     const throttled = throttle(300)(source);

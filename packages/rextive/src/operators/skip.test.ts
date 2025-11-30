@@ -3,6 +3,13 @@ import { signal } from "../signal";
 import { skip, skipLast, skipUntil, skipWhile } from "./skip";
 
 describe("skip", () => {
+  it("should use custom name when provided", () => {
+    const source = signal(0);
+    const skipped = skip<number>(2, { name: "customSkip" })(source);
+
+    expect(skipped.displayName).toMatch(/^#customSkip-\d+$/);
+  });
+
   it("should skip the first N emissions", () => {
     const source = signal(0);
     const skipped = skip<number>(2)(source);
@@ -62,6 +69,15 @@ describe("skip", () => {
 });
 
 describe("skipWhile", () => {
+  it("should use custom name when provided", () => {
+    const source = signal(0);
+    const skipped = skipWhile<number>((x) => x < 3, { name: "customSkipWhile" })(
+      source
+    );
+
+    expect(skipped.displayName).toMatch(/^#customSkipWhile-\d+$/);
+  });
+
   it("should skip while predicate is true", () => {
     const source = signal(0);
     const skipped = skipWhile<number>((x) => x < 3)(source);
@@ -125,6 +141,13 @@ describe("skipWhile", () => {
 });
 
 describe("skipLast", () => {
+  it("should use custom name when provided", () => {
+    const source = signal(0);
+    const skipped = skipLast<number>(2, { name: "customSkipLast" })(source);
+
+    expect(skipped.displayName).toMatch(/^#customSkipLast-\d+$/);
+  });
+
   it("should skip the last N values", () => {
     const source = signal(0);
     const skipped = skipLast<number>(2)(source);
@@ -180,6 +203,16 @@ describe("skipLast", () => {
 });
 
 describe("skipUntil", () => {
+  it("should use custom name when provided", () => {
+    const source = signal(0);
+    const notifier = signal(false);
+    const skipped = skipUntil<number>(notifier, { name: "customSkipUntil" })(
+      source
+    );
+
+    expect(skipped.displayName).toMatch(/^#customSkipUntil-\d+$/);
+  });
+
   it("should skip until notifier emits", () => {
     const source = signal(0);
     const notifier = signal(false);

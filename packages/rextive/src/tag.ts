@@ -427,6 +427,40 @@ export function tag<TValue, TKind extends SignalKind = "any">(
       return results;
     },
 
+    refreshAll(): void {
+      for (const signal of signals) {
+        signal.refresh();
+      }
+    },
+
+    resetAll(): void {
+      for (const signal of signals) {
+        // Only mutable signals have reset()
+        if ("reset" in signal && typeof signal.reset === "function") {
+          signal.reset();
+        }
+      }
+    },
+
+    staleAll(): void {
+      for (const signal of signals) {
+        // Only computed signals have stale()
+        if ("stale" in signal && typeof signal.stale === "function") {
+          signal.stale();
+        }
+      }
+    },
+
+    disposeAll(): void {
+      // Copy to array to avoid mutation during iteration
+      const signalsToDispose = [...signals];
+      for (const signal of signalsToDispose) {
+        signal.dispose();
+      }
+      // Note: signals are automatically removed from the tag
+      // when disposed via the _delete() internal method
+    },
+
     get size(): number {
       return signals.size;
     },

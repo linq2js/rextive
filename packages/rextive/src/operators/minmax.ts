@@ -1,6 +1,6 @@
 import { signal } from "../signal";
 import type { Signal, Computed } from "../types";
-import type { Operator } from "./types";
+import type { Operator, OperatorNameOptions } from "./types";
 import { autoPrefix } from "../utils/nameGenerator";
 import { wrapDispose } from "../disposable";
 import { emitter } from "../utils/emitter";
@@ -15,6 +15,17 @@ import { emitter } from "../utils/emitter";
 export type Comparer<T> = (a: T, b: T) => number;
 
 /**
+ * Options for min/max operators.
+ */
+export interface MinMaxOptions<T> extends OperatorNameOptions {
+  /**
+   * Custom comparison function.
+   * Should return negative if a < b, zero if a === b, positive if a > b.
+   */
+  comparer?: Comparer<T>;
+}
+
+/**
  * Default comparer that works for numbers, strings, and other comparable types.
  */
 const defaultComparer = <T>(a: T, b: T): number => {
@@ -27,7 +38,7 @@ const defaultComparer = <T>(a: T, b: T): number => {
  * Emits the maximum value seen so far from the source signal.
  * Updates whenever a new maximum is found.
  *
- * @param comparer - Optional comparison function (default uses < and > operators)
+ * @param options - Optional configuration with comparer and name
  * @returns An operator function
  *
  * @example
@@ -41,20 +52,22 @@ const defaultComparer = <T>(a: T, b: T): number => {
  * @example
  * // With custom comparer for objects
  * const source = signal({ value: 5 });
- * const maximum = max<{ value: number }>((a, b) => a.value - b.value)(source);
+ * const maximum = max<{ value: number }>({ comparer: (a, b) => a.value - b.value })(source);
  */
-export function max<T>(comparer?: Comparer<T>): Operator<T> {
+export function max<T>(options: MinMaxOptions<T> = {}): Operator<T> {
+  const { comparer, name } = options;
   const compare = comparer ?? defaultComparer;
 
   return (source: Signal<T>): Computed<T> => {
+    const baseName = name ?? `max(${source.displayName})`;
     let maxValue = source();
 
     const internal = signal(maxValue, {
-      name: autoPrefix(`max_internal(${source.displayName})`),
+      name: autoPrefix(`${baseName}_internal`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: autoPrefix(`max(${source.displayName})`),
+      name: autoPrefix(baseName),
     });
 
     const cleanup = emitter();
@@ -85,7 +98,7 @@ export function max<T>(comparer?: Comparer<T>): Operator<T> {
  * Emits the minimum value seen so far from the source signal.
  * Updates whenever a new minimum is found.
  *
- * @param comparer - Optional comparison function (default uses < and > operators)
+ * @param options - Optional configuration with comparer and name
  * @returns An operator function
  *
  * @example
@@ -99,20 +112,22 @@ export function max<T>(comparer?: Comparer<T>): Operator<T> {
  * @example
  * // With custom comparer for objects
  * const source = signal({ value: 5 });
- * const minimum = min<{ value: number }>((a, b) => a.value - b.value)(source);
+ * const minimum = min<{ value: number }>({ comparer: (a, b) => a.value - b.value })(source);
  */
-export function min<T>(comparer?: Comparer<T>): Operator<T> {
+export function min<T>(options: MinMaxOptions<T> = {}): Operator<T> {
+  const { comparer, name } = options;
   const compare = comparer ?? defaultComparer;
 
   return (source: Signal<T>): Computed<T> => {
+    const baseName = name ?? `min(${source.displayName})`;
     let minValue = source();
 
     const internal = signal(minValue, {
-      name: autoPrefix(`min_internal(${source.displayName})`),
+      name: autoPrefix(`${baseName}_internal`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: autoPrefix(`min(${source.displayName})`),
+      name: autoPrefix(baseName),
     });
 
     const cleanup = emitter();

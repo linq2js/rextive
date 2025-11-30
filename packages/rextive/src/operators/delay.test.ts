@@ -11,6 +11,13 @@ describe("delay operator", () => {
     vi.useRealTimers();
   });
 
+  it("should use custom name when provided", () => {
+    const source = signal("test");
+    const delayed = delay(300, { name: "customDelay" })(source);
+
+    expect(delayed.displayName).toMatch(/^#customDelay-\d+$/);
+  });
+
   describe("delayScheduler", () => {
     it("should delay notification by specified milliseconds", () => {
       const notify = vi.fn();

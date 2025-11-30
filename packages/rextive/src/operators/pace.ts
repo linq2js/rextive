@@ -1,19 +1,13 @@
 import { signal } from "../signal";
 import type { Signal, Computed } from "../types";
-import type { Scheduler, Operator } from "./types";
+import type { Scheduler, Operator, OperatorNameOptions } from "./types";
 import { autoPrefix } from "../utils/nameGenerator";
 import { wrapDispose } from "../disposable";
 
 /**
  * Options for the pace operator.
  */
-export interface PaceOptions {
-  /**
-   * Name prefix for internal signals (default: "pace").
-   * Used to generate signal names like `{name}_internal(source)` and `{name}(source)`.
-   */
-  name?: string;
-}
+export interface PaceOptions extends OperatorNameOptions {}
 
 /**
  * Creates a derived signal that updates according to the provided scheduler.
@@ -48,17 +42,18 @@ export function pace<T>(
   scheduler: Scheduler,
   options: PaceOptions = {}
 ): Operator<T> {
-  const { name = "pace" } = options;
-
   return (source: Signal<T>): Computed<T> => {
+    // If custom name provided, use it directly; otherwise include source name
+    const baseName = options.name ?? `pace(${source.displayName})`;
+
     // Internal mutable signal holds the paced value (hidden from devtools by default)
     const internal = signal(source(), {
-      name: autoPrefix(`${name}_internal(${source.displayName})`),
+      name: autoPrefix(`${baseName}_internal`),
     });
 
     // Computed signal exposes it as read-only (hidden from devtools by default)
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: autoPrefix(`${name}(${source.displayName})`),
+      name: autoPrefix(baseName),
     });
 
     // Track if disposed to prevent updates after disposal

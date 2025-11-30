@@ -1061,4 +1061,247 @@ describe("tag", () => {
       expect(doubled).toEqual([20, 40, 60]);
     });
   });
+
+  describe("Batch operations", () => {
+    describe("refreshAll()", () => {
+      it("should call refresh() on all signals", () => {
+        const myTag = tag<number>();
+        const base = signal(5);
+
+        const comp1 = signal({ base }, ({ deps }) => deps.base * 2, {
+          use: [myTag],
+        });
+        const comp2 = signal({ base }, ({ deps }) => deps.base * 3, {
+          use: [myTag],
+        });
+
+        const refreshSpy1 = vi.spyOn(comp1, "refresh");
+        const refreshSpy2 = vi.spyOn(comp2, "refresh");
+
+        myTag.refreshAll();
+
+        expect(refreshSpy1).toHaveBeenCalledOnce();
+        expect(refreshSpy2).toHaveBeenCalledOnce();
+
+        refreshSpy1.mockRestore();
+        refreshSpy2.mockRestore();
+      });
+
+      it("should work on mutable signals", () => {
+        const myTag = tag<number>();
+        const a = signal(10, { use: [myTag] });
+
+        const refreshSpy = vi.spyOn(a, "refresh");
+
+        myTag.refreshAll();
+
+        expect(refreshSpy).toHaveBeenCalledOnce();
+        refreshSpy.mockRestore();
+      });
+
+      it("should handle empty tag", () => {
+        const myTag = tag<number>();
+
+        expect(() => myTag.refreshAll()).not.toThrow();
+      });
+    });
+
+    describe("resetAll()", () => {
+      it("should reset all mutable signals to initial values", () => {
+        const myTag = tag<number>();
+        const a = signal(10, { use: [myTag] });
+        const b = signal(20, { use: [myTag] });
+        const c = signal(30, { use: [myTag] });
+
+        // Modify signals
+        a.set(100);
+        b.set(200);
+        c.set(300);
+
+        expect(a()).toBe(100);
+        expect(b()).toBe(200);
+        expect(c()).toBe(300);
+
+        myTag.resetAll();
+
+        expect(a()).toBe(10);
+        expect(b()).toBe(20);
+        expect(c()).toBe(30);
+      });
+
+      it("should skip computed signals (they have no reset)", () => {
+        const myTag = tag<number>();
+        const base = signal(5);
+
+        const mutable = signal(10, { use: [myTag] });
+        const computed = signal({ base }, ({ deps }) => deps.base * 2, {
+          use: [myTag],
+        });
+
+        mutable.set(100);
+
+        // Should not throw even though computed has no reset()
+        expect(() => myTag.resetAll()).not.toThrow();
+
+        // Mutable should be reset
+        expect(mutable()).toBe(10);
+        // Computed should be unchanged
+        expect(computed()).toBe(10);
+      });
+
+      it("should handle empty tag", () => {
+        const myTag = tag<number>();
+
+        expect(() => myTag.resetAll()).not.toThrow();
+      });
+    });
+
+    describe("staleAll()", () => {
+      it("should mark all computed signals as stale", () => {
+        const myTag = tag<number>();
+        const base = signal(5);
+
+        const comp1 = signal({ base }, ({ deps }) => deps.base * 2, {
+          use: [myTag],
+        });
+        const comp2 = signal({ base }, ({ deps }) => deps.base * 3, {
+          use: [myTag],
+        });
+
+        const staleSpy1 = vi.spyOn(comp1, "stale");
+        const staleSpy2 = vi.spyOn(comp2, "stale");
+
+        myTag.staleAll();
+
+        expect(staleSpy1).toHaveBeenCalledOnce();
+        expect(staleSpy2).toHaveBeenCalledOnce();
+
+        staleSpy1.mockRestore();
+        staleSpy2.mockRestore();
+      });
+
+      it("should skip mutable signals (they have no stale)", () => {
+        const myTag = tag<number>();
+        const base = signal(5);
+
+        const mutable = signal(10, { use: [myTag] });
+        const computed = signal({ base }, ({ deps }) => deps.base * 2, {
+          use: [myTag],
+        });
+
+        const staleSpy = vi.spyOn(computed, "stale");
+
+        // Should not throw even though mutable has no stale()
+        expect(() => myTag.staleAll()).not.toThrow();
+
+        // stale should only be called on computed
+        expect(staleSpy).toHaveBeenCalledOnce();
+        staleSpy.mockRestore();
+      });
+
+      it("should handle empty tag", () => {
+        const myTag = tag<number>();
+
+        expect(() => myTag.staleAll()).not.toThrow();
+      });
+    });
+
+    describe("disposeAll()", () => {
+      it("should dispose all signals in the tag", () => {
+        const myTag = tag<number>();
+        const a = signal(10, { use: [myTag] });
+        const b = signal(20, { use: [myTag] });
+        const c = signal(30, { use: [myTag] });
+
+        expect(myTag.size).toBe(3);
+
+        myTag.disposeAll();
+
+        // All signals should be disposed
+        expect(() => a.set(100)).toThrow("Cannot set value on disposed signal");
+        expect(() => b.set(200)).toThrow("Cannot set value on disposed signal");
+        expect(() => c.set(300)).toThrow("Cannot set value on disposed signal");
+
+        // Tag should be empty (signals auto-remove on dispose)
+        expect(myTag.size).toBe(0);
+      });
+
+      it("should dispose computed signals", () => {
+        const myTag = tag<number>();
+        const base = signal(5);
+
+        const comp = signal({ base }, ({ deps }) => deps.base * 2, {
+          use: [myTag],
+        });
+
+        expect(myTag.size).toBe(1);
+
+        myTag.disposeAll();
+
+        // Computed should be disposed
+        expect(comp.disposed()).toBe(true);
+        expect(myTag.size).toBe(0);
+      });
+
+      it("should handle mixed mutable and computed signals", () => {
+        const myTag = tag<number>();
+        const base = signal(5);
+
+        const mutable = signal(10, { use: [myTag] });
+        const computed = signal({ base }, ({ deps }) => deps.base * 2, {
+          use: [myTag],
+        });
+
+        expect(myTag.size).toBe(2);
+
+        myTag.disposeAll();
+
+        expect(mutable.disposed()).toBe(true);
+        expect(computed.disposed()).toBe(true);
+        expect(myTag.size).toBe(0);
+      });
+
+      it("should handle empty tag", () => {
+        const myTag = tag<number>();
+
+        expect(() => myTag.disposeAll()).not.toThrow();
+        expect(myTag.size).toBe(0);
+      });
+
+      it("should trigger onDelete callbacks for each signal", () => {
+        const deletedSignals: Signal<number>[] = [];
+        const myTag = tag<number>({
+          onDelete: (sig) => deletedSignals.push(sig),
+        });
+
+        const a = signal(10, { use: [myTag] });
+        const b = signal(20, { use: [myTag] });
+
+        myTag.disposeAll();
+
+        expect(deletedSignals).toContain(a);
+        expect(deletedSignals).toContain(b);
+        expect(deletedSignals.length).toBe(2);
+      });
+
+      it("should not affect signals in other tags", () => {
+        const tag1 = tag<number>();
+        const tag2 = tag<number>();
+
+        const shared = signal(10, { use: [tag1, tag2] });
+        const onlyTag2 = signal(20, { use: [tag2] });
+
+        tag1.disposeAll();
+
+        // shared was disposed, so it should be removed from both tags
+        expect(tag1.size).toBe(0);
+        expect(tag2.has(shared)).toBe(false);
+
+        // onlyTag2 should still be alive
+        expect(onlyTag2.disposed()).toBe(false);
+        expect(tag2.has(onlyTag2)).toBe(true);
+        expect(tag2.size).toBe(1);
+      });
+    });
+  });
 });

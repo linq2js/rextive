@@ -963,11 +963,47 @@ const positiveOnly = count.pipe(filter((x) => x > 0));
 const total = count.pipe(scan((acc, curr) => acc + curr, 0));
 ```
 
-#### `focus()` - Deep Object Access
+#### `focus()` - Bidirectional Lens for Nested Properties
+
+Create a bidirectional mutable signal for a nested property path:
 
 ```tsx
-const firstName = user.pipe(focus("profile", "name", "first"));
+// Basic usage with dot-notation
+const form = signal({ user: { name: "Alice" } });
+const userName = form.pipe(focus("user.name"));
+console.log(userName()); // "Alice"
+userName.set("Bob");     // Updates source immutably
+
+// With fallback (for optional properties)
+type User = { name: string; nickname?: string };
+const user = signal<User>({ name: "Alice" });
+
+// Without fallback - type is string | undefined
+const nickname = user.pipe(focus("nickname"));
+
+// With fallback - type is string (guaranteed non-nullable)
+const nicknameDefault = user.pipe(focus("nickname", () => "Guest"));
+console.log(nicknameDefault()); // "Guest"
+
+// With options
+const price = form.pipe(focus("price", {
+  get: (v) => v * 1.1,     // Transform on read
+  set: (v) => v / 1.1,     // Transform on write
+  equals: "shallow",
+}));
+
+// Fallback + options
+const theme = user.pipe(focus("settings.theme", () => "light", { name: "userTheme" }));
 ```
+
+**Overloads:**
+- `focus(path, options?)` → `Mutable<PathValue<T, P>>` (may include undefined)
+- `focus(path, fallback, options?)` → `Mutable<F>` (F = fallback return type, non-nullable)
+
+**Fallback behaviors:**
+- Called only for `null` or `undefined` values
+- **Memoized** - factory called only once
+- `0`, `""`, `false` are NOT nullish (no fallback used)
 
 #### `debounce()` - Debounce Updates
 
@@ -1399,7 +1435,8 @@ function Component() {
 - `to(fn, equals?)` - Transform
 - `filter(predicate)` - Filter
 - `scan(fn, initial)` - Accumulate
-- `focus(...keys)` - Deep access
+- `focus(path, options?)` - Bidirectional lens (returns Mutable)
+- `focus(path, fallback, options?)` - With fallback (non-nullable)
 - `debounce(ms)` - Debounce
 - `throttle(ms)` - Throttle
 - `pace(ms)` - Rate limit

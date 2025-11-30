@@ -4,6 +4,13 @@ import { take, takeWhile, takeLast, takeUntil } from "./take";
 
 describe("take operators", () => {
   describe("take", () => {
+    it("should use custom name when provided", () => {
+      const source = signal(0);
+      const taken = take<number>(3, { name: "customTake" })(source);
+
+      expect(taken.displayName).toMatch(/^#customTake-\d+$/);
+    });
+
     it("should take only first N emissions", () => {
       const source = signal(0);
       const taken = take(3)(source);
@@ -61,6 +68,15 @@ describe("take operators", () => {
   });
 
   describe("takeWhile", () => {
+    it("should use custom name when provided", () => {
+      const source = signal(0);
+      const taken = takeWhile<number>((x) => x < 5, { name: "customTakeWhile" })(
+        source
+      );
+
+      expect(taken.displayName).toMatch(/^#customTakeWhile-\d+$/);
+    });
+
     it("should take while predicate returns true", () => {
       const source = signal(0);
       const taken = takeWhile<number>((x) => x < 5)(source);
@@ -121,6 +137,13 @@ describe("take operators", () => {
   });
 
   describe("takeLast", () => {
+    it("should use custom name when provided", () => {
+      const source = signal(0);
+      const taken = takeLast<number>(3, { name: "customTakeLast" })(source);
+
+      expect(taken.displayName).toMatch(/^#customTakeLast-\d+$/);
+    });
+
     it("should keep only the last N values", () => {
       const source = signal(0);
       const last = takeLast<number>(3)(source);
@@ -166,6 +189,16 @@ describe("take operators", () => {
   });
 
   describe("takeUntil", () => {
+    it("should use custom name when provided", () => {
+      const source = signal(0);
+      const notifier = signal(false);
+      const taken = takeUntil<number>(notifier, { name: "customTakeUntil" })(
+        source
+      );
+
+      expect(taken.displayName).toMatch(/^#customTakeUntil-\d+$/);
+    });
+
     it("should take until notifier signal changes", () => {
       const source = signal(0);
       const notifier = signal(false);

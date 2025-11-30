@@ -1,6 +1,7 @@
-import type { Signal, Computed } from "../types";
+import type { Signal, Computed, SignalOptions } from "../types";
 import type { Scheduler, Operator } from "./types";
 import { pace } from "./pace";
+import { autoPrefix } from "../utils/nameGenerator";
 
 /**
  * Creates a scheduler that debounces notifications.
@@ -51,8 +52,14 @@ export function debounceScheduler(ms: number): Scheduler {
  *   validateEmail(deps.email)
  * );
  */
-export function debounce<T>(ms: number): Operator<T> {
+export function debounce<T>(
+  ms: number,
+  options: SignalOptions<T> = {}
+): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
-    return pace<T>(debounceScheduler(ms), { name: "debounce" })(source);
+    const baseName = options?.name ?? `debounce(${source.displayName})`;
+    return pace<T>(debounceScheduler(ms), {
+      name: baseName,
+    })(source);
   };
 }

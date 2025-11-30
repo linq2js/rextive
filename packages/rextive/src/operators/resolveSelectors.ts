@@ -3,6 +3,7 @@
  */
 
 import type { SignalOptions, SignalContext, PredefinedEquals } from "../types";
+import type { OperatorNameOptions } from "./types";
 
 /**
  * Selector function type - receives value and context, returns transformed value
@@ -13,16 +14,19 @@ export type SelectorFn<T = any, R = any> = (
 ) => R;
 
 /**
- * Options that can be passed as the last argument
+ * Options that can be passed as the last argument.
+ * Supports both predefined equals strings and full SignalOptions.
  */
-export type SelectorOptions<T = any> = PredefinedEquals | SignalOptions<T>;
+export type SelectorOptions<T = any> =
+  | PredefinedEquals
+  | (SignalOptions<T> & OperatorNameOptions);
 
 /**
  * Result of resolving selectors and options from arguments
  */
 export type ResolvedSelectors<T = any, R = any> = [
   selector: SelectorFn<T, R> | undefined,
-  options: SignalOptions<R>,
+  options: SignalOptions<R>
 ];
 
 /**
@@ -168,4 +172,3 @@ export function resolveSelectorsRequired<T = any, R = any>(
 
   return [selector, options];
 }
-

@@ -138,6 +138,158 @@ export type ToChainResult<
 export type HydrateStatus = "success" | "skipped";
 
 /**
+ * Transform signal through a chain of operators
+ *
+ * Applies a series of operator functions to the signal, passing the result
+ * of each operator to the next. This enables composing complex transformations
+ * in a readable, left-to-right manner.
+ *
+ * **Type Safety:** Each operator must return a signal. The output type of each
+ * operator becomes the input type of the next, ensuring type safety through
+ * the entire chain.
+ *
+ * **Memory Management:** When the final result is disposed, all intermediate
+ * signals created by the operators are automatically disposed.
+ *
+ * @template TResult - The output type of the first operator
+ * @template TOperators - Array of subsequent operators
+ * @param op - First operator (required) - transforms this signal
+ * @param operators - Additional operators to apply sequentially
+ * @returns The final transformed signal
+ *
+ * @example Basic usage
+ * ```ts
+ * const count = signal(0);
+ *
+ * // Without to() (nested, hard to read)
+ * const result = count.map(x => x * 2).map(x => x + 1).map(x => `Value: ${x}`);
+ *
+ * // With to() (linear, easy to read)
+ * const result = count.to(
+ *   s => s.map(x => x * 2),
+ *   s => s.map(x => x + 1),
+ *   s => s.map(x => `Value: ${x}`)
+ * );
+ * ```
+ *
+ * @example Reusable operators
+ * ```ts
+ * // Define reusable operators
+ * const double = (s: Signal<number>) => s.map(x => x * 2);
+ * const addOne = (s: Signal<number>) => s.map(x => x + 1);
+ * const format = (s: Signal<number>) => s.map(x => `Value: ${x}`);
+ *
+ * // Compose them
+ * const result = count.pipe(double, addOne, format);
+ * // Type: ComputedSignal<string>
+ * ```
+ *
+ * @example Type inference
+ * ```ts
+ * const user = signal({ name: "Alice", age: 30 });
+ *
+ * const displayName = user.pipe(
+ *   s => s.map(u => u.name),              // Signal<string>
+ *   s => s.map(name => name.toUpperCase()) // Signal<string>
+ * );
+ * // Type: ComputedSignal<string>
+ * ```
+ */
+export type Pipe<TKind extends SignalKind, TValue, TInit> = {
+  <T1>(op1: Operator<SignalOf<TValue, TKind, TInit>, T1>): TryInjectDispose<T1>;
+
+  // 2 operators
+  <T1, T2>(
+    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op2: Operator<T1, T2>
+  ): TryInjectDispose<T2>;
+
+  // 3 operators
+  <T1, T2, T3>(
+    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op2: Operator<T1, T2>,
+    op3: Operator<T2, T3>
+  ): TryInjectDispose<T3>;
+
+  // 4 operators
+  <T1, T2, T3, T4>(
+    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op2: Operator<T1, T2>,
+    op3: Operator<T2, T3>,
+    op4: Operator<T3, T4>
+  ): TryInjectDispose<T4>;
+
+  // 5 operators
+  <T1, T2, T3, T4, T5>(
+    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op2: Operator<T1, T2>,
+    op3: Operator<T2, T3>,
+    op4: Operator<T3, T4>,
+    op5: Operator<T4, T5>
+  ): TryInjectDispose<T5>;
+
+  // 6 operators
+  <T1, T2, T3, T4, T5, T6>(
+    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op2: Operator<T1, T2>,
+    op3: Operator<T2, T3>,
+    op4: Operator<T3, T4>,
+    op5: Operator<T4, T5>,
+    op6: Operator<T5, T6>
+  ): TryInjectDispose<T6>;
+
+  // 7 operators
+  <T1, T2, T3, T4, T5, T6, T7>(
+    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op2: Operator<T1, T2>,
+    op3: Operator<T2, T3>,
+    op4: Operator<T3, T4>,
+    op5: Operator<T4, T5>,
+    op6: Operator<T5, T6>,
+    op7: Operator<T6, T7>
+  ): TryInjectDispose<T7>;
+
+  // 8 operators
+  <T1, T2, T3, T4, T5, T6, T7, T8>(
+    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op2: Operator<T1, T2>,
+    op3: Operator<T2, T3>,
+    op4: Operator<T3, T4>,
+    op5: Operator<T4, T5>,
+    op6: Operator<T5, T6>,
+    op7: Operator<T6, T7>,
+    op8: Operator<T7, T8>
+  ): TryInjectDispose<T8>;
+
+  // 9 operators
+  <T1, T2, T3, T4, T5, T6, T7, T8, T9>(
+    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op2: Operator<T1, T2>,
+    op3: Operator<T2, T3>,
+    op4: Operator<T3, T4>,
+    op5: Operator<T4, T5>,
+    op6: Operator<T5, T6>,
+    op7: Operator<T6, T7>,
+    op8: Operator<T7, T8>,
+    op9: Operator<T8, T9>
+  ): TryInjectDispose<T9>;
+
+  // 10 operators
+  <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(
+    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op2: Operator<T1, T2>,
+    op3: Operator<T2, T3>,
+    op4: Operator<T3, T4>,
+    op5: Operator<T4, T5>,
+    op6: Operator<T5, T6>,
+    op7: Operator<T6, T7>,
+    op8: Operator<T7, T8>,
+    op9: Operator<T8, T9>,
+    op10: Operator<T9, T10>
+  ): TryInjectDispose<T10>;
+};
+
+/**
  * Base signal interface - common functionality for all signal types
  */
 export type Signal<TValue, TInit = TValue> = Observable &
@@ -261,162 +413,6 @@ export type Signal<TValue, TInit = TValue> = Observable &
      * @returns "success" if value was hydrated, "skipped" if already modified/computed
      */
     hydrate(value: TValue): HydrateStatus;
-
-    // .map() method removed - use select operator from rextive/op instead
-    // This avoids confusion with Array.map when signal values are arrays
-
-    /**
-     * Transform signal through a chain of operators
-     *
-     * Applies a series of operator functions to the signal, passing the result
-     * of each operator to the next. This enables composing complex transformations
-     * in a readable, left-to-right manner.
-     *
-     * **Type Safety:** Each operator must return a signal. The output type of each
-     * operator becomes the input type of the next, ensuring type safety through
-     * the entire chain.
-     *
-     * **Memory Management:** When the final result is disposed, all intermediate
-     * signals created by the operators are automatically disposed.
-     *
-     * @template TResult - The output type of the first operator
-     * @template TOperators - Array of subsequent operators
-     * @param op - First operator (required) - transforms this signal
-     * @param operators - Additional operators to apply sequentially
-     * @returns The final transformed signal
-     *
-     * @example Basic usage
-     * ```ts
-     * const count = signal(0);
-     *
-     * // Without to() (nested, hard to read)
-     * const result = count.map(x => x * 2).map(x => x + 1).map(x => `Value: ${x}`);
-     *
-     * // With to() (linear, easy to read)
-     * const result = count.to(
-     *   s => s.map(x => x * 2),
-     *   s => s.map(x => x + 1),
-     *   s => s.map(x => `Value: ${x}`)
-     * );
-     * ```
-     *
-     * @example Reusable operators
-     * ```ts
-     * // Define reusable operators
-     * const double = (s: Signal<number>) => s.map(x => x * 2);
-     * const addOne = (s: Signal<number>) => s.map(x => x + 1);
-     * const format = (s: Signal<number>) => s.map(x => `Value: ${x}`);
-     *
-     * // Compose them
-     * const result = count.pipe(double, addOne, format);
-     * // Type: ComputedSignal<string>
-     * ```
-     *
-     * @example Type inference
-     * ```ts
-     * const user = signal({ name: "Alice", age: 30 });
-     *
-     * const displayName = user.pipe(
-     *   s => s.map(u => u.name),              // Signal<string>
-     *   s => s.map(name => name.toUpperCase()) // Signal<string>
-     * );
-     * // Type: ComputedSignal<string>
-     * ```
-     */
-    // 1 operator
-    pipe: {
-      <T1>(op1: Operator<Signal<TValue, TInit>, T1>): TryInjectDispose<T1>;
-
-      // 2 operators
-      <T1, T2>(
-        op1: Operator<Signal<TValue, TInit>, T1>,
-        op2: Operator<T1, T2>
-      ): TryInjectDispose<T2>;
-
-      // 3 operators
-      <T1, T2, T3>(
-        op1: Operator<Signal<TValue, TInit>, T1>,
-        op2: Operator<T1, T2>,
-        op3: Operator<T2, T3>
-      ): TryInjectDispose<T3>;
-
-      // 4 operators
-      <T1, T2, T3, T4>(
-        op1: Operator<Signal<TValue, TInit>, T1>,
-        op2: Operator<T1, T2>,
-        op3: Operator<T2, T3>,
-        op4: Operator<T3, T4>
-      ): TryInjectDispose<T4>;
-
-      // 5 operators
-      <T1, T2, T3, T4, T5>(
-        op1: Operator<Signal<TValue, TInit>, T1>,
-        op2: Operator<T1, T2>,
-        op3: Operator<T2, T3>,
-        op4: Operator<T3, T4>,
-        op5: Operator<T4, T5>
-      ): TryInjectDispose<T5>;
-
-      // 6 operators
-      <T1, T2, T3, T4, T5, T6>(
-        op1: Operator<Signal<TValue, TInit>, T1>,
-        op2: Operator<T1, T2>,
-        op3: Operator<T2, T3>,
-        op4: Operator<T3, T4>,
-        op5: Operator<T4, T5>,
-        op6: Operator<T5, T6>
-      ): TryInjectDispose<T6>;
-
-      // 7 operators
-      <T1, T2, T3, T4, T5, T6, T7>(
-        op1: Operator<Signal<TValue, TInit>, T1>,
-        op2: Operator<T1, T2>,
-        op3: Operator<T2, T3>,
-        op4: Operator<T3, T4>,
-        op5: Operator<T4, T5>,
-        op6: Operator<T5, T6>,
-        op7: Operator<T6, T7>
-      ): TryInjectDispose<T7>;
-
-      // 8 operators
-      <T1, T2, T3, T4, T5, T6, T7, T8>(
-        op1: Operator<Signal<TValue, TInit>, T1>,
-        op2: Operator<T1, T2>,
-        op3: Operator<T2, T3>,
-        op4: Operator<T3, T4>,
-        op5: Operator<T4, T5>,
-        op6: Operator<T5, T6>,
-        op7: Operator<T6, T7>,
-        op8: Operator<T7, T8>
-      ): TryInjectDispose<T8>;
-
-      // 9 operators
-      <T1, T2, T3, T4, T5, T6, T7, T8, T9>(
-        op1: Operator<Signal<TValue, TInit>, T1>,
-        op2: Operator<T1, T2>,
-        op3: Operator<T2, T3>,
-        op4: Operator<T3, T4>,
-        op5: Operator<T4, T5>,
-        op6: Operator<T5, T6>,
-        op7: Operator<T6, T7>,
-        op8: Operator<T7, T8>,
-        op9: Operator<T8, T9>
-      ): TryInjectDispose<T9>;
-
-      // 10 operators
-      <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(
-        op1: Operator<Signal<TValue, TInit>, T1>,
-        op2: Operator<T1, T2>,
-        op3: Operator<T2, T3>,
-        op4: Operator<T3, T4>,
-        op5: Operator<T4, T5>,
-        op6: Operator<T5, T6>,
-        op7: Operator<T6, T7>,
-        op8: Operator<T7, T8>,
-        op9: Operator<T8, T9>,
-        op10: Operator<T9, T10>
-      ): TryInjectDispose<T10>;
-    };
 
     /**
      * Chain value transformations (selector pipeline)
@@ -669,12 +665,12 @@ export type Path<T> = T extends readonly any[]
 type PathImplObject<T> = {
   [K in keyof T & string]: IsAny<T[K]> extends true
     ? K
-    : T[K] extends Primitive
+    : NonNullable<T[K]> extends Primitive
     ? K
-    : T[K] extends readonly any[]
-    ? K | `${K}.${Path<T[K]>}`
-    : T[K] extends object
-    ? K | `${K}.${Path<T[K]>}`
+    : NonNullable<T[K]> extends readonly any[]
+    ? K | `${K}.${Path<NonNullable<T[K]>>}`
+    : NonNullable<T[K]> extends object
+    ? K | `${K}.${Path<NonNullable<T[K]>>}`
     : K;
 }[keyof T & string];
 
@@ -684,18 +680,18 @@ type PathImplArray<
 > = T extends readonly (infer V)[]
   ? IsAny<V> extends true
     ? K
-    : V extends Primitive
+    : NonNullable<V> extends Primitive
     ? K
-    : V extends readonly any[]
-    ? K | `${K}.${Path<V>}`
-    : V extends object
-    ? K | `${K}.${Path<V>}`
+    : NonNullable<V> extends readonly any[]
+    ? K | `${K}.${Path<NonNullable<V>>}`
+    : NonNullable<V> extends object
+    ? K | `${K}.${Path<NonNullable<V>>}`
     : K
   : K;
 
 /**
  * Get the value type at a given path.
- * Handles nested objects, array indices, and tuples.
+ * Handles nested objects, array indices, tuples, and optional/nullable properties.
  *
  * @example
  * ```ts
@@ -705,6 +701,9 @@ type PathImplArray<
  *
  * type List = { items: { id: number }[] };
  * type ItemId = PathValue<List, "items.0.id">; // number
+ *
+ * type Optional = { user?: { name: string } };
+ * type OptName = PathValue<Optional, "user.name">; // string | undefined
  * ```
  */
 export type PathValue<
@@ -712,13 +711,17 @@ export type PathValue<
   P extends Path<T>
 > = P extends `${infer K}.${infer Rest}`
   ? K extends keyof T
-    ? Rest extends Path<T[K]>
-      ? PathValue<T[K], Rest>
+    ? NonNullable<T[K]> extends never
+      ? Extract<T[K], null | undefined>
+      : Rest extends Path<NonNullable<T[K]>>
+      ? PathValue<NonNullable<T[K]>, Rest> | Extract<T[K], null | undefined>
       : never
     : K extends `${ArrayKey}`
     ? T extends readonly (infer V)[]
-      ? Rest extends Path<V>
-        ? PathValue<V, Rest>
+      ? NonNullable<V> extends never
+        ? Extract<V, null | undefined>
+        : Rest extends Path<NonNullable<V>>
+        ? PathValue<NonNullable<V>, Rest> | Extract<V, null | undefined>
         : never
       : never
     : never
@@ -900,6 +903,8 @@ export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
     notifier: N | readonly N[],
     reducer: (self: Mutable<TValue, TInit>, notifier: N) => TValue
   ): Mutable<TValue, TInit>;
+
+  pipe: Pipe<"mutable", TValue, TInit>;
 };
 
 /**
@@ -970,6 +975,8 @@ export type Computed<TValue, TInit = TValue> = Signal<TValue, TInit> & {
     action: ComputedWhenAction,
     filter?: (self: Computed<TValue, TInit>, notifier: N) => boolean
   ): Computed<TValue, TInit>;
+
+  pipe: Pipe<"computed", TValue, TInit>;
 };
 
 /**
@@ -1032,13 +1039,17 @@ export type SignalKind = "mutable" | "computed" | "any";
 /**
  * Helper type to get the signal type based on kind
  */
-export type SignalOf<T, K extends SignalKind> = K extends "any"
-  ? AnySignal<T>
+export type SignalOf<
+  TValue,
+  K extends SignalKind,
+  TInit = TValue
+> = K extends "any"
+  ? AnySignal<TValue, TInit>
   : K extends "mutable"
-  ? Mutable<T>
+  ? Mutable<TValue, TInit>
   : K extends "computed"
-  ? Computed<T>
-  : Signal<T>;
+  ? Computed<TValue, TInit>
+  : Signal<TValue, TInit>;
 
 /**
  * Plugin function type for extending signal behavior.
@@ -1238,6 +1249,76 @@ export type Tag<TValue, TKind extends SignalKind = any> = {
    * ```
    */
   map<TResult>(mapper: (signal: SignalOf<TValue, TKind>) => TResult): TResult[];
+
+  /**
+   * Force immediate recomputation of all signals in this tag.
+   *
+   * For computed signals: triggers recomputation immediately.
+   * For mutable signals: triggers subscribers (value unchanged).
+   *
+   * @example
+   * ```ts
+   * const dataTag = tag<Data>();
+   * // ... add signals
+   *
+   * // Force all data signals to refetch
+   * dataTag.refreshAll();
+   * ```
+   */
+  refreshAll(): void;
+
+  /**
+   * Reset all mutable signals in this tag to their initial values.
+   *
+   * Only affects mutable signals (signals created with initial value).
+   * Computed signals are skipped (they don't have reset()).
+   *
+   * @example
+   * ```ts
+   * const formTag = tag<string>();
+   * // ... add form field signals
+   *
+   * // Reset all form fields
+   * formTag.resetAll();
+   * ```
+   */
+  resetAll(): void;
+
+  /**
+   * Mark all computed signals in this tag as stale for lazy recomputation.
+   *
+   * Only affects computed signals (they recompute on next access).
+   * Mutable signals are skipped (they don't have stale()).
+   *
+   * @example
+   * ```ts
+   * const cacheTag = tag<CachedData>();
+   * // ... add computed signals
+   *
+   * // Invalidate all cached data
+   * cacheTag.staleAll();
+   * ```
+   */
+  staleAll(): void;
+
+  /**
+   * Dispose all signals in this tag.
+   *
+   * After disposal, signals cannot be used anymore.
+   * Disposed signals are automatically removed from this tag.
+   *
+   * **Warning:** This is destructive! Only use when you're done with all signals.
+   *
+   * @example
+   * ```ts
+   * const tempTag = tag<number>();
+   * // ... add temporary signals
+   *
+   * // Cleanup all temporary signals
+   * tempTag.disposeAll();
+   * ```
+   */
+  disposeAll(): void;
 
   /**
    * Number of signals in this tag.
@@ -1582,10 +1663,17 @@ export type UseList<TValue, TKind extends SignalKind> = ReadonlyArray<
         | Tag<TValue, "any" | "mutable" | "computed">
 >;
 
+export type SignalNameOptions = {
+  /** Debug name for the signal */
+  name?: string;
+};
+
+export type EqualsOrOptions<T> = PredefinedEquals | SignalOptions<T>;
+
 /**
  * Options for signal creation
  */
-export type SignalOptions<T> = {
+export type SignalOptions<T> = SignalNameOptions & {
   /**
    * Custom equality function or strategy to determine if value changed.
    *
@@ -1603,8 +1691,7 @@ export type SignalOptions<T> = {
    * ```
    */
   equals?: PredefinedEquals | EqualsFn<T>;
-  /** Debug name for the signal */
-  name?: string;
+
   /** Fallback function to recover from errors */
   fallback?: (error: unknown) => T;
 

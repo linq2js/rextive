@@ -2,8 +2,14 @@
  * Scan operator - Accumulate signal values with state
  */
 
-import type { Signal, Computed, SignalOptions } from "../types";
+import type {
+  Signal,
+  Computed,
+  SignalOptions,
+  EqualsOrOptions,
+} from "../types";
 import { signal } from "../signal";
+import { autoPrefix } from "../utils/nameGenerator";
 
 /**
  * Accumulate signal values with state
@@ -31,7 +37,7 @@ import { signal } from "../signal";
 export function scan<T, U>(
   fn: (accumulator: U, current: T) => U,
   initialValue: U,
-  equalsOrOptions?: "strict" | "shallow" | "deep" | SignalOptions<U>
+  equalsOrOptions?: EqualsOrOptions<U>
 ): (source: Signal<T>) => Computed<U> {
   return (source: Signal<T>) => {
     let acc = initialValue;
@@ -40,13 +46,18 @@ export function scan<T, U>(
         ? { equals: equalsOrOptions }
         : equalsOrOptions;
 
+    const baseName = options?.name ?? `scan(${source.displayName})`;
+
     return signal(
       { source: source as any },
       (ctx: any) => {
         acc = fn(acc, ctx.deps.source);
         return acc;
       },
-      options
+      {
+        ...options,
+        name: autoPrefix(baseName),
+      }
     );
   };
 }

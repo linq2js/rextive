@@ -9,6 +9,7 @@ import type {
   PredefinedEquals,
 } from "../types";
 import { signal } from "../signal";
+import { autoPrefix } from "../utils/nameGenerator";
 
 /**
  * Filter signal values based on a predicate
@@ -65,6 +66,8 @@ export function filter<T>(
         ? { equals: equalsOrOptions }
         : equalsOrOptions;
 
+    const baseName = options?.name ?? `filter(${source.displayName})`;
+
     return signal(
       { source: source as any },
       (ctx: any) => {
@@ -85,7 +88,10 @@ export function filter<T>(
 
         return lastValidValue;
       },
-      options
+      {
+        ...options,
+        name: autoPrefix(baseName),
+      }
     );
   };
 }

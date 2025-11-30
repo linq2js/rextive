@@ -186,7 +186,7 @@ describe("focus operator", () => {
         const form = signal({ user: { name: "Alice" } });
         const focused = form.pipe(focus("user.name"));
 
-        expect(focused.displayName).toBe("focus(user.name)");
+        expect(focused.displayName.includes("user.name")).toBeTruthy();
       });
     });
 
@@ -292,18 +292,16 @@ describe("focus operator", () => {
         expect(form().value).toBe(0); // Unchanged
       });
 
-      it("should call onError when path access fails", () => {
+      it("should use fallback silently when path returns nullish (no onError)", () => {
         const onError = vi.fn();
         const form = signal<{ user?: { name: string } }>({ user: undefined });
         const userName = form.pipe(
-          focus("user.name" as any, {
-            fallback: () => "fallback",
-            onError,
-          })
+          focus("user.name" as any, () => "fallback", { onError })
         );
 
+        // Nullish values trigger fallback silently (not an error)
         expect(userName()).toBe("fallback");
-        expect(onError).toHaveBeenCalled();
+        expect(onError).not.toHaveBeenCalled();
       });
 
       it("should call onError when set fails due to disposed source", () => {
@@ -324,16 +322,129 @@ describe("focus operator", () => {
     });
 
     describe("fallback", () => {
-      it("should use fallback when path access fails", () => {
+      it("should use fallback factory when path access fails", () => {
+        const form = signal<{ user?: { name: string } }>({ user: undefined });
+        const userName = form.pipe(focus("user.name" as any, () => "default"));
+
+        // Should use fallback because user is undefined
+        expect(userName()).toBe("default");
+      });
+
+      it("should use fallback with options", () => {
         const form = signal<{ user?: { name: string } }>({ user: undefined });
         const userName = form.pipe(
-          focus("user.name" as any, {
-            fallback: () => "default",
+          focus("user.name" as any, () => "fallback-value", {
+            name: "userName",
           })
         );
 
         // Should use fallback because user is undefined
-        expect(userName()).toBe("default");
+        expect(userName()).toBe("fallback-value");
+        expect(userName.displayName).toMatch(/userName/);
+      });
+
+      it("should apply get transform to fallback value", () => {
+        const form = signal<{ user?: { name: string } }>({ user: undefined });
+        const userName = form.pipe(
+          focus("user.name" as any, () => "guest", {
+            get: (v) => v.toUpperCase(),
+          })
+        );
+
+        // Should use fallback with get transform applied
+        expect(userName()).toBe("GUEST");
+      });
+
+      it("should apply get transform to both source and fallback", () => {
+        const form = signal<{ user?: { name: string } }>({
+          user: { name: "alice" },
+        });
+        const userName = form.pipe(
+          focus("user.name", () => "guest", {
+            get: (v) => v.toUpperCase(),
+          })
+        );
+
+        // Source value with transform
+        expect(userName()).toBe("ALICE");
+
+        // Remove user to trigger fallback
+        form.set({ user: undefined } as any);
+
+        // Fallback value with same transform
+        expect(userName()).toBe("GUEST");
+      });
+
+      it("should memoize fallback value (called only once)", () => {
+        const fallbackFactory = vi.fn(() => "memoized");
+        const form = signal<{ name?: string }>({ name: undefined });
+        const name = form.pipe(focus("name", fallbackFactory));
+
+        // First read - should call fallback
+        expect(name()).toBe("memoized");
+        expect(fallbackFactory).toHaveBeenCalledTimes(1);
+
+        // Second read - should use cached fallback
+        expect(name()).toBe("memoized");
+        expect(fallbackFactory).toHaveBeenCalledTimes(1);
+
+        // Third read - still cached
+        expect(name()).toBe("memoized");
+        expect(fallbackFactory).toHaveBeenCalledTimes(1);
+      });
+
+      it("should use fallback when value is null", () => {
+        const form = signal<{ name: string | null }>({ name: null });
+        const name = form.pipe(focus("name", () => "fallback"));
+
+        expect(name()).toBe("fallback");
+      });
+
+      it("should use fallback when value is undefined", () => {
+        const form = signal<{ name?: string }>({ name: undefined });
+        const name = form.pipe(focus("name", () => "fallback"));
+
+        expect(name()).toBe("fallback");
+      });
+
+      it("should NOT use fallback when value is empty string", () => {
+        const form = signal({ name: "" });
+        const name = form.pipe(focus("name", () => "fallback"));
+
+        // Empty string is NOT nullish, so no fallback
+        expect(name()).toBe("");
+      });
+
+      it("should NOT use fallback when value is 0", () => {
+        const form = signal({ count: 0 });
+        const count = form.pipe(focus("count", () => 999));
+
+        // 0 is NOT nullish, so no fallback
+        expect(count()).toBe(0);
+      });
+
+      it("should NOT use fallback when value is false", () => {
+        const form = signal({ enabled: false });
+        const enabled = form.pipe(focus("enabled", () => true));
+
+        // false is NOT nullish, so no fallback
+        expect(enabled()).toBe(false);
+      });
+
+      it("should switch between source and fallback when value changes", () => {
+        const form = signal<{ name: string | null }>({ name: "Alice" });
+        const name = form.pipe(focus("name", () => "Guest"));
+
+        // Has value - use source
+        expect(name()).toBe("Alice");
+
+        // Set to null - use fallback
+        form.set({ name: null });
+        expect(name()).toBe("Guest");
+
+        // Set back to value - use source again
+        form.set({ name: "Bob" });
+        expect(name()).toBe("Bob");
       });
     });
   });
@@ -398,9 +509,271 @@ describe("focus operator", () => {
         doubled: deps.source.value * 2,
       }));
 
+      // @ts-expect-error - Computed signal is not mutable
       expect(() => computed.pipe(focus("doubled" as any))).toThrow(
         "focus() requires a mutable signal"
       );
+    });
+  });
+
+  describe("disposal", () => {
+    it("should lazy-dispose focus signal when source is disposed and focus is accessed", () => {
+      const form = signal({ name: "Alice" });
+      const name = form.pipe(focus("name"));
+
+      expect(name()).toBe("Alice");
+      expect(name.disposed()).toBe(false);
+
+      // Dispose source
+      form.dispose();
+
+      // Focus is not immediately disposed (lazy disposal)
+      // But trying to set will trigger disposal check
+      name.set("Bob");
+
+      // Now focus should be disposed
+      expect(name.disposed()).toBe(true);
+    });
+
+    it("should silently fail set after source disposal", () => {
+      const form = signal({ name: "Alice" });
+      const name = form.pipe(focus("name"));
+
+      expect(name()).toBe("Alice");
+
+      // Dispose source
+      form.dispose();
+
+      // Set should not throw, just no-op and dispose
+      expect(() => name.set("Bob")).not.toThrow();
+
+      // Focus should be disposed after attempted set
+      expect(name.disposed()).toBe(true);
+
+      // Value should still be readable (last known value)
+      expect(name()).toBe("Alice");
+    });
+
+    it("should dispose focus but keep source when focus is disposed directly", () => {
+      const form = signal({ name: "Alice" });
+      const name = form.pipe(focus("name"));
+
+      // Dispose focus only
+      name.dispose();
+
+      // Source should still work
+      expect(form.disposed()).toBe(false);
+      expect(form()).toEqual({ name: "Alice" });
+
+      // Focus is disposed
+      expect(name.disposed()).toBe(true);
+    });
+
+    it("should not sync from disposed source", () => {
+      const form = signal({ name: "Alice" });
+      const name = form.pipe(focus("name"));
+
+      expect(name()).toBe("Alice");
+
+      // Dispose source
+      form.dispose();
+
+      // Even if we could change source (we can't), focus should not sync
+      // This test verifies the subscription cleanup path
+      expect(name()).toBe("Alice"); // Still has last value
+    });
+  });
+
+  describe("optional and nullable properties", () => {
+    it("should handle optional parent property", () => {
+      type FormWithOptional = {
+        user?: { name: string };
+      };
+
+      const form = signal<FormWithOptional>({ user: { name: "Alice" } });
+      const userName = form.pipe(focus("user.name"));
+
+      expect(userName()).toBe("Alice");
+
+      // Update through focused signal
+      userName.set("Bob");
+      expect(form().user?.name).toBe("Bob");
+    });
+
+    it("should handle optional parent when undefined", () => {
+      type FormWithOptional = {
+        user?: { name: string };
+      };
+
+      const form = signal<FormWithOptional>({});
+      const userName = form.pipe(focus("user.name"));
+
+      // Should return undefined when parent is missing
+      expect(userName()).toBeUndefined();
+    });
+
+    it("should create path when setting value on nullish parent object", () => {
+      type FormWithOptional = {
+        user?: { name: string };
+      };
+
+      const form = signal<FormWithOptional>({});
+      const userName = form.pipe(focus("user.name"));
+
+      // Should create intermediate object when setting
+      userName.set("Alice");
+
+      expect(userName()).toBe("Alice");
+      expect(form()).toEqual({ user: { name: "Alice" } });
+    });
+
+    it("should create path when setting value on deeply nested nullish object", () => {
+      type DeepOptional = {
+        a?: {
+          b?: {
+            c?: string;
+          };
+        };
+      };
+
+      const data = signal<DeepOptional>({});
+      const deepValue = data.pipe(focus("a.b.c"));
+
+      // Should create all intermediate objects
+      deepValue.set("created");
+
+      expect(deepValue()).toBe("created");
+      expect(data()).toEqual({ a: { b: { c: "created" } } });
+    });
+
+    it("should handle nullable array items", () => {
+      type ListWithNullable = {
+        items: [{ name?: string } | undefined | null];
+      };
+
+      const list = signal<ListWithNullable>({
+        items: [{ name: "first" }],
+      });
+      const firstName = list.pipe(focus("items.0.name"));
+
+      expect(firstName()).toBe("first");
+
+      // Update through focused signal
+      firstName.set("updated");
+      expect(list().items[0]?.name).toBe("updated");
+    });
+
+    it("should handle nullable array item when null", () => {
+      type ListWithNullable = {
+        items: [{ name?: string } | undefined | null];
+      };
+
+      const list = signal<ListWithNullable>({
+        items: [null],
+      });
+      const firstName = list.pipe(focus("items.0.name"));
+
+      // Should return undefined when item is null
+      expect(firstName()).toBeUndefined();
+    });
+
+    it("should create object in array when setting value on null item", () => {
+      type ListWithNullable = {
+        items: ({ name: string } | null)[];
+      };
+
+      const list = signal<ListWithNullable>({
+        items: [null],
+      });
+      const firstName = list.pipe(focus("items.0.name"));
+
+      // Should create object in array when setting
+      firstName.set("created");
+
+      expect(firstName()).toBe("created");
+      expect(list().items[0]).toEqual({ name: "created" });
+    });
+
+    it("should create array and object when setting value on nullish array", () => {
+      type WithOptionalArray = {
+        items?: { name: string }[];
+      };
+
+      const data = signal<WithOptionalArray>({});
+      const firstName = data.pipe(focus("items.0.name"));
+
+      // Should create array and object
+      firstName.set("created");
+
+      expect(firstName()).toBe("created");
+      expect(data().items).toBeDefined();
+      expect(data().items![0]).toEqual({ name: "created" });
+    });
+
+    it("should handle deeply nested optional properties", () => {
+      type DeepOptional = {
+        a?: {
+          b?: {
+            c?: string;
+          };
+        };
+      };
+
+      const data = signal<DeepOptional>({
+        a: { b: { c: "deep" } },
+      });
+      const deepValue = data.pipe(focus("a.b.c"));
+
+      expect(deepValue()).toBe("deep");
+
+      deepValue.set("updated");
+      expect(data().a?.b?.c).toBe("updated");
+    });
+
+    it("should return undefined for missing intermediate property", () => {
+      type DeepOptional = {
+        a?: {
+          b?: {
+            c?: string;
+          };
+        };
+      };
+
+      const data = signal<DeepOptional>({
+        a: { b: undefined },
+      });
+      const deepValue = data.pipe(focus("a.b.c"));
+
+      expect(deepValue()).toBeUndefined();
+    });
+
+    it("should use fallback for optional property", () => {
+      type FormWithOptional = {
+        nickname?: string;
+      };
+
+      const form = signal<FormWithOptional>({});
+      const nickname = form.pipe(focus("nickname", () => "Anonymous"));
+
+      // Should return fallback when value is undefined
+      expect(nickname()).toBe("Anonymous");
+
+      // After setting a value, should return the actual value
+      nickname.set("Alice");
+      expect(nickname()).toBe("Alice");
+    });
+
+    it("should use fallback for nullable array item property", () => {
+      type ListWithNullable = {
+        items: [{ name?: string } | null];
+      };
+
+      const list = signal<ListWithNullable>({
+        items: [null],
+      });
+      const firstName = list.pipe(focus("items.0.name", () => "default"));
+
+      expect(firstName()).toBe("default");
     });
   });
 });

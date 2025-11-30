@@ -6,16 +6,60 @@ Real-world examples to help you master Rextive. Each example includes detailed e
 
 ## Table of Contents
 
-- [Example 1: Counter (The Basics)](#example-1-counter-the-basics)
-- [Example 2: Async Data Fetching with Auto-Cancel](#example-2-async-data-fetching-with-auto-cancel)
-- [Example 3: Advanced Timeout & Cancellation](#example-3-advanced-timeout--cancellation)
-- [Example 4: Component-Scoped State with Auto-Cleanup](#example-4-component-scoped-state-with-auto-cleanup)
-- [Example 5: React Query-like Data Fetching](#example-5-react-query-like-data-fetching)
-- [Example 6: Form Validation with Async Checks](#example-6-form-validation-with-async-checks)
-- [Example 7: Debounced Search](#example-7-debounced-search)
-- [Example 8: Batch Updates for Performance](#example-8-batch-updates-for-performance)
-- [Example 9: Persist to LocalStorage](#example-9-persist-to-localstorage)
-- [Example 10: React to Other Signals with `.when()`](#example-10-react-to-other-signals-with-when)
+- [Learn by Example](#learn-by-example)
+  - [Table of Contents](#table-of-contents)
+  - [Example 1: Counter (The Basics)](#example-1-counter-the-basics)
+    - [What You'll Learn](#what-youll-learn)
+    - [Code](#code)
+    - [Key Points](#key-points)
+  - [Example 2: Async Data Fetching with Auto-Cancel](#example-2-async-data-fetching-with-auto-cancel)
+    - [What You'll Learn](#what-youll-learn-1)
+    - [Code (Suspense Mode)](#code-suspense-mode)
+    - [Code (Manual Loading States)](#code-manual-loading-states)
+    - [Key Points](#key-points-1)
+  - [Example 3: Advanced Timeout \& Cancellation](#example-3-advanced-timeout--cancellation)
+    - [What You'll Learn](#what-youll-learn-2)
+    - [Code](#code-1)
+    - [Key Points](#key-points-2)
+  - [Example 4: Component-Scoped State with Auto-Cleanup](#example-4-component-scoped-state-with-auto-cleanup)
+    - [What You'll Learn](#what-youll-learn-3)
+    - [Code](#code-2)
+    - [Key Points](#key-points-3)
+  - [Example 5: React Query-like Data Fetching](#example-5-react-query-like-data-fetching)
+    - [What You'll Learn](#what-youll-learn-4)
+    - [Code](#code-3)
+    - [Key Points](#key-points-4)
+  - [Example 6: Form Validation with Async Checks](#example-6-form-validation-with-async-checks)
+    - [What You'll Learn](#what-youll-learn-5)
+    - [Code](#code-4)
+    - [Key Points](#key-points-5)
+  - [Example 7: Debounced Search](#example-7-debounced-search)
+    - [What You'll Learn](#what-youll-learn-6)
+    - [Code](#code-5)
+    - [How Debouncing Works](#how-debouncing-works)
+    - [Key Points](#key-points-6)
+  - [Example 8: Batch Updates for Performance](#example-8-batch-updates-for-performance)
+    - [What You'll Learn](#what-youll-learn-7)
+    - [Code](#code-6)
+    - [When to Use Batching](#when-to-use-batching)
+  - [Example 9: Persist to LocalStorage](#example-9-persist-to-localstorage)
+    - [What You'll Learn](#what-youll-learn-8)
+    - [Code](#code-7)
+    - [How It Works](#how-it-works)
+    - [Key Points](#key-points-7)
+  - [Example 10: React to Other Signals with `.when()`](#example-10-react-to-other-signals-with-when)
+    - [What You'll Learn](#what-youll-learn-9)
+    - [Code](#code-8)
+    - [Available Actions](#available-actions)
+    - [Key Points](#key-points-8)
+  - [Example 11: Data Polling with Auto-Refresh](#example-11-data-polling-with-auto-refresh)
+    - [What You'll Learn](#what-youll-learn-10)
+    - [Code](#code-9)
+    - [React Component with Polling](#react-component-with-polling)
+    - [Conditional Polling](#conditional-polling)
+    - [Key Points](#key-points-9)
+    - [Best Practices](#best-practices)
+  - [Next Steps](#next-steps)
 
 ---
 
@@ -67,13 +111,13 @@ function Counter() {
 
 ### Key Points
 
-| Concept | Description |
-|---------|-------------|
-| `signal(0)` | Creates a mutable signal with initial value `0` |
-| `.to(fn)` | Creates a computed signal from a single source - no deps needed |
-| `rx(signal)` | Renders signal value and re-renders only when it changes |
-| `.set(fn)` | Updates using an updater function `(prev) => next` |
-| `.reset()` | Resets to initial value |
+| Concept      | Description                                                     |
+| ------------ | --------------------------------------------------------------- |
+| `signal(0)`  | Creates a mutable signal with initial value `0`                 |
+| `.to(fn)`    | Creates a computed signal from a single source - no deps needed |
+| `rx(signal)` | Renders signal value and re-renders only when it changes        |
+| `.set(fn)`   | Updates using an updater function `(prev) => next`              |
+| `.reset()`   | Resets to initial value                                         |
 
 ---
 
@@ -150,12 +194,12 @@ function ProfileManual() {
 
 ### Key Points
 
-| Concept | Description |
-|---------|-------------|
-| `signal({ deps }, async fn)` | Creates async computed signal with explicit dependencies |
-| `abortSignal` | Automatically provided; cancels when deps change or signal disposes |
-| `Suspense` | Works out-of-the-box with async signals |
-| `loadable()` | Converts Promise to `{ loading, error, value }` for manual handling |
+| Concept                      | Description                                                         |
+| ---------------------------- | ------------------------------------------------------------------- |
+| `signal({ deps }, async fn)` | Creates async computed signal with explicit dependencies            |
+| `abortSignal`                | Automatically provided; cancels when deps change or signal disposes |
+| `Suspense`                   | Works out-of-the-box with async signals                             |
+| `loadable()`                 | Converts Promise to `{ loading, error, value }` for manual handling |
 
 ---
 
@@ -221,11 +265,11 @@ manualController.current().abort();
 
 ### Key Points
 
-| Concept | Description |
-|---------|-------------|
-| `AbortSignal.any([...])` | First signal to abort wins (ES2024+) |
-| `AbortSignal.timeout(ms)` | Creates auto-abort signal after delay |
-| `producer(factory)` | Creates replaceable values; `.next()` replaces current |
+| Concept                   | Description                                            |
+| ------------------------- | ------------------------------------------------------ |
+| `AbortSignal.any([...])`  | First signal to abort wins (ES2024+)                   |
+| `AbortSignal.timeout(ms)` | Creates auto-abort signal after delay                  |
+| `producer(factory)`       | Creates replaceable values; `.next()` replaces current |
 
 ---
 
@@ -260,8 +304,8 @@ function createTodoListScope() {
   });
 
   // Derived state from single signal (no deps needed)
-  const activeCount = todos.to((list) =>
-    list.filter((t) => t.status === "active").length
+  const activeCount = todos.to(
+    (list) => list.filter((t) => t.status === "active").length
   );
 
   // Actions (plain functions that update signals)
@@ -320,11 +364,11 @@ function TodoList() {
 
 ### Key Points
 
-| Concept | Description |
-|---------|-------------|
-| `useScope(factory)` | Calls factory once, disposes on unmount |
+| Concept             | Description                                             |
+| ------------------- | ------------------------------------------------------- |
+| `useScope(factory)` | Calls factory once, disposes on unmount                 |
 | `disposable({...})` | Wraps object, adds `.dispose()` that cleans all signals |
-| Factory pattern | Separates state creation from component for testability |
+| Factory pattern     | Separates state creation from component for testability |
 
 ---
 
@@ -390,7 +434,7 @@ function UserProfile({ userId }) {
       <button onClick={() => userQuery.refetch()}>Refresh</button>
 
       {rx(() => {
-        const state = loadable(userQuery.result());
+        const state = loadable(userQuery.result);
 
         if (state.loading) return <div>Loading...</div>;
         if (state.error) return <div>Error: {state.error.message}</div>;
@@ -408,11 +452,11 @@ function UserProfile({ userId }) {
 
 ### Key Points
 
-| Concept | Description |
-|---------|-------------|
-| `useScope(factory, { update })` | Runs effect when dependencies change |
-| `result.refresh()` | Forces immediate re-computation |
-| Query pattern | Separates triggering (params) from fetching (result) |
+| Concept                         | Description                                          |
+| ------------------------------- | ---------------------------------------------------- |
+| `useScope(factory, { update })` | Runs effect when dependencies change                 |
+| `result.refresh()`              | Forces immediate re-computation                      |
+| Query pattern                   | Separates triggering (params) from fetching (result) |
 
 ---
 
@@ -429,7 +473,14 @@ Build a registration form with both synchronous and asynchronous validation.
 ### Code
 
 ```tsx
-import { signal, disposable, rx, useScope, loadable, wait } from "rextive/react";
+import {
+  signal,
+  disposable,
+  rx,
+  useScope,
+  loadable,
+  wait,
+} from "rextive/react";
 
 function createRegistrationFormScope() {
   // Mock existing usernames (would be API call in real app)
@@ -513,12 +564,12 @@ function RegistrationForm() {
 
 ### Key Points
 
-| Concept | Description |
-|---------|-------------|
-| Sync `.to()` | Returns computed value immediately |
-| Async `.to()` | Returns Promise, handles cancellation automatically |
-| `safe(promise)` | Throws if cancelled - use for debounce/delay |
-| `loadable()` | Normalizes sync/async validation to `{ loading, value }` |
+| Concept         | Description                                              |
+| --------------- | -------------------------------------------------------- |
+| Sync `.to()`    | Returns computed value immediately                       |
+| Async `.to()`   | Returns Promise, handles cancellation automatically      |
+| `safe(promise)` | Throws if cancelled - use for debounce/delay             |
+| `loadable()`    | Normalizes sync/async validation to `{ loading, value }` |
 
 ---
 
@@ -535,7 +586,14 @@ Build a search box with debouncing and automatic cancellation of in-flight reque
 ### Code
 
 ```tsx
-import { signal, disposable, rx, useScope, wait, loadable } from "rextive/react";
+import {
+  signal,
+  disposable,
+  rx,
+  useScope,
+  wait,
+  loadable,
+} from "rextive/react";
 
 function SearchBox() {
   const scope = useScope(() => {
@@ -573,7 +631,7 @@ function SearchBox() {
       />
 
       {rx(() => {
-        const resultsState = loadable(scope.results());
+        const resultsState = loadable(scope.results);
 
         if (resultsState.loading) return <div>Searching...</div>;
         if (resultsState.error) return <div>Error!</div>;
@@ -600,10 +658,10 @@ function SearchBox() {
 
 ### Key Points
 
-| Concept | Description |
-|---------|-------------|
-| `safe(wait.delay(ms))` | Cancellable debounce - throws if signal re-computes |
-| Double cancellation | Debounce (safe) + fetch (abortSignal) for complete control |
+| Concept                | Description                                                |
+| ---------------------- | ---------------------------------------------------------- |
+| `safe(wait.delay(ms))` | Cancellable debounce - throws if signal re-computes        |
+| Double cancellation    | Debounce (safe) + fetch (abortSignal) for complete control |
 
 ---
 
@@ -651,12 +709,12 @@ signal.batch(() => {
 
 ### When to Use Batching
 
-| Scenario | Use Batch? |
-|----------|------------|
-| Updating multiple related signals at once | ✅ Yes |
-| Form reset (clearing all fields) | ✅ Yes |
-| Single signal update | ❌ No |
-| Unrelated signals | ❌ No |
+| Scenario                                  | Use Batch? |
+| ----------------------------------------- | ---------- |
+| Updating multiple related signals at once | ✅ Yes     |
+| Form reset (clearing all fields)          | ✅ Yes     |
+| Single signal update                      | ❌ No      |
+| Unrelated signals                         | ❌ No      |
 
 ---
 
@@ -716,11 +774,11 @@ theme.set("light"); // Automatically saved to localStorage
 
 ### Key Points
 
-| Concept | Description |
-|---------|-------------|
+| Concept                     | Description                          |
+| --------------------------- | ------------------------------------ |
 | `persistor({ load, save })` | Creates reusable persistence factory |
-| `use: [plugin]` | Attaches plugin to signal |
-| Type safety | Key must exist in type parameter |
+| `use: [plugin]`             | Attaches plugin to signal            |
+| Type safety                 | Key must exist in type parameter     |
 
 ---
 
@@ -773,21 +831,203 @@ counter.when(increment, (self, notifier) => self() + notifier());
 
 ### Available Actions
 
-| Action | For | Description |
-|--------|-----|-------------|
-| `"refresh"` | Computed | Force immediate recomputation |
-| `"stale"` | Computed | Mark stale, recompute on next access |
-| `"reset"` | Mutable only | Reset to initial value |
-| `(self, notifier) => newValue` | Mutable only | Custom reducer |
+| Action                         | For          | Description                          |
+| ------------------------------ | ------------ | ------------------------------------ |
+| `"refresh"`                    | Computed     | Force immediate recomputation        |
+| `"stale"`                      | Computed     | Mark stale, recompute on next access |
+| `"reset"`                      | Mutable only | Reset to initial value               |
+| `(self, notifier) => newValue` | Mutable only | Custom reducer                       |
 
 ### Key Points
 
-| Concept | Description |
-|---------|-------------|
-| `.when(notifier, action)` | React to another signal's changes |
-| `[notifier1, notifier2]` | React to multiple signals |
-| Filter function | Optional third arg to conditionally trigger |
-| Chaining | `.when()` returns `this` for chaining |
+| Concept                   | Description                                 |
+| ------------------------- | ------------------------------------------- |
+| `.when(notifier, action)` | React to another signal's changes           |
+| `[notifier1, notifier2]`  | React to multiple signals                   |
+| Filter function           | Optional third arg to conditionally trigger |
+| Chaining                  | `.when()` returns `this` for chaining       |
+
+---
+
+## Example 11: Data Polling with Auto-Refresh
+
+Implement automatic data polling using the signal context's `refresh()` method. This is useful for dashboards, live data feeds, and any scenario requiring periodic updates.
+
+### What You'll Learn
+
+- Using `context.refresh()` to trigger recomputation
+- Proper cancellation handling with `abortSignal`
+- Different polling strategies (continuous vs. success-only)
+- Combining auto-polling with manual refresh
+
+### Code
+
+```tsx
+import { signal, loadable, disposable } from "rextive";
+import { useScope, rx } from "rextive/react";
+
+// Basic polling - refreshes every 10 seconds
+const stockPrice = signal(async ({ abortSignal, refresh }) => {
+  // Schedule next refresh BEFORE fetch
+  // Ensures polling continues even if request fails
+  setTimeout(refresh, 10 * 1000);
+
+  const res = await fetch("/api/stock/AAPL", { signal: abortSignal });
+  return res.json();
+});
+
+// Poll only after successful fetch
+const reliableData = signal(async ({ abortSignal, refresh }) => {
+  const res = await fetch("/api/data", { signal: abortSignal });
+  const data = await res.json();
+
+  // Only schedule next poll after success
+  setTimeout(refresh, 30 * 1000);
+
+  return data;
+});
+
+// Poll regardless of success/failure using finally
+const resilientData = signal(async ({ abortSignal, refresh }) => {
+  const result = fetch("/api/metrics", { signal: abortSignal }).then((res) =>
+    res.json()
+  );
+
+  // Schedule next refresh after completion
+  result.finally(() => {
+    setTimeout(refresh, 15 * 1000);
+  });
+
+  return result;
+});
+```
+
+### React Component with Polling
+
+```tsx
+function StockTicker() {
+  const scope = useScope(() => {
+    const symbol = signal("AAPL");
+
+    // Poll stock price every 5 seconds
+    const price = signal({ symbol }, async ({ deps, abortSignal, refresh }) => {
+      setTimeout(refresh, 5 * 1000);
+
+      const res = await fetch(`/api/stock/${deps.symbol}`, {
+        signal: abortSignal,
+      });
+      return res.json();
+    });
+
+    return disposable({ symbol, price });
+  });
+
+  return (
+    <div>
+      <select onChange={(e) => scope.symbol.set(e.target.value)}>
+        <option value="AAPL">Apple</option>
+        <option value="GOOGL">Google</option>
+        <option value="MSFT">Microsoft</option>
+      </select>
+
+      {rx(() => {
+        const state = loadable(scope.price);
+
+        if (state.loading) return <span>Loading...</span>;
+        if (state.error) return <span>Error: {state.error.message}</span>;
+
+        return (
+          <span>
+            {state.value.symbol}: ${state.value.price}
+          </span>
+        );
+      })}
+
+      {/* Manual refresh button */}
+      <button onClick={() => scope.price.refresh()}>Refresh Now</button>
+    </div>
+  );
+}
+```
+
+### Conditional Polling
+
+```tsx
+function Dashboard() {
+  const scope = useScope(() => {
+    const isVisible = signal(true);
+    const pollInterval = signal(30 * 1000);
+
+    const metrics = signal(
+      { isVisible, pollInterval },
+      async ({ deps, abortSignal, refresh }) => {
+        // Only poll when tab is visible
+        if (deps.isVisible) {
+          setTimeout(refresh, deps.pollInterval);
+        }
+
+        const res = await fetch("/api/metrics", { signal: abortSignal });
+        return res.json();
+      }
+    );
+
+    // Pause/resume polling based on tab visibility
+    const handleVisibility = () => {
+      isVisible.set(!document.hidden);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return disposable({
+      metrics,
+      isVisible,
+      pollInterval,
+      dispose: [
+        () =>
+          document.removeEventListener("visibilitychange", handleVisibility),
+      ],
+    });
+  });
+
+  return (
+    <div>
+      {rx(() => {
+        const state = loadable(scope.metrics);
+        if (state.loading) return <Spinner />;
+        return <MetricsView data={state.value} />;
+      })}
+
+      {/* Adjust polling interval */}
+      <select onChange={(e) => scope.pollInterval.set(Number(e.target.value))}>
+        <option value="10000">Every 10s</option>
+        <option value="30000">Every 30s</option>
+        <option value="60000">Every 1min</option>
+      </select>
+    </div>
+  );
+}
+```
+
+### Key Points
+
+| Concept               | Description                                                        |
+| --------------------- | ------------------------------------------------------------------ |
+| `refresh()`           | Triggers recomputation, cancels previous request via `abortSignal` |
+| Schedule before fetch | Polling continues even if request fails                            |
+| Schedule after fetch  | Only polls after successful response                               |
+| `finally()`           | Reliable scheduling regardless of success/failure                  |
+| Conditional polling   | Check conditions before scheduling (e.g., tab visibility)          |
+| Manual + Auto         | Combine `setTimeout(refresh, ...)` with `signal.refresh()` button  |
+
+### Best Practices
+
+| Practice                  | Reason                                                |
+| ------------------------- | ----------------------------------------------------- |
+| Always pass `abortSignal` | Ensures previous requests are cancelled               |
+| Choose polling strategy   | Based on failure tolerance requirements               |
+| Consider tab visibility   | Don't waste resources polling hidden tabs             |
+| Use reasonable intervals  | 10s-60s typical for dashboards; respect server limits |
+| Provide manual refresh    | Users expect control over data freshness              |
 
 ---
 

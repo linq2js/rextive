@@ -1,6 +1,7 @@
-import type { Signal, Computed } from "../types";
+import type { Signal, Computed, SignalOptions } from "../types";
 import type { Scheduler, Operator } from "./types";
 import { pace } from "./pace";
+import { autoPrefix } from "../utils/nameGenerator";
 
 /**
  * Creates a scheduler that throttles notifications.
@@ -78,8 +79,14 @@ export function throttleScheduler(ms: number): Scheduler {
  *   expensiveHeatmapCalculation(deps.pos)
  * );
  */
-export function throttle<T>(ms: number): Operator<T> {
+export function throttle<T>(
+  ms: number,
+  options: SignalOptions<T> = {}
+): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
-    return pace<T>(throttleScheduler(ms), { name: "throttle" })(source);
+    const baseName = options?.name ?? `throttle(${source.displayName})`;
+    return pace<T>(throttleScheduler(ms), {
+      name: baseName,
+    })(source);
   };
 }

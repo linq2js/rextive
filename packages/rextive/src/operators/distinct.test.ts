@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { signal } from "../signal";
-import { distinct, distinctUntilChanged } from "./distinct";
+import { distinct } from "./distinct";
 
 describe("distinct", () => {
-  describe("distinctUntilChanged", () => {
+  describe("mode: consecutive (default)", () => {
     it("should only emit when value changes", () => {
       const source = signal(1);
-      const distincted = distinctUntilChanged<number>()(source);
+      const distincted = distinct<number>()(source);
       const emissions: number[] = [];
 
       distincted.on(() => emissions.push(distincted()));
@@ -22,11 +22,11 @@ describe("distinct", () => {
       expect(distincted()).toBe(1);
     });
 
-    it("should use custom comparer", () => {
+    it("should use custom equals function", () => {
       const source = signal({ id: 1, name: "Alice" });
-      const distincted = distinctUntilChanged<{ id: number; name: string }>(
-        (a, b) => a.id === b.id
-      )(source);
+      const distincted = distinct<{ id: number; name: string }>({
+        equals: (a, b) => a.id === b.id,
+      })(source);
       const emissions: { id: number; name: string }[] = [];
 
       distincted.on(() => emissions.push(distincted()));
@@ -42,12 +42,11 @@ describe("distinct", () => {
       ]);
     });
 
-    it("should work with key selector", () => {
+    it("should work with getKey option", () => {
       const source = signal({ id: 1, name: "Alice" });
-      const distincted = distinctUntilChanged<{ id: number; name: string }>(
-        undefined,
-        (x) => x.id
-      )(source);
+      const distincted = distinct<{ id: number; name: string }, number>({
+        getKey: (x) => x.id,
+      })(source);
       const emissions: { id: number; name: string }[] = [];
 
       distincted.on(() => emissions.push(distincted()));
@@ -59,22 +58,30 @@ describe("distinct", () => {
       expect(emissions).toEqual([{ id: 2, name: "Charlie" }]);
     });
 
+    it("should use custom name", () => {
+      const source = signal(1);
+      const distincted = distinct<number>({ name: "myUnique" })(source);
+
+      expect(distincted.displayName).toMatch(/^#myUnique-\d+$/);
+    });
+
     it("should clean up on dispose", () => {
       const source = signal(1);
-      const distincted = distinctUntilChanged<number>()(source);
+      const distincted = distinct<number>()(source);
 
       expect(distincted()).toBe(1);
 
       distincted.dispose();
 
       // After dispose, just verify no errors during dispose
+      expect(distincted.disposed()).toBe(true);
     });
   });
 
-  describe("distinct (all-time unique)", () => {
+  describe("mode: all (all-time unique)", () => {
     it("should only emit values never seen before", () => {
       const source = signal(1);
-      const distincted = distinct<number>()(source);
+      const distincted = distinct<number>({ mode: "all" })(source);
       const emissions: number[] = [];
 
       distincted.on(() => emissions.push(distincted()));
@@ -90,11 +97,12 @@ describe("distinct", () => {
       expect(distincted()).toBe(4);
     });
 
-    it("should use custom key selector", () => {
+    it("should use custom getKey option", () => {
       const source = signal({ id: 1, name: "Alice" });
-      const distincted = distinct<{ id: number; name: string }>(
-        (x) => x.id
-      )(source);
+      const distincted = distinct<{ id: number; name: string }, number>({
+        mode: "all",
+        getKey: (x) => x.id,
+      })(source);
       const emissions: { id: number; name: string }[] = [];
 
       distincted.on(() => emissions.push(distincted()));
@@ -112,7 +120,7 @@ describe("distinct", () => {
 
     it("should work with primitives", () => {
       const source = signal("a");
-      const distincted = distinct<string>()(source);
+      const distincted = distinct<string>({ mode: "all" })(source);
       const emissions: string[] = [];
 
       distincted.on(() => emissions.push(distincted()));
@@ -126,16 +134,25 @@ describe("distinct", () => {
       expect(emissions).toEqual(["b", "c", "d"]);
     });
 
+    it("should use custom name", () => {
+      const source = signal(1);
+      const distincted = distinct<number>({
+        mode: "all",
+        name: "allUnique",
+      })(source);
+
+      expect(distincted.displayName).toMatch(/^#allUnique-\d+$/);
+    });
+
     it("should clean up on dispose", () => {
       const source = signal(1);
-      const distincted = distinct<number>()(source);
+      const distincted = distinct<number>({ mode: "all" })(source);
 
       expect(distincted()).toBe(1);
 
       distincted.dispose();
 
-      // After dispose, just verify no errors during dispose
+      expect(distincted.disposed()).toBe(true);
     });
   });
 });
-

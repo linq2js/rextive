@@ -1,14 +1,25 @@
 import { signal } from "../signal";
 import type { Signal, Computed } from "../types";
+import type { OperatorNameOptions } from "./types";
 import { autoPrefix } from "../utils/nameGenerator";
 import { wrapDispose } from "../disposable";
 import { emitter } from "../utils/emitter";
 
 /**
+ * Options for count operator.
+ */
+export interface CountOptions extends OperatorNameOptions {
+  /**
+   * Optional predicate to filter which values to count.
+   */
+  predicate?: (value: any, index: number) => boolean;
+}
+
+/**
  * Counts the number of emissions from the source signal.
  * Optionally, only counts emissions that satisfy a predicate.
  *
- * @param predicate - Optional function to test each value (receives value and index)
+ * @param options - Optional configuration with predicate and name
  * @returns An operator function that returns a Computed<number>
  *
  * @example
@@ -21,7 +32,7 @@ import { emitter } from "../utils/emitter";
  *
  * @example
  * // Count only even numbers
- * const evenCount = count<number>(x => x % 2 === 0)(source);
+ * const evenCount = count<number>({ predicate: x => x % 2 === 0 })(source);
  *
  * source.set(1); // evenCount = 0 (odd)
  * source.set(2); // evenCount = 1 (even)
@@ -29,15 +40,19 @@ import { emitter } from "../utils/emitter";
  * source.set(4); // evenCount = 2 (even)
  */
 export function count<T>(
-  predicate?: (value: T, index: number) => boolean
+  options: CountOptions = {}
 ): (source: Signal<T>) => Computed<number> {
+  const { predicate, name } = options;
+
   return (source: Signal<T>): Computed<number> => {
+    const baseName = name ?? `count(${source.displayName})`;
+
     const internal = signal(0, {
-      name: autoPrefix(`count_internal(${source.displayName})`),
+      name: autoPrefix(`${baseName}_internal`),
     });
 
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: autoPrefix(`count(${source.displayName})`),
+      name: autoPrefix(baseName),
     });
 
     let index = 0;

@@ -21,7 +21,7 @@ describe("count", () => {
 
   it("should count with predicate", () => {
     const source = signal(0);
-    const evenCount = count<number>((x) => x % 2 === 0)(source);
+    const evenCount = count<number>({ predicate: (x) => x % 2 === 0 })(source);
 
     expect(evenCount()).toBe(0);
 
@@ -42,9 +42,11 @@ describe("count", () => {
     const source = signal("a");
     const indices: number[] = [];
 
-    const counted = count<string>((_, index) => {
-      indices.push(index);
-      return true;
+    const counted = count<string>({
+      predicate: (_, index) => {
+        indices.push(index);
+        return true;
+      },
     })(source);
 
     source.set("b");
@@ -76,5 +78,11 @@ describe("count", () => {
 
     // After dispose, just verify no errors during dispose
   });
-});
 
+  it("should use custom name", () => {
+    const source = signal(0);
+    const counted = count<number>({ name: "myCounter" })(source);
+
+    expect(counted.displayName).toMatch(/^#myCounter-\d+$/);
+  });
+});

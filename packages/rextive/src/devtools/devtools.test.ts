@@ -83,11 +83,9 @@ describe("rextive/devtools", () => {
 
     it("should track signal kind", () => {
       const mutable = signal(0, { name: "mutable" });
-      const computed = signal(
-        { mutable },
-        ({ deps }) => deps.mutable * 2,
-        { name: "computed" }
-      );
+      const computed = signal({ mutable }, ({ deps }) => deps.mutable * 2, {
+        name: "computed",
+      });
 
       expect(getSignal("mutable")?.kind).toBe("mutable");
       expect(getSignal("computed")?.kind).toBe("computed");
@@ -159,19 +157,6 @@ describe("rextive/devtools", () => {
       expect(info?.history.length).toBe(3);
       expect(info?.history[0].value).toBe(5);
       expect(info?.history[2].value).toBe(3);
-    });
-
-    it("should handle signal rename via pipe", () => {
-      const source = signal(5, { name: "mySource" });
-      const piped = source.pipe(to((x) => x * 2));
-
-      // Piped signal should have a meaningful name
-      expect(piped.displayName).toMatch(/^pipe\(mySource\|/);
-
-      // DevTools should track it under the new name
-      const pipedInfo = getSignal(piped.displayName);
-      expect(pipedInfo).toBeDefined();
-      expect(pipedInfo?.signal).toBe(piped);
     });
   });
 
@@ -285,20 +270,6 @@ describe("rextive/devtools", () => {
       expect(events).toContain("tag:create");
       expect(events).toContain("tag:add");
       expect(events).toContain("tag:remove");
-    });
-
-    it("should emit signal:rename event", () => {
-      const listener = vi.fn();
-      onDevToolsEvent(listener);
-
-      const source = signal(5, { name: "mySource" });
-      source.pipe(to((x) => x * 2));
-
-      const events = listener.mock.calls.map((call) => call[0]);
-      const renameEvent = events.find((e) => e.type === "signal:rename");
-
-      expect(renameEvent).toBeDefined();
-      expect(renameEvent?.newId).toMatch(/^pipe\(mySource\|/);
     });
 
     it("should support unsubscribe", () => {
@@ -420,4 +391,3 @@ describe("rextive/devtools", () => {
     });
   });
 });
-

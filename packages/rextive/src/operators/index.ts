@@ -1,6 +1,10 @@
 // Types
-export type { Scheduler, Operator } from "./types";
-export type { SelectorFn, SelectorOptions, ResolvedSelectors } from "./resolveSelectors";
+export type { Scheduler, Operator, OperatorNameOptions } from "./types";
+export type {
+  SelectorFn,
+  SelectorOptions,
+  ResolvedSelectors,
+} from "./resolveSelectors";
 
 // Utilities
 export { resolveSelectors, resolveSelectorsRequired } from "./resolveSelectors";
@@ -10,6 +14,12 @@ export { to, type ToOperatorOptions } from "./to";
 export { scan } from "./scan";
 export { filter } from "./filter";
 export { focus } from "./focus";
+export type {
+  FocusOptions,
+  FocusBaseOptions,
+  FocusFallback,
+  FocusContext,
+} from "./focus";
 
 // Timing operators
 export { pace, type PaceOptions } from "./pace";
@@ -26,10 +36,12 @@ export { skip, skipWhile, skipLast, skipUntil } from "./skip";
 
 // Min/Max operators
 export { min, max } from "./minmax";
-export type { Comparer } from "./minmax";
+export type { Comparer, MinMaxOptions } from "./minmax";
 
 // Count operator
 export { count } from "./count";
+export type { CountOptions } from "./count";
 
 // Distinct operators
-export { distinct, distinctUntilChanged } from "./distinct";
+export { distinct } from "./distinct";
+export type { DistinctOptions } from "./distinct";
