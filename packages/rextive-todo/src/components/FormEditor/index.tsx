@@ -11,7 +11,6 @@ import { SettingsSection } from "./SettingsSection";
 import { TagsEditor } from "./TagsEditor";
 import { ContactsEditor } from "./ContactsEditor";
 import "./FormEditor.css";
-import { useLayoutEffect, useMemo, useRef, useState, useId } from "react";
 
 function FormEditorContent() {
   const { formConfig } = useFormContext();
@@ -187,47 +186,6 @@ function BudgetField() {
   );
 }
 
-const map = new WeakSet<any>();
-
-const FormTest = (props: { name: string }) => {
-  const id = useId();
-  const obj = useMemo(() => {
-    console.log("FormTest useMemo", props.name, id);
-    return {
-      id,
-      name: props.name,
-    };
-  }, [props.name, id]);
-  const instanceRef = useRef(obj);
-  console.log("FormTest instanceRef", instanceRef.current);
-  instanceRef.current = obj;
-
-  useLayoutEffect(() => {
-    console.log("FormTest useLayoutEffect dep", obj);
-    if (instanceRef.current !== obj) {
-      instanceRef.current = obj;
-      console.log("changed", instanceRef.current);
-    }
-    return () => {
-      console.log("FormTest useLayoutEffect dep cleanup", obj);
-    };
-  }, [obj]);
-
-  return <div>FormTest {props.name}</div>;
-};
-
-function Wrapper() {
-  const [, rerender] = useState({});
-  console.log("Wrapper render");
-
-  return (
-    <>
-      <FormTest name="John" />
-      <button onClick={() => rerender({})}>Rerender</button>
-    </>
-  );
-}
-
 // Main export with provider wrapper
 export function FormEditor() {
   return (
@@ -236,7 +194,6 @@ export function FormEditor() {
       <p className="form-editor-subtitle">
         Using <code>focus</code> operator with <code>provider</code> pattern
       </p>
-      <Wrapper />
       <FormContextProvider
         value={{ formData: defaultFormModel, formConfig: defaultFormConfig }}
       >
