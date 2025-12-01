@@ -16,7 +16,7 @@ import {
   batch,         // Batch multiple updates
   wait,          // Coordinate async operations
   emitter,       // Event emitter utility
-  loadable,      // Async state representation
+  task,      // Async state representation
   isSignal,      // Type guard
   // ... and more utilities
 } from 'rextive';
@@ -70,7 +70,7 @@ import type {
   SignalMap,
   SignalOptions,
   SignalContext,
-  Loadable,
+  Task,
   Awaitable,
   // ... other core types
 } from 'rextive';

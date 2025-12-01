@@ -1744,11 +1744,11 @@ export type SignalOptions<T> = SignalNameOptions & {
   // This is to ensure proper type constraints for mutable vs computed signals
 };
 
-export type ResolveValueType = "awaited" | "loadable" | "value";
+export type ResolveValueType = "awaited" | "task" | "value";
 
 export type ResolveAwaitable<T> = T extends Signal<infer TValue>
   ? ResolveAwaitable<TValue>
-  : T extends Loadable<any>
+  : T extends Task<any>
   ? Awaited<T["promise"]>
   : Awaited<T>;
 
@@ -1762,8 +1762,8 @@ export type ResolvedValueMap<
   readonly [K in keyof TMap]: TMap[K] extends () => infer T
     ? TType extends "awaited"
       ? Awaited<T>
-      : TType extends "loadable"
-      ? Loadable<Awaited<T>>
+      : TType extends "task"
+      ? Task<Awaited<T>>
       : TType extends "value"
       ? T
       : never
@@ -1771,15 +1771,15 @@ export type ResolvedValueMap<
 };
 
 /**
- * Internal symbol used to identify loadable objects at runtime.
+ * Internal symbol used to identify task objects at runtime.
  * This allows for reliable type checking without relying on duck typing.
  */
-export const LOADABLE_TYPE = Symbol("LOADABLE_TYPE");
+export const TASK_TYPE = Symbol("TASK_TYPE");
 
 /**
  * Represents the status of an async operation.
  */
-export type LoadableStatus = "loading" | "success" | "error";
+export type TaskStatus = "loading" | "success" | "error";
 
 /**
  * Represents an in-progress async operation.
@@ -1792,8 +1792,8 @@ export type LoadableStatus = "loading" | "success" | "error";
  *
  * @example
  * ```typescript
- * const loadingState: LoadingLoadable = {
- *   [LOADABLE_TYPE]: true,
+ * const loadingState: LoadingTask = {
+ *   [TASK_TYPE]: true,
  *   status: "loading",
  *   promise: fetchUser(1),
  *   value: undefined,
@@ -1802,8 +1802,8 @@ export type LoadableStatus = "loading" | "success" | "error";
  * };
  * ```
  */
-export type LoadingLoadable<TValue> = {
-  [LOADABLE_TYPE]: true;
+export type LoadingTask<TValue> = {
+  [TASK_TYPE]: true;
   status: "loading";
   promise: PromiseLike<TValue>;
   value: undefined;
@@ -1823,8 +1823,8 @@ export type LoadingLoadable<TValue> = {
  *
  * @example
  * ```typescript
- * const successState: SuccessLoadable<User> = {
- *   [LOADABLE_TYPE]: true,
+ * const successState: SuccessTask<User> = {
+ *   [TASK_TYPE]: true,
  *   status: "success",
  *   promise: Promise.resolve(user),
  *   value: { id: 1, name: "Alice" },
@@ -1833,8 +1833,8 @@ export type LoadingLoadable<TValue> = {
  * };
  * ```
  */
-export type SuccessLoadable<TValue> = {
-  [LOADABLE_TYPE]: true;
+export type SuccessTask<TValue> = {
+  [TASK_TYPE]: true;
   status: "success";
   promise: PromiseLike<TValue>;
   value: TValue;
@@ -1853,8 +1853,8 @@ export type SuccessLoadable<TValue> = {
  *
  * @example
  * ```typescript
- * const errorState: ErrorLoadable = {
- *   [LOADABLE_TYPE]: true,
+ * const errorState: ErrorTask = {
+ *   [TASK_TYPE]: true,
  *   status: "error",
  *   promise: Promise.reject(new Error("Failed")),
  *   value: undefined,
@@ -1863,8 +1863,8 @@ export type SuccessLoadable<TValue> = {
  * };
  * ```
  */
-export type ErrorLoadable<TValue> = {
-  [LOADABLE_TYPE]: true;
+export type ErrorTask<TValue> = {
+  [TASK_TYPE]: true;
   status: "error";
   promise: PromiseLike<TValue>;
   value: undefined;
@@ -1875,12 +1875,12 @@ export type ErrorLoadable<TValue> = {
 /**
  * A discriminated union representing all possible states of an async operation.
  *
- * A Loadable encapsulates the three states of async data:
- * - `LoadingLoadable`: Operation in progress
- * - `SuccessLoadable<T>`: Operation completed successfully with data
- * - `ErrorLoadable`: Operation failed with error
+ * A Task encapsulates the three states of async data:
+ * - `LoadingTask`: Operation in progress
+ * - `SuccessTask<T>`: Operation completed successfully with data
+ * - `ErrorTask`: Operation failed with error
  *
- * Each loadable maintains a reference to the underlying promise, allowing
+ * Each task maintains a reference to the underlying promise, allowing
  * integration with React Suspense and other promise-based systems.
  *
  * @template T - The type of data when operation succeeds
@@ -1888,22 +1888,22 @@ export type ErrorLoadable<TValue> = {
  * @example
  * ```typescript
  * // Type-safe pattern matching
- * function renderLoadable<T>(loadable: Loadable<T>) {
- *   switch (loadable.status) {
+ * function renderTask<T>(task: Task<T>) {
+ *   switch (task.status) {
  *     case "loading":
  *       return <Spinner />;
  *     case "success":
- *       return <div>{loadable.value}</div>; // TypeScript knows data exists
+ *       return <div>{task.value}</div>; // TypeScript knows data exists
  *     case "error":
- *       return <Error error={loadable.error} />; // TypeScript knows error exists
+ *       return <Error error={task.error} />; // TypeScript knows error exists
  *   }
  * }
  * ```
  */
-export type Loadable<T> =
-  | LoadingLoadable<T>
-  | SuccessLoadable<T>
-  | ErrorLoadable<T>;
+export type Task<T> =
+  | LoadingTask<T>
+  | SuccessTask<T>
+  | ErrorTask<T>;
 
 /**
  * A lazy factory that produces and manages a single instance at a time.

@@ -9,7 +9,16 @@
     "lodash/isEqual": "npm:lodash@4/isEqual",
     "lodash/debounce": "npm:lodash@4/debounce",
     "react": "npm:react@18",
-    "immer": "npm:immer@10"
+    "immer": "npm:immer@10",
+    "@/index": "./src/index.ts",
+    "@/utils/task": "./src/utils/task.ts",
+    "@/utils/isPromiseLike": "./src/utils/isPromiseLike.ts",
+    "@/utils/errorTracking": "./src/utils/errorTracking.ts",
+    "@/utils/createSignalAccessProxy": "./src/utils/createSignalAccessProxy.ts",
+    "@/utils/nameGenerator": "./src/utils/nameGenerator.ts",
+    "@/devtools/types": "./src/devtools/types.ts",
+    "@/devtools/index": "./src/devtools/index.ts",
+    "@/devtools/utils/buildDependencyGraph": "./src/devtools/utils/buildDependencyGraph.ts"
   },
   "exports": {
     ".": "./src/index.ts",

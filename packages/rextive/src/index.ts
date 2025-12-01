@@ -11,7 +11,7 @@
  * - **signal.from()** - Combine signals into records or tuples
  * - **disposable()** - Combine disposable resources
  * - **wait()** - Suspense-compatible async utilities
- * - **loadable.from()** - Manual loading state management
+ * - **task.from()** - Manual loading state management
  *
  * @example Basic usage
  * ```ts
@@ -46,8 +46,8 @@ export type * from "./types";
 // Re-export signal.on types
 export type { SignalOnControl } from "./signal.on";
 
-// Re-export LOADABLE_TYPE constant
-export { LOADABLE_TYPE } from "./types";
+// Re-export TASK_TYPE constant
+export { TASK_TYPE } from "./types";
 
 // Import signal and utilities, combine them, then export
 import { signal as signalBase } from "./signal";
@@ -86,7 +86,7 @@ export const $: SignalApi = signal;
 // Core utilities (no React)
 export { emitter } from "./utils/emitter";
 export type { Emitter } from "./utils/emitter";
-export { loadable } from "./utils/loadable";
+export { task } from "./utils/task";
 export { isPromiseLike } from "./utils/isPromiseLike";
 export { createProxy } from "./utils/createProxy";
 export type { ProxyOptions } from "./utils/createProxy";

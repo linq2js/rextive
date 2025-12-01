@@ -1,4 +1,4 @@
-import { signal, wait, loadable, rx, useScope } from "rextive/react";
+import { signal, wait, task, rx, useScope } from "rextive/react";
 
 /**
  * Factory function that creates an async signal that may throw
@@ -30,7 +30,7 @@ const createMaybeErrorSignal = () => {
  * Error Demo Component
  *
  * Demonstrates:
- * - Using loadable() for loading/error/success states
+ * - Using task() for loading/error/success states
  * - Refresh button to retry the operation
  * - Proper async signal error handling pattern
  */
@@ -46,7 +46,7 @@ export const ErrorDemo = () => {
       </p>
 
       {rx(() => {
-        const state = loadable(maybeError);
+        const state = task.from(maybeError);
 
         return (
           <div className="demo-content">

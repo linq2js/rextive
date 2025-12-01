@@ -1,72 +1,72 @@
-# Loadable API v2 - Breaking Changes
+# Task API v2 - Breaking Changes
 
 ## Summary
 
-The `loadable` API has been completely refactored to use a namespace-based design with a primary normalizer function. This is a **breaking change** that improves API consistency and discoverability.
+The `task` API has been completely refactored to use a namespace-based design with a primary normalizer function. This is a **breaking change** that improves API consistency and discoverability.
 
 ## Migration Guide
 
 ###  Before (v1)
 
 ```typescript
-import { loadable, isLoadable, getLoadable, setLoadable, toLoadable } from "rextive";
+import { task, isTask, getTask, setTask, toTask } from "rextive";
 
 // Factory functions with status as first parameter
-const loading = loadable("loading", promise);
-const success = loadable("success", data);
-const error = loadable("error", err);
+const loading = task("loading", promise);
+const success = task("success", data);
+const error = task("error", err);
 
 // Type guard
-if (isLoadable(value)) { ... }
+if (isTask(value)) { ... }
 
 // Cache management
-const l = getLoadable(promise);
-setLoadable(promise, loadable);
+const l = getTask(promise);
+setTask(promise, task);
 
 // Normalization
-const normalized = toLoadable(value);
+const normalized = toTask(value);
 ```
 
 ### After (v2)
 
 ```typescript
-import { loadable } from "rextive";
+import { task } from "rextive";
 
-// Main function: normalizes any value to loadable
-const normalized = loadable.from(value);        // Automatic normalization
-const normalized2 = loadable.from(promise);     // Wraps in loading loadable
-const normalized3 = loadable.from(loadable);    // Returns as-is
+// Main function: normalizes any value to task
+const normalized = task.from(value);        // Automatic normalization
+const normalized2 = task.from(promise);     // Wraps in loading task
+const normalized3 = task.from(task);    // Returns as-is
 
 // Namespace methods for explicit creation
-const loading = loadable.loading(promise);
-const success = loadable.success(data);
-const error = loadable.error(err);
+const loading = task.loading(promise);
+const success = task.success(data);
+const error = task.error(err);
 
 // Type guard namespace method
-if (loadable.is(value)) { ... }
+if (task.is(value)) { ... }
 
 // Cache management namespace methods
-const l = loadable.get(promise);
-loadable.set(promise, l);
+const l = task.get(promise);
+task.set(promise, l);
 ```
 
 ## API Changes
 
-### 1. **Main Function: `loadable.from(value)`**
+### 1. **Main Function: `task.from(value)`**
 
-The primary `loadable.from()` function normalizes any value to a Loadable:
+The primary `task.from()` function normalizes any value to a Task:
 
 ```typescript
-// Promise → LoadingLoadable
-const l1 = loadable.from(fetchUser());
+// Promise → LoadingTask
+const l1 = task.from(fetchUser());
 // { status: "loading", promise, ... }
 
-// Plain value → SuccessLoadable
-const l2 = loadable.from({ id: 1, name: "Alice" });
+// Plain value → SuccessTask
+const l2 = task.from({ id: 1, name: "Alice" });
 // { status: "success", value: { id: 1, name: "Alice" }, ... }
 
-// Already loadable → returns as-is
-const l3 = loadable.from(l1);
+// Already task → returns as-is
+const l3 = task.from(l1);
 // l3 === l1 (same reference)
 ```
 
@@ -74,39 +74,39 @@ const l3 = loadable.from(l1);
 
 ```typescript
 const promise = Promise.resolve(42);
-const l = loadable.from(promise);
-// Type: Loadable<number>
+const l = task.from(promise);
+// Type: Task<number>
 
 const data = { id: 1 };
-const l2 = loadable(data);
-// Type: Loadable<{ id: number }>
+const l2 = task(data);
+// Type: Task<{ id: number }>
 ```
 
 ### 2. **Namespace Methods**
 
-All factory and helper functions are now under the `loadable` namespace:
+All factory and helper functions are now under the `task` namespace:
 
 #### **Factory Methods**
 
 ```typescript
-// Create loading loadable
-loadable.loading<T>(promise: PromiseLike<T>): LoadingLoadable<T>
+// Create loading task
+task.loading<T>(promise: PromiseLike<T>): LoadingTask<T>
 
-// Create success loadable  
-loadable.success<T>(value: T, promise?: PromiseLike<T>): SuccessLoadable<T>
+// Create success task  
+task.success<T>(value: T, promise?: PromiseLike<T>): SuccessTask<T>
 
-// Create error loadable
-loadable.error<T>(error: unknown, promise?: PromiseLike<T>): ErrorLoadable<T>
+// Create error task
+task.error<T>(error: unknown, promise?: PromiseLike<T>): ErrorTask<T>
 ```
 
 #### **Type Guard**
 
 ```typescript
-// Check if value is a loadable
-loadable.is<T>(value: unknown): value is Loadable<T>
+// Check if value is a task
+task.is<T>(value: unknown): value is Task<T>
 
 // Example
-if (loadable.is<User>(value)) {
+if (task.is<User>(value)) {
   console.log(value.status); // Type-safe
 }
 ```
@@ -114,21 +114,21 @@ if (loadable.is<User>(value)) {
 #### **Cache Management**
 
 ```typescript
-// Get or create loadable for promise
-loadable.get<T>(promise: PromiseLike<T>): Loadable<T>
+// Get or create task for promise
+task.get<T>(promise: PromiseLike<T>): Task<T>
 
-// Set loadable for promise
-loadable.set<T>(promise: PromiseLike<T>, l: Loadable<T>): Loadable<T>
+// Set task for promise
+task.set<T>(promise: PromiseLike<T>, l: Task<T>): Task<T>
 ```
 
 ### 3. **Removed Exports**
 
 The following standalone functions have been **removed**:
 
-- ❌ `isLoadable()` → Use `loadable.is()`
-- ❌ `getLoadable()` → Use `loadable.get()`
-- ❌ `setLoadable()` → Use `loadable.set()`
-- ❌ `toLoadable()` → Use `loadable.from()`
+- ❌ `isTask()` → Use `task.is()`
+- ❌ `getTask()` → Use `task.get()`
+- ❌ `setTask()` → Use `task.set()`
+- ❌ `toTask()` → Use `task.from()`
 
 ## Migration Steps
 
@@ -136,68 +136,68 @@ The following standalone functions have been **removed**:
 
 ```typescript
 // Before
-import { loadable, isLoadable, getLoadable, setLoadable, toLoadable } from "rextive";
+import { task, isTask, getTask, setTask, toTask } from "rextive";
 
 // After
-import { loadable } from "rextive";
+import { task } from "rextive";
 ```
 
 ### Step 2: Update Factory Calls
 
 ```typescript
 // Before
-const l1 = loadable("loading", promise);
-const l2 = loadable("success", data);
-const l3 = loadable("error", err);
+const l1 = task("loading", promise);
+const l2 = task("success", data);
+const l3 = task("error", err);
 
 // After
-const l1 = loadable.loading(promise);
-const l2 = loadable.success(data);
-const l3 = loadable.error(err);
+const l1 = task.loading(promise);
+const l2 = task.success(data);
+const l3 = task.error(err);
 ```
 
 ### Step 3: Update Type Guards
 
 ```typescript
 // Before
-if (isLoadable(value)) { ... }
+if (isTask(value)) { ... }
 
 // After
-if (loadable.is(value)) { ... }
+if (task.is(value)) { ... }
 ```
 
 ### Step 4: Update Cache Functions
 
 ```typescript
 // Before
-const l = getLoadable(promise);
-setLoadable(promise, l);
+const l = getTask(promise);
+setTask(promise, l);
 
 // After
-const l = loadable.get(promise);
-loadable.set(promise, l);
+const l = task.get(promise);
+task.set(promise, l);
 ```
 
 ### Step 5: Update Normalization
 
 ```typescript
 // Before
-const normalized = toLoadable(value);
+const normalized = toTask(value);
 
 // After
-const normalized = loadable.from(value);
+const normalized = task.from(value);
 ```
 
 ## Benefits of New API
 
 ### 1. **Better Discoverability**
 
-All loadable-related functionality is under one namespace:
+All task-related functionality is under one namespace:
 
 ```typescript
-import { loadable } from "rextive";
+import { task } from "rextive";
 
-loadable.           // IDE autocomplete shows all methods:
+task.           // IDE autocomplete shows all methods:
   // - from()
   // - loading()
   // - success()
@@ -211,21 +211,21 @@ loadable.           // IDE autocomplete shows all methods:
 
 ```typescript
 // Before: 5+ imports
-import { loadable, isLoadable, getLoadable, setLoadable, toLoadable } from "rextive";
+import { task, isTask, getTask, setTask, toTask } from "rextive";
 
 // After: 1 import
-import { loadable } from "rextive";
+import { task } from "rextive";
 ```
 
 ### 3. **More Intuitive Primary Function**
 
-The main `loadable.from()` function does what you expect - converts any value to a loadable:
+The main `task.from()` function does what you expect - converts any value to a task:
 
 ```typescript
 // Automatic "do what I mean" behavior
-const l1 = loadable.from(promise);      // Loading
-const l2 = loadable.from(data);         // Success
-const l3 = loadable.from(existingL);    // Pass-through
+const l1 = task.from(promise);      // Loading
+const l2 = task.from(data);         // Success
+const l3 = task.from(existingL);    // Pass-through
 ```
 
 ### 4. **Consistent with Modern APIs**
@@ -237,25 +237,25 @@ Follows patterns from popular libraries:
 
 ## Examples
 
-### Creating Loadables
+### Creating Tasks
 
 ```typescript
 // Explicit creation
-const loading = loadable.loading(fetchUser());
-const success = loadable.success({ id: 1, name: "Alice" });
-const error = loadable.error(new Error("Failed"));
+const loading = task.loading(fetchUser());
+const success = task.success({ id: 1, name: "Alice" });
+const error = task.error(new Error("Failed"));
 
 // Automatic normalization
-const l1 = loadable.from(Promise.resolve(42));        // LoadingLoadable<number>
-const l2 = loadable.from({ id: 1 });                  // SuccessLoadable<{ id: number }>
-const l3 = loadable.from(loadable.success(42));       // SuccessLoadable<number> (same reference)
+const l1 = task.from(Promise.resolve(42));        // LoadingTask<number>
+const l2 = task.from({ id: 1 });                  // SuccessTask<{ id: number }>
+const l3 = task.from(task.success(42));       // SuccessTask<number> (same reference)
 ```
 
 ### Type Guards
 
 ```typescript
 function handleValue(value: unknown) {
-  if (loadable.is<User>(value)) {
+  if (task.is<User>(value)) {
     switch (value.status) {
       case "loading":
         return <Spinner />;
@@ -265,7 +265,7 @@ function handleValue(value: unknown) {
         return <Error error={value.error} />;
     }
   }
-  return <div>Not a loadable</div>;
+  return <div>Not a task</div>;
 }
 ```
 
@@ -276,8 +276,8 @@ function handleValue(value: unknown) {
 async function fetchWithCache(url: string) {
   const promise = fetch(url).then(r => r.json());
   
-  // Get or create loadable
-  const l = loadable.get(promise);
+  // Get or create task
+  const l = task.get(promise);
   
   if (l.status === "loading") {
     const data = await l.promise;
@@ -291,11 +291,11 @@ async function fetchWithCache(url: string) {
 ### Integration with wait()
 
 ```typescript
-import { wait, loadable } from "rextive";
+import { wait, task } from "rextive";
 
-// wait() uses loadable.from() internally
-const user = loadable.from(fetchUser());
-const posts = loadable.from(fetchPosts());
+// wait() uses task.from() internally
+const user = task.from(fetchUser());
+const posts = task.from(fetchPosts());
 
 // Suspense-style
 const [userData, postsData] = wait([user, posts]);
@@ -312,30 +312,30 @@ If you have a large codebase, you can use find-and-replace:
 
 ```bash
 # Replace factory calls
-sed -i 's/loadable("loading",/loadable.loading(/g' **/*.ts
-sed -i 's/loadable("success",/loadable.success(/g' **/*.ts
-sed -i 's/loadable("error",/loadable.error(/g' **/*.ts
+sed -i 's/task("loading",/task.loading(/g' **/*.ts
+sed -i 's/task("success",/task.success(/g' **/*.ts
+sed -i 's/task("error",/task.error(/g' **/*.ts
 
 # Replace type guard
-sed -i 's/isLoadable(/loadable.is(/g' **/*.ts
+sed -i 's/isTask(/task.is(/g' **/*.ts
 
 # Replace cache functions
-sed -i 's/getLoadable(/loadable.get(/g' **/*.ts
-sed -i 's/setLoadable(/loadable.set(/g' **/*.ts
+sed -i 's/getTask(/task.get(/g' **/*.ts
+sed -i 's/setTask(/task.set(/g' **/*.ts
 
 # Replace normalization
-sed -i 's/toLoadable(/loadable.from(/g' **/*.ts
-sed -i 's/loadable(\([^)]*\))/loadable.from(\1)/g' **/*.ts
+sed -i 's/toTask(/task.from(/g' **/*.ts
+sed -i 's/task(\([^)]*\))/task.from(\1)/g' **/*.ts
 ```
 
 ## Type Compatibility
 
-The underlying types (`Loadable<T>`, `LoadingLoadable<T>`, `SuccessLoadable<T>`, `ErrorLoadable<T>`) remain unchanged, so existing type annotations work without modification.
+The underlying types (`Task<T>`, `LoadingTask<T>`, `SuccessTask<T>`, `ErrorTask<T>`) remain unchanged, so existing type annotations work without modification.
 
 ## Questions?
 
 If you have questions about the migration, please refer to:
 - API Reference: `docs/api-reference.md`
 - Examples: `examples/`
-- Tests: `src/utils/loadable.test.ts`
+- Tests: `src/utils/task.test.ts`
 

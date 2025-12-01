@@ -13,13 +13,13 @@ Created comprehensive type check files for all APIs with multiple overloads:
 ### 2. `react/rx.type.check.tsx`
 - Tests 3 overloads of the `rx()` API
 - Validates static render, single signal, and multiple signals patterns
-- Tests both awaited (Suspense) and loadable (manual) access patterns
+- Tests both awaited (Suspense) and task (manual) access patterns
 - Covers conditional rendering and complex scenarios
 
-### 3. `utils/loadable.type.check.ts`
-- Tests 3 overloads of the `loadable()` API
-- Validates loading, success, and error loadables
-- Tests helper functions (isLoadable, getLoadable, setLoadable, toLoadable)
+### 3. `utils/task.type.check.ts`
+- Tests 3 overloads of the `task()` API
+- Validates loading, success, and error tasks
+- Tests helper functions (isTask, getTask, setTask, toTask)
 - Covers discriminated union narrowing
 
 ### 4. `wait.type.check.ts` (Already existed)
@@ -48,10 +48,10 @@ rextive/
 │   ├── tag.ts
 │   ├── utils/                      # Core utilities
 │   │   ├── emitter.ts
-│   │   ├── loadable.ts
+│   │   ├── task.ts
 │   │   ├── createProxy.ts
 │   │   ├── ...
-│   │   └── loadable.type.check.ts
+│   │   └── task.type.check.ts
 │   ├── signal.type.check.ts
 │   ├── wait.type.check.ts
 │   └── react/                      # React-specific code
@@ -82,7 +82,7 @@ import {
   batch,         // Update batching
   wait,          // Async coordination
   emitter,       // Event emitter
-  loadable,      // Async state
+  task,      // Async state
   isSignal,      // Type guard
   // ... more core utilities
 } from 'rextive';
@@ -126,7 +126,7 @@ import {
 - `SignalMap`
 - `SignalContext`
 - `SignalOptions<T>`
-- `Loadable<T>`
+- `Task<T>`
 - `Awaitable<T>`
 - `ResolveValue<TMap, TType>`
 - All other framework-agnostic types
@@ -177,7 +177,7 @@ Test Files  12 passed (12)
 - ✅ `utils/dev.test.ts` (10 tests)
 - ✅ `utils/createProxy.test.ts` (40 tests)
 - ✅ `utils/emitter.test.ts` (18 tests)
-- ✅ `utils/loadable.test.ts` (41 tests)
+- ✅ `utils/task.test.ts` (41 tests)
 - ✅ `batch.test.ts` (14 tests)
 - ✅ `signal.test.ts` (65 tests)
 - ✅ `persistSignals.test.ts` (31 tests)
@@ -238,7 +238,7 @@ Test Files  12 passed (12)
 - `src/react/types.ts` - React types
 - `src/signal.type.check.ts` - Signal type tests
 - `src/react/rx.type.check.tsx` - Rx type tests
-- `src/utils/loadable.type.check.ts` - Loadable type tests
+- `src/utils/task.type.check.ts` - Task type tests
 - `MIGRATION_CORE_REACT.md` - Migration guide
 - `STRUCTURE.md` - Structure documentation
 - `COMPLETION_SUMMARY.md` - This summary

@@ -39,7 +39,7 @@ import { isPromiseLike } from "../utils/isPromiseLike";
  *
  * For signals containing Promises:
  * - Use `wait(signal())` to get the resolved value (throws for Suspense)
- * - Use `loadable(signal())` to get loading/error/success state
+ * - Use `task.from(signal())` to get loading/error/success state
  *
  * @warning **Do NOT use `rx()` directly in element attributes!**
  *
@@ -100,12 +100,12 @@ import { isPromiseLike } from "../utils/isPromiseLike";
  * })}
  * ```
  *
- * @example Manual loading state with loadable
+ * @example Manual loading state with task
  * ```tsx
- * import { loadable } from "rextive";
+ * import { task } from "rextive";
  *
  * {rx(() => {
- *   const state = loadable.from(user());
+ *   const state = task.from(user());
  *   if (state.loading) return <Spinner />;
  *   if (state.error) return <Error error={state.error} />;
  *   return <div>{state.value.name}</div>;

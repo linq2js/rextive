@@ -65,7 +65,11 @@ export function useDevToolsState() {
   // Check if devtools is enabled
   useEffect(() => {
     const checkEnabled = () => {
-      setEnabled(isDevToolsEnabled());
+      const isEnabled = isDevToolsEnabled();
+      setEnabled(isEnabled);
+      if (!isEnabled) {
+        console.warn("[rextive/devtools] DevTools is not enabled. Call enableDevTools() before creating signals.");
+      }
     };
 
     checkEnabled();
@@ -75,12 +79,23 @@ export function useDevToolsState() {
 
   // Refresh data periodically when enabled
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      console.log("[rextive/devtools] Panel refresh disabled - DevTools not enabled");
+      return;
+    }
 
     const refresh = () => {
-      setSignals(new Map(getSignals()));
-      setTags(new Map(getTags()));
-      setStats(getStats());
+      const signalsMap = new Map(getSignals());
+      const tagsMap = new Map(getTags());
+      const statsData = getStats();
+      
+      if (signalsMap.size === 0 && tagsMap.size === 0) {
+        console.log("[rextive/devtools] No signals or tags found. Make sure enableDevTools() is called before creating signals.");
+      }
+      
+      setSignals(signalsMap);
+      setTags(tagsMap);
+      setStats(statsData);
     };
 
     refresh();

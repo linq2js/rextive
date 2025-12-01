@@ -2,7 +2,7 @@
  * Signal value extraction utilities
  */
 
-import { loadable } from "@/utils/loadable";
+import { task } from "@/utils/task";
 import { isPromiseLike } from "@/utils/isPromiseLike";
 import { signal } from "@/index";
 import type { SignalInfo } from "@/devtools/types";
@@ -33,7 +33,7 @@ export function extractSignalValue(info: SignalInfo): {
       currentValue = signalError;
     } else {
       currentValue = info.signal.tryGet();
-      
+
       // Handle nested signals - if the value is itself a signal, extract its value
       if (signal.is(currentValue)) {
         try {
@@ -44,20 +44,24 @@ export function extractSignalValue(info: SignalInfo): {
             const nestedValue = (currentValue as any).tryGet?.();
             if (nestedValue !== undefined) {
               // Recursively handle nested signals
-              currentValue = signal.is(nestedValue) 
+              currentValue = signal.is(nestedValue)
                 ? `[Signal: ${(nestedValue as any).displayName || "nested"}]`
                 : nestedValue;
             } else {
-              currentValue = `[Signal: ${(currentValue as any).displayName || "signal"}]`;
+              currentValue = `[Signal: ${
+                (currentValue as any).displayName || "signal"
+              }]`;
             }
           }
         } catch {
-          currentValue = `[Signal: ${(currentValue as any).displayName || "signal"}]`;
+          currentValue = `[Signal: ${
+            (currentValue as any).displayName || "signal"
+          }]`;
         }
       }
-      // For async signals, show the resolved/rejected value from loadable
+      // For async signals, show the resolved/rejected value from task
       else if (isPromiseLike(currentValue)) {
-        const state = loadable.from(currentValue);
+        const state = task.from(currentValue);
         if (state.status === "success") {
           currentValue = state.value;
         } else if (state.status === "error") {
@@ -73,4 +77,3 @@ export function extractSignalValue(info: SignalInfo): {
 
   return { value: currentValue, error: signalError };
 }
-

@@ -29,7 +29,7 @@ rx(() => <div>{value}</div>, { watch: [value] })
 
 **Overload 2: Explicit Signals (Always Reactive)**
 ```tsx
-rx({ user, posts }, (awaited, loadable) => (
+rx({ user, posts }, (awaited, task) => (
   <div>{awaited.user.name}</div>
 ))
 ```
@@ -38,7 +38,7 @@ rx({ user, posts }, (awaited, loadable) => (
 - Overload 1: No reactivity by default, use `watch` for manual control
 - Overload 2: Always reactive, tracks signals automatically
 - Lazy tracking: Only subscribes to signals actually accessed
-- Supports Suspense (`awaited`) and manual loading states (`loadable`)
+- Supports Suspense (`awaited`) and manual loading states (`task`)
 
 ### 3. useScope - Component-Scoped Disposables
 
@@ -283,10 +283,10 @@ rx(() => <div>Static</div>);
 rx(() => <div>{value}</div>, { watch: [value] });
 
 // With signals
-rx({ user, posts }, (awaited, loadable) => (
+rx({ user, posts }, (awaited, task) => (
   <div>
     <div>{awaited.user.name}</div>
-    {loadable.posts.status === "loading" && <Spinner />}
+    {task.posts.status === "loading" && <Spinner />}
   </div>
 ));
 ```
@@ -338,15 +338,15 @@ const awaited = useAwaited({ user, posts });
 // awaited.posts throws promise if loading
 ```
 
-### useLoadable
+### useTask
 
 ```tsx
 const data = signal(async () => fetchData());
 
-const loadable = useLoadable({ data });
-// loadable.data.status: "loading" | "success" | "error"
-// loadable.data.value: T (if success)
-// loadable.data.error: unknown (if error)
+const task = useTask({ data });
+// task.data.status: "loading" | "success" | "error"
+// task.data.value: T (if success)
+// task.data.error: unknown (if error)
 ```
 
 ### signal.persist
@@ -585,7 +585,7 @@ const scope = useScope(() => ({
 - **`rx`**: For reactive rendering in components
 - **`useScope`**: For component-scoped signals with cleanup
 - **`useAwaited`**: For Suspense integration (usually use `rx` instead)
-- **`useLoadable`**: For manual loading states (usually use `rx` instead)
+- **`useTask`**: For manual loading states (usually use `rx` instead)
 
 ## Migration from Other Libraries
 

@@ -1,0 +1,328 @@
+import { isPromiseLike } from "./isPromiseLike";
+import {
+  TASK_TYPE,
+  type TaskStatus,
+  type LoadingTask,
+  type SuccessTask,
+  type ErrorTask,
+  type Task,
+  Signal,
+} from "../types";
+import { getRenderHooks } from "../hooks";
+import { is } from "../is";
+
+// Re-export types
+export { TASK_TYPE };
+export type { TaskStatus, LoadingTask, SuccessTask, ErrorTask, Task };
+
+/**
+ * Normalizes an arbitrary value into a Task.
+ *
+ * - If the value is already a Task, returns it as-is.
+ * - If the value is a PromiseLike, wraps or reuses a cached Task.
+ * - Otherwise, wraps the value in a "success" Task.
+ *
+ * @template TValue - The type of the value
+ * @param value - The value to convert to a Task
+ * @returns A Task wrapping the value
+ *
+ * @example
+ * ```typescript
+ * // Convert promise to task
+ * const userTask = task.from(fetchUser(1));
+ *
+ * // Convert plain value to task
+ * const dataTask = task.from({ id: 1, name: "Alice" });
+ *
+ * // Already a task? Returns as-is
+ * const t = task.success(42);
+ * const same = task.from(t); // same === t
+ * ```
+ */
+export function task<TValue>(
+  value: TValue
+): TValue extends Signal<infer T>
+  ? Task<Awaited<T>>
+  : TValue extends Task<any>
+  ? TValue
+  : TValue extends PromiseLike<infer T>
+  ? Task<T>
+  : Task<TValue> {
+  if (is(value)) {
+    if (value.error()) {
+      return task.error(value.error()) as any;
+    }
+    value = (value as Signal<any>)();
+  }
+  const t = toTaskImpl(value) as any;
+
+  getRenderHooks().onTaskAccess(t);
+
+  return t;
+}
+
+// Namespace with factory and helper methods
+export namespace task {
+  /**
+   * Creates a loading task from a promise.
+   *
+   * @param promise - The promise representing the ongoing operation
+   * @returns A LoadingTask wrapping the promise
+   *
+   * @example
+   * ```typescript
+   * const userPromise = fetchUser(1);
+   * const loading = task.loading(userPromise);
+   * ```
+   */
+  export function loading<TValue>(
+    promise: PromiseLike<TValue>
+  ): LoadingTask<TValue> {
+    return {
+      [TASK_TYPE]: true,
+      status: "loading",
+      promise,
+      value: undefined,
+      error: undefined,
+      loading: true,
+    };
+  }
+
+  /**
+   * Creates a success task with data.
+   *
+   * @param value - The successful result data
+   * @param promise - The resolved promise (optional)
+   * @returns A SuccessTask containing the data
+   *
+   * @example
+   * ```typescript
+   * const user = { id: 1, name: "Alice" };
+   * const success = task.success(user);
+   * ```
+   */
+  export function success<TValue>(
+    value: TValue,
+    promise?: PromiseLike<TValue>
+  ): SuccessTask<TValue> {
+    const resolvedPromise = promise || Promise.resolve(value);
+    return {
+      [TASK_TYPE]: true,
+      status: "success",
+      promise: resolvedPromise,
+      value,
+      error: undefined,
+      loading: false,
+    };
+  }
+
+  /**
+   * Creates an error task.
+   *
+   * @param error - The error that occurred
+   * @param promise - The rejected promise (optional)
+   * @returns An ErrorTask containing the error
+   *
+   * @example
+   * ```typescript
+   * const err = new Error("User not found");
+   * const error = task.error(err);
+   * ```
+   */
+  export function error<TValue = any>(
+    error: unknown,
+    promise?: PromiseLike<TValue>
+  ): ErrorTask<TValue> {
+    const rejectedPromise = promise || Promise.reject(error);
+    if (rejectedPromise instanceof Promise) {
+      // Prevent unhandled rejection warnings
+      rejectedPromise.catch(() => {});
+    }
+    return {
+      [TASK_TYPE]: true,
+      status: "error",
+      promise: rejectedPromise,
+      value: undefined,
+      error,
+      loading: false,
+    };
+  }
+
+  /**
+   * Type guard to check if a value is a Task.
+   *
+   * @param value - The value to check
+   * @returns True if value is a Task
+   *
+   * @example
+   * ```typescript
+   * if (task.is(value)) {
+   *   console.log(value.status);
+   * }
+   * ```
+   */
+  export function is<T = unknown>(value: unknown): value is Task<T> {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      TASK_TYPE in value &&
+      (value as any)[TASK_TYPE] === true
+    );
+  }
+
+  /**
+   * Associates a task with a promise in the cache.
+   *
+   * @param promise - The promise to cache
+   * @param t - The task to associate with the promise
+   * @returns The task that was cached
+   *
+   * @example
+   * ```typescript
+   * const promise = fetchUser(1);
+   * const t = task.loading(promise);
+   * task.set(promise, t);
+   * ```
+   */
+  export function set<T, L extends Task<T>>(promise: PromiseLike<T>, t: L): L {
+    getPromiseCache().set(promise, t);
+    return t;
+  }
+
+  /**
+   * Gets or creates a task for a promise.
+   *
+   * @param promise - The promise to get/create task for
+   * @returns Task representing the promise state
+   *
+   * @example
+   * ```typescript
+   * const promise = fetchUser(1);
+   * const t = task.get(promise);
+   * ```
+   */
+  export function get<T>(promise: PromiseLike<T>): Task<T> {
+    const cache = getPromiseCache();
+    let t = cache.get(promise) as Task<T> | undefined;
+    if (t) return t;
+
+    promise.then(
+      (data) => {
+        task.set(promise, task.success(data, promise as Promise<T>));
+      },
+      (error) => {
+        task.set(promise, task.error(error, promise as Promise<T>));
+      }
+    );
+
+    return task.set(promise, task.loading(promise as Promise<T>));
+  }
+
+  /**
+   * Normalizes an arbitrary value into a Task.
+   * This is an alias for the main `task()` function.
+   *
+   * - If the value is already a Task, returns it as-is.
+   * - If the value is a PromiseLike, wraps or reuses a cached Task.
+   * - If the value is a Signal, unwraps and normalizes the signal's value.
+   * - Otherwise, wraps the value in a "success" Task.
+   *
+   * @template TValue - The type of the value
+   * @param value - The value to convert to a Task
+   * @returns A Task wrapping the value
+   *
+   * @example
+   * ```typescript
+   * // Convert promise to task
+   * const userTask = task.from(fetchUser(1));
+   *
+   * // Convert plain value to task
+   * const dataTask = task.from({ id: 1, name: "Alice" });
+   *
+   * // Convert signal to task
+   * const signalTask = task.from(userSignal);
+   *
+   * // Already a task? Returns as-is
+   * const t = task.success(42);
+   * const same = task.from(t); // same === t
+   * ```
+   */
+  export function from<TValue>(
+    value: TValue
+  ): TValue extends Signal<infer T>
+    ? Task<Awaited<T>>
+    : TValue extends Task<any>
+    ? TValue
+    : TValue extends PromiseLike<infer T>
+    ? Task<T>
+    : Task<TValue> {
+    return task(value) as any;
+  }
+}
+
+/**
+ * Get or create global promise cache (shared across all module instances).
+ * This ensures that tasks for the same promise are shared between entry points.
+ */
+function getPromiseCache(): WeakMap<PromiseLike<unknown>, Task<unknown>> {
+  if (typeof globalThis !== "undefined") {
+    if (!(globalThis as any).__REXTIVE_PROMISE_CACHE__) {
+      (globalThis as any).__REXTIVE_PROMISE_CACHE__ = new WeakMap<
+        PromiseLike<unknown>,
+        Task<unknown>
+      >();
+    }
+    return (globalThis as any).__REXTIVE_PROMISE_CACHE__;
+  }
+  // Fallback for environments without globalThis (shouldn't happen in modern JS)
+  return new WeakMap<PromiseLike<unknown>, Task<unknown>>();
+}
+
+/**
+ * Get or create global static task cache (shared across all module instances).
+ * This ensures that tasks for the same object/function are shared between entry points.
+ */
+function getStaticTaskCache(): WeakMap<object, Task<unknown>> {
+  if (typeof globalThis !== "undefined") {
+    if (!(globalThis as any).__REXTIVE_STATIC_TASK_CACHE__) {
+      (globalThis as any).__REXTIVE_STATIC_TASK_CACHE__ = new WeakMap<
+        object,
+        Task<unknown>
+      >();
+    }
+    return (globalThis as any).__REXTIVE_STATIC_TASK_CACHE__;
+  }
+  // Fallback for environments without globalThis
+  return new WeakMap<object, Task<unknown>>();
+}
+
+/**
+ * Internal implementation for normalizing a value to a Task.
+ */
+function toTaskImpl<T>(value: unknown): Task<T> {
+  if (task.is<T>(value)) {
+    return value;
+  }
+
+  if (isPromiseLike<T>(value)) {
+    return task.get(value);
+  }
+
+  // Cache object/function values to reuse their success tasks
+  if (
+    value !== null &&
+    (typeof value === "object" || typeof value === "function")
+  ) {
+    const staticCache = getStaticTaskCache();
+    const existing = staticCache.get(value as object);
+    if (existing) {
+      return existing as Task<T>;
+    }
+    const t = task.success(value as T) as Task<T>;
+    staticCache.set(value as object, t);
+    return t;
+  }
+
+  // Primitives are cheap to wrap, no caching needed
+  return task.success(value as T) as Task<T>;
+}

@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { signal } from "./signal";
-import { loadable } from "./utils/loadable";
+import { task } from "./utils/task";
 import { wait } from "./wait";
 
 describe("signal.to() - single selector", () => {

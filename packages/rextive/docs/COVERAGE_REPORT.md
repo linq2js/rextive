@@ -34,7 +34,7 @@ Successfully increased test coverage from 50.5% to **95.37%**, exceeding the 90%
 | File | Coverage | Status |
 |------|----------|--------|
 | emitter.ts | 100% | ✅ Perfect |
-| loadable.ts | 100% | ✅ Perfect |
+| task.ts | 100% | ✅ Perfect |
 | guardDisposed.ts | 100% | ✅ Perfect |
 | isPromiseLike.ts | 100% | ✅ Perfect |
 | shallowEquals.ts | 100% | ✅ Perfect |
@@ -49,7 +49,7 @@ Successfully increased test coverage from 50.5% to **95.37%**, exceeding the 90%
 - **New Test Files Created:**
   - `tag.test.ts` - 21+ tests covering all tag functionality
   - `wait.test.ts` - 73 tests covering async coordination
-  - Enhanced coverage for `useRerender`, `useScope`, `emitter`, and `loadable`
+  - Enhanced coverage for `useRerender`, `useScope`, `emitter`, and `task`
 
 ## New Tests Added
 
@@ -88,11 +88,11 @@ Successfully increased test coverage from 50.5% to **95.37%**, exceeding the 90%
 - Batch add/remove
 - Empty array handling
 
-### 6. **loadable.ts** (97% → 100%)
-- getLoadable with promises
-- toLoadable with objects/functions/primitives
+### 6. **task.ts** (97% → 100%)
+- getTask with promises
+- toTask with objects/functions/primitives
 - Static value caching
-- setLoadable override behavior
+- setTask override behavior
 
 ## Remaining Uncovered Lines
 
@@ -130,7 +130,7 @@ Added compile-time type safety tests for all APIs with overloads:
 
 1. `signal.type.check.ts` - Tests 3 signal() overloads
 2. `rx.type.check.tsx` - Tests 4 rx() overloads  
-3. `loadable.type.check.ts` - Tests 3 loadable() overloads
+3. `task.type.check.ts` - Tests 3 task() overloads
 4. `wait.type.check.ts` - Already existed
 
 ## Architecture Improvements

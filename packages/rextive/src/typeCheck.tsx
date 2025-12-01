@@ -4,7 +4,7 @@
  *
  * This file consolidates type checking for:
  * - signal() and its overloads
- * - loadable.from() and its namespace
+ * - task.from() and its namespace
  * - wait() and its utilities
  *
  * Run type checking with: tsc --noEmit
@@ -15,7 +15,7 @@ import * as React from "react";
 import { rx } from "./react/rx";
 import { signal } from "./signal";
 import { tag } from "./tag";
-import { loadable } from "./utils/loadable";
+import { task } from "./utils/task";
 import { wait, type Awaitable, type AwaitedFromAwaitable } from "./wait";
 import { awaited } from "./awaited";
 import { compose } from "./utils/compose";
@@ -50,10 +50,10 @@ import type {
   Mutable,
   Computed,
   SignalContext,
-  Loadable,
-  LoadingLoadable,
-  SuccessLoadable,
-  ErrorLoadable,
+  Task,
+  LoadingTask,
+  SuccessTask,
+  ErrorTask,
   Plugin,
   Tag,
   SignalKind,
@@ -94,7 +94,7 @@ interface User<T> {
 type UserType = { id: number; name: string };
 
 // -----------------------------------------------------------------------------
-// Promise declarations (for loadable/wait tests)
+// Promise declarations (for task/wait tests)
 // -----------------------------------------------------------------------------
 
 declare const promiseNumber: PromiseLike<number>;
@@ -104,26 +104,26 @@ declare const promiseNum: Promise<number>;
 declare const promiseStr: Promise<string>;
 
 // -----------------------------------------------------------------------------
-// Loadable declarations
+// Task declarations
 // -----------------------------------------------------------------------------
 
-declare const loadableNumber: Loadable<number>;
-declare const loadableString: Loadable<string>;
-declare const userLoadable: Loadable<UserType>;
+declare const taskNumber: Task<number>;
+declare const taskString: Task<string>;
+declare const userTask: Task<UserType>;
 declare const userPromise: Promise<UserType>;
-declare const userSignal: Signal<Loadable<UserType>>;
+declare const userSignal: Signal<Task<UserType>>;
 
 // -----------------------------------------------------------------------------
 // Signal declarations (for wait tests)
 // -----------------------------------------------------------------------------
 
-declare const signalLoadableNumber: Signal<Loadable<number>>;
+declare const signalTaskNumber: Signal<Task<number>>;
 declare const signalPromiseNumber: Signal<Promise<number>>;
-declare const signalNumberAwaitable: Signal<Promise<number> | Loadable<number>>;
-declare const signalStringAwaitable: Signal<Promise<string> | Loadable<string>>;
+declare const signalNumberAwaitable: Signal<Promise<number> | Task<number>>;
+declare const signalStringAwaitable: Signal<Promise<string> | Task<string>>;
 
 // -----------------------------------------------------------------------------
-// Loadable instances
+// Task instances
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
@@ -134,24 +134,24 @@ declare const signalStringAwaitable: Signal<Promise<string> | Loadable<string>>;
 // Integration test instances
 // -----------------------------------------------------------------------------
 
-const sigWithLoadable = signal(loadable.success(42));
-const loadable1 = loadable.success(1);
-const loadable2 = loadable.success(2);
+const sigWithTask = signal(task.success(42));
+const task1 = task.success(1);
+const task2 = task.success(2);
 
-const mixedArray = wait([sigWithLoadable, loadable1, loadable2]);
-const singleSig = wait(sigWithLoadable);
-const promiseResultSig = wait(sigWithLoadable, (value) => value.value);
+const mixedArray = wait([sigWithTask, task1, task2]);
+const singleSig = wait(sigWithTask);
+const promiseResultSig = wait(sigWithTask, (value) => value.value);
 
 const mixedRecord = wait({
-  sig: sigWithLoadable,
-  loadable: loadable1,
+  sig: sigWithTask,
+  task: task1,
   promise: promiseNumber,
 });
 
 const userResultFromSignal = wait(userSignal);
-const usersArray = wait([userLoadable, userPromise, userSignal]);
+const usersArray = wait([userTask, userPromise, userSignal]);
 const usersRecord = wait({
-  loadable: userLoadable,
+  task: userTask,
   promise: userPromise,
   signal: userSignal,
 });
@@ -462,257 +462,257 @@ function signalTests() {
 }
 
 // =============================================================================
-// LOADABLE API TYPE CHECKS
+// TASK API TYPE CHECKS
 // =============================================================================
 
-function loadableTests() {
+function taskTests() {
   // Clone variables from global scope
-  const loadingNumber = loadable.loading(promiseNumber);
-  const loadingString = loadable.loading(promiseString);
-  const loadingUser = loadable.loading(promiseUser);
-  const successNumber = loadable.success(42);
-  const successString = loadable.success("hello");
-  const successUser = loadable.success({ id: 1, name: "Alice" });
-  const successArray = loadable.success([1, 2, 3]);
-  const successWithPromise = loadable.success(100, Promise.resolve(100));
-  const errorWithError = loadable.error(new Error("Something failed"));
-  const errorWithString = loadable.error("Error message");
-  const errorWithNumber = loadable.error(404);
-  const errorTyped = loadable.error<string>(new Error("Failed to load string"));
-  const errorWithPromise = loadable.error<number>(
+  const loadingNumber = task.loading(promiseNumber);
+  const loadingString = task.loading(promiseString);
+  const loadingUser = task.loading(promiseUser);
+  const successNumber = task.success(42);
+  const successString = task.success("hello");
+  const successUser = task.success({ id: 1, name: "Alice" });
+  const successArray = task.success([1, 2, 3]);
+  const successWithPromise = task.success(100, Promise.resolve(100));
+  const errorWithError = task.error(new Error("Something failed"));
+  const errorWithString = task.error("Error message");
+  const errorWithNumber = task.error(404);
+  const errorTyped = task.error<string>(new Error("Failed to load string"));
+  const errorWithPromise = task.error<number>(
     new Error("Failed"),
     Promise.reject(new Error("Failed"))
   );
   const unknownValue: unknown = { status: "success", value: 42 };
-  const maybeLoadable: unknown = successNumber;
-  const getLoadNumber = loadable.get(promiseNumber);
-  const getLoadString = loadable.get(promiseString);
-  const getLoadUser = loadable.get(promiseUser);
-  const setLoad1 = loadable.set(promiseNumber, successNumber);
-  const setLoad2 = loadable.set(promiseString, loadingString);
-  const setLoad3 = loadable.set(
+  const maybeTask: unknown = successNumber;
+  const getLoadNumber = task.get(promiseNumber);
+  const getLoadString = task.get(promiseString);
+  const getLoadUser = task.get(promiseUser);
+  const setLoad1 = task.set(promiseNumber, successNumber);
+  const setLoad2 = task.set(promiseString, loadingString);
+  const setLoad3 = task.set(
     promiseUser,
-    loadable.error<{ id: number; name: string }>(new Error("Failed"))
+    task.error<{ id: number; name: string }>(new Error("Failed"))
   );
-  const norm1 = loadable.from(42);
-  const norm2 = loadable.from(promiseNumber);
-  const norm3 = loadable.from(successNumber);
-  const norm4 = loadable.from({ id: 1, name: "Alice" });
-  const norm5 = loadable.from(null);
-  const norm6 = loadable.from(undefined);
-  const testLoadable: Loadable<number> =
-    successNumber as unknown as Loadable<number>;
+  const norm1 = task.from(42);
+  const norm2 = task.from(promiseNumber);
+  const norm3 = task.from(successNumber);
+  const norm4 = task.from({ id: 1, name: "Alice" });
+  const norm5 = task.from(null);
+  const norm6 = task.from(undefined);
+  const testTask: Task<number> =
+    successNumber as unknown as Task<number>;
 
   // -----------------------------------------------------------------------------
-  // loadable.loading(promise) - LoadingLoadable
+  // task.loading(promise) - LoadingTask
   // -----------------------------------------------------------------------------
 
-  expectType<LoadingLoadable<number>>(loadingNumber);
+  expectType<LoadingTask<number>>(loadingNumber);
   expectType<"loading">(loadingNumber.status);
   expectType<PromiseLike<number>>(loadingNumber.promise);
   expectType<undefined>(loadingNumber.value);
   expectType<undefined>(loadingNumber.error);
   expectType<true>(loadingNumber.loading);
 
-  expectType<LoadingLoadable<string>>(loadingString);
+  expectType<LoadingTask<string>>(loadingString);
   expectType<"loading">(loadingString.status);
   expectType<PromiseLike<string>>(loadingString.promise);
 
-  expectType<LoadingLoadable<{ id: number; name: string }>>(loadingUser);
+  expectType<LoadingTask<{ id: number; name: string }>>(loadingUser);
   expectType<"loading">(loadingUser.status);
   expectType<PromiseLike<{ id: number; name: string }>>(loadingUser.promise);
 
   // -----------------------------------------------------------------------------
-  // loadable.success(value) - SuccessLoadable
+  // task.success(value) - SuccessTask
   // -----------------------------------------------------------------------------
 
-  expectType<SuccessLoadable<number>>(successNumber);
+  expectType<SuccessTask<number>>(successNumber);
   expectType<"success">(successNumber.status);
   expectType<number>(successNumber.value);
   expectType<undefined>(successNumber.error);
   expectType<false>(successNumber.loading);
   expectType<PromiseLike<number>>(successNumber.promise);
 
-  expectType<SuccessLoadable<string>>(successString);
+  expectType<SuccessTask<string>>(successString);
   expectType<"success">(successString.status);
   expectType<string>(successString.value);
 
-  expectType<SuccessLoadable<{ id: number; name: string }>>(successUser);
+  expectType<SuccessTask<{ id: number; name: string }>>(successUser);
   expectType<"success">(successUser.status);
   expectType<{ id: number; name: string }>(successUser.value);
 
-  expectType<SuccessLoadable<number[]>>(successArray);
+  expectType<SuccessTask<number[]>>(successArray);
   expectType<"success">(successArray.status);
   expectType<number[]>(successArray.value);
 
   // With explicit promise
-  expectType<SuccessLoadable<number>>(successWithPromise);
+  expectType<SuccessTask<number>>(successWithPromise);
   expectType<number>(successWithPromise.value);
   expectType<PromiseLike<number>>(successWithPromise.promise);
 
   // -----------------------------------------------------------------------------
-  // loadable.error(error) - ErrorLoadable
+  // task.error(error) - ErrorTask
   // -----------------------------------------------------------------------------
 
-  expectType<ErrorLoadable<any>>(errorWithError);
+  expectType<ErrorTask<any>>(errorWithError);
   expectType<"error">(errorWithError.status);
   expectType<unknown>(errorWithError.error);
   expectType<undefined>(errorWithError.value);
   expectType<false>(errorWithError.loading);
   expectType<PromiseLike<any>>(errorWithError.promise);
 
-  expectType<ErrorLoadable<any>>(errorWithString);
+  expectType<ErrorTask<any>>(errorWithString);
   expectType<"error">(errorWithString.status);
   expectType<unknown>(errorWithString.error);
 
-  expectType<ErrorLoadable<any>>(errorWithNumber);
+  expectType<ErrorTask<any>>(errorWithNumber);
   expectType<"error">(errorWithNumber.status);
   expectType<unknown>(errorWithNumber.error);
 
   // With explicit type parameter
-  expectType<ErrorLoadable<string>>(errorTyped);
+  expectType<ErrorTask<string>>(errorTyped);
   expectType<"error">(errorTyped.status);
   expectType<unknown>(errorTyped.error);
 
   // With explicit promise
-  expectType<ErrorLoadable<number>>(errorWithPromise);
+  expectType<ErrorTask<number>>(errorWithPromise);
   expectType<unknown>(errorWithPromise.error);
   expectType<PromiseLike<number>>(errorWithPromise.promise);
 
   // -----------------------------------------------------------------------------
-  // loadable.is() type guard
+  // task.is() type guard
   // -----------------------------------------------------------------------------
 
-  if (loadable.is(unknownValue)) {
-    expectType<Loadable<unknown>>(unknownValue);
+  if (task.is(unknownValue)) {
+    expectType<Task<unknown>>(unknownValue);
     expectType<"loading" | "success" | "error">(unknownValue.status);
   }
 
   // With type parameter
-  if (loadable.is<number>(unknownValue)) {
-    expectType<Loadable<number>>(unknownValue);
+  if (task.is<number>(unknownValue)) {
+    expectType<Task<number>>(unknownValue);
 
     if (unknownValue.status === "success") {
       expectType<number>(unknownValue.value);
     }
   }
 
-  // Narrowing within loadable
-  if (loadable.is<string>(maybeLoadable)) {
-    if (maybeLoadable.status === "success") {
-      expectType<string>(maybeLoadable.value);
+  // Narrowing within task
+  if (task.is<string>(maybeTask)) {
+    if (maybeTask.status === "success") {
+      expectType<string>(maybeTask.value);
     }
-    if (maybeLoadable.status === "loading") {
-      expectType<PromiseLike<string>>(maybeLoadable.promise);
+    if (maybeTask.status === "loading") {
+      expectType<PromiseLike<string>>(maybeTask.promise);
     }
-    if (maybeLoadable.status === "error") {
-      expectType<unknown>(maybeLoadable.error);
+    if (maybeTask.status === "error") {
+      expectType<unknown>(maybeTask.error);
     }
   }
 
   // -----------------------------------------------------------------------------
-  // loadable.get() - Get or create loadable from promise
+  // task.get() - Get or create task from promise
   // -----------------------------------------------------------------------------
 
-  expectType<Loadable<number>>(getLoadNumber);
+  expectType<Task<number>>(getLoadNumber);
   // First call creates loading, subsequent calls may return success/error
   expectType<"loading" | "success" | "error">(getLoadNumber.status);
 
-  expectType<Loadable<string>>(getLoadString);
+  expectType<Task<string>>(getLoadString);
 
-  expectType<Loadable<{ id: number; name: string }>>(getLoadUser);
-
-  // -----------------------------------------------------------------------------
-  // loadable.set() - Associate loadable with promise
-  // -----------------------------------------------------------------------------
-
-  expectType<SuccessLoadable<number>>(setLoad1);
-
-  expectType<LoadingLoadable<string>>(setLoad2);
-
-  expectType<ErrorLoadable<{ id: number; name: string }>>(setLoad3);
+  expectType<Task<{ id: number; name: string }>>(getLoadUser);
 
   // -----------------------------------------------------------------------------
-  // loadable.from() - Normalize any value to loadable
+  // task.set() - Associate task with promise
+  // -----------------------------------------------------------------------------
+
+  expectType<SuccessTask<number>>(setLoad1);
+
+  expectType<LoadingTask<string>>(setLoad2);
+
+  expectType<ErrorTask<{ id: number; name: string }>>(setLoad3);
+
+  // -----------------------------------------------------------------------------
+  // task.from() - Normalize any value to task
   // -----------------------------------------------------------------------------
 
   // From plain value
-  expectType<Loadable<number>>(norm1);
+  expectType<Task<number>>(norm1);
 
   // From promise
-  expectType<Loadable<number>>(norm2);
+  expectType<Task<number>>(norm2);
 
-  // From existing loadable
-  expectType<SuccessLoadable<number>>(norm3);
+  // From existing task
+  expectType<SuccessTask<number>>(norm3);
 
   // From object
-  expectType<Loadable<{ id: number; name: string }>>(norm4);
+  expectType<Task<{ id: number; name: string }>>(norm4);
 
   // From null/undefined
-  expectType<Loadable<null>>(norm5);
+  expectType<Task<null>>(norm5);
 
-  expectType<Loadable<undefined>>(norm6);
+  expectType<Task<undefined>>(norm6);
 
   // -----------------------------------------------------------------------------
   // Status narrowing with discriminated union
   // -----------------------------------------------------------------------------
 
   // Narrow by status
-  if (testLoadable.status === "loading") {
-    expectType<LoadingLoadable<number>>(testLoadable);
-    expectType<undefined>(testLoadable.value);
-    expectType<undefined>(testLoadable.error);
-    expectType<PromiseLike<number>>(testLoadable.promise);
-    expectType<true>(testLoadable.loading);
-  } else if (testLoadable.status === "success") {
-    expectType<SuccessLoadable<number>>(testLoadable);
-    expectType<number>(testLoadable.value);
-    expectType<undefined>(testLoadable.error);
-    expectType<PromiseLike<number>>(testLoadable.promise);
-    expectType<false>(testLoadable.loading);
-  } else if (testLoadable.status === "error") {
-    expectType<ErrorLoadable<number>>(testLoadable);
-    expectType<undefined>(testLoadable.value);
-    expectType<unknown>(testLoadable.error);
-    expectType<PromiseLike<number>>(testLoadable.promise);
-    expectType<false>(testLoadable.loading);
+  if (testTask.status === "loading") {
+    expectType<LoadingTask<number>>(testTask);
+    expectType<undefined>(testTask.value);
+    expectType<undefined>(testTask.error);
+    expectType<PromiseLike<number>>(testTask.promise);
+    expectType<true>(testTask.loading);
+  } else if (testTask.status === "success") {
+    expectType<SuccessTask<number>>(testTask);
+    expectType<number>(testTask.value);
+    expectType<undefined>(testTask.error);
+    expectType<PromiseLike<number>>(testTask.promise);
+    expectType<false>(testTask.loading);
+  } else if (testTask.status === "error") {
+    expectType<ErrorTask<number>>(testTask);
+    expectType<undefined>(testTask.value);
+    expectType<unknown>(testTask.error);
+    expectType<PromiseLike<number>>(testTask.promise);
+    expectType<false>(testTask.loading);
   }
 
   // Switch statement
-  switch (testLoadable.status) {
+  switch (testTask.status) {
     case "loading":
-      expectType<LoadingLoadable<number>>(testLoadable);
-      expectType<PromiseLike<number>>(testLoadable.promise);
+      expectType<LoadingTask<number>>(testTask);
+      expectType<PromiseLike<number>>(testTask.promise);
       break;
     case "success":
-      expectType<SuccessLoadable<number>>(testLoadable);
-      expectType<number>(testLoadable.value);
+      expectType<SuccessTask<number>>(testTask);
+      expectType<number>(testTask.value);
       break;
     case "error":
-      expectType<ErrorLoadable<number>>(testLoadable);
-      expectType<unknown>(testLoadable.error);
+      expectType<ErrorTask<number>>(testTask);
+      expectType<unknown>(testTask.error);
       break;
   }
 
   // -----------------------------------------------------------------------------
-  // Complex loadable scenarios
+  // Complex task scenarios
   // -----------------------------------------------------------------------------
 
-  void (function testComplexLoadableScenarios() {
+  void (function testComplexTaskScenarios() {
     // Union types
-    const unionLoadable = loadable.success<string | number>(42);
-    expectType<SuccessLoadable<string | number>>(unionLoadable);
-    expectType<string | number>(unionLoadable.value);
+    const unionTask = task.success<string | number>(42);
+    expectType<SuccessTask<string | number>>(unionTask);
+    expectType<string | number>(unionTask.value);
 
     // Optional types
-    const optionalLoadable = loadable.success<string | undefined>(undefined);
-    expectType<SuccessLoadable<string | undefined>>(optionalLoadable);
-    expectType<string | undefined>(optionalLoadable.value);
+    const optionalTask = task.success<string | undefined>(undefined);
+    expectType<SuccessTask<string | undefined>>(optionalTask);
+    expectType<string | undefined>(optionalTask.value);
 
     // Nullable types
-    const nullableLoadable = loadable.success<string | null>(null);
-    expectType<SuccessLoadable<string | null>>(nullableLoadable);
-    expectType<string | null>(nullableLoadable.value);
+    const nullableTask = task.success<string | null>(null);
+    expectType<SuccessTask<string | null>>(nullableTask);
+    expectType<string | null>(nullableTask.value);
 
     // Generic types
     interface Result<T> {
@@ -720,87 +720,87 @@ function loadableTests() {
       timestamp: number;
     }
 
-    const genericLoadable = loadable.success<Result<number>>({
+    const genericTask = task.success<Result<number>>({
       data: 42,
       timestamp: Date.now(),
     });
-    expectType<SuccessLoadable<Result<number>>>(genericLoadable);
-    expectType<Result<number>>(genericLoadable.value);
+    expectType<SuccessTask<Result<number>>>(genericTask);
+    expectType<Result<number>>(genericTask.value);
 
-    // Array of loadables
-    const loadableArray: Array<Loadable<number>> = [
-      loadable.loading(promiseNumber),
-      loadable.success(42),
-      loadable.error(new Error("Failed")),
+    // Array of tasks
+    const taskArray: Array<Task<number>> = [
+      task.loading(promiseNumber),
+      task.success(42),
+      task.error(new Error("Failed")),
     ];
-    expectType<Array<Loadable<number>>>(loadableArray);
+    expectType<Array<Task<number>>>(taskArray);
 
-    // Map of loadables
-    const loadableMap: Record<string, Loadable<string>> = {
-      a: loadable.success("hello"),
-      b: loadable.loading(promiseString),
-      c: loadable.error(new Error("Failed")),
+    // Map of tasks
+    const taskMap: Record<string, Task<string>> = {
+      a: task.success("hello"),
+      b: task.loading(promiseString),
+      c: task.error(new Error("Failed")),
     };
-    expectType<Record<string, Loadable<string>>>(loadableMap);
+    expectType<Record<string, Task<string>>>(taskMap);
   })();
 
-  void (function testLoadableHelpers() {
-    // Async function returning loadable
-    async function fetchData(): Promise<Loadable<number>> {
+  void (function testTaskHelpers() {
+    // Async function returning task
+    async function fetchData(): Promise<Task<number>> {
       const data = await promiseNumber;
-      return loadable.success(data);
+      return task.success(data);
     }
 
     const asyncResult = fetchData();
-    expectType<PromiseLike<Loadable<number>>>(asyncResult);
+    expectType<PromiseLike<Task<number>>>(asyncResult);
 
-    // Helper function to map loadable values
-    function mapLoadable<T, U>(
-      l: Loadable<T>,
+    // Helper function to map task values
+    function mapTask<T, U>(
+      t: Task<T>,
       fn: (value: T) => U
-    ): Loadable<U> {
-      if (l.status === "success") {
-        return loadable.success(fn(l.value));
+    ): Task<U> {
+      if (t.status === "success") {
+        return task.success(fn(t.value));
       }
-      if (l.status === "loading") {
-        return loadable.loading(l.promise.then(fn));
+      if (t.status === "loading") {
+        return task.loading(t.promise.then(fn));
       }
-      return loadable.error(l.error);
+      return task.error(t.error);
     }
 
-    const mapped = mapLoadable(successNumber, (n) => n * 2);
-    expectType<Loadable<number>>(mapped);
+    const mapped = mapTask(successNumber, (n) => n * 2);
+    expectType<Task<number>>(mapped);
 
     // Helper to extract value or default
-    function getValueOr<T>(l: Loadable<T>, defaultValue: T): T {
-      return l.status === "success" ? l.value : defaultValue;
+    function getValueOr<T>(t: Task<T>, defaultValue: T): T {
+      return t.status === "success" ? t.value : defaultValue;
     }
 
     const extracted = getValueOr(successNumber, 0);
     expectType<number>(extracted);
 
-    // Chaining loadables
-    const chain1 = loadable.success(5);
-    const chain2 = mapLoadable(chain1, (n) => n.toString());
-    expectType<Loadable<string>>(chain2);
+    // Chaining tasks
+    const chain1 = task.success(5);
+    const chain2 = mapTask(chain1, (n) => n.toString());
+    expectType<Task<string>>(chain2);
 
     // Error recovery
     function recoverFromError<T>(
-      l: Loadable<T>,
+      t: Task<T>,
       recovery: T
-    ): SuccessLoadable<T> {
-      if (l.status === "error") {
-        return loadable.success(recovery);
+    ): SuccessTask<T> {
+      if (t.status === "error") {
+        return task.success(recovery);
       }
-      if (l.status === "success") {
-        return l;
+      if (t.status === "success") {
+        return t;
       }
       // Loading state - need to handle somehow
       throw new Error("Cannot recover from loading state");
     }
 
-    const recovered = recoverFromError(errorWithNumber as Loadable<number>, 0);
-    expectType<SuccessLoadable<number>>(recovered);
+    const recovered = recoverFromError(errorWithNumber as Task<number>, 0);
+    expectType<SuccessTask<number>>(recovered);
   })();
 }
 
@@ -811,9 +811,9 @@ function loadableTests() {
 function waitTests() {
   // Clone variables from global scope
   const awaitableNumber: Awaitable<number> =
-    loadableNumber ?? promiseNumber ?? signalNumberAwaitable;
+    taskNumber ?? promiseNumber ?? signalNumberAwaitable;
   const awaitableString: Awaitable<string> =
-    loadableString ?? promiseString ?? signalStringAwaitable;
+    taskString ?? promiseString ?? signalStringAwaitable;
   const tupleResult = wait([awaitableNumber, awaitableString]);
   const recordResult = wait({
     num: awaitableNumber,
@@ -875,23 +875,23 @@ function waitTests() {
   // Type inference tests for AwaitedFromAwaitable
   // -----------------------------------------------------------------------------
 
-  // Test Loadable type extraction using Awaited<Loadable["promise"]>
-  expectType<number>(0 as AwaitedFromAwaitable<typeof loadableNumber>);
+  // Test Task type extraction using Awaited<Task["promise"]>
+  expectType<number>(0 as AwaitedFromAwaitable<typeof taskNumber>);
 
-  expectType<string>("" as AwaitedFromAwaitable<typeof loadableString>);
+  expectType<string>("" as AwaitedFromAwaitable<typeof taskString>);
 
   // Test Promise type extraction
   expectType<number>(0 as AwaitedFromAwaitable<typeof promiseNum>);
 
   expectType<string>("" as AwaitedFromAwaitable<typeof promiseStr>);
 
-  // Test Signal wrapping Loadable
-  expectType<number>(0 as AwaitedFromAwaitable<typeof signalLoadableNumber>);
+  // Test Signal wrapping Task
+  expectType<number>(0 as AwaitedFromAwaitable<typeof signalTaskNumber>);
 
   // Test Signal wrapping Promise
   expectType<number>(0 as AwaitedFromAwaitable<typeof signalPromiseNumber>);
 
-  // Test Signal wrapping union of Promise and Loadable
+  // Test Signal wrapping union of Promise and Task
   expectType<number>(0 as AwaitedFromAwaitable<typeof signalNumberAwaitable>);
 
   expectType<string>("" as AwaitedFromAwaitable<typeof signalStringAwaitable>);
@@ -978,7 +978,7 @@ function integrationTests() {
   // Test array with mixed types
   expectType<readonly [number, number, number]>(mixedArray);
 
-  // Test single signal with loadable
+  // Test single signal with task
   expectType<number>(singleSig);
 
   // Test with promise callbacks
@@ -987,7 +987,7 @@ function integrationTests() {
   // Test record with mixed types
   expectType<{
     sig: number;
-    loadable: number;
+    task: number;
     promise: number;
   }>(mixedRecord);
 
@@ -997,7 +997,7 @@ function integrationTests() {
   expectType<readonly [UserType, UserType, UserType]>(usersArray);
 
   expectType<{
-    loadable: UserType;
+    task: UserType;
     promise: UserType;
     signal: UserType;
   }>(usersRecord);
@@ -3648,7 +3648,7 @@ function operatorOptionsTests() {
 
 export {
   signalTests,
-  loadableTests,
+  taskTests,
   waitTests,
   integrationTests,
   rxTests,

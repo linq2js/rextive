@@ -1,9 +1,9 @@
 /**
- * Examples demonstrating rx, useScope, useAwaited, and useLoadable
+ * Examples demonstrating rx, useScope, useAwaited, and useTask
  */
 
 import { Suspense } from "react";
-import { signal, rx, useScope, useAwaited, useLoadable } from "rextive";
+import { signal, rx, useScope, useAwaited, useTask } from "rextive";
 
 // ============================================================================
 // Example 1: rx with static render (no auto-tracking)
@@ -72,29 +72,29 @@ const ProfileWithSuspense = () => {
 };
 
 // ============================================================================
-// Example 4: rx with loadable (manual loading states)
+// Example 4: rx with task (manual loading states)
 // ============================================================================
 
-const ProfileWithLoadable = () => {
+const ProfileWithTask = () => {
   return (
     <div>
-      {/* loadable provides manual control over loading/error states */}
-      {rx({ user, posts }, (_awaited, loadable) => {
-        const postsLoadable = loadable.posts;
+      {/* task provides manual control over loading/error states */}
+      {rx({ user, posts }, (_awaited, task) => {
+        const postsTask = task.posts;
 
-        if (postsLoadable.status === "loading") {
+        if (postsTask.status === "loading") {
           return <div>Loading posts...</div>;
         }
 
-        if (postsLoadable.status === "error") {
-          return <div>Error: {postsLoadable.error.message}</div>;
+        if (postsTask.status === "error") {
+          return <div>Error: {postsTask.error.message}</div>;
         }
 
         return (
           <div>
-            <h1>{loadable.user.value.name}</h1>
+            <h1>{task.user.value.name}</h1>
             <ul>
-              {postsLoadable.value.map((post: any) => (
+              {postsTask.value.map((post: any) => (
                 <li key={post.id}>{post.title}</li>
               ))}
             </ul>
@@ -241,7 +241,7 @@ const LazyTrackingExample = () => {
 /*
 ✅ rx() with two overloads:
    1. Static/manual render with optional watch array
-   2. Explicit signals with awaited/loadable proxies
+   2. Explicit signals with awaited/task proxies
 
 ✅ useScope():
    - Component-scoped disposables (auto-cleanup)
@@ -256,7 +256,7 @@ const LazyTrackingExample = () => {
 
 ✅ Two async patterns:
    - awaited: Throws promises (Suspense integration)
-   - loadable: Manual state handling (loading/success/error)
+   - task: Manual state handling (loading/success/error)
 
 ✅ Reactive rendering:
    - Automatic re-renders when tracked signals change
@@ -274,7 +274,7 @@ export {
   StaticExample,
   ManualWatchExample,
   ProfileWithSuspense,
-  ProfileWithLoadable,
+  ProfileWithTask,
   CounterWithScope,
   UserDataFetcher,
   SyncedTimer,

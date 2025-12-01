@@ -5,7 +5,7 @@ Complete reference for all Rextive APIs with every overload documented.
 ## Table of Contents
 
 1. [signal()](#signal)
-2. [loadable namespace](#loadable)
+2. [task namespace](#task)
 3. [wait namespace](#wait)
 4. [React Hooks](#react-hooks)
 
@@ -263,88 +263,88 @@ interface ComputedSignal<TValue> extends Signal<TValue> {
 
 ---
 
-## loadable
+## task
 
-Namespace for working with loadable values (loading/success/error states).
+Namespace for working with task values (loading/success/error states).
 
 ### Main Function
 
-#### `loadable.from(value)` - Normalize to loadable
+#### `task.from(value)` - Normalize to task
 
 ```ts
-function from<TValue>(value: TValue): Loadable<T>
+function from<TValue>(value: TValue): Task<T>
 ```
 
-Converts any value to a Loadable. Idempotent if already a loadable.
+Converts any value to a Task. Idempotent if already a task.
 
 **Examples:**
 ```ts
-loadable.from(42);                    // SuccessLoadable<number>
-loadable.from(Promise.resolve(42));   // LoadingLoadable<number>
-loadable.from(existingLoadable);      // Returns as-is
+task.from(42);                    // SuccessTask<number>
+task.from(Promise.resolve(42));   // LoadingTask<number>
+task.from(existingTask);      // Returns as-is
 ```
 
 ---
 
 ### Namespace Methods
 
-#### `loadable.loading(promise)` - Create loading loadable
+#### `task.loading(promise)` - Create loading task
 
 ```ts
-function loading<TValue>(promise: PromiseLike<TValue>): LoadingLoadable<TValue>
+function loading<TValue>(promise: PromiseLike<TValue>): LoadingTask<TValue>
 ```
 
 **Example:**
 ```ts
-const loading = loadable.loading(fetch("/api/data"));
+const loading = task.loading(fetch("/api/data"));
 ```
 
 ---
 
-#### `loadable.success(value, promise?)` - Create success loadable
+#### `task.success(value, promise?)` - Create success task
 
 ```ts
 function success<TValue>(
   value: TValue,
   promise?: PromiseLike<TValue>
-): SuccessLoadable<TValue>
+): SuccessTask<TValue>
 ```
 
 **Examples:**
 ```ts
-const success = loadable.success(42);
-const withPromise = loadable.success(42, Promise.resolve(42));
+const success = task.success(42);
+const withPromise = task.success(42, Promise.resolve(42));
 ```
 
 ---
 
-#### `loadable.error(error, promise?)` - Create error loadable
+#### `task.error(error, promise?)` - Create error task
 
 ```ts
 function error<TValue = any>(
   error: unknown,
   promise?: PromiseLike<TValue>
-): ErrorLoadable<TValue>
+): ErrorTask<TValue>
 ```
 
 **Examples:**
 ```ts
-const error = loadable.error(new Error("Failed"));
-const withPromise = loadable.error<User>(err, userPromise);
+const error = task.error(new Error("Failed"));
+const withPromise = task.error<User>(err, userPromise);
 ```
 
 ---
 
-#### `loadable.is(value)` - Type guard
+#### `task.is(value)` - Type guard
 
 ```ts
-function is<T = unknown>(value: unknown): value is Loadable<T>
+function is<T = unknown>(value: unknown): value is Task<T>
 ```
 
 **Example:**
 ```ts
-if (loadable.is(value)) {
-  // value is Loadable<unknown>
+if (task.is(value)) {
+  // value is Task<unknown>
   switch (value.status) {
     case "loading": /* ... */
     case "success": /* ... */
@@ -355,32 +355,32 @@ if (loadable.is(value)) {
 
 ---
 
-#### `loadable.get(promise)` - Get or create from promise
+#### `task.get(promise)` - Get or create from promise
 
 ```ts
-function get<T>(promise: PromiseLike<T>): Loadable<T>
+function get<T>(promise: PromiseLike<T>): Task<T>
 ```
 
-Gets cached loadable for promise or creates a loading one.
+Gets cached task for promise or creates a loading one.
 
 ---
 
-#### `loadable.set(promise, loadable)` - Associate loadable with promise
+#### `task.set(promise, task)` - Associate task with promise
 
 ```ts
-function set<T, L extends Loadable<T>>(
+function set<T, L extends Task<T>>(
   promise: PromiseLike<T>,
-  loadable: L
+  task: L
 ): L
 ```
 
-Caches loadable for a promise.
+Caches task for a promise.
 
 ---
 
 ## wait
 
-Namespace for waiting on awaitables (promises, loadables, signals).
+Namespace for waiting on awaitables (promises, tasks, signals).
 
 ### Main Function - `wait()` / `wait.all()`
 
@@ -707,7 +707,7 @@ count.map(x => x * 2, { equals: (a, b) => a === b, name: 'mapped' })
 | API | Overloads | Notes |
 |-----|-----------|-------|
 | `signal()` | 6 overloads | Mutable (3) + Computed (3) |
-| `loadable` | 1 main + 6 namespace methods | Namespace pattern |
+| `task` | 1 main + 6 namespace methods | Namespace pattern |
 | `wait()` | 6 main overloads | Suspense + Promise modes |
 | `wait.*` | Each has multiple overloads | any, race, settled, timeout, delay |
 | `useScope()` | 3 overloads | Component, Object, Factory modes |

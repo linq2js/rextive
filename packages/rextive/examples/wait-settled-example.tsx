@@ -6,7 +6,7 @@
  */
 
 import { signal, wait } from "../src/index";
-import { loadable } from "../src/utils/loadable";
+import { task } from "../src/utils/task";
 
 // ============================================================================
 // Example 1: Synchronous Mode (Suspense-style)
@@ -17,9 +17,9 @@ import { loadable } from "../src/utils/loadable";
 // ❌ NEVER throws errors - failed awaitables become { status: "rejected", reason }
 
 function SyncExample() {
-  const user = signal(loadable("success", { name: "Alice", id: 1 }));
-  const posts = signal(loadable("error", new Error("Failed to load")));
-  const comments = signal(loadable("success", ["Great!", "Nice"]));
+  const user = signal(task("success", { name: "Alice", id: 1 }));
+  const posts = signal(task("error", new Error("Failed to load")));
+  const comments = signal(task("success", ["Great!", "Nice"]));
 
   // If any were "loading", this would throw a promise
   // Since all are complete (success or error), returns settled shapes immediately

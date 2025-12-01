@@ -1,12 +1,12 @@
-# Type Inference Fix for wait() with Signal<Loadable<T>>
+# Type Inference Fix for wait() with Signal<Task<T>>
 
 ## Problem
 
-TypeScript was failing to infer types correctly when passing `Signal<Loadable<T>>` to `wait()` functions. The errors were:
+TypeScript was failing to infer types correctly when passing `Signal<Task<T>>` to `wait()` functions. The errors were:
 
 ```typescript
 // This was failing:
-const sig = signal(loadable("success", 42));
+const sig = signal(task("success", 42));
 const result = wait(sig); // ERROR: Type mismatch
 ```
 
@@ -16,15 +16,15 @@ The original `Awaitable` type was too restrictive:
 
 ```typescript
 export type Awaitable<T> =
-  | Loadable<T>
+  | Task<T>
   | PromiseLike<T>
-  | Signal<PromiseLike<T> | Loadable<T>>;
+  | Signal<PromiseLike<T> | Task<T>>;
 ```
 
-**Problem:** `Signal<Loadable<T>>` is NOT assignable to `Signal<Loadable<T> | PromiseLike<T>>` due to TypeScript's **contravariance** in function parameters.
+**Problem:** `Signal<Task<T>>` is NOT assignable to `Signal<Task<T> | PromiseLike<T>>` due to TypeScript's **contravariance** in function parameters.
 
-- A `Signal<Loadable<T>>` has a `set` method that only accepts `Loadable<T>`
-- A `Signal<Loadable<T> | PromiseLike<T>>` has a `set` method that accepts either type
+- A `Signal<Task<T>>` has a `set` method that only accepts `Task<T>`
+- A `Signal<Task<T> | PromiseLike<T>>` has a `set` method that accepts either type
 - TypeScript correctly prevents widening the accepted input types
 
 ## Solution
@@ -42,7 +42,7 @@ Changed to use `Signal<any>` as a more permissive helper type:
 type SignalAwaitable = Signal<any>;
 
 export type Awaitable<T> =
-  | Loadable<T>
+  | Task<T>
   | PromiseLike<T>
   | SignalAwaitable;
 ```
@@ -54,58 +54,58 @@ export type Awaitable<T> =
 
 ### 2. Enhanced Type Extraction
 
-Improved `AwaitedFromAwaitable` to use `Awaited<Loadable["promise"]>` pattern:
+Improved `AwaitedFromAwaitable` to use `Awaited<Task["promise"]>` pattern:
 
 ```typescript
-export type AwaitedFromAwaitable<A> = A extends Loadable<any>
-  ? Awaited<A["promise"]>  // Extract T from Loadable<T>
+export type AwaitedFromAwaitable<A> = A extends Task<any>
+  ? Awaited<A["promise"]>  // Extract T from Task<T>
   : A extends PromiseLike<infer T>
   ? T
   : A extends Signal<infer V>
-  ? V extends Loadable<any>
-    ? Awaited<V["promise"]>  // Extract T from Signal<Loadable<T>>
+  ? V extends Task<any>
+    ? Awaited<V["promise"]>  // Extract T from Signal<Task<T>>
     : V extends PromiseLike<infer T>
     ? T
     : V // Fallback to the signal's return type
   : never;
 ```
 
-**Key improvement:** Using `Awaited<L["promise"]>` correctly extracts the type `T` from any `Loadable<T>`, including subtypes like `SuccessLoadable<T>`.
+**Key improvement:** Using `Awaited<L["promise"]>` correctly extracts the type `T` from any `Task<T>`, including subtypes like `SuccessTask<T>`.
 
 ### 3. Comprehensive Type Tests
 
 Added extensive type checks in `wait.type.check.ts`:
 
 ```typescript
-// Test Loadable type extraction
-declare const loadableNumber: Loadable<number>;
-expectType<number>(0 as AwaitedFromAwaitable<typeof loadableNumber>);
+// Test Task type extraction
+declare const taskNumber: Task<number>;
+expectType<number>(0 as AwaitedFromAwaitable<typeof taskNumber>);
 
-// Test Signal wrapping Loadable
-declare const signalLoadableNumber: Signal<Loadable<number>>;
-expectType<number>(0 as AwaitedFromAwaitable<typeof signalLoadableNumber>);
+// Test Signal wrapping Task
+declare const signalTaskNumber: Signal<Task<number>>;
+expectType<number>(0 as AwaitedFromAwaitable<typeof signalTaskNumber>);
 
 // Real-world usage
-const sigWithLoadable = signal(loadable("success", 42));
-const result = wait(sigWithLoadable);
+const sigWithTask = signal(task("success", 42));
+const result = wait(sigWithTask);
 // Works at runtime, type is 'unknown' due to Signal<any> (runtime-safe)
 ```
 
 ## Trade-offs
 
 ### What We Gained ✅
-1. **Fixed compilation errors** - All `Signal<Loadable<T>>` cases now compile
+1. **Fixed compilation errors** - All `Signal<Task<T>>` cases now compile
 2. **Runtime safety maintained** - `resolveAwaitable()` properly handles all signal types
 3. **Type checks pass** - Comprehensive compile-time validation added
 4. **Tests pass** - All 475 tests pass successfully
 
 ### Type Safety Note ⚠️
 When using `Signal<any>`, the type extracted from signals is `unknown` rather than the specific type. This is a TypeScript limitation - we cannot both:
-1. Allow `Signal<Loadable<T>>` to be passed (requires permissive input)
+1. Allow `Signal<Task<T>>` to be passed (requires permissive input)
 2. Infer the exact `T` from the signal (requires strict type extraction)
 
 **Impact:** Minimal in practice because:
-- Most code uses direct `Loadable<T>` or `Promise<T>`, which maintain full type inference
+- Most code uses direct `Task<T>` or `Promise<T>`, which maintain full type inference
 - Runtime behavior is unaffected - signals work correctly
 - Type narrowing at call sites still works
 - The API remains type-safe at boundaries
@@ -115,16 +115,16 @@ When using `Signal<any>`, the type extracted from signals is `unknown` rather th
 ```typescript
 // ✅ All of these now work correctly:
 
-// Direct loadable - full type inference
-const l = loadable("success", 42);
+// Direct task - full type inference
+const l = task("success", 42);
 const result1 = wait(l); // Type: number
 
 // Promise - full type inference  
 const p = Promise.resolve(42);
 const result2 = wait(p); // Type: number
 
-// Signal wrapping loadable - compiles, type is unknown at TS level
-const sig = signal(loadable("success", 42));
+// Signal wrapping task - compiles, type is unknown at TS level
+const sig = signal(task("success", 42));
 const result3 = wait(sig); // Type: unknown (but runtime value is 42)
 
 // Arrays work correctly
@@ -147,7 +147,7 @@ const result5 = wait({ a: l, b: p, c: sig });
 
 3. **`src/wait.type.check.ts`**
    - Added comprehensive type inference tests
-   - Tests for Loadable, Promise, and Signal<Loadable> cases
+   - Tests for Task, Promise, and Signal<Task> cases
    - Validates `AwaitedFromAwaitable` type extraction
    - Tests edge cases (void, never, unknown, any)
 
@@ -176,7 +176,7 @@ The fix successfully resolves TypeScript compilation errors while maintaining:
 - ✅ Compile-time type validation
 
 The trade-off of using `unknown` for signal-wrapped values is acceptable given that:
-1. It only affects signals (not direct Loadables or Promises)
+1. It only affects signals (not direct Tasks or Promises)
 2. Runtime behavior is unaffected
 3. The API remains ergonomic and type-safe
 4. Tests validate correctness

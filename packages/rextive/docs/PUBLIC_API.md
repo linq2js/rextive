@@ -181,59 +181,59 @@ Add timeout to promise.
 const result = wait.timeout(fetchData(), 5000);
 ```
 
-### Loadable State
+### Task State
 
-#### `loadable.from(value)`
+#### `task.from(value)`
 
-Normalize values to loadable state.
+Normalize values to task state.
 
 ```ts
-const l = loadable.from(promise);
-const l2 = loadable.from(signal);
-const l3 = loadable.from(loadable); // Pass-through
+const l = task.from(promise);
+const l2 = task.from(signal);
+const l3 = task.from(task); // Pass-through
 ```
 
-#### `loadable.loading(promise)`
+#### `task.loading(promise)`
 
 Create loading state.
 
 ```ts
-const l = loadable.loading(fetchData());
+const l = task.loading(fetchData());
 ```
 
-#### `loadable.success(value, promise?)`
+#### `task.success(value, promise?)`
 
 Create success state.
 
 ```ts
-const l = loadable.success({ id: 1, name: "Alice" });
+const l = task.success({ id: 1, name: "Alice" });
 ```
 
-#### `loadable.error(error, promise?)`
+#### `task.error(error, promise?)`
 
 Create error state.
 
 ```ts
-const l = loadable.error(new Error("Failed"));
+const l = task.error(new Error("Failed"));
 ```
 
-#### `loadable.is(value)`
+#### `task.is(value)`
 
-Type guard for loadable.
+Type guard for task.
 
 ```ts
-if (loadable.is(value)) {
+if (task.is(value)) {
   console.log(value.status); // 'loading' | 'success' | 'error'
 }
 ```
 
-#### `loadable.get(promise)` / `loadable.set(promise, loadable)`
+#### `task.get(promise)` / `task.set(promise, task)`
 
-Get/set loadable state for a promise.
+Get/set task state for a promise.
 
 ```ts
-const l = loadable.get(myPromise);
-loadable.set(myPromise, loadable.success(data));
+const l = task.get(myPromise);
+task.set(myPromise, task.success(data));
 ```
 
 ### Type Guards
@@ -347,10 +347,10 @@ rx({ user, posts }, (awaited) => (
   </div>
 ));
 
-// Overload 2: With loadables
-rx({ user, posts }, (awaited, loadables) => {
-  if (loadables.user.status === "loading") return <Spinner />;
-  if (loadables.user.status === "error") return <Error />;
+// Overload 2: With tasks
+rx({ user, posts }, (awaited, tasks) => {
+  if (tasks.user.status === "loading") return <Spinner />;
+  if (tasks.user.status === "error") return <Error />;
   return <div>{awaited.user.name}</div>;
 });
 
@@ -445,12 +445,12 @@ const getPhase = useScope({
 Subscribe to signals with lazy tracking.
 
 ```tsx
-const [value, loadable] = useWatch({ user, posts });
+const [value, task] = useWatch({ user, posts });
 
 // value: { user: User, posts: Post[] }
-// loadable: { user: Loadable<User>, posts: Loadable<Post[]> }
+// task: { user: Task<User>, posts: Task<Post[]> }
 
-if (loadable.user.status === "loading") return <Spinner />;
+if (task.user.status === "loading") return <Spinner />;
 return <div>{value.user.name}</div>;
 ```
 
@@ -482,10 +482,10 @@ import type {
   ComputedSignal,
   Observable,
   Disposable,
-  Loadable,
-  LoadingLoadable,
-  SuccessLoadable,
-  ErrorLoadable,
+  Task,
+  LoadingTask,
+  SuccessTask,
+  ErrorTask,
   SignalOptions,
   EqualsFn,
   EqualsStrategy,
@@ -516,7 +516,7 @@ import type {
 - Signal: `signal` / `$`, `.set`, `.reset`, `.on`, `.dispose`, `.map`, `.scan`
 - Batch: `batch`, `signal.batch`
 - Async: `wait.all`, `wait.any`, `wait.race`, `wait.settled`, `wait.delay`, `wait.timeout`
-- Loadable: `loadable`, `loadable.loading`, `loadable.success`, `loadable.error`, `loadable.is`, `loadable.get`, `loadable.set`
+- Task: `task`, `task.loading`, `task.success`, `task.error`, `task.is`, `task.get`, `task.set`
 - Guards: `is`, `isSignal`
 - Utils: `emitter`, `tryDispose`, `resolveEquals`
 - Dev: `dev`, `dev(fn)`, `dev.log`, `dev.warn`, `dev.error`, `dev.assert`

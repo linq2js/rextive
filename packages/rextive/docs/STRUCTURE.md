@@ -21,7 +21,7 @@ packages/rextive/
 │   ├── types.ts                    # Core types
 │   ├── utils/                      # Core utilities
 │   │   ├── emitter.ts
-│   │   ├── loadable.ts
+│   │   ├── task.ts
 │   │   ├── createProxy.ts
 │   │   └── ...
 │   └── react/                      # React-specific code
@@ -57,7 +57,7 @@ import {
   batch, // Batch multiple updates
   wait, // Coordinate async operations
   emitter, // Event emitter utility
-  loadable, // Async state representation
+  task, // Async state representation
   isSignal, // Type guard
   // ... more utilities
 } from "rextive";
@@ -105,7 +105,7 @@ export type Signal<T>
 export type SignalMap
 export type SignalContext
 export type SignalOptions<T>
-export type Loadable<T>
+export type Task<T>
 export type Awaitable<T>
 // ... more core types
 ```
@@ -175,7 +175,7 @@ Located in `src/react/`:
 
 Compile-time type validation:
 
-- Core: `signal.type.check.ts`, `wait.type.check.ts`, `utils/loadable.type.check.ts`
+- Core: `signal.type.check.ts`, `wait.type.check.ts`, `utils/task.type.check.ts`
 - React: `react/rx.type.check.tsx`
 
 ## Migration Guide

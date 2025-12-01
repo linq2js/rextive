@@ -2,7 +2,7 @@ import { createProxy } from "./createProxy";
 import { is } from "../is";
 import { ResolveValueType, AnySignal, SignalMap } from "../types";
 import { isPromiseLike } from "./isPromiseLike";
-import { loadable } from "./loadable";
+import { task } from "./task";
 
 export type SignalAccessProxyOptions<
   TSignals extends SignalMap,
@@ -47,13 +47,13 @@ export type SignalAccessProxyOptions<
  */
 type ResolveValue<
   TMap extends SignalMap,
-  TType extends "awaited" | "loadable" | "value"
+  TType extends "awaited" | "task" | "value"
 > = {
   readonly [K in keyof TMap]: TMap[K] extends () => infer T
     ? TType extends "awaited"
       ? Awaited<T>
-      : TType extends "loadable"
-      ? import("../types").Loadable<Awaited<T>>
+      : TType extends "task"
+      ? import("../types").Task<Awaited<T>>
       : TType extends "value"
       ? T
       : never
@@ -69,7 +69,7 @@ type ResolveValue<
  * 3. Transforming signal values before returning
  *
  * The return type is inferred from the `getValue` transformation function, allowing
- * proper type resolution for "value", "awaited", and "loadable" access patterns.
+ * proper type resolution for "value", "awaited", and "task" access patterns.
  *
  * @example Usage in signal.ts (deps proxy)
  * ```ts
@@ -94,7 +94,7 @@ type ResolveValue<
  *   },
  *   getValue: (signal) => {
  *     const value = signal();
- *     // Transform based on type (value/awaited/loadable)
+ *     // Transform based on type (value/awaited/task)
  *     return transformValue(value, type);
  *   },
  *   shouldTrack: () => rerender.rendering(), // lazy tracking
@@ -130,7 +130,7 @@ export function createSignalAccessProxy<
 
     if (type === "awaited") {
       if (isPromiseLike(value)) {
-        const l = loadable.get(value);
+        const l = task.get(value);
         if (l.status === "loading") {
           throw l.promise;
         }
@@ -142,12 +142,12 @@ export function createSignalAccessProxy<
       return value;
     }
 
-    if (type === "loadable") {
-      const l = loadable.from(value);
-      if (l.status === "loading" && onFinally) {
-        l.promise.then(onFinally, onFinally);
+    if (type === "task") {
+      const t = task.from(value);
+      if (t.status === "loading" && onFinally) {
+        t.promise.then(onFinally, onFinally);
       }
-      return l;
+      return t;
     }
 
     // Default: return signal value directly

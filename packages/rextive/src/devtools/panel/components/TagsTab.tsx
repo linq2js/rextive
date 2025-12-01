@@ -8,7 +8,7 @@ import type { TagInfo, SignalInfo } from "@/devtools/types";
 import type { PanelPosition } from "../styles";
 import * as styles from "../styles";
 import { formatValue } from "../utils/formatUtils";
-import { loadable } from "@/utils/loadable";
+import { task } from "@/utils/task";
 import { isPromiseLike } from "@/utils/isPromiseLike";
 
 interface TagsTabProps {
@@ -38,9 +38,7 @@ export function TagsTab({
   if (filteredTags.length === 0) {
     if (searchQuery.trim()) {
       return (
-        <div style={styles.emptyStateStyles}>
-          No tags match "{searchQuery}"
-        </div>
+        <div style={styles.emptyStateStyles}>No tags match "{searchQuery}"</div>
       );
     }
     return (
@@ -71,18 +69,14 @@ export function TagsTab({
             <div style={styles.itemHeaderStyles}>
               <span style={styles.itemNameStyles}>
                 <span style={styles.badgeStyles("tag")}>T</span>
-                <span
-                  style={{ overflow: "hidden", textOverflow: "ellipsis" }}
-                >
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                   {info.id}
                 </span>
               </span>
               <div
                 style={{ display: "flex", alignItems: "center", gap: "6px" }}
               >
-                <span
-                  style={{ color: styles.colors.textDim, fontSize: "9px" }}
-                >
+                <span style={{ color: styles.colors.textDim, fontSize: "9px" }}>
                   {info.signals.size} sig
                 </span>
                 <span
@@ -215,7 +209,7 @@ export function TagsTab({
                               {(() => {
                                 const val = signalInfo.signal.tryGet();
                                 if (isPromiseLike(val)) {
-                                  const state = loadable.from(val);
+                                  const state = task.from(val);
                                   if (state.status === "success")
                                     return formatValue(state.value);
                                   if (state.status === "error")
@@ -239,4 +233,3 @@ export function TagsTab({
     </div>
   );
 }
-

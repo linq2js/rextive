@@ -6,7 +6,7 @@
  * 2. DevTools hooks - for debugging/monitoring (used by DevTools)
  */
 
-import type { AnySignal, Loadable, Tag } from "./types";
+import type { AnySignal, Task, Tag } from "./types";
 
 // ============================================
 // Types
@@ -15,7 +15,7 @@ import type { AnySignal, Loadable, Tag } from "./types";
 /** Render-time hooks for tracking signal access */
 export interface RenderHooks {
   onSignalAccess: (signal: AnySignal<any>) => void;
-  onLoadableAccess: (loadable: Loadable<any>) => void;
+  onTaskAccess: (task: Task<any>) => void;
 }
 
 /** DevTools hooks for monitoring signal lifecycle */
@@ -37,7 +37,7 @@ export interface DevToolsHooks {
 
 const noopRenderHooks: RenderHooks = {
   onSignalAccess: () => {},
-  onLoadableAccess: () => {},
+  onTaskAccess: () => {},
 };
 
 let activeRenderHooks: RenderHooks = noopRenderHooks;
@@ -67,14 +67,52 @@ export function withRenderHooks<T>(
 
 let devToolsHooks: Partial<DevToolsHooks> | null = null;
 
+/** Get hooks from globalThis (shared across all module instances) or local fallback */
+function getDevToolsHooks(): Partial<DevToolsHooks> | null {
+  // Check globalThis first (shared across all module instances)
+  if (typeof globalThis !== "undefined" && (globalThis as any).__REXTIVE_DEVTOOLS__) {
+    return (globalThis as any).__REXTIVE_DEVTOOLS__;
+  }
+  // Fallback to local instance (for backwards compatibility)
+  return devToolsHooks;
+}
+
+/** Get or create global queue (shared across all module instances) */
+function getGlobalQueue(): AnySignal<any>[] {
+  if (typeof globalThis !== "undefined") {
+    if (!(globalThis as any).__REXTIVE_QUEUE__) {
+      (globalThis as any).__REXTIVE_QUEUE__ = [];
+    }
+    return (globalThis as any).__REXTIVE_QUEUE__;
+  }
+  // Fallback for environments without globalThis (shouldn't happen in modern JS)
+  const fallback: AnySignal<any>[] = [];
+  return fallback;
+}
+
 /** Set devtools hooks (called by enableDevTools) */
 export function setDevToolsHooks(hooks: Partial<DevToolsHooks> | null): void {
   devToolsHooks = hooks;
+  
+  // Also set in globalThis for cross-module-instance sharing
+  if (typeof globalThis !== "undefined") {
+    (globalThis as any).__REXTIVE_DEVTOOLS__ = hooks;
+  }
+  
+  // Replay queued signal creations from global queue now that hooks are set
+  const globalQueue = getGlobalQueue();
+  if (hooks?.onSignalCreate && globalQueue.length > 0) {
+    const signals = [...globalQueue];
+    globalQueue.length = 0; // Clear queue
+    for (const signal of signals) {
+      hooks.onSignalCreate(signal);
+    }
+  }
 }
 
 /** Check if devtools is enabled */
 export function hasDevTools(): boolean {
-  return devToolsHooks !== null;
+  return getDevToolsHooks() !== null;
 }
 
 // ============================================
@@ -89,13 +127,22 @@ let forgetModeDepth = 0;
 /** Emit devtools events */
 export const emit = {
   signalCreate: (signal: AnySignal<any>) => {
-    devToolsHooks?.onSignalCreate?.(signal);
+    const hooks = getDevToolsHooks();
+    const onSignalCreate = hooks?.onSignalCreate;
+    
+    if (!onSignalCreate) {
+      // DevTools not enabled yet - queue for later replay in global queue
+      getGlobalQueue().push(signal);
+      return;
+    }
+    
+    onSignalCreate(signal);
   },
   signalChange: (signal: AnySignal<any>, value: unknown) => {
-    devToolsHooks?.onSignalChange?.(signal, value);
+    getDevToolsHooks()?.onSignalChange?.(signal, value);
   },
   signalError: (signal: AnySignal<any>, error: unknown) => {
-    devToolsHooks?.onSignalError?.(signal, error);
+    getDevToolsHooks()?.onSignalError?.(signal, error);
   },
   signalDispose: (signal: AnySignal<any>) => {
     if (forgetModeSignals !== null) {
@@ -103,11 +150,11 @@ export const emit = {
       forgetModeSignals.add(signal);
     } else {
       // Normal mode - mark as disposed (keeps history)
-      devToolsHooks?.onSignalDispose?.(signal);
+      getDevToolsHooks()?.onSignalDispose?.(signal);
     }
   },
   signalRename: (signal: AnySignal<any>) => {
-    devToolsHooks?.onSignalRename?.(signal);
+    getDevToolsHooks()?.onSignalRename?.(signal);
   },
   /**
    * Execute disposal within "forget mode" - all signals disposed
@@ -133,19 +180,19 @@ export const emit = {
       // Only flush and reset when outermost call completes
       if (forgetModeDepth === 0) {
         if (forgetModeSignals && forgetModeSignals.size > 0) {
-          devToolsHooks?.onForgetSignals?.([...forgetModeSignals]);
+          getDevToolsHooks()?.onForgetSignals?.([...forgetModeSignals]);
         }
         forgetModeSignals = null;
       }
     }
   },
   tagCreate: (tag: Tag<any, any>) => {
-    devToolsHooks?.onTagCreate?.(tag);
+    getDevToolsHooks()?.onTagCreate?.(tag);
   },
   tagAdd: (tag: Tag<any, any>, signal: AnySignal<any>) => {
-    devToolsHooks?.onTagAdd?.(tag, signal);
+    getDevToolsHooks()?.onTagAdd?.(tag, signal);
   },
   tagRemove: (tag: Tag<any, any>, signal: AnySignal<any>) => {
-    devToolsHooks?.onTagRemove?.(tag, signal);
+    getDevToolsHooks()?.onTagRemove?.(tag, signal);
   },
 };

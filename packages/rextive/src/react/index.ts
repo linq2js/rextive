@@ -7,7 +7,7 @@
  * @example
  * ```tsx
  * // All-in-one import for React users
- * import { signal, rx, useScope, wait, loadable } from 'rextive/react';
+ * import { signal, rx, useScope, wait, task } from 'rextive/react';
  *
  * const count = signal(0);
  *

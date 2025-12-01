@@ -85,7 +85,7 @@ type CounterService = ReturnType<typeof createCounterService>;
 ### Async Service with Loading States
 
 ```typescript
-import { signal, loadable } from 'rextive';
+import { signal, task } from 'rextive';
 import type { Disposable } from 'rextive';
 
 interface User {

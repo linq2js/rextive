@@ -1,22 +1,18 @@
 import { describe, it, expect } from "vitest";
-import {
-  type Loadable,
-  LOADABLE_TYPE,
-  loadable,
-} from "./loadable";
+import { type Task, TASK_TYPE, task } from "./task";
 
-describe("loadable", () => {
-  describe("loadable.loading() - factory", () => {
-    it("should create loading loadable with promise", () => {
+describe("task", () => {
+  describe("task.loading() - factory", () => {
+    it("should create loading task with promise", () => {
       const promise = Promise.resolve(42);
-      const l = loadable.loading(promise);
+      const l = task.loading(promise);
 
       expect(l.status).toBe("loading");
       expect(l.promise).toBe(promise);
       expect(l.value).toBeUndefined();
       expect(l.error).toBeUndefined();
       expect(l.loading).toBe(true);
-      expect(l[LOADABLE_TYPE]).toBe(true);
+      expect(l[TASK_TYPE]).toBe(true);
     });
 
     it("should handle pending promise", async () => {
@@ -24,7 +20,7 @@ describe("loadable", () => {
       const promise = new Promise<number>((r) => {
         resolve = r;
       });
-      const l = loadable.loading(promise);
+      const l = task.loading(promise);
 
       expect(l.status).toBe("loading");
       expect(l.value).toBeUndefined();
@@ -37,29 +33,29 @@ describe("loadable", () => {
 
     it("should infer correct promise type", () => {
       const promise = Promise.resolve({ id: 1, name: "Alice" });
-      const l = loadable.loading(promise);
+      const l = task.loading(promise);
 
-      // Type should be LoadingLoadable<{ id: number; name: string }>
+      // Type should be LoadingTask<{ id: number; name: string }>
       expect(l.status).toBe("loading");
       // TypeScript should infer the correct type
     });
   });
 
-  describe("loadable.success() - factory", () => {
-    it("should create success loadable with data", () => {
+  describe("task.success() - factory", () => {
+    it("should create success task with data", () => {
       const data = { id: 1, name: "Alice" };
-      const l = loadable.success(data);
+      const l = task.success(data);
 
       expect(l.status).toBe("success");
       expect(l.value).toEqual(data);
       expect(l.error).toBeUndefined();
       expect(l.loading).toBe(false);
-      expect(l[LOADABLE_TYPE]).toBe(true);
+      expect(l[TASK_TYPE]).toBe(true);
     });
 
     it("should create promise if not provided", () => {
       const data = 42;
-      const l = loadable.success(data);
+      const l = task.success(data);
 
       expect(l.promise).toBeInstanceOf(Promise);
     });
@@ -67,7 +63,7 @@ describe("loadable", () => {
     it("should use provided promise", async () => {
       const data = 42;
       const promise = Promise.resolve(data);
-      const l = loadable.success(data, promise);
+      const l = task.success(data, promise);
 
       expect(l.promise).toBe(promise);
       expect(await l.promise).toBe(42);
@@ -79,24 +75,24 @@ describe("loadable", () => {
         nested: { value: "test" },
         array: [1, 2, 3],
       };
-      const l = loadable.success(data);
+      const l = task.success(data);
 
       expect(l.value).toEqual(data);
       expect(l.value?.nested.value).toBe("test");
     });
 
     it("should handle null and undefined data", () => {
-      const successNull = loadable.success(null);
+      const successNull = task.success(null);
       expect(successNull.value).toBeNull();
 
-      const successUndef = loadable.success(undefined);
+      const successUndef = task.success(undefined);
       expect(successUndef.value).toBeUndefined();
     });
 
     it("should infer correct data type", () => {
-      const l = loadable.success({ id: 1, name: "Alice" });
+      const l = task.success({ id: 1, name: "Alice" });
 
-      // Type should be SuccessLoadable<{ id: number; name: string }>
+      // Type should be SuccessTask<{ id: number; name: string }>
       if (l.status === "success") {
         // TypeScript should know data type
         const id: number = l.value.id;
@@ -107,21 +103,21 @@ describe("loadable", () => {
     });
   });
 
-  describe("loadable.error() - factory", () => {
-    it("should create error loadable with error", () => {
+  describe("task.error() - factory", () => {
+    it("should create error task with error", () => {
       const err = new Error("Failed");
-      const l = loadable.error(err);
+      const l = task.error(err);
 
       expect(l.status).toBe("error");
       expect(l.error).toBe(err);
       expect(l.value).toBeUndefined();
       expect(l.loading).toBe(false);
-      expect(l[LOADABLE_TYPE]).toBe(true);
+      expect(l[TASK_TYPE]).toBe(true);
     });
 
     it("should create rejected promise if not provided", () => {
       const err = new Error("Failed");
-      const l = loadable.error(err);
+      const l = task.error(err);
 
       expect(l.promise).toBeInstanceOf(Promise);
       // Should be rejected but caught internally
@@ -134,7 +130,7 @@ describe("loadable", () => {
       // Catch to prevent unhandled rejection
       promise.catch(() => {});
 
-      const l = loadable.error(err, promise);
+      const l = task.error(err, promise);
 
       expect(l.promise).toBe(promise);
       await expect(l.promise).rejects.toBe(err);
@@ -142,62 +138,62 @@ describe("loadable", () => {
 
     it("should handle different error types", () => {
       // Error object
-      const errorObj = loadable.error(new Error("Error obj"));
+      const errorObj = task.error(new Error("Error obj"));
       expect(errorObj.error).toBeInstanceOf(Error);
 
       // String error
-      const errorStr = loadable.error("String error");
+      const errorStr = task.error("String error");
       expect(errorStr.error).toBe("String error");
 
       // Number error
-      const errorNum = loadable.error(404);
+      const errorNum = task.error(404);
       expect(errorNum.error).toBe(404);
 
       // Object error
-      const errorCustom = loadable.error({ code: "NOT_FOUND" });
+      const errorCustom = task.error({ code: "NOT_FOUND" });
       expect(errorCustom.error).toEqual({ code: "NOT_FOUND" });
     });
 
     it("should not cause unhandled rejection warnings", () => {
-      // Creating error loadable shouldn't cause unhandled rejection
-      const l = loadable.error(new Error("Test"));
+      // Creating error task shouldn't cause unhandled rejection
+      const l = task.error(new Error("Test"));
 
       // Promise rejection is caught internally
       expect(l.promise).toBeInstanceOf(Promise);
     });
   });
 
-  describe("loadable.is() - type guard", () => {
-    it("should identify loading loadable", () => {
-      const l = loadable.loading(Promise.resolve(1));
-      expect(loadable.is(l)).toBe(true);
+  describe("task.is() - type guard", () => {
+    it("should identify loading task", () => {
+      const l = task.loading(Promise.resolve(1));
+      expect(task.is(l)).toBe(true);
     });
 
-    it("should identify success loadable", () => {
-      const l = loadable.success(42);
-      expect(loadable.is(l)).toBe(true);
+    it("should identify success task", () => {
+      const l = task.success(42);
+      expect(task.is(l)).toBe(true);
     });
 
-    it("should identify error loadable", () => {
-      const l = loadable.error(new Error());
-      expect(loadable.is(l)).toBe(true);
+    it("should identify error task", () => {
+      const l = task.error(new Error());
+      expect(task.is(l)).toBe(true);
     });
 
-    it("should reject non-loadable values", () => {
-      expect(loadable.is(null)).toBe(false);
-      expect(loadable.is(undefined)).toBe(false);
-      expect(loadable.is(42)).toBe(false);
-      expect(loadable.is("string")).toBe(false);
-      expect(loadable.is({})).toBe(false);
-      expect(loadable.is([])).toBe(false);
-      expect(loadable.is({ status: "success", data: 42 })).toBe(false);
+    it("should reject non-task values", () => {
+      expect(task.is(null)).toBe(false);
+      expect(task.is(undefined)).toBe(false);
+      expect(task.is(42)).toBe(false);
+      expect(task.is("string")).toBe(false);
+      expect(task.is({})).toBe(false);
+      expect(task.is([])).toBe(false);
+      expect(task.is({ status: "success", data: 42 })).toBe(false);
     });
 
     it("should work with type narrowing", () => {
-      const value: unknown = loadable.success({ id: 1, name: "Alice" });
+      const value: unknown = task.success({ id: 1, name: "Alice" });
 
-      if (loadable.is<{ id: number; name: string }>(value)) {
-        // TypeScript should know value is Loadable<{ id: number; name: string }>
+      if (task.is<{ id: number; name: string }>(value)) {
+        // TypeScript should know value is Task<{ id: number; name: string }>
         if (value.status === "success") {
           expect(value.value.id).toBe(1);
           expect(value.value.name).toBe("Alice");
@@ -208,7 +204,7 @@ describe("loadable", () => {
 
   describe("type discrimination", () => {
     it("should narrow type based on status - loading", () => {
-      const l: Loadable<number> = loadable.loading(Promise.resolve(42));
+      const l: Task<number> = task.loading(Promise.resolve(42));
 
       if (l.status === "loading") {
         // TypeScript should know these are undefined
@@ -219,7 +215,7 @@ describe("loadable", () => {
     });
 
     it("should narrow type based on status - success", () => {
-      const l: Loadable<number> = loadable.success(42);
+      const l: Task<number> = task.success(42);
 
       if (l.status === "success") {
         // TypeScript should know data exists and is number
@@ -232,7 +228,7 @@ describe("loadable", () => {
 
     it("should narrow type based on status - error", () => {
       const err = new Error("Failed");
-      const l: Loadable<number> = loadable.error(err);
+      const l: Task<number> = task.error(err);
 
       if (l.status === "error") {
         // TypeScript should know error exists
@@ -243,7 +239,7 @@ describe("loadable", () => {
     });
 
     it("should work with switch statement", () => {
-      const testLoadable = (l: Loadable<string>) => {
+      const testTask = (t: Task<string>) => {
         switch (l.status) {
           case "loading":
             return "loading";
@@ -254,18 +250,16 @@ describe("loadable", () => {
         }
       };
 
-      expect(testLoadable(loadable.loading(Promise.resolve("test")))).toBe(
-        "loading"
-      );
-      expect(testLoadable(loadable.success("hello"))).toBe("success: hello");
-      expect(testLoadable(loadable.error("oops"))).toBe("error: oops");
+      expect(testTask(task.loading(Promise.resolve("test")))).toBe("loading");
+      expect(testTask(task.success("hello"))).toBe("success: hello");
+      expect(testTask(task.error("oops"))).toBe("error: oops");
     });
   });
 
   describe("promise integration", () => {
     it("should maintain promise reference in loading state", async () => {
       const promise = Promise.resolve(42);
-      const l = loadable.loading(promise);
+      const l = task.loading(promise);
 
       expect(l.promise).toBe(promise);
       const result = await l.promise;
@@ -274,7 +268,7 @@ describe("loadable", () => {
 
     it("should handle promise resolution", async () => {
       const promise = Promise.resolve({ id: 1, name: "Alice" });
-      const l = loadable.loading(promise);
+      const l = task.loading(promise);
 
       const data = await l.promise;
       expect(data).toEqual({ id: 1, name: "Alice" });
@@ -283,7 +277,7 @@ describe("loadable", () => {
     it("should handle promise rejection", async () => {
       const error = new Error("Failed");
       const promise = Promise.reject(error);
-      const l = loadable.loading(promise);
+      const l = task.loading(promise);
 
       await expect(l.promise).rejects.toBe(error);
     });
@@ -292,7 +286,7 @@ describe("loadable", () => {
       const promise = new Promise((resolve) => {
         setTimeout(() => resolve(42), 100);
       });
-      const l = loadable.loading(promise);
+      const l = task.loading(promise);
 
       // In React Suspense, you would throw the promise
       let thrownValue;
@@ -308,39 +302,39 @@ describe("loadable", () => {
     });
   });
 
-  describe("LOADABLE_TYPE symbol", () => {
-    it("should be present on all loadable types", () => {
-      const l1 = loadable.loading(Promise.resolve());
-      const l2 = loadable.success(42);
-      const l3 = loadable.error(new Error());
+  describe("TASK_TYPE symbol", () => {
+    it("should be present on all task types", () => {
+      const l1 = task.loading(Promise.resolve());
+      const l2 = task.success(42);
+      const l3 = task.error(new Error());
 
-      expect(l1[LOADABLE_TYPE]).toBe(true);
-      expect(l2[LOADABLE_TYPE]).toBe(true);
-      expect(l3[LOADABLE_TYPE]).toBe(true);
+      expect(l1[TASK_TYPE]).toBe(true);
+      expect(l2[TASK_TYPE]).toBe(true);
+      expect(l3[TASK_TYPE]).toBe(true);
     });
 
     it("should be a unique symbol", () => {
-      const obj = { [LOADABLE_TYPE]: true };
-      expect(LOADABLE_TYPE.toString()).toContain("Symbol");
-      expect(obj[LOADABLE_TYPE]).toBe(true);
+      const obj = { [TASK_TYPE]: true };
+      expect(TASK_TYPE.toString()).toContain("Symbol");
+      expect(obj[TASK_TYPE]).toBe(true);
     });
 
     it("should not conflict with regular properties", () => {
-      const l = loadable.success({
+      const l = task.success({
         status: "custom",
         data: "test",
       });
 
       expect(l.status).toBe("success");
       expect(l.value).toEqual({ status: "custom", data: "test" });
-      expect(l[LOADABLE_TYPE]).toBe(true);
+      expect(l[TASK_TYPE]).toBe(true);
     });
   });
 
   describe("edge cases", () => {
     it("should handle promises that never resolve", () => {
       const neverResolve = new Promise(() => {});
-      const l = loadable.loading(neverResolve);
+      const l = task.loading(neverResolve);
 
       expect(l.status).toBe("loading");
       expect(l.promise).toBe(neverResolve);
@@ -348,7 +342,7 @@ describe("loadable", () => {
 
     it("should handle immediately resolved promises", async () => {
       const promise = Promise.resolve("immediate");
-      const l = loadable.loading(promise);
+      const l = task.loading(promise);
 
       expect(l.status).toBe("loading");
       const result = await l.promise;
@@ -356,42 +350,42 @@ describe("loadable", () => {
     });
 
     it("should handle empty objects and arrays", () => {
-      const emptyObj = loadable.success({});
+      const emptyObj = task.success({});
       expect(emptyObj.value).toEqual({});
 
-      const emptyArr = loadable.success([]);
+      const emptyArr = task.success([]);
       expect(emptyArr.value).toEqual([]);
     });
 
     it("should handle boolean values", () => {
-      const trueValue = loadable.success(true);
+      const trueValue = task.success(true);
       expect(trueValue.value).toBe(true);
 
-      const falseValue = loadable.success(false);
+      const falseValue = task.success(false);
       expect(falseValue.value).toBe(false);
     });
 
     it("should handle zero and empty string", () => {
-      const zero = loadable.success(0);
+      const zero = task.success(0);
       expect(zero.value).toBe(0);
 
-      const empty = loadable.success("");
+      const empty = task.success("");
       expect(empty.value).toBe("");
     });
 
     it("should handle generic type parameters correctly", () => {
       // Loading with specific type
-      const loading = loadable.loading<User>(
+      const loading = task.loading<User>(
         Promise.resolve({ id: 1, name: "Alice" })
       );
       expect(loading.status).toBe("loading");
 
       // Success with inferred type
-      const success = loadable.success({ id: 1, name: "Bob" });
+      const success = task.success({ id: 1, name: "Bob" });
       expect(success.value.name).toBe("Bob");
 
       // Error with type parameter
-      const error = loadable.error<User>(new Error("Failed"));
+      const error = task.error<User>(new Error("Failed"));
       expect(error.status).toBe("error");
     });
   });
@@ -404,19 +398,19 @@ describe("loadable", () => {
         name: "Alice",
         email: "alice@example.com",
       });
-      const loading = loadable.loading(userPromise);
+      const loading = task.loading(userPromise);
       expect(loading.status).toBe("loading");
 
       // Resolve to success
       const userData = await userPromise;
-      const success = loadable.success(userData);
+      const success = task.success(userData);
       expect(success.status).toBe("success");
       expect(success.value.name).toBe("Alice");
     });
 
     it("should model failed API calls", () => {
       const apiError = new Error("Network error");
-      const l = loadable.error(apiError);
+      const l = task.error(apiError);
 
       expect(l.status).toBe("error");
       expect(l.error).toBeInstanceOf(Error);
@@ -424,7 +418,7 @@ describe("loadable", () => {
     });
 
     it("should work with React-like render logic", () => {
-      const renderLoadable = <T>(l: Loadable<T>) => {
+      const renderTask = <T>(t: Task<T>) => {
         switch (l.status) {
           case "loading":
             return "Loading...";
@@ -435,96 +429,94 @@ describe("loadable", () => {
         }
       };
 
-      expect(renderLoadable(loadable.loading(Promise.resolve(1)))).toBe(
-        "Loading..."
-      );
-      expect(renderLoadable(loadable.success({ value: 42 }))).toBe(
+      expect(renderTask(task.loading(Promise.resolve(1)))).toBe("Loading...");
+      expect(renderTask(task.success({ value: 42 }))).toBe(
         'Success: {"value":42}'
       );
-      expect(renderLoadable(loadable.error("Failed"))).toBe("Error: Failed");
+      expect(renderTask(task.error("Failed"))).toBe("Error: Failed");
     });
   });
 
-  describe("loadable.get() - promise cache", () => {
-    it("should get or create loadable for promise", () => {
+  describe("task.get() - promise cache", () => {
+    it("should get or create task for promise", () => {
       const promise = Promise.resolve(42);
-      const l1 = loadable.get(promise);
-      const l2 = loadable.get(promise);
+      const l1 = task.get(promise);
+      const l2 = task.get(promise);
 
       expect(l1).toBe(l2); // Should return same instance
       expect(l1.status).toBe("loading");
       expect(l1.promise).toBe(promise);
     });
 
-    it("should return cached loadable for same promise", () => {
+    it("should return cached task for same promise", () => {
       const promise1 = Promise.resolve(42);
       const promise2 = Promise.resolve(42); // Different promise instance
 
-      const l1 = loadable.get(promise1);
-      const l2 = loadable.get(promise1); // Same promise
-      const l3 = loadable.get(promise2); // Different promise
+      const l1 = task.get(promise1);
+      const l2 = task.get(promise1); // Same promise
+      const l3 = task.get(promise2); // Different promise
 
       expect(l1).toBe(l2); // Should return same instance for same promise
-      expect(l1).not.toBe(l3); // Different promises get different loadables
+      expect(l1).not.toBe(l3); // Different promises get different tasks
     });
   });
 
-  describe("loadable.set() - promise cache", () => {
-    it("should set and retrieve custom loadable for promise", () => {
+  describe("task.set() - promise cache", () => {
+    it("should set and retrieve custom task for promise", () => {
       const promise = Promise.resolve(100);
-      const customLoadable = loadable.success(100, promise);
+      const customTask = task.success(100, promise);
 
-      loadable.set(promise, customLoadable);
-      const retrieved = loadable.get(promise);
+      task.set(promise, customTask);
+      const retrieved = task.get(promise);
 
-      expect(retrieved).toBe(customLoadable);
+      expect(retrieved).toBe(customTask);
       expect(retrieved.status).toBe("success");
       expect(retrieved.value).toBe(100);
     });
 
-    it("should override existing loadable", () => {
+    it("should override existing task", () => {
       const promise = Promise.resolve(42);
-      const loadable1 = loadable.get(promise);
-      const loadable2 = loadable.success(42, promise);
+      const task1 = task.get(promise);
+      const task2 = task.success(42, promise);
 
-      loadable.set(promise, loadable2);
-      const retrieved = loadable.get(promise);
+      task.set(promise, task2);
+      const retrieved = task.get(promise);
 
-      expect(retrieved).toBe(loadable2);
-      expect(retrieved).not.toBe(loadable1);
+      expect(retrieved).toBe(task2);
+      expect(retrieved).not.toBe(task1);
     });
   });
 
-  describe("loadable() - value normalization", () => {
-    it("should return existing loadable if already a loadable", () => {
-      const l = loadable.success(42);
-      const result = loadable.from(l);
+  describe("task() - value normalization", () => {
+    it("should return existing task if already a task", () => {
+      const l = task.success(42);
+      const result = task.from(l);
 
       expect(result).toBe(l);
     });
 
-    it("should wrap promises in loading loadable", () => {
+    it("should wrap promises in loading task", () => {
       const promise = Promise.resolve(42);
-      const result = loadable.from(promise);
+      const result = task.from(promise);
 
       expect(result.status).toBe("loading");
       expect(result.promise).toBe(promise);
     });
 
-    it("should cache loadables for object values", () => {
+    it("should cache tasks for object values", () => {
       const obj = { value: 42 };
-      const l1 = loadable.from(obj);
-      const l2 = loadable.from(obj);
+      const l1 = task.from(obj);
+      const l2 = task.from(obj);
 
       expect(l1).toBe(l2); // Should return same instance (cached)
       expect(l1.status).toBe("success");
       expect(l1.value).toBe(obj);
     });
 
-    it("should cache loadables for function values", () => {
+    it("should cache tasks for function values", () => {
       const fn = () => 42;
-      const l1 = loadable.from(fn);
-      const l2 = loadable.from(fn);
+      const l1 = task.from(fn);
+      const l2 = task.from(fn);
 
       expect(l1).toBe(l2); // Should return same instance (cached)
       expect(l1.status).toBe("success");
@@ -532,8 +524,8 @@ describe("loadable", () => {
     });
 
     it("should not cache primitive values", () => {
-      const l1 = loadable.from(42);
-      const l2 = loadable.from(42);
+      const l1 = task.from(42);
+      const l2 = task.from(42);
 
       // Primitives are cheap to wrap, so no caching
       expect(l1.status).toBe("success");
@@ -543,54 +535,54 @@ describe("loadable", () => {
     });
 
     it("should handle null values", () => {
-      const l = loadable.from(null);
+      const l = task.from(null);
       expect(l.status).toBe("success");
       expect(l.value).toBe(null);
     });
 
-    it("should wrap strings in success loadable", () => {
-      const l = loadable.from("hello");
+    it("should wrap strings in success task", () => {
+      const l = task.from("hello");
       expect(l.status).toBe("success");
       expect(l.value).toBe("hello");
     });
 
-    it("should wrap numbers in success loadable", () => {
-      const l = loadable.from(123);
+    it("should wrap numbers in success task", () => {
+      const l = task.from(123);
       expect(l.status).toBe("success");
       expect(l.value).toBe(123);
     });
   });
 
-  describe("loadable() with signals", () => {
+  describe("task() with signals", () => {
     it("should extract value from signal containing primitive", async () => {
       // Import signal here to avoid circular dependency issues
       const { signal } = await import("../signal");
 
       const sig = signal(42);
-      const l = loadable.from(sig);
+      const l = task.from(sig);
 
       expect(l.status).toBe("success");
       expect(l.value).toBe(42);
     });
 
-    it("should extract value from signal containing loadable", async () => {
+    it("should extract value from signal containing task", async () => {
       const { signal } = await import("../signal");
 
-      const successLoadable = loadable.success({ id: 1, name: "Test" });
-      const sig = signal(successLoadable);
-      const l = loadable.from(sig);
+      const successTask = task.success({ id: 1, name: "Test" });
+      const sig = signal(successTask);
+      const l = task.from(sig);
 
       expect(l.status).toBe("success");
       expect(l.value).toEqual({ id: 1, name: "Test" });
     });
 
-    it("should extract loading loadable from signal", async () => {
+    it("should extract loading task from signal", async () => {
       const { signal } = await import("../signal");
 
       const promise = new Promise(() => {}); // Never resolves
-      const loadingLoadable = loadable.loading(promise);
-      const sig = signal(loadingLoadable);
-      const l = loadable.from(sig);
+      const loadingTask = task.loading(promise);
+      const sig = signal(loadingTask);
+      const l = task.from(sig);
 
       expect(l.status).toBe("loading");
     });

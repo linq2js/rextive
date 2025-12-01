@@ -5,7 +5,7 @@ import "@testing-library/jest-dom/vitest";
 import { disposable } from "../disposable";
 import { signal } from "../signal";
 import { wait } from "../wait";
-import { loadable } from "../utils/loadable";
+import { task } from "../utils/task";
 import { useScope } from "./useScope";
 import { rx } from "./rx";
 import { Mutable, Signal, Computed } from "../types";
@@ -63,9 +63,9 @@ describe("examples", () => {
     /**
      * Reusable field component that handles both sync and async validation
      *
-     * Key pattern: Uses rx(() => ...) with loadable.from() for:
+     * Key pattern: Uses rx(() => ...) with task.from() for:
      * - Reading signal values directly with field()
-     * - Access to loading/error/success states via loadable.from()
+     * - Access to loading/error/success states via task.from()
      */
     const Field = ({
       testKey,
@@ -78,7 +78,7 @@ describe("examples", () => {
     }) => {
       return rx(() => {
         const fieldValue = field();
-        const validationState = loadable.from(validation());
+        const validationState = task.from(validation());
 
         return (
           <>
@@ -193,10 +193,10 @@ describe("examples", () => {
      * Error Demo Component (Async)
      *
      * Demonstrates:
-     * - Using loadable.from() for loading/error/success states
+     * - Using task.from() for loading/error/success states
      * - Refresh button to retry the operation
      *
-     * Note: For async signals, use loadable.from() to handle Promise states.
+     * Note: For async signals, use task.from() to handle Promise states.
      * signal.error() and signal.tryGet() check the signal's internal state,
      * which is the Promise itself for async signals.
      */
@@ -204,7 +204,7 @@ describe("examples", () => {
       const { maybeError } = useScope(createMaybeErrorSignal);
 
       return rx(() => {
-        const state = loadable.from(maybeError);
+        const state = task.from(maybeError);
 
         return (
           <div>

@@ -99,7 +99,12 @@ const chainState: ChainTrackingState = {
 
 function emit(event: DevToolsEvent): void {
   if (config.logToConsole) {
-    console.log(`[${config.name}]`, event.type, event);
+    // Filter out noisy events that aren't useful for console logging
+    // (they're still emitted to listeners, just not logged to console)
+    const shouldLog = event.type !== "signals:forget";
+    if (shouldLog) {
+      console.log(`[${config.name}]`, event.type, event);
+    }
   }
   for (const listener of listeners) {
     try {
@@ -117,7 +122,8 @@ function getSignalKind(signal: Signal<any>): "mutable" | "computed" {
 
 // Window error listeners
 let windowErrorHandler: ((event: ErrorEvent) => void) | null = null;
-let windowRejectionHandler: ((event: PromiseRejectionEvent) => void) | null = null;
+let windowRejectionHandler: ((event: PromiseRejectionEvent) => void) | null =
+  null;
 
 /**
  * Set up window error and unhandled rejection listeners
@@ -383,6 +389,12 @@ function addToChain(signalId: string): void {
 
 const devToolsHooks: DevTools = {
   onSignalCreate(signal: Signal<any>): void {
+    if (config.logToConsole) {
+      console.log(
+        `[${config.name}] onSignalCreate called for:`,
+        signal.displayName || "unnamed"
+      );
+    }
     // Generate unique ID for this signal object
     const id = `signal-${++signalIdCounter}`;
     const name = signal.displayName || "unnamed";
@@ -988,13 +1000,13 @@ export function deleteChain(id: string): boolean {
 
 /**
  * Build dependency graph from tracked signals and chain reactions.
- * 
+ *
  * @returns Dependency graph with nodes and edges
- * 
+ *
  * @example
  * ```ts
  * import { buildDependencyGraph, getSignals, getChainsList } from "rextive/devtools";
- * 
+ *
  * const graph = buildDependencyGraph(getSignals(), getChainsList());
  * console.log("Nodes:", graph.nodes.size);
  * console.log("Edges:", graph.edges.length);

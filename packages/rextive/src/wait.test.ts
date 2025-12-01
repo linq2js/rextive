@@ -1,14 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 import { wait, TimeoutError } from "./wait";
 import { signal } from "./index";
-import { loadable } from "./utils/loadable";
+import { task } from "./utils/task";
 
 // Helper for tests - equivalent to old success( value)
-const success = <T>(value: T) => loadable.success(value);
+const success = <T>(value: T) => task.success(value);
 // Helper for tests - equivalent to old loading( promise)
-const loading = <T>(promise: PromiseLike<T>) => loadable.loading(promise);
+const loading = <T>(promise: PromiseLike<T>) => task.loading(promise);
 // Helper for tests - equivalent to old error( error)
-const error = (err: unknown) => loadable.error(err);
+const error = (err: unknown) => task.error(err);
 
 describe("wait", () => {
   describe("waitAll - Synchronous mode (Suspense)", () => {
@@ -24,22 +24,22 @@ describe("wait", () => {
         });
       });
 
-      it.skip("should return value from success loadable", () => {
+      it.skip("should return value from success task", () => {
         const l = success(42);
         const result = wait(l);
         expect(result).toBe(42);
       });
 
-      it("should throw promise from loading loadable", () => {
+      it("should throw promise from loading task", () => {
         const promise = new Promise(() => {}); // Never resolves
         const l = loading(promise);
 
         expect(() => wait(l)).toThrow(Promise);
       });
 
-      it.skip("should throw error from error loadable", () => {
+      it.skip("should throw error from error task", () => {
         const error = new Error("Failed");
-        const l = loadable.error(error);
+        const l = task.error(error);
 
         try {
           wait(l);
@@ -55,14 +55,14 @@ describe("wait", () => {
         expect(wait(sig)).toBe(42);
       });
 
-      it("should handle signal with loadable", () => {
+      it("should handle signal with task", () => {
         const l = success(42);
         const sig = signal(l);
 
         expect(wait(sig)).toBe(42);
       });
 
-      it("should throw promise from signal with loading loadable", () => {
+      it("should throw promise from signal with loading task", () => {
         const promise = new Promise(() => {});
         const l = loading(promise);
         const sig = signal(l);
@@ -97,7 +97,7 @@ describe("wait", () => {
         expect(() => wait([l1, l2, l3])).toThrow("Error 2");
       });
 
-      it("should handle mixed loadables and promises", () => {
+      it("should handle mixed tasks and promises", () => {
         const l1 = success(1);
         const l2 = success(2);
         const l3 = success(3);
@@ -237,7 +237,7 @@ describe("wait", () => {
       });
 
       it("should throw aggregated error if all failed", async () => {
-        // Use loadables to avoid unhandled rejections
+        // Use tasks to avoid unhandled rejections
         const l1 = error(new Error("E1"));
         const l2 = error(new Error("E2"));
 
@@ -246,7 +246,7 @@ describe("wait", () => {
         );
       });
 
-      it("should handle immediate success loadable", () => {
+      it("should handle immediate success task", () => {
         const l1 = loading(new Promise(() => {}));
         const l2 = success(42);
 
@@ -367,7 +367,7 @@ describe("wait", () => {
         expect(() => wait.settled([p1, p2])).toThrow(Promise);
       });
 
-      it("should throw promise for record with loading loadable", () => {
+      it("should throw promise for record with loading task", () => {
         const l1 = success(1);
         const l2 = loading(new Promise(() => {}));
 
@@ -417,7 +417,7 @@ describe("wait", () => {
         expect(results).toHaveLength(3);
       });
 
-      it("should handle loadables", () => {
+      it("should handle tasks", () => {
         const l1 = success(1);
         const l2 = error(new Error("E2"));
 
@@ -452,7 +452,7 @@ describe("wait", () => {
         expect(result).toEqual(["fulfilled", "rejected"]);
       });
 
-      it("should handle array with all success loadables in async mode", async () => {
+      it("should handle array with all success tasks in async mode", async () => {
         const l1 = success(1);
         const l2 = success("static");
 
@@ -463,7 +463,7 @@ describe("wait", () => {
         expect(result).toEqual([1, "static"]);
       });
 
-      it("should handle array with all error loadables in async mode", async () => {
+      it("should handle array with all error tasks in async mode", async () => {
         const l1 = error(new Error("E1"));
         const l2 = error(new Error("E2"));
 
@@ -474,7 +474,7 @@ describe("wait", () => {
         expect(result).toEqual(["rejected", "rejected"]);
       });
 
-      it("should handle record with all success loadables in async mode", async () => {
+      it("should handle record with all success tasks in async mode", async () => {
         const l1 = success(1);
         const l2 = success("static");
 
@@ -486,7 +486,7 @@ describe("wait", () => {
         expect(result).toEqual({ a: 1, b: "static" });
       });
 
-      it("should handle record with all error loadables in async mode", async () => {
+      it("should handle record with all error tasks in async mode", async () => {
         const l1 = error(new Error("E1"));
         const l2 = error(new Error("E2"));
 
@@ -531,19 +531,19 @@ describe("wait", () => {
         expect(result).toBe("handled");
       });
 
-      it("should handle single error loadable in async mode (via promise)", async () => {
-        // Use a rejected promise instead of loadable.error for async path
-        const p = Promise.reject(new Error("Loadable error"));
+      it("should handle single error task in async mode (via promise)", async () => {
+        // Use a rejected promise instead of task.error for async path
+        const p = Promise.reject(new Error("Task error"));
         const result = await wait.settled(p, (r: any) => {
           expect(r.status).toBe("rejected");
-          expect(r.reason.message).toBe("Loadable error");
+          expect(r.reason.message).toBe("Task error");
           return "error-handled";
         });
 
         expect(result).toBe("error-handled");
       });
 
-      it("should handle single success loadable in async mode (via promise)", async () => {
+      it("should handle single success task in async mode (via promise)", async () => {
         // Use a resolved promise for async path
         const p = Promise.resolve(100);
         const result = await wait.settled(p, (r: any) => {
@@ -555,8 +555,8 @@ describe("wait", () => {
         expect(result).toBe(200);
       });
 
-      it("should handle single loading loadable in async mode (via promise)", async () => {
-        // Use the raw promise directly rather than wrapping in loadable
+      it("should handle single loading task in async mode (via promise)", async () => {
+        // Use the raw promise directly rather than wrapping in task
         // as wait.settled awaits promises internally
         const p = Promise.resolve(42);
         const result = await wait.settled(p, (r: any) => {
@@ -666,7 +666,7 @@ describe("wait", () => {
   });
 
   describe("Integration tests", () => {
-    it("should handle complex signal + loadable + promise mix", () => {
+    it("should handle complex signal + task + promise mix", () => {
       const sig = signal(success(1));
       const l2 = success(2);
       const l3 = success(3);

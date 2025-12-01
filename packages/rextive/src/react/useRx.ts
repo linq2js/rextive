@@ -1,6 +1,6 @@
 import { useLayoutEffect, useState, useRef } from "react";
 import { RenderHooks, withRenderHooks } from "../hooks";
-import { AnySignal, Loadable } from "../types";
+import { AnySignal, Task } from "../types";
 import { emitter } from "../utils/emitter";
 import { useSafeFactory } from "./useSafeFactory";
 
@@ -35,12 +35,12 @@ class RxController implements RenderHooks {
   };
 
   /**
-   * Track a loadable and trigger rerender when it resolves/rejects.
+   * Track a task and trigger rerender when it resolves/rejects.
    * Used for async signals to re-render when the promise settles.
    */
-  onLoadableAccess = (loadable: Loadable<any>) => {
-    if (loadable.status === "loading") {
-      loadable.promise.then(
+  onTaskAccess = (task: Task<any>) => {
+    if (task.status === "loading") {
+      task.promise.then(
         () => this.rerender(),
         () => this.rerender()
       );
@@ -68,7 +68,7 @@ class RxController implements RenderHooks {
  * - **Lazy tracking**: Only subscribes to signals actually accessed during render
  * - **Automatic cleanup**: Subscriptions are cleaned up on unmount
  * - **Re-tracks on each render**: Supports conditional signal access
- * - **Handles loadables**: Async signals trigger re-render when they resolve
+ * - **Handles tasks**: Async signals trigger re-render when they resolve
  *
  * @param fn - Function that accesses signals and returns a value
  * @returns The return value of `fn`

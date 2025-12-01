@@ -194,7 +194,7 @@ describe("useRx", () => {
 
       expect(capturedHooks).toBeDefined();
       expect(typeof capturedHooks.onSignalAccess).toBe("function");
-      expect(typeof capturedHooks.onLoadableAccess).toBe("function");
+      expect(typeof capturedHooks.onTaskAccess).toBe("function");
     });
 
     it("should restore previous hooks after execution", () => {
