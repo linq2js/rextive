@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from "react";
-import type { SignalInfo } from "../../types";
+import type { SignalInfo } from "@/devtools/types";
 import * as styles from "../styles";
 import { IconCopy, IconChevronRight, IconChevronDown } from "../icons";
 import { formatValue, formatTime } from "../utils/formatUtils";

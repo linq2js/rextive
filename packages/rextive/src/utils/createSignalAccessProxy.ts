@@ -143,7 +143,7 @@ export function createSignalAccessProxy<
     }
 
     if (type === "loadable") {
-      const l = loadable(value);
+      const l = loadable.from(value);
       if (l.status === "loading" && onFinally) {
         l.promise.then(onFinally, onFinally);
       }

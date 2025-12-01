@@ -498,14 +498,14 @@ describe("loadable", () => {
   describe("loadable() - value normalization", () => {
     it("should return existing loadable if already a loadable", () => {
       const l = loadable.success(42);
-      const result = loadable(l);
+      const result = loadable.from(l);
 
       expect(result).toBe(l);
     });
 
     it("should wrap promises in loading loadable", () => {
       const promise = Promise.resolve(42);
-      const result = loadable(promise);
+      const result = loadable.from(promise);
 
       expect(result.status).toBe("loading");
       expect(result.promise).toBe(promise);
@@ -513,8 +513,8 @@ describe("loadable", () => {
 
     it("should cache loadables for object values", () => {
       const obj = { value: 42 };
-      const l1 = loadable(obj);
-      const l2 = loadable(obj);
+      const l1 = loadable.from(obj);
+      const l2 = loadable.from(obj);
 
       expect(l1).toBe(l2); // Should return same instance (cached)
       expect(l1.status).toBe("success");
@@ -523,8 +523,8 @@ describe("loadable", () => {
 
     it("should cache loadables for function values", () => {
       const fn = () => 42;
-      const l1 = loadable(fn);
-      const l2 = loadable(fn);
+      const l1 = loadable.from(fn);
+      const l2 = loadable.from(fn);
 
       expect(l1).toBe(l2); // Should return same instance (cached)
       expect(l1.status).toBe("success");
@@ -532,8 +532,8 @@ describe("loadable", () => {
     });
 
     it("should not cache primitive values", () => {
-      const l1 = loadable(42);
-      const l2 = loadable(42);
+      const l1 = loadable.from(42);
+      const l2 = loadable.from(42);
 
       // Primitives are cheap to wrap, so no caching
       expect(l1.status).toBe("success");
@@ -543,19 +543,19 @@ describe("loadable", () => {
     });
 
     it("should handle null values", () => {
-      const l = loadable(null);
+      const l = loadable.from(null);
       expect(l.status).toBe("success");
       expect(l.value).toBe(null);
     });
 
     it("should wrap strings in success loadable", () => {
-      const l = loadable("hello");
+      const l = loadable.from("hello");
       expect(l.status).toBe("success");
       expect(l.value).toBe("hello");
     });
 
     it("should wrap numbers in success loadable", () => {
-      const l = loadable(123);
+      const l = loadable.from(123);
       expect(l.status).toBe("success");
       expect(l.value).toBe(123);
     });
@@ -567,7 +567,7 @@ describe("loadable", () => {
       const { signal } = await import("../signal");
 
       const sig = signal(42);
-      const l = loadable(sig);
+      const l = loadable.from(sig);
 
       expect(l.status).toBe("success");
       expect(l.value).toBe(42);
@@ -578,7 +578,7 @@ describe("loadable", () => {
 
       const successLoadable = loadable.success({ id: 1, name: "Test" });
       const sig = signal(successLoadable);
-      const l = loadable(sig);
+      const l = loadable.from(sig);
 
       expect(l.status).toBe("success");
       expect(l.value).toEqual({ id: 1, name: "Test" });
@@ -590,7 +590,7 @@ describe("loadable", () => {
       const promise = new Promise(() => {}); // Never resolves
       const loadingLoadable = loadable.loading(promise);
       const sig = signal(loadingLoadable);
-      const l = loadable(sig);
+      const l = loadable.from(sig);
 
       expect(l.status).toBe("loading");
     });

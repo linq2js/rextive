@@ -269,19 +269,19 @@ Namespace for working with loadable values (loading/success/error states).
 
 ### Main Function
 
-#### `loadable(value)` - Normalize to loadable
+#### `loadable.from(value)` - Normalize to loadable
 
 ```ts
-function loadable<TValue>(value: TValue): Loadable<T>
+function from<TValue>(value: TValue): Loadable<T>
 ```
 
 Converts any value to a Loadable. Idempotent if already a loadable.
 
 **Examples:**
 ```ts
-loadable(42);                    // SuccessLoadable<number>
-loadable(Promise.resolve(42));   // LoadingLoadable<number>
-loadable(existingLoadable);      // Returns as-is
+loadable.from(42);                    // SuccessLoadable<number>
+loadable.from(Promise.resolve(42));   // LoadingLoadable<number>
+loadable.from(existingLoadable);      // Returns as-is
 ```
 
 ---

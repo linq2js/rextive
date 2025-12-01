@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useMemo } from "react";
-import type { DependencyGraph, GraphNode, GraphEdge } from "../../utils/buildDependencyGraph";
+import type { DependencyGraph, GraphNode, GraphEdge } from "@/devtools/utils/buildDependencyGraph";
 import * as styles from "../styles";
 
 
@@ -128,7 +128,6 @@ export function SimpleTreeView({
   
   // Use controlled or internal state
   const expandedNodes = controlledExpandedNodes ?? internalExpandedNodes;
-  const setExpandedNodes = onExpandedNodesChange ?? setInternalExpandedNodes;
   
   // Expand all by default on mount (only if using internal state)
   React.useEffect(() => {
@@ -149,15 +148,27 @@ export function SimpleTreeView({
   
   const toggleExpand = (nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setExpandedNodes((prev) => {
-      const next = new Set(prev);
+    if (onExpandedNodesChange) {
+      // Controlled mode - call the callback with new value
+      const next = new Set(expandedNodes);
       if (next.has(nodeId)) {
         next.delete(nodeId);
       } else {
         next.add(nodeId);
       }
-      return next;
-    });
+      onExpandedNodesChange(next);
+    } else {
+      // Internal state - use setState callback
+      setInternalExpandedNodes((prev: Set<string>) => {
+        const next = new Set(prev);
+        if (next.has(nodeId)) {
+          next.delete(nodeId);
+        } else {
+          next.add(nodeId);
+        }
+        return next;
+      });
+    }
   };
   
   const renderNode = (

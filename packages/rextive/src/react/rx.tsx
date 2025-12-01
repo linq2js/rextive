@@ -105,7 +105,7 @@ import { isPromiseLike } from "../utils/isPromiseLike";
  * import { loadable } from "rextive";
  *
  * {rx(() => {
- *   const state = loadable(user());
+ *   const state = loadable.from(user());
  *   if (state.loading) return <Spinner />;
  *   if (state.error) return <Error error={state.error} />;
  *   return <div>{state.value.name}</div>;

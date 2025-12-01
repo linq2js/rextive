@@ -183,14 +183,14 @@ const result = wait.timeout(fetchData(), 5000);
 
 ### Loadable State
 
-#### `loadable(value)`
+#### `loadable.from(value)`
 
 Normalize values to loadable state.
 
 ```ts
-const l = loadable(promise);
-const l2 = loadable(signal);
-const l3 = loadable(loadable); // Pass-through
+const l = loadable.from(promise);
+const l2 = loadable.from(signal);
+const l3 = loadable.from(loadable); // Pass-through
 ```
 
 #### `loadable.loading(promise)`

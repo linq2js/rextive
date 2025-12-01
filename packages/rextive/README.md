@@ -67,12 +67,12 @@ const userData = signal({ userId }, async ({ deps, abortSignal }) => {
 });
 ```
 
-**Manual loading states with `loadable()`** — Full control over loading, error, and success states:
+**Manual loading states with `loadable.from()`** — Full control over loading, error, and success states:
 
 ```tsx
 {
   rx(() => {
-    const state = loadable(userData);
+    const state = loadable.from(userData);
     if (state.status === "loading") return <Spinner />;
     if (state.status === "error") return <Error error={state.error} />;
     return <User data={state.value} />;
@@ -215,7 +215,7 @@ The full docs include:
 | **`.to()`**          | Transform values with chained selectors          |
 | **`.pipe()`**        | Compose operators for complex data flows         |
 | **`wait()`**         | Suspense-ready async handling                    |
-| **`loadable()`**     | Manual loading/error/success states              |
+| **`loadable.from()`**     | Manual loading/error/success states              |
 | **`signal.trace()`** | Error debugging across signal chains             |
 | **DevTools**         | Visual debugging panel                           |
 

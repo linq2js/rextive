@@ -5,9 +5,9 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import type { DependencyGraph, GraphNode, GraphEdge } from "../../utils/buildDependencyGraph";
+import type { DependencyGraph, GraphNode, GraphEdge } from "@/devtools/utils/buildDependencyGraph";
 import * as styles from "../styles";
-import { getDependencies, getDependents, getRootNodes, getLeafNodes } from "../../utils/buildDependencyGraph";
+import { getDependencies, getDependents } from "@/devtools/utils/buildDependencyGraph";
 
 interface DependencyGraphViewProps {
   graph: DependencyGraph;
@@ -104,7 +104,7 @@ function calculateTreeLayout(
   
   // BFS to assign levels
   while (queue.length > 0) {
-    const { id, level } = queue.shift()!;
+    const { id } = queue.shift()!;
     
     // Assign children to next level
     for (const childId of children.get(id) || []) {
@@ -151,7 +151,7 @@ function calculateTreeLayout(
   );
   
   for (let i = 0; i < sortedLevels.length; i++) {
-    const [level, levelNodes] = sortedLevels[i];
+    const [, levelNodes] = sortedLevels[i];
     // Sort nodes within level by dependents count (most first)
     levelNodes.sort((a, b) => {
       const countA = dependentsCount.get(a) || 0;

@@ -35,14 +35,14 @@ export type {
  * @example
  * ```typescript
  * // Convert promise to loadable
- * const userLoadable = loadable(fetchUser(1));
+ * const userLoadable = loadable.from(fetchUser(1));
  *
  * // Convert plain value to loadable
- * const dataLoadable = loadable({ id: 1, name: "Alice" });
+ * const dataLoadable = loadable.from({ id: 1, name: "Alice" });
  *
  * // Already a loadable? Returns as-is
  * const l = loadable.success(42);
- * const same = loadable(l); // same === l
+ * const same = loadable.from(l); // same === l
  * ```
  */
 export function loadable<TValue>(
@@ -224,6 +224,47 @@ export namespace loadable {
     );
 
     return loadable.set(promise, loadable.loading(promise as Promise<T>));
+  }
+
+  /**
+   * Normalizes an arbitrary value into a Loadable.
+   * This is an alias for the main `loadable()` function.
+   *
+   * - If the value is already a Loadable, returns it as-is.
+   * - If the value is a PromiseLike, wraps or reuses a cached Loadable.
+   * - If the value is a Signal, unwraps and normalizes the signal's value.
+   * - Otherwise, wraps the value in a "success" Loadable.
+   *
+   * @template TValue - The type of the value
+   * @param value - The value to convert to a Loadable
+   * @returns A Loadable wrapping the value
+   *
+   * @example
+   * ```typescript
+   * // Convert promise to loadable
+   * const userLoadable = loadable.from(fetchUser(1));
+   *
+   * // Convert plain value to loadable
+   * const dataLoadable = loadable.from({ id: 1, name: "Alice" });
+   *
+   * // Convert signal to loadable
+   * const signalLoadable = loadable.from(userSignal);
+   *
+   * // Already a loadable? Returns as-is
+   * const l = loadable.success(42);
+   * const same = loadable.from(l); // same === l
+   * ```
+   */
+  export function from<TValue>(
+    value: TValue
+  ): TValue extends Signal<infer T>
+    ? Loadable<Awaited<T>>
+    : TValue extends Loadable<any>
+    ? TValue
+    : TValue extends PromiseLike<infer T>
+    ? Loadable<T>
+    : Loadable<TValue> {
+    return loadable(value) as any;
   }
 }
 

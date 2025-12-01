@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from "react";
-import type { SignalInfo } from "../../types";
+import type { SignalInfo } from "@/devtools/types";
 import type { PanelPosition } from "../styles";
 import * as styles from "../styles";
 import {
@@ -20,7 +20,7 @@ import {
 } from "../icons";
 import { formatValue, formatValueFull, formatTime } from "../utils/formatUtils";
 import { extractSignalValue } from "../utils/signalUtils";
-import { deleteSignal } from "../../index";
+import { deleteSignal } from "@/devtools/index";
 
 interface SignalsTabProps {
   signals: Map<string, SignalInfo>;

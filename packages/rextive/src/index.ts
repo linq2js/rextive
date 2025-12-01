@@ -11,7 +11,7 @@
  * - **signal.from()** - Combine signals into records or tuples
  * - **disposable()** - Combine disposable resources
  * - **wait()** - Suspense-compatible async utilities
- * - **loadable()** - Manual loading state management
+ * - **loadable.from()** - Manual loading state management
  *
  * @example Basic usage
  * ```ts

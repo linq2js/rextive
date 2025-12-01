@@ -63,9 +63,9 @@ describe("examples", () => {
     /**
      * Reusable field component that handles both sync and async validation
      *
-     * Key pattern: Uses rx(() => ...) with loadable() for:
+     * Key pattern: Uses rx(() => ...) with loadable.from() for:
      * - Reading signal values directly with field()
-     * - Access to loading/error/success states via loadable()
+     * - Access to loading/error/success states via loadable.from()
      */
     const Field = ({
       testKey,
@@ -78,7 +78,7 @@ describe("examples", () => {
     }) => {
       return rx(() => {
         const fieldValue = field();
-        const validationState = loadable(validation());
+        const validationState = loadable.from(validation());
 
         return (
           <>
@@ -193,10 +193,10 @@ describe("examples", () => {
      * Error Demo Component (Async)
      *
      * Demonstrates:
-     * - Using loadable() for loading/error/success states
+     * - Using loadable.from() for loading/error/success states
      * - Refresh button to retry the operation
      *
-     * Note: For async signals, use loadable() to handle Promise states.
+     * Note: For async signals, use loadable.from() to handle Promise states.
      * signal.error() and signal.tryGet() check the signal's internal state,
      * which is the Promise itself for async signals.
      */
@@ -204,7 +204,7 @@ describe("examples", () => {
       const { maybeError } = useScope(createMaybeErrorSignal);
 
       return rx(() => {
-        const state = loadable(maybeError);
+        const state = loadable.from(maybeError);
 
         return (
           <div>

@@ -33,9 +33,9 @@ const normalized = toLoadable(value);
 import { loadable } from "rextive";
 
 // Main function: normalizes any value to loadable
-const normalized = loadable(value);        // Automatic normalization
-const normalized2 = loadable(promise);     // Wraps in loading loadable
-const normalized3 = loadable(loadable);    // Returns as-is
+const normalized = loadable.from(value);        // Automatic normalization
+const normalized2 = loadable.from(promise);     // Wraps in loading loadable
+const normalized3 = loadable.from(loadable);    // Returns as-is
 
 // Namespace methods for explicit creation
 const loading = loadable.loading(promise);
@@ -52,21 +52,21 @@ loadable.set(promise, l);
 
 ## API Changes
 
-### 1. **Main Function: `loadable(value)`**
+### 1. **Main Function: `loadable.from(value)`**
 
-The primary `loadable()` function now normalizes any value to a Loadable:
+The primary `loadable.from()` function normalizes any value to a Loadable:
 
 ```typescript
 // Promise → LoadingLoadable
-const l1 = loadable(fetchUser());
+const l1 = loadable.from(fetchUser());
 // { status: "loading", promise, ... }
 
 // Plain value → SuccessLoadable
-const l2 = loadable({ id: 1, name: "Alice" });
+const l2 = loadable.from({ id: 1, name: "Alice" });
 // { status: "success", value: { id: 1, name: "Alice" }, ... }
 
 // Already loadable → returns as-is
-const l3 = loadable(l1);
+const l3 = loadable.from(l1);
 // l3 === l1 (same reference)
 ```
 
@@ -74,7 +74,7 @@ const l3 = loadable(l1);
 
 ```typescript
 const promise = Promise.resolve(42);
-const l = loadable(promise);
+const l = loadable.from(promise);
 // Type: Loadable<number>
 
 const data = { id: 1 };
@@ -128,7 +128,7 @@ The following standalone functions have been **removed**:
 - ❌ `isLoadable()` → Use `loadable.is()`
 - ❌ `getLoadable()` → Use `loadable.get()`
 - ❌ `setLoadable()` → Use `loadable.set()`
-- ❌ `toLoadable()` → Use `loadable()`
+- ❌ `toLoadable()` → Use `loadable.from()`
 
 ## Migration Steps
 
@@ -185,7 +185,7 @@ loadable.set(promise, l);
 const normalized = toLoadable(value);
 
 // After
-const normalized = loadable(value);
+const normalized = loadable.from(value);
 ```
 
 ## Benefits of New API
@@ -198,6 +198,7 @@ All loadable-related functionality is under one namespace:
 import { loadable } from "rextive";
 
 loadable.           // IDE autocomplete shows all methods:
+  // - from()
   // - loading()
   // - success()
   // - error()
@@ -218,13 +219,13 @@ import { loadable } from "rextive";
 
 ### 3. **More Intuitive Primary Function**
 
-The main `loadable()` function does what you expect - converts any value to a loadable:
+The main `loadable.from()` function does what you expect - converts any value to a loadable:
 
 ```typescript
 // Automatic "do what I mean" behavior
-const l1 = loadable(promise);      // Loading
-const l2 = loadable(data);         // Success
-const l3 = loadable(existingL);    // Pass-through
+const l1 = loadable.from(promise);      // Loading
+const l2 = loadable.from(data);         // Success
+const l3 = loadable.from(existingL);    // Pass-through
 ```
 
 ### 4. **Consistent with Modern APIs**
@@ -245,9 +246,9 @@ const success = loadable.success({ id: 1, name: "Alice" });
 const error = loadable.error(new Error("Failed"));
 
 // Automatic normalization
-const l1 = loadable(Promise.resolve(42));        // LoadingLoadable<number>
-const l2 = loadable({ id: 1 });                  // SuccessLoadable<{ id: number }>
-const l3 = loadable(loadable.success(42));       // SuccessLoadable<number> (same reference)
+const l1 = loadable.from(Promise.resolve(42));        // LoadingLoadable<number>
+const l2 = loadable.from({ id: 1 });                  // SuccessLoadable<{ id: number }>
+const l3 = loadable.from(loadable.success(42));       // SuccessLoadable<number> (same reference)
 ```
 
 ### Type Guards
@@ -292,9 +293,9 @@ async function fetchWithCache(url: string) {
 ```typescript
 import { wait, loadable } from "rextive";
 
-// wait() uses loadable() internally
-const user = loadable(fetchUser());
-const posts = loadable(fetchPosts());
+// wait() uses loadable.from() internally
+const user = loadable.from(fetchUser());
+const posts = loadable.from(fetchPosts());
 
 // Suspense-style
 const [userData, postsData] = wait([user, posts]);
@@ -323,7 +324,8 @@ sed -i 's/getLoadable(/loadable.get(/g' **/*.ts
 sed -i 's/setLoadable(/loadable.set(/g' **/*.ts
 
 # Replace normalization
-sed -i 's/toLoadable(/loadable(/g' **/*.ts
+sed -i 's/toLoadable(/loadable.from(/g' **/*.ts
+sed -i 's/loadable(\([^)]*\))/loadable.from(\1)/g' **/*.ts
 ```
 
 ## Type Compatibility

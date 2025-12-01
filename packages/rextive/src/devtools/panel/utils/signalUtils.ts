@@ -2,10 +2,10 @@
  * Signal value extraction utilities
  */
 
-import { loadable } from "../../../utils/loadable";
-import { isPromiseLike } from "../../../utils/isPromiseLike";
-import { signal } from "../../../index";
-import type { SignalInfo } from "../../types";
+import { loadable } from "@/utils/loadable";
+import { isPromiseLike } from "@/utils/isPromiseLike";
+import { signal } from "@/index";
+import type { SignalInfo } from "@/devtools/types";
 
 /**
  * Extract current value from a signal, handling errors and async states
@@ -57,7 +57,7 @@ export function extractSignalValue(info: SignalInfo): {
       }
       // For async signals, show the resolved/rejected value from loadable
       else if (isPromiseLike(currentValue)) {
-        const state = loadable(currentValue);
+        const state = loadable.from(currentValue);
         if (state.status === "success") {
           currentValue = state.value;
         } else if (state.status === "error") {

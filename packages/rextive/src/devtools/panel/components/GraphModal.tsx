@@ -8,7 +8,7 @@ import { IconClose } from "../icons";
 import * as styles from "../styles";
 import { SimpleTreeView } from "./SimpleTreeView";
 import { ActionBar } from "./shared/ActionBar";
-import type { DependencyGraph } from "../../utils/buildDependencyGraph";
+import type { DependencyGraph } from "@/devtools/utils/buildDependencyGraph";
 
 interface GraphModalProps {
   isOpen: boolean;

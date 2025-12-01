@@ -4,8 +4,8 @@
  */
 
 import React, { useMemo, useState } from "react";
-import type { SignalInfo, ChainReaction } from "../../types";
-import { buildDependencyGraph } from "../../index";
+import type { SignalInfo, ChainReaction } from "@/devtools/types";
+import { buildDependencyGraph } from "@/devtools/index";
 import { GraphModal } from "./GraphModal";
 import * as styles from "../styles";
 

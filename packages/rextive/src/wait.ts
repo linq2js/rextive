@@ -11,7 +11,7 @@
  *
  * - **Promise mode (async)**: when you pass callbacks (`onResolve`/`onError` for most APIs,
  *   `onSettled` for `wait.settled`), the helpers return a Promise and run your callbacks.
- *   These Promises are also registered with the loadable cache (via `loadable()`) so their
+ *   These Promises are also registered with the loadable cache (via `loadable.from()`) so their
  *   status can be observed through the normal `Loadable` API without awaiting them.
  *
  * `wait.timeout` and `wait.delay` are Promise-only utilities with no callback overloads.
@@ -90,7 +90,7 @@ function isSingleAwaitable(value: unknown): boolean {
  * Resolves an awaitable to a Loadable representation.
  *
  * - Signal -> call to get underlying value
- * - Value -> normalized via loadable()
+ * - Value -> normalized via loadable.from()
  */
 function resolveAwaitable(awaitable: Awaitable<any>): Loadable<any> {
   let value: unknown = awaitable;
@@ -100,7 +100,7 @@ function resolveAwaitable(awaitable: Awaitable<any>): Loadable<any> {
     value = (value as Signal<unknown>)();
   }
 
-  return loadable(value);
+  return loadable.from(value);
 }
 
 /**
@@ -409,7 +409,7 @@ export function waitAll(
       onResolve,
       hasOnError ? onError : undefined
     );
-    loadable(promise);
+    loadable.from(promise);
     return promise;
   }
 
@@ -419,7 +419,7 @@ export function waitAll(
       onResolve,
       hasOnError ? onError : undefined
     );
-    loadable(promise);
+    loadable.from(promise);
     return promise;
   }
 
@@ -428,7 +428,7 @@ export function waitAll(
     onResolve,
     hasOnError ? onError : undefined
   );
-  loadable(promise);
+  loadable.from(promise);
   return promise;
 }
 
@@ -593,7 +593,7 @@ export function waitAny(
     hasOnError ? onError : undefined
   );
   // Track this Promise in the loadable cache so its state is observable
-  loadable(promise);
+  loadable.from(promise);
   return promise;
 }
 
@@ -718,7 +718,7 @@ export function waitRace(
     onResolve,
     hasOnError ? onError : undefined
   );
-  loadable(promise);
+  loadable.from(promise);
   return promise;
 }
 
@@ -1066,7 +1066,7 @@ export function waitSettled(awaitableOrCollection: any, onSettled?: any): any {
   // Async mode with callback
   // Always resolves (never rejects) with transformed result
   const promise = waitSettledAsync(awaitableOrCollection, onSettled);
-  loadable(promise);
+  loadable.from(promise);
   return promise;
 }
 
@@ -1144,7 +1144,7 @@ export function waitTimeout(
   }
 
   const promise = Promise.race([mainPromise, timeoutPromise]);
-  loadable(promise);
+  loadable.from(promise);
   return promise;
 }
 

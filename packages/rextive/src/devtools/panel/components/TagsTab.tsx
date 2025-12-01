@@ -4,12 +4,12 @@
  */
 
 import React, { useState } from "react";
-import type { TagInfo, SignalInfo } from "../../types";
+import type { TagInfo, SignalInfo } from "@/devtools/types";
 import type { PanelPosition } from "../styles";
 import * as styles from "../styles";
 import { formatValue } from "../utils/formatUtils";
-import { loadable } from "../../../utils/loadable";
-import { isPromiseLike } from "../../../utils/isPromiseLike";
+import { loadable } from "@/utils/loadable";
+import { isPromiseLike } from "@/utils/isPromiseLike";
 
 interface TagsTabProps {
   tags: Map<string, TagInfo>;
@@ -215,7 +215,7 @@ export function TagsTab({
                               {(() => {
                                 const val = signalInfo.signal.tryGet();
                                 if (isPromiseLike(val)) {
-                                  const state = loadable(val);
+                                  const state = loadable.from(val);
                                   if (state.status === "success")
                                     return formatValue(state.value);
                                   if (state.status === "error")

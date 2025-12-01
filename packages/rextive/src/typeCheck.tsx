@@ -4,7 +4,7 @@
  *
  * This file consolidates type checking for:
  * - signal() and its overloads
- * - loadable() and its namespace
+ * - loadable.from() and its namespace
  * - wait() and its utilities
  *
  * Run type checking with: tsc --noEmit
@@ -494,12 +494,12 @@ function loadableTests() {
     promiseUser,
     loadable.error<{ id: number; name: string }>(new Error("Failed"))
   );
-  const norm1 = loadable(42);
-  const norm2 = loadable(promiseNumber);
-  const norm3 = loadable(successNumber);
-  const norm4 = loadable({ id: 1, name: "Alice" });
-  const norm5 = loadable(null);
-  const norm6 = loadable(undefined);
+  const norm1 = loadable.from(42);
+  const norm2 = loadable.from(promiseNumber);
+  const norm3 = loadable.from(successNumber);
+  const norm4 = loadable.from({ id: 1, name: "Alice" });
+  const norm5 = loadable.from(null);
+  const norm6 = loadable.from(undefined);
   const testLoadable: Loadable<number> =
     successNumber as unknown as Loadable<number>;
 
@@ -633,7 +633,7 @@ function loadableTests() {
   expectType<ErrorLoadable<{ id: number; name: string }>>(setLoad3);
 
   // -----------------------------------------------------------------------------
-  // loadable() - Normalize any value to loadable
+  // loadable.from() - Normalize any value to loadable
   // -----------------------------------------------------------------------------
 
   // From plain value

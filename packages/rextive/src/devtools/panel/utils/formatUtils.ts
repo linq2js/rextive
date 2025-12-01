@@ -2,7 +2,7 @@
  * Formatting utilities for DevTools
  */
 
-import { signal } from "../../index";
+import { signal } from "@/index";
 
 export function formatValue(value: unknown, maxLength = 40): string {
   if (value === undefined) return "undefined";
