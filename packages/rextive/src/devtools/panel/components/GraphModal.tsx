@@ -3,10 +3,11 @@
  * Full-screen modal for dependency graph visualization
  */
 
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { IconClose } from "../icons";
 import * as styles from "../styles";
-import { DependencyGraphView } from "./DependencyGraphView";
+import { SimpleTreeView } from "./SimpleTreeView";
+import { ActionBar } from "./shared/ActionBar";
 import type { DependencyGraph } from "../../utils/buildDependencyGraph";
 
 interface GraphModalProps {
@@ -24,6 +25,45 @@ export function GraphModal({
   onNodeClick,
   selectedNodeId,
 }: GraphModalProps): React.ReactElement | null {
+  // Get all nodes with children for expand all
+  const allNodesWithChildren = useMemo(() => {
+    const nodes = new Set<string>();
+    for (const edge of graph.edges) {
+      nodes.add(edge.from);
+    }
+    return nodes;
+  }, [graph]);
+  
+  // Track if we've initialized to prevent auto-expand after manual collapse
+  const hasInitializedRef = React.useRef(false);
+  
+  // Initialize with all nodes expanded, but only on first open
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
+    return new Set(allNodesWithChildren);
+  });
+  
+  // Only auto-expand on initial open, not when manually collapsed
+  React.useEffect(() => {
+    if (isOpen && !hasInitializedRef.current && allNodesWithChildren.size > 0) {
+      hasInitializedRef.current = true;
+      setExpandedNodes(new Set(allNodesWithChildren));
+    }
+    if (!isOpen) {
+      // Reset when modal closes so it expands again on next open
+      hasInitializedRef.current = false;
+      // Reset to expanded state when modal closes
+      setExpandedNodes(new Set(allNodesWithChildren));
+    }
+  }, [isOpen, allNodesWithChildren]);
+  
+  const handleExpandAll = () => {
+    setExpandedNodes(new Set(allNodesWithChildren));
+  };
+  
+  const handleCollapseAll = () => {
+    setExpandedNodes(new Set());
+  };
+  
   if (!isOpen) return null;
 
   return (
@@ -79,10 +119,46 @@ export function GraphModal({
             flexDirection: "column",
           }}
         >
-          <DependencyGraphView
+          <ActionBar>
+            <button
+              style={{
+                padding: "4px 10px",
+                fontSize: "10px",
+                backgroundColor: styles.colors.bgHover,
+                border: `1px solid ${styles.colors.border}`,
+                borderRadius: "4px",
+                color: styles.colors.text,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+              onClick={handleExpandAll}
+              title="Expand all nodes"
+            >
+              Expand All
+            </button>
+            <button
+              style={{
+                padding: "4px 10px",
+                fontSize: "10px",
+                backgroundColor: styles.colors.bgHover,
+                border: `1px solid ${styles.colors.border}`,
+                borderRadius: "4px",
+                color: styles.colors.text,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+              onClick={handleCollapseAll}
+              title="Collapse all nodes"
+            >
+              Collapse All
+            </button>
+          </ActionBar>
+          <SimpleTreeView
             graph={graph}
             onNodeClick={onNodeClick}
             selectedNodeId={selectedNodeId}
+            expandedNodes={expandedNodes}
+            onExpandedNodesChange={setExpandedNodes}
           />
         </div>
       </div>

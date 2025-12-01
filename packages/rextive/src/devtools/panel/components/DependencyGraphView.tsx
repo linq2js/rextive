@@ -16,37 +16,89 @@ interface DependencyGraphViewProps {
 }
 
 /**
- * Simple force-directed graph layout
+ * Calculate number of dependents for each node
  */
-function calculateLayout(
+function countDependents(
+  nodes: Map<string, GraphNode>,
+  edges: GraphEdge[]
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  
+  // Initialize all nodes with 0
+  for (const id of nodes.keys()) {
+    counts.set(id, 0);
+  }
+  
+  // Count dependents (edges where this node is the source)
+  for (const edge of edges) {
+    const current = counts.get(edge.from) || 0;
+    counts.set(edge.from, current + 1);
+  }
+  
+  return counts;
+}
+
+/**
+ * Tree layout: signals with most dependents at the top
+ * This creates a hierarchical tree where important signals (with many dependents) are at the root
+ */
+function calculateTreeLayout(
   nodes: Map<string, GraphNode>,
   edges: GraphEdge[],
   width: number,
   height: number
 ): Map<string, { x: number; y: number }> {
   const positions = new Map<string, { x: number; y: number }>();
+  const dependentsCount = countDependents(nodes, edges);
   
-  // Simple hierarchical layout
-  // 1. Find root nodes (no incoming edges)
-  const hasIncoming = new Set(edges.map((e) => e.to));
-  const rootNodes = Array.from(nodes.keys()).filter((id) => !hasIncoming.has(id));
+  // Build dependency tree (reverse edges: dependents → dependencies)
+  // This way, nodes with most dependents become roots
+  const children = new Map<string, string[]>();
+  const parents = new Map<string, string[]>();
   
-  // 2. Build levels (BFS from roots)
-  const levels: string[][] = [];
-  const visited = new Set<string>();
-  const queue: { id: string; level: number }[] = [];
-  
-  // Start with root nodes
-  for (const id of rootNodes) {
-    queue.push({ id, level: 0 });
-    visited.add(id);
+  // Initialize
+  for (const id of nodes.keys()) {
+    children.set(id, []);
+    parents.set(id, []);
   }
   
-  // If no roots, start with all nodes
-  if (rootNodes.length === 0) {
-    for (const id of nodes.keys()) {
-      queue.push({ id, level: 0 });
+  // Build reverse tree: edge.from (source) → edge.to (dependent)
+  // In tree view: we want to show source → dependents, so source is parent
+  for (const edge of edges) {
+    // edge.from is the source, edge.to depends on it
+    // In tree: edge.from is parent, edge.to is child
+    const parent = edge.from;
+    const child = edge.to;
+    
+    if (!children.get(parent)!.includes(child)) {
+      children.get(parent)!.push(child);
+    }
+    if (!parents.get(child)!.includes(parent)) {
+      parents.get(child)!.push(parent);
+    }
+  }
+  
+  // Sort nodes by number of dependents (descending)
+  // Nodes with most dependents go to top level
+  const sortedNodes = Array.from(nodes.keys()).sort((a, b) => {
+    const countA = dependentsCount.get(a) || 0;
+    const countB = dependentsCount.get(b) || 0;
+    return countB - countA; // Descending
+  });
+  
+  // Assign levels: nodes with most dependents at level 0
+  const nodeLevel = new Map<string, number>();
+  const visited = new Set<string>();
+  
+  // Assign levels using BFS from nodes with most dependents
+  const queue: { id: string; level: number }[] = [];
+  
+  // Start with nodes that have no parents (or most dependents)
+  for (const id of sortedNodes) {
+    if (parents.get(id)!.length === 0 || !visited.has(id)) {
+      nodeLevel.set(id, 0);
       visited.add(id);
+      queue.push({ id, level: 0 });
     }
   }
   
@@ -54,49 +106,87 @@ function calculateLayout(
   while (queue.length > 0) {
     const { id, level } = queue.shift()!;
     
-    if (!levels[level]) levels[level] = [];
-    levels[level].push(id);
-    
-    // Add children to next level
-    for (const edge of edges) {
-      if (edge.from === id && !visited.has(edge.to)) {
-        visited.add(edge.to);
-        queue.push({ id: edge.to, level: level + 1 });
+    // Assign children to next level
+    for (const childId of children.get(id) || []) {
+      if (!visited.has(childId)) {
+        const parentLevel = nodeLevel.get(id) || 0;
+        nodeLevel.set(childId, parentLevel + 1);
+        visited.add(childId);
+        queue.push({ id: childId, level: parentLevel + 1 });
+      } else {
+        // If already visited, use minimum level
+        const currentLevel = nodeLevel.get(childId) || 0;
+        const parentLevel = nodeLevel.get(id) || 0;
+        nodeLevel.set(childId, Math.min(currentLevel, parentLevel + 1));
       }
     }
   }
   
-  // Add unvisited nodes to last level
+  // Handle unvisited nodes (isolated or cycles)
   for (const id of nodes.keys()) {
     if (!visited.has(id)) {
-      if (!levels[levels.length]) levels[levels.length] = [];
-      levels[levels.length].push(id);
+      // Put them at a level based on dependents count
+      const count = dependentsCount.get(id) || 0;
+      nodeLevel.set(id, Math.max(0, 5 - Math.floor(count / 2))); // Lower count = lower level
     }
   }
   
-  // Position nodes in levels
+  // Group nodes by level
+  const levels = new Map<number, string[]>();
+  for (const [id, level] of nodeLevel) {
+    if (!levels.has(level)) {
+      levels.set(level, []);
+    }
+    levels.get(level)!.push(id);
+  }
+  
+  // Sort levels and assign positions
+  const sortedLevels = Array.from(levels.entries()).sort((a, b) => a[0] - b[0]);
   const padding = 40;
   const nodeWidth = 120;
   const nodeHeight = 60;
-  const levelHeight = Math.max(nodeHeight + 40, height / Math.max(levels.length, 1));
+  const levelHeight = Math.max(
+    nodeHeight + 40,
+    height / Math.max(sortedLevels.length, 1)
+  );
   
-  for (let level = 0; level < levels.length; level++) {
-    const levelNodes = levels[level];
+  for (let i = 0; i < sortedLevels.length; i++) {
+    const [level, levelNodes] = sortedLevels[i];
+    // Sort nodes within level by dependents count (most first)
+    levelNodes.sort((a, b) => {
+      const countA = dependentsCount.get(a) || 0;
+      const countB = dependentsCount.get(b) || 0;
+      return countB - countA;
+    });
+    
     const levelWidth = Math.max(
       levelNodes.length * (nodeWidth + padding),
       width * 0.8
     );
     const startX = (width - levelWidth) / 2;
-    const y = padding + level * levelHeight;
+    const y = padding + i * levelHeight;
     
-    for (let i = 0; i < levelNodes.length; i++) {
-      const id = levelNodes[i];
-      const x = startX + i * (nodeWidth + padding) + nodeWidth / 2;
+    for (let j = 0; j < levelNodes.length; j++) {
+      const id = levelNodes[j];
+      const x = startX + j * (nodeWidth + padding) + nodeWidth / 2;
       positions.set(id, { x, y });
     }
   }
   
   return positions;
+}
+
+/**
+ * Simple force-directed graph layout (original)
+ */
+function calculateLayout(
+  nodes: Map<string, GraphNode>,
+  edges: GraphEdge[],
+  width: number,
+  height: number
+): Map<string, { x: number; y: number }> {
+  // Use tree layout by default
+  return calculateTreeLayout(nodes, edges, width, height);
 }
 
 export function DependencyGraphView({
@@ -610,4 +700,5 @@ export function DependencyGraphView({
     </div>
   );
 }
+
 

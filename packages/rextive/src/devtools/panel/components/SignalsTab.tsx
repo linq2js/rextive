@@ -273,104 +273,6 @@ export function SignalsTab({
                 : formatValue(currentValue)}
             </div>
 
-            {/* Edit form for mutable signals */}
-            {editingSignal === info.id && info.kind === "mutable" && (
-              <div
-                style={{
-                  marginTop: "6px",
-                  paddingTop: "6px",
-                  borderTop: `1px solid ${styles.colors.border}`,
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <textarea
-                  value={editValue}
-                  onChange={(e) => {
-                    setEditValue(e.target.value);
-                    setEditError(null);
-                  }}
-                  style={{
-                    width: "100%",
-                    minHeight: "60px",
-                    backgroundColor: styles.colors.bg,
-                    border: editError
-                      ? `1px solid ${styles.colors.error}`
-                      : `1px solid ${styles.colors.border}`,
-                    borderRadius: "4px",
-                    color: styles.colors.text,
-                    fontSize: "10px",
-                    fontFamily: styles.fontMono,
-                    padding: "6px",
-                    resize: "vertical",
-                    outline: "none",
-                  }}
-                  placeholder="Enter JSON value..."
-                  autoFocus
-                />
-                {editError && (
-                  <div
-                    style={{
-                      color: styles.colors.error,
-                      fontSize: "9px",
-                      marginTop: "4px",
-                    }}
-                  >
-                    {editError}
-                  </div>
-                )}
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "6px",
-                    marginTop: "6px",
-                    justifyContent: "flex-end",
-                    flexWrap: "nowrap",
-                  }}
-                >
-                  <button
-                    style={{
-                      ...styles.signalActionButtonStyles,
-                      width: "auto",
-                      height: "auto",
-                      padding: "4px 10px",
-                      whiteSpace: "nowrap",
-                    }}
-                    onClick={() => {
-                      setEditingSignal(null);
-                      setEditError(null);
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    style={{
-                      ...styles.signalActionButtonStyles,
-                      width: "auto",
-                      height: "auto",
-                      padding: "4px 10px",
-                      backgroundColor: styles.colors.mutable + "33",
-                      color: styles.colors.mutable,
-                      whiteSpace: "nowrap",
-                    }}
-                    onClick={() => {
-                      try {
-                        const parsed = JSON.parse(editValue);
-                        (info.signal as any).set(parsed);
-                        setEditingSignal(null);
-                        setEditError(null);
-                      } catch (err) {
-                        setEditError(
-                          err instanceof Error ? err.message : "Invalid JSON"
-                        );
-                      }
-                    }}
-                  >
-                    Set Value
-                  </button>
-                </div>
-              </div>
-            )}
-
             {isExpanded && (
               <div
                 style={{
@@ -400,8 +302,124 @@ export function SignalsTab({
                   {displayName}
                 </div>
 
-                {/* Full value with actions */}
-                {!info.disposed && (
+                {/* Edit form for mutable signals - replaces readonly value display */}
+                {editingSignal === info.id && info.kind === "mutable" && (
+                  <div
+                    style={{
+                      marginBottom: "8px",
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "9px",
+                          color: styles.colors.textMuted,
+                        }}
+                      >
+                        Value:
+                      </span>
+                    </div>
+                    <textarea
+                      value={editValue}
+                      onChange={(e) => {
+                        setEditValue(e.target.value);
+                        setEditError(null);
+                      }}
+                      style={{
+                        width: "100%",
+                        minHeight: "150px",
+                        backgroundColor: styles.colors.bg,
+                        border: editError
+                          ? `1px solid ${styles.colors.error}`
+                          : `1px solid ${styles.colors.border}`,
+                        borderRadius: "4px",
+                        color: styles.colors.text,
+                        fontSize: "10px",
+                        fontFamily: styles.fontMono,
+                        padding: "6px",
+                        resize: "vertical",
+                        outline: "none",
+                        overflow: "auto",
+                        whiteSpace: "pre",
+                        wordBreak: "normal",
+                      }}
+                      placeholder="Enter JSON value..."
+                      autoFocus
+                    />
+                    {editError && (
+                      <div
+                        style={{
+                          color: styles.colors.error,
+                          fontSize: "9px",
+                          marginTop: "4px",
+                        }}
+                      >
+                        {editError}
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "6px",
+                        marginTop: "6px",
+                        justifyContent: "flex-end",
+                        flexWrap: "nowrap",
+                      }}
+                    >
+                      <button
+                        style={{
+                          ...styles.signalActionButtonStyles,
+                          width: "auto",
+                          height: "auto",
+                          padding: "4px 10px",
+                          whiteSpace: "nowrap",
+                        }}
+                        onClick={() => {
+                          setEditingSignal(null);
+                          setEditError(null);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        style={{
+                          ...styles.signalActionButtonStyles,
+                          width: "auto",
+                          height: "auto",
+                          padding: "4px 10px",
+                          backgroundColor: styles.colors.mutable + "33",
+                          color: styles.colors.mutable,
+                          whiteSpace: "nowrap",
+                        }}
+                        onClick={() => {
+                          try {
+                            const parsed = JSON.parse(editValue);
+                            (info.signal as any).set(parsed);
+                            setEditingSignal(null);
+                            setEditError(null);
+                          } catch (err) {
+                            setEditError(
+                              err instanceof Error ? err.message : "Invalid JSON"
+                            );
+                          }
+                        }}
+                      >
+                        Set Value
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Full value with actions - hide when editing */}
+                {!info.disposed && editingSignal !== info.id && (
                   <div style={{ marginBottom: "8px" }}>
                     <div
                       style={{
