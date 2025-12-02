@@ -217,12 +217,10 @@ export function useScope<TScope extends Record<string, any>>(
       init?.(scope);
       return scope as ExDisposable & TScope;
     },
-    () => {
+    (_, dispose) => {
       // Only called for orphaned scopes (StrictMode double-invoke)
       // Forget signals from DevTools completely
-      emit.forgetDisposedSignals(() => {
-        controller.dispose();
-      });
+      emit.forgetDisposedSignals(dispose);
     },
     watchDeps
   );

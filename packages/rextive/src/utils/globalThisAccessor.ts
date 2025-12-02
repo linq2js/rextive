@@ -33,5 +33,9 @@ export function getGlobalThisAccessor<T>(key: string, defaultValue: T) {
       g[key] = value;
       return value;
     },
+    /** Clear the global property (removes it from globalThis) */
+    clear: (): void => {
+      delete g[key];
+    },
   };
 }

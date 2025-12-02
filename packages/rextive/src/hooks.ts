@@ -108,7 +108,7 @@ export function setHooks(
  * Used for cleanup (e.g., disabling devtools).
  */
 export function resetHooks(): void {
-  hooksAccessor.set(defaultHooks);
+  hooksAccessor.clear();
 }
 
 /**

@@ -30,7 +30,9 @@ describe.each(testModes)(
         { wrapper }
       );
 
-      expect(result.current.result).toEqual({ value: 42 });
+      // Result is wrapped with disposable() which adds dispose method
+      expect(result.current.result).toMatchObject({ value: 42 });
+      expect(result.current.result.dispose).toBeInstanceOf(Function);
     });
 
     it("should handle committed objects correctly", async () => {
@@ -63,9 +65,12 @@ describe.each(testModes)(
     });
 
     it("should handle scheduleDispose and re-commit (remount simulation)", async () => {
-      const factory = vi.fn(() => ({ value: 42 }));
+      const disposeTracker = vi.fn();
+      const factory = vi.fn(() => ({
+        value: 42,
+        dispose: disposeTracker,
+      }));
       const onOrphanDispose = vi.fn();
-      const disposeCallback = vi.fn();
 
       const { result } = renderHook(
         () => useSafeFactory(factory, onOrphanDispose, []),
@@ -82,9 +87,12 @@ describe.each(testModes)(
         await Promise.resolve();
       });
 
+      // Clear any calls from orphan disposal in StrictMode
+      disposeTracker.mockClear();
+
       // Schedule dispose (simulates cleanup phase)
       act(() => {
-        result.current.scheduleDispose(disposeCallback);
+        result.current.scheduleDispose();
       });
 
       // Re-commit before microtask (simulates remount)
@@ -97,14 +105,17 @@ describe.each(testModes)(
         await Promise.resolve();
       });
 
-      // Re-committed before microtask = disposeCallback not called
-      expect(disposeCallback).not.toHaveBeenCalled();
+      // Re-committed before microtask = dispose not called
+      expect(disposeTracker).not.toHaveBeenCalled();
     });
 
-    it("should call disposeCallback when scheduleDispose and NOT re-committed (real unmount)", async () => {
-      const factory = vi.fn(() => ({ value: 42 }));
+    it("should call dispose when scheduleDispose and NOT re-committed (real unmount)", async () => {
+      const disposeTracker = vi.fn();
+      const factory = vi.fn(() => ({
+        value: 42,
+        dispose: disposeTracker,
+      }));
       const onOrphanDispose = vi.fn();
-      const disposeCallback = vi.fn();
 
       const { result } = renderHook(
         () => useSafeFactory(factory, onOrphanDispose, []),
@@ -121,9 +132,12 @@ describe.each(testModes)(
         await Promise.resolve();
       });
 
+      // Clear any calls from orphan disposal in StrictMode
+      disposeTracker.mockClear();
+
       // Schedule dispose (simulates cleanup phase)
       act(() => {
-        result.current.scheduleDispose(disposeCallback);
+        result.current.scheduleDispose();
       });
 
       // DO NOT re-commit (simulates real unmount)
@@ -133,8 +147,8 @@ describe.each(testModes)(
         await Promise.resolve();
       });
 
-      // Not re-committed = disposeCallback called
-      expect(disposeCallback).toHaveBeenCalledTimes(1);
+      // Not re-committed = dispose called
+      expect(disposeTracker).toHaveBeenCalledTimes(1);
     });
 
     it("should recreate when deps change", async () => {
@@ -174,9 +188,12 @@ describe.each(testModes)(
     });
 
     it("should handle multiple scheduleDispose/commit cycles", async () => {
-      const factory = vi.fn(() => ({ value: 42 }));
+      const disposeTracker = vi.fn();
+      const factory = vi.fn(() => ({
+        value: 42,
+        dispose: disposeTracker,
+      }));
       const onOrphanDispose = vi.fn();
-      const disposeCallback = vi.fn();
 
       const { result } = renderHook(
         () => useSafeFactory(factory, onOrphanDispose, []),
@@ -192,9 +209,12 @@ describe.each(testModes)(
         await Promise.resolve();
       });
 
+      // Clear any calls from orphan disposal in StrictMode
+      disposeTracker.mockClear();
+
       // First cycle: scheduleDispose -> commit
       act(() => {
-        result.current.scheduleDispose(disposeCallback);
+        result.current.scheduleDispose();
       });
       act(() => {
         result.current.commit();
@@ -204,11 +224,11 @@ describe.each(testModes)(
         await Promise.resolve();
       });
 
-      expect(disposeCallback).not.toHaveBeenCalled();
+      expect(disposeTracker).not.toHaveBeenCalled();
 
       // Second cycle: scheduleDispose -> commit
       act(() => {
-        result.current.scheduleDispose(disposeCallback);
+        result.current.scheduleDispose();
       });
       act(() => {
         result.current.commit();
@@ -218,18 +238,18 @@ describe.each(testModes)(
         await Promise.resolve();
       });
 
-      expect(disposeCallback).not.toHaveBeenCalled();
+      expect(disposeTracker).not.toHaveBeenCalled();
 
       // Third cycle: scheduleDispose -> NO commit (real unmount)
       act(() => {
-        result.current.scheduleDispose(disposeCallback);
+        result.current.scheduleDispose();
       });
 
       await act(async () => {
         await Promise.resolve();
       });
 
-      expect(disposeCallback).toHaveBeenCalledTimes(1);
+      expect(disposeTracker).toHaveBeenCalledTimes(1);
     });
 
     it("should return stable result reference between renders when deps unchanged", () => {
@@ -252,9 +272,12 @@ describe.each(testModes)(
 
     describe("integration with useEffect", () => {
       it("should work with standard useEffect lifecycle", async () => {
-        const factory = vi.fn(() => ({ value: 42 }));
+        const disposeTracker = vi.fn();
+        const factory = vi.fn(() => ({
+          value: 42,
+          dispose: disposeTracker,
+        }));
         const onOrphanDispose = vi.fn();
-        const disposeCallback = vi.fn();
 
         const { result, unmount } = renderHook(
           () => {
@@ -263,10 +286,7 @@ describe.each(testModes)(
             // Simulate useEffect commit pattern
             React.useEffect(() => {
               controller.commit();
-              return () =>
-                controller.scheduleDispose(() => {
-                  disposeCallback(controller.result);
-                });
+              return () => controller.scheduleDispose();
             }, [controller]);
 
             return controller;
@@ -279,8 +299,10 @@ describe.each(testModes)(
           await Promise.resolve();
         });
 
-        expect(disposeCallback).not.toHaveBeenCalled();
-        expect(result.current.result).toEqual({ value: 42 });
+        // Clear any calls from orphan disposal in StrictMode
+        disposeTracker.mockClear();
+
+        expect(result.current.result).toMatchObject({ value: 42 });
 
         // Unmount - useEffect cleanup runs scheduleDispose
         unmount();
@@ -290,9 +312,8 @@ describe.each(testModes)(
           await Promise.resolve();
         });
 
-        // disposeCallback called (normal disposal)
-        expect(disposeCallback).toHaveBeenCalledTimes(1);
-        expect(disposeCallback).toHaveBeenCalledWith({ value: 42 });
+        // dispose called (normal disposal)
+        expect(disposeTracker).toHaveBeenCalledTimes(1);
       });
 
       it("should handle deps change correctly", async () => {
@@ -304,21 +325,20 @@ describe.each(testModes)(
             const controller = useSafeFactory(
               () => {
                 const id = ++instanceCounter;
-                return { id };
+                return {
+                  id,
+                  dispose: () => disposeLog.push(id),
+                };
               },
               () => {
-                // Orphan dispose
+                // Orphan dispose - also logs
               },
               [dep]
             );
 
             React.useEffect(() => {
               controller.commit();
-              return () => {
-                controller.scheduleDispose(() => {
-                  disposeLog.push(controller.result.id);
-                });
-              };
+              return () => controller.scheduleDispose();
             }, [controller]);
 
             return controller;
@@ -332,7 +352,9 @@ describe.each(testModes)(
         });
 
         const initialId = result.current.result.id;
-        expect(disposeLog).toEqual([]);
+
+        // Clear dispose log (StrictMode may have disposed orphans)
+        disposeLog.length = 0;
 
         // Change deps - should create new instance
         rerender({ dep: 2 });

@@ -34,7 +34,7 @@ export interface SafeFactoryController<T> {
  */
 export function useSafeFactory<T>(
   factory: () => T,
-  onOrphanDispose: (result: T) => void,
+  onOrphanDispose: (result: T, dispose: () => void) => void,
   deps: unknown[]
 ): SafeFactoryController<T> {
   return useMemo(() => {
@@ -53,7 +53,7 @@ export function useSafeFactory<T>(
       Promise.resolve().then(() => {
         if (!committed && !disposed) {
           disposed = true;
-          onOrphanDispose(result);
+          onOrphanDispose(result, dispose);
         }
       });
     }
