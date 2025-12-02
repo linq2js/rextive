@@ -5,7 +5,7 @@
 
 import React from "react";
 import * as styles from "../../styles";
-import { IconClose, IconHelp } from "../../icons";
+import { IconClose, IconHelp, IconSearch } from "../../icons";
 
 interface SearchBoxProps {
   value: string;
@@ -29,7 +29,9 @@ export function SearchBox({
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         {leftActions}
         <div style={{ ...styles.searchBoxStyles, flex: 1 }}>
-          <span style={styles.searchIconStyles}>🔍</span>
+          <span style={styles.searchIconStyles}>
+            <IconSearch size={12} />
+          </span>
           <input
             type="text"
             placeholder={placeholder}

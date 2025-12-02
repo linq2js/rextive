@@ -570,7 +570,8 @@ export const searchBoxStyles: React.CSSProperties = {
 };
 
 export const searchIconStyles: React.CSSProperties = {
-  fontSize: "10px",
+  display: "flex",
+  alignItems: "center",
   color: colors.textMuted,
   marginRight: "6px",
   flexShrink: 0,
