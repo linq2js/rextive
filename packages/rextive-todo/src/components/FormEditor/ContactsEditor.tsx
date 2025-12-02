@@ -39,7 +39,7 @@ export function ContactsEditor() {
           .contacts()
           .map((contact: Contact, index: number) => (
             <ContactItem
-              key={contact.id || index}
+              key={contact.id}
               index={index}
               onRemove={() => scope.removeContact(index)}
             />
@@ -71,35 +71,38 @@ interface ContactItemProps {
 function ContactItem({ index, onRemove }: ContactItemProps) {
   const { formData } = useFormContext();
 
-  // Use watch to recreate scope when index changes (e.g., after removal of another item)
-  const scope = useScope(() => {
-    const firstName = formData.pipe(focus(`contacts.${index}.firstName`));
-    const lastName = formData.pipe(focus(`contacts.${index}.lastName`));
-    const email = formData.pipe(focus(`contacts.${index}.email`));
-    const phone = formData.pipe(focus(`contacts.${index}.phone`, () => ""));
-    const role = formData.pipe(focus(`contacts.${index}.role`, () => ""));
-    const addresses = formData.pipe(focus(`contacts.${index}.addresses`));
+  // Array item components must watch by index to recreate scope when indices shift
+  const scope = useScope(
+    () => {
+      const firstName = formData.pipe(focus(`contacts.${index}.firstName`));
+      const lastName = formData.pipe(focus(`contacts.${index}.lastName`));
+      const email = formData.pipe(focus(`contacts.${index}.email`));
+      const phone = formData.pipe(focus(`contacts.${index}.phone`, () => ""));
+      const role = formData.pipe(focus(`contacts.${index}.role`, () => ""));
+      const addresses = formData.pipe(focus(`contacts.${index}.addresses`));
 
-    return {
-      firstName,
-      lastName,
-      email,
-      phone,
-      role,
-      addresses,
-      addAddress() {
-        const newAddress: Address = {
-          id: generateId(),
-          street: "",
-          city: "",
-          country: "",
-        };
-        addresses.set((prev) => [...prev, newAddress]);
-      },
-      removeAddress: (addrIndex: number) =>
-        addresses.set((prev) => prev.filter((_, i) => i !== addrIndex)),
-    };
-  });
+      return {
+        firstName,
+        lastName,
+        email,
+        phone,
+        role,
+        addresses,
+        addAddress() {
+          const newAddress: Address = {
+            id: generateId(),
+            street: "",
+            city: "",
+            country: "",
+          };
+          addresses.set((prev) => [...prev, newAddress]);
+        },
+        removeAddress: (addrIndex: number) =>
+          addresses.set((prev) => prev.filter((_, i) => i !== addrIndex)),
+      };
+    },
+    { watch: [index] }
+  );
 
   return (
     <div className="contact-item">
@@ -180,14 +183,16 @@ function ContactItem({ index, onRemove }: ContactItemProps) {
         <div className="addresses-section">
           <h5>Addresses</h5>
           {rx(() =>
-            (scope.addresses() as Address[]).map((addr, addrIndex) => (
-              <AddressItem
-                key={addr.id || addrIndex}
-                contactIndex={index}
-                addressIndex={addrIndex}
-                onRemove={() => scope.removeAddress(addrIndex)}
-              />
-            ))
+            scope
+              .addresses()
+              .map((addr, addrIndex) => (
+                <AddressItem
+                  key={addr.id}
+                  contactIndex={index}
+                  addressIndex={addrIndex}
+                  onRemove={() => scope.removeAddress(addrIndex)}
+                />
+              ))
           )}
           <button
             type="button"
@@ -215,19 +220,25 @@ function AddressItem({
 }: AddressItemProps) {
   const { formData } = useFormContext();
 
-  const basePath = `contacts.${contactIndex}.addresses.${addressIndex}`;
-
-  // Use watch to recreate scope when indices change
-  const scope = useScope(() => ({
-    street: formData.pipe(focus(`${basePath}.street` as any)),
-    city: formData.pipe(focus(`${basePath}.city` as any)),
-    state: formData.pipe(focus(`${basePath}.state` as any, () => "")),
-    postalCode: formData.pipe(focus(`${basePath}.postalCode` as any, () => "")),
-    country: formData.pipe(focus(`${basePath}.country` as any)),
-    isPrimary: formData.pipe(
-      focus(`${basePath}.isPrimary` as any, () => false)
-    ),
-  }));
+  // Array item components must watch by index to recreate scope when indices shift
+  const scope = useScope(
+    () => {
+      const basePath = `contacts.${contactIndex}.addresses.${addressIndex}`;
+      return {
+        street: formData.pipe(focus(`${basePath}.street` as any)),
+        city: formData.pipe(focus(`${basePath}.city` as any)),
+        state: formData.pipe(focus(`${basePath}.state` as any, () => "")),
+        postalCode: formData.pipe(
+          focus(`${basePath}.postalCode` as any, () => "")
+        ),
+        country: formData.pipe(focus(`${basePath}.country` as any)),
+        isPrimary: formData.pipe(
+          focus(`${basePath}.isPrimary` as any, () => false)
+        ),
+      };
+    },
+    { watch: [contactIndex, addressIndex] }
+  );
 
   return (
     <div className="address-item">
