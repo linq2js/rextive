@@ -241,7 +241,6 @@ export function DevToolsPanel(): React.ReactElement | null {
   const [graphSelectedNodeId, setGraphSelectedNodeId] = useState<string | null>(
     null
   );
-  const graphInitializedRef = useRef(false);
   const [compareModal, setCompareModal] = useState<{
     signalId: string;
     currentValue: unknown;
@@ -2630,13 +2629,10 @@ export function DevToolsPanel(): React.ReactElement | null {
     return nodes;
   }, [dependencyGraph.edges]);
 
-  // Auto-expand all nodes on first view of graph tab
+  // Auto-expand all nodes whenever graph changes
   useEffect(() => {
-    if (activeTab === "graph" && !graphInitializedRef.current) {
-      graphInitializedRef.current = true;
-      setGraphExpandedNodes(getGraphNodesWithChildren());
-    }
-  }, [activeTab, getGraphNodesWithChildren]);
+    setGraphExpandedNodes(getGraphNodesWithChildren());
+  }, [getGraphNodesWithChildren]);
 
   const handleGraphExpandAll = useCallback(() => {
     setGraphExpandedNodes(getGraphNodesWithChildren());
@@ -2660,6 +2656,13 @@ export function DevToolsPanel(): React.ReactElement | null {
   );
 
   const renderGraph = () => {
+    // Legend items for status colors (consistent with Signals tab)
+    const legendItems = [
+      { color: styles.colors.change, label: "Updated" },
+      { color: styles.colors.error, label: "Error" },
+      { color: styles.colors.textMuted, label: "Disposed" },
+    ];
+
     return (
       <div
         style={{
@@ -2669,12 +2672,50 @@ export function DevToolsPanel(): React.ReactElement | null {
           overflow: "hidden",
         }}
       >
+        {/* Status Legend */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            padding: "6px 12px",
+            borderBottom: `1px solid ${styles.colors.border}`,
+            backgroundColor: styles.colors.bgHeader,
+            fontSize: "10px",
+            color: styles.colors.textMuted,
+            flexShrink: 0,
+          }}
+        >
+          <span>Status:</span>
+          {legendItems.map(({ color, label }) => (
+            <div
+              key={label}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  backgroundColor: color,
+                  boxShadow: label === "Updated" ? `0 0 4px ${color}` : undefined,
+                }}
+              />
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
         <SimpleTreeView
           graph={dependencyGraph}
           onNodeClick={handleGraphNodeClick}
           selectedNodeId={graphSelectedNodeId}
           expandedNodes={graphExpandedNodes}
           onExpandedNodesChange={setGraphExpandedNodes}
+          recentlyUpdatedNodes={new Set(flashingSignals.keys())}
         />
       </div>
     );

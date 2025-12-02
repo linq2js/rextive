@@ -12,6 +12,14 @@ import type {
 } from "@/devtools/utils/buildDependencyGraph";
 import * as styles from "../styles";
 
+// Status colors - consistent with Signals tab
+const STATUS_COLORS = {
+  active: styles.colors.change, // Orange - recently updated (same as Signals tab)
+  idle: styles.colors.text, // Default text color
+  error: styles.colors.error, // Red - has error
+  disposed: styles.colors.textMuted, // Gray - disposed
+} as const;
+
 /**
  * Count dependents for each node
  */
@@ -113,6 +121,8 @@ export interface SimpleTreeViewProps {
   selectedNodeId?: string | null;
   expandedNodes?: Set<string>;
   onExpandedNodesChange?: (nodes: Set<string>) => void;
+  /** Set of node IDs that were recently updated (for flash effect) */
+  recentlyUpdatedNodes?: Set<string>;
 }
 
 export function SimpleTreeView({
@@ -121,6 +131,7 @@ export function SimpleTreeView({
   selectedNodeId,
   expandedNodes: controlledExpandedNodes,
   onExpandedNodesChange,
+  recentlyUpdatedNodes = new Set(),
 }: SimpleTreeViewProps): React.ReactElement {
   const [internalExpandedNodes, setInternalExpandedNodes] = useState<
     Set<string>
@@ -180,9 +191,53 @@ export function SimpleTreeView({
   const renderNode = (node: GraphNode, level: number, hasChildren: boolean) => {
     const isExpanded = expandedNodes.has(node.id);
     const isSelected = node.id === selectedNodeId;
+    const isRecentlyUpdated = recentlyUpdatedNodes.has(node.id);
     const dependents = dependentsCount.get(node.id) || 0;
     const nodeColor =
       node.kind === "mutable" ? styles.colors.mutable : styles.colors.computed;
+
+    // Determine status color based on state (consistent with Signals tab)
+    const getStatusColor = () => {
+      if (node.hasError) return STATUS_COLORS.error;
+      if (node.disposed) return STATUS_COLORS.disposed;
+      if (isRecentlyUpdated) return STATUS_COLORS.active;
+      return STATUS_COLORS.idle;
+    };
+
+    // Get background color (consistent with Signals tab itemStyles)
+    const getBgColor = () => {
+      if (node.hasError) return styles.colors.errorBg;
+      if (isRecentlyUpdated) return STATUS_COLORS.active + "33"; // 20% opacity
+      if (isSelected) return styles.colors.bgHover;
+      return "transparent";
+    };
+
+    // Get border color (consistent with Signals tab)
+    const getBorderColor = () => {
+      if (node.hasError) return styles.colors.error;
+      if (isRecentlyUpdated) return STATUS_COLORS.active;
+      return "transparent";
+    };
+
+    // Get box shadow (consistent with Signals tab)
+    const getBoxShadow = () => {
+      if (node.hasError) return `0 0 8px ${styles.colors.error}44`;
+      if (isRecentlyUpdated) return `0 0 8px ${STATUS_COLORS.active}44`;
+      return "none";
+    };
+
+    // Status indicator dot style
+    const statusDotStyle: React.CSSProperties = {
+      width: "6px",
+      height: "6px",
+      borderRadius: "50%",
+      backgroundColor: getStatusColor(),
+      marginRight: "6px",
+      flexShrink: 0,
+      ...(isRecentlyUpdated && {
+        boxShadow: `0 0 6px ${STATUS_COLORS.active}`,
+      }),
+    };
 
     return (
       <div key={node.id}>
@@ -191,20 +246,23 @@ export function SimpleTreeView({
             display: "flex",
             alignItems: "center",
             padding: "4px 8px",
-            backgroundColor: isSelected ? styles.colors.bgHover : "transparent",
+            backgroundColor: getBgColor(),
             borderRadius: "4px",
             fontFamily: styles.fontMono,
             fontSize: "11px",
             color: styles.colors.text,
             paddingLeft: `${8 + level * 16}px`,
+            borderLeft: `3px solid ${getBorderColor()}`,
+            boxShadow: getBoxShadow(),
+            transition: "all 0.25s ease",
           }}
           onMouseEnter={(e) => {
-            if (!isSelected) {
+            if (!isSelected && !isRecentlyUpdated && !node.hasError) {
               e.currentTarget.style.backgroundColor = styles.colors.bgHover;
             }
           }}
           onMouseLeave={(e) => {
-            if (!isSelected) {
+            if (!isSelected && !isRecentlyUpdated && !node.hasError) {
               e.currentTarget.style.backgroundColor = "transparent";
             }
           }}
@@ -232,6 +290,10 @@ export function SimpleTreeView({
           {!hasChildren && (
             <span style={{ width: "12px", marginRight: "4px" }} />
           )}
+          {/* Status indicator dot */}
+          <span style={statusDotStyle} title={
+            node.hasError ? "Error" : node.disposed ? "Disposed" : isRecentlyUpdated ? "Recently updated" : "Idle"
+          } />
           <span
             style={{
               color: nodeColor,
@@ -259,6 +321,10 @@ export function SimpleTreeView({
               ...(node.hasError && {
                 color: styles.colors.errorText,
               }),
+              ...(isRecentlyUpdated && !node.hasError && !node.disposed && {
+                color: STATUS_COLORS.active,
+                fontWeight: 600,
+              }),
             }}
             onClick={() => onNodeClick?.(node.id)}
             title={node.name}
@@ -282,9 +348,12 @@ export function SimpleTreeView({
                 color: styles.colors.textMuted,
                 fontSize: "8px",
                 marginLeft: "4px",
+                backgroundColor: styles.colors.textMuted + "22",
+                padding: "1px 4px",
+                borderRadius: "3px",
               }}
             >
-              [disposed]
+              disposed
             </span>
           )}
           {node.hasError && (
@@ -293,9 +362,12 @@ export function SimpleTreeView({
                 color: styles.colors.error,
                 fontSize: "8px",
                 marginLeft: "4px",
+                backgroundColor: styles.colors.error + "22",
+                padding: "1px 4px",
+                borderRadius: "3px",
               }}
             >
-              ⚠
+              ⚠ error
             </span>
           )}
         </div>
