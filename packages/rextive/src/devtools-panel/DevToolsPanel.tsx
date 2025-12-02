@@ -56,9 +56,11 @@ import {
   IconRevert,
   IconUndo,
   IconRecord,
+  IconCamera,
 } from "./icons";
 import { SearchHelpModal } from "./SearchHelpModal";
 import { ValueDiffModal } from "./ValueDiffModal";
+import { SnapshotDiffModal, CURRENT_STATE_ID } from "./SnapshotDiffModal";
 import { SimpleTreeView } from "./components/SimpleTreeView";
 import { buildDependencyGraph } from "@/devtools";
 import { isPromiseLike } from "@/utils/isPromiseLike";
@@ -269,6 +271,10 @@ export function DevToolsPanel(): React.ReactElement | null {
     null
   );
   const [editingSnapshotName, setEditingSnapshotName] = useState("");
+  const [snapshotSearch, setSnapshotSearch] = useState("");
+  const [snapshotDiffOpen, setSnapshotDiffOpen] = useState(false);
+  const [snapshotDiff1Id, setSnapshotDiff1Id] = useState<string | null>(null);
+  const [snapshotDiff2Id, setSnapshotDiff2Id] = useState<string | null>(null);
   const snapshotCounterRef = useRef(1);
   const snapshotInitDoneRef = useRef(false);
   const snapshotIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -372,6 +378,101 @@ export function DevToolsPanel(): React.ReactElement | null {
     setSnapshots((prev) => [newSnapshot, ...prev]);
   }, [signals]);
 
+  // Take snapshot for specific tag
+  const takeSnapshotForTag = useCallback(
+    (tagId: string, signalIds: string[]) => {
+      const tagSignals = signalIds
+        .map((id) => signals.get(id))
+        .filter(
+          (s): s is SignalInfo =>
+            s !== undefined &&
+            s.kind === "mutable" &&
+            !s.disposed &&
+            !s.errorCount
+        );
+
+      if (tagSignals.length === 0) return;
+
+      const snapshotSignals: SnapshotSignal[] = tagSignals.map((s) => {
+        let value: unknown;
+        try {
+          value = s.signal?.get?.();
+        } catch {
+          value = "[error reading value]";
+        }
+        const signalObj = s.signal as
+          | { set?: (value: unknown) => void }
+          | undefined;
+        const signalRef = signalObj?.set
+          ? new WeakRef(signalObj as { set: (value: unknown) => void })
+          : null;
+        return {
+          id: s.id,
+          name: s.name,
+          value,
+          signalRef,
+        };
+      });
+
+      const newSnapshot: Snapshot = {
+        id: `snapshot-${Date.now()}`,
+        timestamp: Date.now(),
+        name: `Tag: ${tagId} #${snapshotCounterRef.current}`,
+        signals: snapshotSignals,
+      };
+
+      snapshotCounterRef.current++;
+      setSnapshots((prev) => [newSnapshot, ...prev]);
+    },
+    [signals]
+  );
+
+  // Take snapshot for bookmarked signals only
+  const takeSnapshotBookmarkedOnly = useCallback(() => {
+    const bookmarkedMutableSignals = Array.from(signals.values()).filter(
+      (s) =>
+        s.kind === "mutable" &&
+        !s.disposed &&
+        !s.errorCount &&
+        bookmarkedSignals.has(s.id)
+    );
+
+    if (bookmarkedMutableSignals.length === 0) return;
+
+    const snapshotSignals: SnapshotSignal[] = bookmarkedMutableSignals.map(
+      (s) => {
+        let value: unknown;
+        try {
+          value = s.signal?.get?.();
+        } catch {
+          value = "[error reading value]";
+        }
+        const signalObj = s.signal as
+          | { set?: (value: unknown) => void }
+          | undefined;
+        const signalRef = signalObj?.set
+          ? new WeakRef(signalObj as { set: (value: unknown) => void })
+          : null;
+        return {
+          id: s.id,
+          name: s.name,
+          value,
+          signalRef,
+        };
+      }
+    );
+
+    const newSnapshot: Snapshot = {
+      id: `snapshot-${Date.now()}`,
+      timestamp: Date.now(),
+      name: `Bookmarked #${snapshotCounterRef.current}`,
+      signals: snapshotSignals,
+    };
+
+    snapshotCounterRef.current++;
+    setSnapshots((prev) => [newSnapshot, ...prev]);
+  }, [signals, bookmarkedSignals]);
+
   const deleteSnapshot = useCallback(
     (snapshotId: string) => {
       setSnapshots((prev) => prev.filter((s) => s.id !== snapshotId));
@@ -453,6 +554,32 @@ export function DevToolsPanel(): React.ReactElement | null {
     setSnapshots([]);
     setExpandedSnapshot(null);
     snapshotCounterRef.current = 1;
+  }, []);
+
+  // Get current state of mutable signals for comparison
+  const getCurrentStateSignals = useCallback(() => {
+    return Array.from(signals.values())
+      .filter((s) => s.kind === "mutable" && !s.disposed && !s.errorCount)
+      .map((s) => {
+        let value: unknown;
+        try {
+          value = (s.signal as { get?: () => unknown })?.get?.();
+        } catch {
+          value = "[error reading value]";
+        }
+        return {
+          id: s.id,
+          name: s.name,
+          value,
+        };
+      });
+  }, [signals]);
+
+  // Helper to compare a snapshot with current state
+  const compareSnapshotWithCurrent = useCallback((snapshotId: string) => {
+    setSnapshotDiff1Id(snapshotId);
+    setSnapshotDiff2Id(CURRENT_STATE_ID);
+    setSnapshotDiffOpen(true);
   }, []);
 
   // Resize handlers - supports both mouse and touch events
@@ -1649,6 +1776,21 @@ export function DevToolsPanel(): React.ReactElement | null {
                   >
                     {info.signals.size} sig
                   </span>
+                  {info.signals.size > 0 && (
+                    <button
+                      style={{
+                        ...styles.signalActionButtonStyles,
+                        color: styles.colors.error,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        takeSnapshotForTag(info.id, signalIds);
+                      }}
+                      title={`Take snapshot of signals in "${info.id}"`}
+                    >
+                      <IconCamera size={12} />
+                    </button>
+                  )}
                   <span
                     style={{
                       color: styles.colors.textMuted,
@@ -2551,6 +2693,23 @@ export function DevToolsPanel(): React.ReactElement | null {
   };
 
   const renderSnapshots = () => {
+    // Filter snapshots by search
+    const filteredSnapshots = snapshotSearch.trim()
+      ? snapshots.filter((snapshot) => {
+          const searchLower = snapshotSearch.toLowerCase();
+          // Match snapshot name
+          if (snapshot.name.toLowerCase().includes(searchLower)) return true;
+          // Match signal names in snapshot
+          if (
+            snapshot.signals.some((s) =>
+              s.name.toLowerCase().includes(searchLower)
+            )
+          )
+            return true;
+          return false;
+        })
+      : snapshots;
+
     if (snapshots.length === 0) {
       return (
         <div style={styles.emptyStateStyles}>
@@ -2562,9 +2721,17 @@ export function DevToolsPanel(): React.ReactElement | null {
       );
     }
 
+    if (filteredSnapshots.length === 0) {
+      return (
+        <div style={styles.emptyStateStyles}>
+          No snapshots match "{snapshotSearch}"
+        </div>
+      );
+    }
+
     return (
       <div style={styles.contentGridStyles(position)}>
-        {snapshots.map((snapshot) => {
+        {filteredSnapshots.map((snapshot) => {
           const isExpanded = expandedSnapshot === snapshot.id;
           const isEditing = editingSnapshotId === snapshot.id;
 
@@ -2691,6 +2858,24 @@ export function DevToolsPanel(): React.ReactElement | null {
                     title="Rename snapshot"
                   >
                     <IconEdit size={10} />
+                  </button>
+                  {/* Compare with current */}
+                  <button
+                    style={{
+                      padding: "3px 6px",
+                      fontSize: "10px",
+                      backgroundColor: styles.colors.bgHover,
+                      border: `1px solid ${styles.colors.border}`,
+                      borderRadius: "3px",
+                      color: styles.colors.computed,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                    onClick={() => compareSnapshotWithCurrent(snapshot.id)}
+                    title="Compare with current state"
+                  >
+                    <IconCompare size={10} />
                   </button>
                   {/* Revert all */}
                   <button
@@ -3422,13 +3607,21 @@ export function DevToolsPanel(): React.ReactElement | null {
               {/* Tab content with search, filters, and main content */}
               <TabContent
                 searchBox={
-                  activeTab === "graph" || activeTab === "snaps"
+                  activeTab === "graph"
                     ? undefined
                     : activeTab === "chains"
                     ? {
                         value: chainFilter,
                         onChange: setChainFilter,
                         placeholder: "Filter by signal name...",
+                        showHelp: false,
+                        leftActions: undefined,
+                      }
+                    : activeTab === "snaps"
+                    ? {
+                        value: snapshotSearch,
+                        onChange: setSnapshotSearch,
+                        placeholder: "Search snapshots...",
                         showHelp: false,
                         leftActions: undefined,
                       }
@@ -3488,10 +3681,75 @@ export function DevToolsPanel(): React.ReactElement | null {
                           gap: "4px",
                         }}
                         onClick={takeSnapshot}
-                        title="Take snapshot now"
+                        title="Take snapshot of all mutable signals"
                       >
                         <IconRecord size={10} />
                       </button>
+                      {/* Take bookmarked only button */}
+                      <button
+                        style={{
+                          padding: "3px 8px",
+                          fontSize: "10px",
+                          backgroundColor: styles.colors.warning + "22",
+                          border: `1px solid ${styles.colors.warning}`,
+                          borderRadius: "4px",
+                          color: styles.colors.warning,
+                          cursor:
+                            bookmarkedSignals.size === 0
+                              ? "not-allowed"
+                              : "pointer",
+                          opacity: bookmarkedSignals.size === 0 ? 0.5 : 1,
+                          fontFamily: "inherit",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                        onClick={takeSnapshotBookmarkedOnly}
+                        disabled={bookmarkedSignals.size === 0}
+                        title={
+                          bookmarkedSignals.size === 0
+                            ? "No bookmarked signals"
+                            : `Take snapshot of ${bookmarkedSignals.size} bookmarked signal(s)`
+                        }
+                      >
+                        <IconStar size={10} filled />
+                      </button>
+                      <FilterGroup>
+                        {/* Diff button */}
+                        <button
+                          style={{
+                            padding: "3px 8px",
+                            fontSize: "10px",
+                            backgroundColor:
+                              snapshots.length < 2
+                                ? styles.colors.bgHover
+                                : styles.colors.computed + "22",
+                            border: `1px solid ${
+                              snapshots.length < 2
+                                ? styles.colors.border
+                                : styles.colors.computed
+                            }`,
+                            borderRadius: "4px",
+                            color:
+                              snapshots.length < 2
+                                ? styles.colors.textMuted
+                                : styles.colors.computed,
+                            cursor:
+                              snapshots.length < 2 ? "not-allowed" : "pointer",
+                            opacity: snapshots.length < 2 ? 0.5 : 1,
+                            fontFamily: "inherit",
+                          }}
+                          onClick={() => setSnapshotDiffOpen(true)}
+                          disabled={snapshots.length < 2}
+                          title={
+                            snapshots.length < 2
+                              ? "Need at least 2 snapshots to compare"
+                              : "Compare two snapshots"
+                          }
+                        >
+                          <IconCompare size={10} /> Diff
+                        </button>
+                      </FilterGroup>
                       <FilterGroup>
                         {/* Snapshot on init toggle */}
                         <button
@@ -3659,6 +3917,20 @@ export function DevToolsPanel(): React.ReactElement | null {
             formatTime={formatTime}
           />
         )}
+        <SnapshotDiffModal
+          isOpen={snapshotDiffOpen}
+          onClose={() => {
+            setSnapshotDiffOpen(false);
+            setSnapshotDiff1Id(null);
+            setSnapshotDiff2Id(null);
+          }}
+          snapshots={snapshots}
+          snapshot1Id={snapshotDiff1Id}
+          snapshot2Id={snapshotDiff2Id}
+          onSelectSnapshot1={setSnapshotDiff1Id}
+          onSelectSnapshot2={setSnapshotDiff2Id}
+          currentStateSignals={getCurrentStateSignals()}
+        />
       </div>
     </>
   );

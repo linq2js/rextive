@@ -10,6 +10,7 @@ import * as styles from "../styles";
 import { formatValue } from "../utils/formatUtils";
 import { task } from "@/utils/task";
 import { isPromiseLike } from "@/utils/isPromiseLike";
+import { IconCamera } from "../icons";
 
 interface TagsTabProps {
   tags: Map<string, TagInfo>;
@@ -18,6 +19,7 @@ interface TagsTabProps {
   position: PanelPosition;
   searchQuery: string;
   onNavigateToSignal: (signalId: string) => void;
+  onTakeSnapshotForTag?: (tagId: string, signalIds: string[]) => void;
 }
 
 export function TagsTab({
@@ -27,6 +29,7 @@ export function TagsTab({
   position,
   searchQuery,
   onNavigateToSignal,
+  onTakeSnapshotForTag,
 }: TagsTabProps): React.ReactElement {
   const [expandedTag, setExpandedTag] = useState<string | null>(null);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
@@ -79,6 +82,21 @@ export function TagsTab({
                 <span style={{ color: styles.colors.textDim, fontSize: "9px" }}>
                   {info.signals.size} sig
                 </span>
+                {onTakeSnapshotForTag && info.signals.size > 0 && (
+                  <button
+                    style={{
+                      ...styles.signalActionButtonStyles,
+                      color: styles.colors.error,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTakeSnapshotForTag(info.id, Array.from(info.signals));
+                    }}
+                    title={`Take snapshot of signals in "${info.id}"`}
+                  >
+                    <IconCamera size={12} />
+                  </button>
+                )}
                 <span
                   style={{
                     color: styles.colors.textMuted,
