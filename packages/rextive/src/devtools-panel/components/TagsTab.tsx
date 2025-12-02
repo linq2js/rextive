@@ -113,7 +113,10 @@ export function TagsTab({
             {/* Collapsed preview */}
             {!isExpanded && info.signals.size > 0 && (
               <div style={styles.valueStyles}>
-                {signalIds.slice(0, 3).join(", ")}
+                {signalIds
+                  .slice(0, 3)
+                  .map((id) => signals.get(id)?.name || id)
+                  .join(", ")}
                 {info.signals.size > 3 && ` +${info.signals.size - 3}`}
               </div>
             )}
@@ -211,7 +214,7 @@ export function TagsTab({
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {signalId}
+                            {signalInfo?.name || signalId}
                           </span>
                           {signalInfo && !isDisposed && (
                             <span
