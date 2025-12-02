@@ -80,7 +80,7 @@ import {
   getSearchPlaceholder,
 } from "./searchUtils";
 
-type Tab = "signals" | "tags" | "events" | "chains" | "graph" | "snaps";
+type Tab = "signals" | "snaps" | "tags" | "events" | "chains" | "graph";
 
 const STORAGE_KEY = "rextive-devtools-config";
 const BOOKMARKS_STORAGE_KEY = "rextive-devtools-bookmarks";
@@ -94,6 +94,7 @@ interface DevToolsConfig {
   sizeLeft: number | null;
   snapshotOnInit: boolean;
   snapshotAutoInterval: boolean;
+  snapshotBookmarkedOnly: boolean;
 }
 
 const DEFAULT_CONFIG: DevToolsConfig = {
@@ -105,6 +106,7 @@ const DEFAULT_CONFIG: DevToolsConfig = {
   sizeLeft: null,
   snapshotOnInit: false,
   snapshotAutoInterval: false,
+  snapshotBookmarkedOnly: false,
 };
 
 // Snapshot types
@@ -267,6 +269,9 @@ export function DevToolsPanel(): React.ReactElement | null {
   const [snapshotAutoInterval, setSnapshotAutoInterval] = useState(
     initialConfig.snapshotAutoInterval
   );
+  const [snapshotBookmarkedOnly, setSnapshotBookmarkedOnly] = useState(
+    initialConfig.snapshotBookmarkedOnly
+  );
   const [editingSnapshotId, setEditingSnapshotId] = useState<string | null>(
     null
   );
@@ -340,43 +345,83 @@ export function DevToolsPanel(): React.ReactElement | null {
   }, []);
 
   // Snapshot functions
-  const takeSnapshot = useCallback(() => {
-    const mutableSignals = Array.from(signals.values()).filter(
-      (s) => s.kind === "mutable" && !s.disposed && !s.errorCount
-    );
-
-    const snapshotSignals: SnapshotSignal[] = mutableSignals.map((s) => {
-      let value: unknown;
-      try {
-        value = s.signal?.get?.();
-      } catch {
-        value = "[error reading value]";
+  // Helper to compare two snapshot signal lists for equality
+  const snapshotsAreEqual = useCallback(
+    (a: SnapshotSignal[], b: SnapshotSignal[]): boolean => {
+      if (a.length !== b.length) return false;
+      const aMap = new Map(a.map((s) => [s.id, s.value]));
+      for (const sig of b) {
+        const aVal = aMap.get(sig.id);
+        if (aVal === undefined && !aMap.has(sig.id)) return false;
+        try {
+          if (JSON.stringify(aVal) !== JSON.stringify(sig.value)) return false;
+        } catch {
+          if (aVal !== sig.value) return false;
+        }
       }
-      // Store WeakRef to allow GC of the signal
-      const signalObj = s.signal as
-        | { set?: (value: unknown) => void }
-        | undefined;
-      const signalRef = signalObj?.set
-        ? new WeakRef(signalObj as { set: (value: unknown) => void })
-        : null;
-      return {
-        id: s.id,
-        name: s.name,
-        value,
-        signalRef,
+      return true;
+    },
+    []
+  );
+
+  const takeSnapshot = useCallback(
+    (options?: { skipIfNoDiff?: boolean }) => {
+      // Filter mutable signals, optionally by bookmarked only
+      const mutableSignals = Array.from(signals.values()).filter(
+        (s) =>
+          s.kind === "mutable" &&
+          !s.disposed &&
+          !s.errorCount &&
+          (!snapshotBookmarkedOnly || bookmarkedSignals.has(s.id))
+      );
+
+      // Don't create empty snapshot when bookmarked-only mode is on but no bookmarks
+      if (snapshotBookmarkedOnly && mutableSignals.length === 0) {
+        return;
+      }
+
+      const snapshotSignals: SnapshotSignal[] = mutableSignals.map((s) => {
+        let value: unknown;
+        try {
+          value = s.signal?.get?.();
+        } catch {
+          value = "[error reading value]";
+        }
+        // Store WeakRef to allow GC of the signal
+        const signalObj = s.signal as
+          | { set?: (value: unknown) => void }
+          | undefined;
+        const signalRef = signalObj?.set
+          ? new WeakRef(signalObj as { set: (value: unknown) => void })
+          : null;
+        return {
+          id: s.id,
+          name: s.name,
+          value,
+          signalRef,
+        };
+      });
+
+      // Skip if no diff with latest snapshot (for auto-snapshot)
+      if (options?.skipIfNoDiff && snapshots.length > 0) {
+        const latestSnapshot = snapshots[0];
+        if (snapshotsAreEqual(latestSnapshot.signals, snapshotSignals)) {
+          return; // No changes, skip creating duplicate
+        }
+      }
+
+      const newSnapshot: Snapshot = {
+        id: `snapshot-${Date.now()}`,
+        timestamp: Date.now(),
+        name: `Snapshot #${snapshotCounterRef.current}`,
+        signals: snapshotSignals,
       };
-    });
 
-    const newSnapshot: Snapshot = {
-      id: `snapshot-${Date.now()}`,
-      timestamp: Date.now(),
-      name: `Snapshot #${snapshotCounterRef.current}`,
-      signals: snapshotSignals,
-    };
-
-    snapshotCounterRef.current++;
-    setSnapshots((prev) => [newSnapshot, ...prev]);
-  }, [signals]);
+      snapshotCounterRef.current++;
+      setSnapshots((prev) => [newSnapshot, ...prev]);
+    },
+    [signals, snapshotBookmarkedOnly, bookmarkedSignals, snapshots, snapshotsAreEqual]
+  );
 
   // Take snapshot for specific tag
   const takeSnapshotForTag = useCallback(
@@ -426,52 +471,6 @@ export function DevToolsPanel(): React.ReactElement | null {
     },
     [signals]
   );
-
-  // Take snapshot for bookmarked signals only
-  const takeSnapshotBookmarkedOnly = useCallback(() => {
-    const bookmarkedMutableSignals = Array.from(signals.values()).filter(
-      (s) =>
-        s.kind === "mutable" &&
-        !s.disposed &&
-        !s.errorCount &&
-        bookmarkedSignals.has(s.id)
-    );
-
-    if (bookmarkedMutableSignals.length === 0) return;
-
-    const snapshotSignals: SnapshotSignal[] = bookmarkedMutableSignals.map(
-      (s) => {
-        let value: unknown;
-        try {
-          value = s.signal?.get?.();
-        } catch {
-          value = "[error reading value]";
-        }
-        const signalObj = s.signal as
-          | { set?: (value: unknown) => void }
-          | undefined;
-        const signalRef = signalObj?.set
-          ? new WeakRef(signalObj as { set: (value: unknown) => void })
-          : null;
-        return {
-          id: s.id,
-          name: s.name,
-          value,
-          signalRef,
-        };
-      }
-    );
-
-    const newSnapshot: Snapshot = {
-      id: `snapshot-${Date.now()}`,
-      timestamp: Date.now(),
-      name: `Bookmarked #${snapshotCounterRef.current}`,
-      signals: snapshotSignals,
-    };
-
-    snapshotCounterRef.current++;
-    setSnapshots((prev) => [newSnapshot, ...prev]);
-  }, [signals, bookmarkedSignals]);
 
   const deleteSnapshot = useCallback(
     (snapshotId: string) => {
@@ -548,6 +547,11 @@ export function DevToolsPanel(): React.ReactElement | null {
   const updateSnapshotAutoInterval = useCallback((enabled: boolean) => {
     setSnapshotAutoInterval(enabled);
     saveConfig({ snapshotAutoInterval: enabled });
+  }, []);
+
+  const updateSnapshotBookmarkedOnly = useCallback((enabled: boolean) => {
+    setSnapshotBookmarkedOnly(enabled);
+    saveConfig({ snapshotBookmarkedOnly: enabled });
   }, []);
 
   const clearAllSnapshots = useCallback(() => {
@@ -886,8 +890,8 @@ export function DevToolsPanel(): React.ReactElement | null {
   useEffect(() => {
     if (snapshotAutoInterval && enabled) {
       snapshotIntervalRef.current = setInterval(() => {
-        takeSnapshot();
-      }, 30000); // 30 seconds
+        takeSnapshot({ skipIfNoDiff: true }); // Skip if no changes
+      }, 10000); // 10 seconds
       return () => {
         if (snapshotIntervalRef.current) {
           clearInterval(snapshotIntervalRef.current);
@@ -3590,11 +3594,11 @@ export function DevToolsPanel(): React.ReactElement | null {
                 tabs={(
                   [
                     "signals",
+                    "snaps",
                     "tags",
                     "events",
                     "chains",
                     "graph",
-                    "snaps",
                   ] as Tab[]
                 ).map((tab) => ({
                   id: tab,
@@ -3674,45 +3678,72 @@ export function DevToolsPanel(): React.ReactElement | null {
                           border: `1px solid ${styles.colors.error}`,
                           borderRadius: "4px",
                           color: styles.colors.error,
+                          cursor:
+                            snapshotBookmarkedOnly && bookmarkedSignals.size === 0
+                              ? "not-allowed"
+                              : "pointer",
+                          opacity:
+                            snapshotBookmarkedOnly && bookmarkedSignals.size === 0
+                              ? 0.5
+                              : 1,
+                          fontFamily: "inherit",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                        onClick={() => takeSnapshot()}
+                        disabled={
+                          snapshotBookmarkedOnly && bookmarkedSignals.size === 0
+                        }
+                        title={
+                          snapshotBookmarkedOnly
+                            ? bookmarkedSignals.size === 0
+                              ? "No bookmarked signals"
+                              : `Take snapshot of ${bookmarkedSignals.size} bookmarked signal(s)`
+                            : "Take snapshot of all mutable signals"
+                        }
+                      >
+                        <IconRecord size={10} />
+                      </button>
+                      {/* Bookmarked only toggle */}
+                      <button
+                        style={{
+                          padding: "3px 8px",
+                          fontSize: "10px",
+                          backgroundColor: snapshotBookmarkedOnly
+                            ? styles.colors.warning + "33"
+                            : styles.colors.bgHover,
+                          border: `1px solid ${
+                            snapshotBookmarkedOnly
+                              ? styles.colors.warning
+                              : styles.colors.border
+                          }`,
+                          borderRadius: "4px",
+                          color: snapshotBookmarkedOnly
+                            ? styles.colors.warning
+                            : styles.colors.textMuted,
                           cursor: "pointer",
                           fontFamily: "inherit",
                           display: "flex",
                           alignItems: "center",
                           gap: "4px",
                         }}
-                        onClick={takeSnapshot}
-                        title="Take snapshot of all mutable signals"
-                      >
-                        <IconRecord size={10} />
-                      </button>
-                      {/* Take bookmarked only button */}
-                      <button
-                        style={{
-                          padding: "3px 8px",
-                          fontSize: "10px",
-                          backgroundColor: styles.colors.warning + "22",
-                          border: `1px solid ${styles.colors.warning}`,
-                          borderRadius: "4px",
-                          color: styles.colors.warning,
-                          cursor:
-                            bookmarkedSignals.size === 0
-                              ? "not-allowed"
-                              : "pointer",
-                          opacity: bookmarkedSignals.size === 0 ? 0.5 : 1,
-                          fontFamily: "inherit",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                        }}
-                        onClick={takeSnapshotBookmarkedOnly}
-                        disabled={bookmarkedSignals.size === 0}
+                        onClick={() =>
+                          updateSnapshotBookmarkedOnly(!snapshotBookmarkedOnly)
+                        }
                         title={
-                          bookmarkedSignals.size === 0
-                            ? "No bookmarked signals"
-                            : `Take snapshot of ${bookmarkedSignals.size} bookmarked signal(s)`
+                          snapshotBookmarkedOnly
+                            ? "Click to snapshot all signals"
+                            : "Click to snapshot bookmarked only"
                         }
                       >
-                        <IconStar size={10} filled />
+                        <IconStar
+                          size={10}
+                          filled={snapshotBookmarkedOnly}
+                        />
+                        <span style={{ fontSize: "9px" }}>
+                          ⭐{bookmarkedSignals.size}
+                        </span>
                       </button>
                       <FilterGroup>
                         {/* Diff button */}
@@ -3799,9 +3830,9 @@ export function DevToolsPanel(): React.ReactElement | null {
                           onClick={() =>
                             updateSnapshotAutoInterval(!snapshotAutoInterval)
                           }
-                          title="Auto snapshot every 30 seconds"
+                          title="Auto snapshot every 10 seconds"
                         >
-                          Auto 30s
+                          Auto 10s
                         </button>
                       </FilterGroup>
                     </>
