@@ -3,7 +3,7 @@
  * Full-screen modal for dependency graph visualization
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { IconClose } from "../icons";
 import * as styles from "../styles";
 import { SimpleTreeView } from "./SimpleTreeView";
@@ -25,39 +25,35 @@ export function GraphModal({
   onNodeClick,
   selectedNodeId,
 }: GraphModalProps): React.ReactElement | null {
-  // Get all nodes with children for expand all
-  const allNodesWithChildren = useMemo(() => {
+  // Track expanded nodes - start empty and expand on first open
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const hasInitializedRef = React.useRef(false);
+
+  // Get all nodes with children (for expand all button)
+  const getAllNodesWithChildren = () => {
     const nodes = new Set<string>();
     for (const edge of graph.edges) {
       nodes.add(edge.from);
     }
     return nodes;
-  }, [graph]);
-  
-  // Track if we've initialized to prevent auto-expand after manual collapse
-  const hasInitializedRef = React.useRef(false);
-  
-  // Initialize with all nodes expanded, but only on first open
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
-    return new Set(allNodesWithChildren);
-  });
-  
-  // Only auto-expand on initial open, not when manually collapsed
+  };
+
+  // Auto-expand all nodes on FIRST open only
   React.useEffect(() => {
-    if (isOpen && !hasInitializedRef.current && allNodesWithChildren.size > 0) {
+    if (isOpen && !hasInitializedRef.current) {
       hasInitializedRef.current = true;
-      setExpandedNodes(new Set(allNodesWithChildren));
+      setExpandedNodes(getAllNodesWithChildren());
     }
+    // Reset flag when modal closes (so next open will expand again)
     if (!isOpen) {
-      // Reset when modal closes so it expands again on next open
       hasInitializedRef.current = false;
-      // Reset to expanded state when modal closes
-      setExpandedNodes(new Set(allNodesWithChildren));
     }
-  }, [isOpen, allNodesWithChildren]);
+    // Note: We intentionally don't depend on graph here to avoid re-expanding
+    // when the graph updates while modal is open
+  }, [isOpen]);
   
   const handleExpandAll = () => {
-    setExpandedNodes(new Set(allNodesWithChildren));
+    setExpandedNodes(getAllNodesWithChildren());
   };
   
   const handleCollapseAll = () => {
