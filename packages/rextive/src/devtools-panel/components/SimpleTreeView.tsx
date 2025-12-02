@@ -261,6 +261,7 @@ export function SimpleTreeView({
               }),
             }}
             onClick={() => onNodeClick?.(node.id)}
+            title={node.name}
           >
             {node.name}
           </span>

@@ -1,21 +1,71 @@
 /**
  * FilterBar Component
- * Filter bar with left (wrap) and right (no wrap) groups
+ * Unified filter bar with filter groups separated by dividers
  */
 
 import React from "react";
 import * as styles from "../../styles";
 
+/**
+ * Separator component for visual grouping
+ */
+export function FilterSeparator(): React.ReactElement {
+  return (
+    <div
+      style={{
+        width: "1px",
+        height: "16px",
+        backgroundColor: styles.colors.border,
+        margin: "0 4px",
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
+interface FilterGroupProps {
+  children: React.ReactNode;
+}
+
+/**
+ * FilterGroup component - keeps buttons together on the same line (no wrap within group)
+ * Includes a left separator for visual grouping
+ */
+export function FilterGroup({ children }: FilterGroupProps): React.ReactElement {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "4px",
+        flexShrink: 0,
+        flexWrap: "nowrap",
+      }}
+    >
+      {/* Left separator */}
+      <div
+        style={{
+          width: "1px",
+          height: "16px",
+          backgroundColor: styles.colors.border,
+          marginRight: "4px",
+          flexShrink: 0,
+        }}
+      />
+      {children}
+    </div>
+  );
+}
+
 interface FilterBarProps {
-  leftFilters?: React.ReactNode;
-  rightFilters?: React.ReactNode;
+  /** All filter elements (use FilterSeparator for visual grouping) */
+  filters?: React.ReactNode;
 }
 
 export function FilterBar({
-  leftFilters,
-  rightFilters,
+  filters,
 }: FilterBarProps): React.ReactElement | null {
-  if (!leftFilters && !rightFilters) {
+  if (!filters) {
     return null;
   }
 
@@ -24,8 +74,7 @@ export function FilterBar({
       style={{
         display: "flex",
         alignItems: "center",
-        justifyContent: "space-between",
-        gap: "6px",
+        gap: "4px",
         padding: "6px 8px",
         borderBottom: `1px solid ${styles.colors.border}`,
         backgroundColor: styles.colors.bg,
@@ -33,36 +82,7 @@ export function FilterBar({
         flexWrap: "wrap",
       }}
     >
-      {/* Left filters - can wrap */}
-      {leftFilters && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            flexWrap: "wrap",
-            flex: 1,
-            minWidth: 0,
-          }}
-        >
-          {leftFilters}
-        </div>
-      )}
-
-      {/* Right filters - no wrap */}
-      {rightFilters && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            flexWrap: "nowrap",
-            flexShrink: 0,
-          }}
-        >
-          {rightFilters}
-        </div>
-      )}
+      {filters}
     </div>
   );
 }

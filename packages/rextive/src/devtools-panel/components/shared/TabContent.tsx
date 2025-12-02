@@ -20,11 +20,8 @@ interface TabContentProps {
     leftActions?: React.ReactNode;
   };
 
-  // Optional filter bar
-  filterBar?: {
-    leftFilters?: React.ReactNode;
-    rightFilters?: React.ReactNode;
-  };
+  // Optional filter bar (unified - use FilterSeparator for grouping)
+  filterBar?: React.ReactNode;
 
   // Optional action bar
   actionBar?: React.ReactNode;
@@ -61,12 +58,7 @@ export function TabContent({
       )}
 
       {/* Optional filter bar */}
-      {filterBar && (
-        <FilterBar
-          leftFilters={filterBar.leftFilters}
-          rightFilters={filterBar.rightFilters}
-        />
-      )}
+      {filterBar && <FilterBar filters={filterBar} />}
 
       {/* Optional action bar */}
       {actionBar && <ActionBar>{actionBar}</ActionBar>}
