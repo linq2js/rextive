@@ -1,13 +1,11 @@
 import { useLayoutEffect, useRef } from "react";
 import { ExDisposable } from "../types";
-import { tryDispose } from "../disposable";
 
 import {
   useLifecycle,
   LifecycleCallbacks,
   LifecyclePhase,
 } from "./useLifecycle";
-import { emit } from "../hooks";
 import { useSafeFactory } from "./useSafeFactory";
 
 /**
@@ -210,20 +208,13 @@ export function useScope<TScope extends Record<string, any>>(
   optionsRef.current = options;
 
   // Use useSafeFactory for StrictMode-safe scope creation
-  const controller = useSafeFactory(
-    () => {
-      const scope = isArgsMode ? create(...(args || [])) : create();
+  // Orphan disposal and DevTools cleanup is handled internally
+  const controller = useSafeFactory(() => {
+    const scope = isArgsMode ? create(...(args || [])) : create();
 
-      init?.(scope);
-      return scope as ExDisposable & TScope;
-    },
-    (_, dispose) => {
-      // Only called for orphaned scopes (StrictMode double-invoke)
-      // Forget signals from DevTools completely
-      emit.forgetDisposedSignals(dispose);
-    },
-    watchDeps
-  );
+    init?.(scope);
+    return scope as ExDisposable & TScope;
+  }, watchDeps);
 
   const { result: scope } = controller;
 

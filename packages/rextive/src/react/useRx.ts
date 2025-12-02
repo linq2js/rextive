@@ -117,9 +117,6 @@ export function useRx<T>(fn: () => T): T {
   // Use useSafeFactory for StrictMode-safe controller creation
   const factory = useSafeFactory(
     () => new RxController(rerenderRef.current),
-    () => {
-      // No cleanup needed for orphaned RxController
-    },
     [] // Empty deps - controller persists for component lifetime
   );
 

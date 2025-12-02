@@ -23,26 +23,26 @@ describe.each(testModes)(
 
     it("should create object using factory", () => {
       const factory = vi.fn(() => ({ value: 42 }));
-      const onOrphanDispose = vi.fn();
 
-      const { result } = renderHook(
-        () => useSafeFactory(factory, onOrphanDispose, []),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useSafeFactory(factory, []), {
+        wrapper,
+      });
 
       // Result is wrapped with disposable() which adds dispose method
       expect(result.current.result).toMatchObject({ value: 42 });
-      expect(result.current.result.dispose).toBeInstanceOf(Function);
+      expect((result.current.result as any).dispose).toBeInstanceOf(Function);
     });
 
     it("should handle committed objects correctly", async () => {
-      const factory = vi.fn(() => ({ value: 42 }));
-      const onOrphanDispose = vi.fn();
+      const disposeTracker = vi.fn();
+      const factory = vi.fn(() => ({
+        value: 42,
+        dispose: disposeTracker,
+      }));
 
-      const { result } = renderHook(
-        () => useSafeFactory(factory, onOrphanDispose, []),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useSafeFactory(factory, []), {
+        wrapper,
+      });
 
       // Commit immediately
       act(() => {
@@ -54,13 +54,13 @@ describe.each(testModes)(
         await Promise.resolve();
       });
 
-      // In StrictMode, useMemo runs twice - first instance becomes orphan
+      // In StrictMode, useMemo runs twice - first instance becomes orphan and is disposed
       // In normal mode, the committed instance is not disposed
       if (isStrictMode) {
-        // One orphan from StrictMode double-invoke
-        expect(onOrphanDispose).toHaveBeenCalledTimes(1);
+        // One orphan from StrictMode double-invoke gets disposed
+        expect(disposeTracker).toHaveBeenCalledTimes(1);
       } else {
-        expect(onOrphanDispose).not.toHaveBeenCalled();
+        expect(disposeTracker).not.toHaveBeenCalled();
       }
     });
 
@@ -70,12 +70,10 @@ describe.each(testModes)(
         value: 42,
         dispose: disposeTracker,
       }));
-      const onOrphanDispose = vi.fn();
 
-      const { result } = renderHook(
-        () => useSafeFactory(factory, onOrphanDispose, []),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useSafeFactory(factory, []), {
+        wrapper,
+      });
 
       // Commit first
       act(() => {
@@ -115,12 +113,10 @@ describe.each(testModes)(
         value: 42,
         dispose: disposeTracker,
       }));
-      const onOrphanDispose = vi.fn();
 
-      const { result } = renderHook(
-        () => useSafeFactory(factory, onOrphanDispose, []),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useSafeFactory(factory, []), {
+        wrapper,
+      });
 
       // Commit first
       act(() => {
@@ -153,10 +149,9 @@ describe.each(testModes)(
 
     it("should recreate when deps change", async () => {
       const factory = vi.fn(() => ({ value: Math.random() }));
-      const onOrphanDispose = vi.fn();
 
       const { result, rerender } = renderHook(
-        ({ dep }) => useSafeFactory(factory, onOrphanDispose, [dep]),
+        ({ dep }) => useSafeFactory(factory, [dep]),
         { initialProps: { dep: 1 }, wrapper }
       );
 
@@ -193,12 +188,10 @@ describe.each(testModes)(
         value: 42,
         dispose: disposeTracker,
       }));
-      const onOrphanDispose = vi.fn();
 
-      const { result } = renderHook(
-        () => useSafeFactory(factory, onOrphanDispose, []),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useSafeFactory(factory, []), {
+        wrapper,
+      });
 
       // First commit
       act(() => {
@@ -254,10 +247,9 @@ describe.each(testModes)(
 
     it("should return stable result reference between renders when deps unchanged", () => {
       const factory = vi.fn(() => ({ value: 42 }));
-      const onOrphanDispose = vi.fn();
 
       const { result, rerender } = renderHook(
-        () => useSafeFactory(factory, onOrphanDispose, []),
+        () => useSafeFactory(factory, []),
         { wrapper }
       );
 
@@ -277,11 +269,10 @@ describe.each(testModes)(
           value: 42,
           dispose: disposeTracker,
         }));
-        const onOrphanDispose = vi.fn();
 
         const { result, unmount } = renderHook(
           () => {
-            const controller = useSafeFactory(factory, onOrphanDispose, []);
+            const controller = useSafeFactory(factory, []);
 
             // Simulate useEffect commit pattern
             React.useEffect(() => {
@@ -322,19 +313,13 @@ describe.each(testModes)(
 
         const { result, rerender } = renderHook(
           ({ dep }) => {
-            const controller = useSafeFactory(
-              () => {
-                const id = ++instanceCounter;
-                return {
-                  id,
-                  dispose: () => disposeLog.push(id),
-                };
-              },
-              () => {
-                // Orphan dispose - also logs
-              },
-              [dep]
-            );
+            const controller = useSafeFactory(() => {
+              const id = ++instanceCounter;
+              return {
+                id,
+                dispose: () => disposeLog.push(id),
+              };
+            }, [dep]);
 
             React.useEffect(() => {
               controller.commit();

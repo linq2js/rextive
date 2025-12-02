@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { dev } from "../utils/dev";
 import { disposable, tryDispose } from "../disposable";
+import { emit } from "../hooks";
 
 export interface SafeFactoryController<T> {
   /** The created object */
@@ -26,25 +27,35 @@ export interface SafeFactoryController<T> {
  * 2. Auto-disposing orphaned objects via microtask (only in dev mode)
  * 3. Providing scheduleDispose() for caller-controlled disposal
  *
+ * Orphaned objects (from StrictMode double-invoke) are automatically
+ * disposed and forgotten from DevTools.
+ *
  * @param factory - Function to create the object
- * @param onOrphanDispose - Called ONLY for orphaned objects (StrictMode double-invoke).
- *                          Use this to completely forget signals from DevTools.
  * @param deps - Dependency array - object is recreated when deps change
  * @returns Controller with result, commit, and scheduleDispose methods
  */
 export function useSafeFactory<T>(
   factory: () => T,
-  onOrphanDispose: (result: T, dispose: () => void) => void,
   deps: unknown[]
 ): SafeFactoryController<T> {
+  // store last dispose function
+  const disposeRef = useRef<VoidFunction>();
   return useMemo(() => {
     let committed = false;
     let disposed = false;
+    // dispose last result
+    disposeRef.current?.();
     let result = factory();
     if (typeof result === "object" && result && !("dispose" in result)) {
       // keep it as it is
       result = disposable(result as any) as T;
     }
+
+    const dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      tryDispose(result);
+    };
 
     // Auto-dispose orphaned objects (dev mode only)
     // In StrictMode, useMemo runs twice - the second object gets committed,
@@ -52,15 +63,13 @@ export function useSafeFactory<T>(
     if (dev()) {
       Promise.resolve().then(() => {
         if (!committed && !disposed) {
-          disposed = true;
-          onOrphanDispose(result, dispose);
+          // Dispose and forget from DevTools in one call
+          emit.forgetDisposedSignals(dispose);
         }
       });
     }
 
-    const dispose = () => {
-      tryDispose(result);
-    };
+    disposeRef.current = dispose;
 
     return {
       result,
@@ -75,8 +84,7 @@ export function useSafeFactory<T>(
         committed = false;
 
         const doDispose = () => {
-          if (!committed && !disposed) {
-            disposed = true;
+          if (!committed) {
             dispose();
           }
         };
