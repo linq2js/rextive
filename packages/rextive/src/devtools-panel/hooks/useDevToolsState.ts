@@ -11,7 +11,7 @@ import {
   onDevToolsEvent,
   enableChainTracking,
   disableChainTracking,
-} from "@/devtools/index";
+} from "@/devtools";
 import type {
   SignalInfo,
   TagInfo,

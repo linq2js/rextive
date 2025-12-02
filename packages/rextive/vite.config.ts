@@ -35,10 +35,6 @@ export default defineConfig({
           __dirname,
           "src/devtools-panel/index.ts"
         ),
-        "devtools/panel/index": resolve(
-          __dirname,
-          "src/devtools/panel/index.ts"
-        ),
         "operators/index": resolve(__dirname, "src/operators/index.ts"),
         op: resolve(__dirname, "src/op.ts"),
       },

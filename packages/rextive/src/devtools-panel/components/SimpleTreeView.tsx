@@ -9,7 +9,7 @@ import type {
   DependencyGraph,
   GraphNode,
   GraphEdge,
-} from "../../utils/buildDependencyGraph";
+} from "@/devtools/utils/buildDependencyGraph";
 import * as styles from "../styles";
 
 /**

@@ -21,13 +21,6 @@ export default defineConfig({
         ),
       },
       {
-        find: "rextive/devtools/panel",
-        replacement: resolve(
-          __dirname,
-          "../rextive/dist/devtools/panel/index.js"
-        ),
-      },
-      {
         find: "rextive/devtools",
         replacement: resolve(__dirname, "../rextive/dist/devtools/index.js"),
       },

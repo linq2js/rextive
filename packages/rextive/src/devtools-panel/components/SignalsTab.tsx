@@ -20,7 +20,7 @@ import {
 } from "../icons";
 import { formatValue, formatValueFull, formatTime } from "../utils/formatUtils";
 import { extractSignalValue } from "../utils/signalUtils";
-import { deleteSignal } from "@/devtools/index";
+import { deleteSignal } from "@/devtools";
 
 interface SignalsTabProps {
   signals: Map<string, SignalInfo>;

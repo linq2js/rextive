@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { DevToolsPanel } from "./DevToolsPanel";
-import { enableDevTools, disableDevTools } from "../index";
-import { signal } from "../../signal";
-import { tag } from "../../tag";
+import { enableDevTools, disableDevTools } from "../devtools";
+import { signal } from "../signal";
+import { tag } from "../tag";
 
 describe("DevToolsPanel", () => {
   beforeEach(() => {
