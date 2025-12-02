@@ -756,6 +756,20 @@ export function isDevToolsEnabled(): boolean {
 }
 
 /**
+ * Update devtools configuration at runtime.
+ *
+ * @param options - Partial config to update
+ */
+export function updateDevToolsConfig(
+  options: Partial<{ maxHistory: number }>
+): void {
+  const state = getState();
+  if (options.maxHistory !== undefined) {
+    state.config.maxHistory = options.maxHistory;
+  }
+}
+
+/**
  * Get all tracked signals.
  *
  * @returns Map of signal ID to SignalInfo
