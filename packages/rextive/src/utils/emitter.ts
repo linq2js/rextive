@@ -61,6 +61,7 @@ export interface Emitter<T = void> {
    * @param payload - The value to pass to all listeners
    */
   emitAndClear(payload: T): void;
+  size: number;
 }
 
 /**
@@ -121,6 +122,9 @@ export function emitter<T = void>(
   };
 
   return {
+    get size() {
+      return listeners.size;
+    },
     /**
      * Adds one or more listeners to the emitter.
      *

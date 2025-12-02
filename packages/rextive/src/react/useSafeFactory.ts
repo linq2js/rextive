@@ -1,7 +1,8 @@
 import { useMemo, useRef } from "react";
 import { dev } from "../utils/dev";
 import { disposable, tryDispose } from "../disposable";
-import { emit } from "../hooks";
+import { emit, withHooks } from "../hooks";
+import { Emitter, emitter } from "@/utils/emitter";
 
 export interface SafeFactoryController<T> {
   /** The created object */
@@ -43,61 +44,80 @@ export function useSafeFactory<T>(
   return useMemo(() => {
     let committed = false;
     let disposed = false;
+    let onDispose: Emitter | undefined = emitter();
     // dispose last result
     disposeRef.current?.();
-    let result = factory();
-    if (typeof result === "object" && result && !("dispose" in result)) {
-      // keep it as it is
-      result = disposable(result as any) as T;
-    }
-
-    const dispose = () => {
-      if (disposed) return;
-      disposed = true;
-      tryDispose(result);
-    };
-
-    // Auto-dispose orphaned objects (dev mode only)
-    // In StrictMode, useMemo runs twice - the second object gets committed,
-    // the first one stays uncommitted and gets disposed by this microtask
-    if (dev()) {
-      Promise.resolve().then(() => {
-        if (!committed && !disposed) {
-          // Dispose and forget from DevTools in one call
-          emit.forgetDisposedSignals(dispose);
-        }
-      });
-    }
-
-    disposeRef.current = dispose;
-
-    return {
-      result,
-      dispose,
-      commit() {
-        committed = true;
-      },
-      scheduleDispose() {
-        if (disposed) return;
-
-        // Reset committed state for StrictMode remount detection
-        committed = false;
-
-        const doDispose = () => {
-          if (!committed) {
-            dispose();
-          }
+    try {
+      let result = withHooks((prevHooks) => {
+        return {
+          onSignalCreate(signal) {
+            prevHooks.onSignalCreate?.(signal);
+            onDispose?.on(signal.dispose);
+          },
         };
+      }, factory);
 
-        if (dev()) {
-          // Dev mode: defer to allow StrictMode remount to re-commit
-          Promise.resolve().then(doDispose);
-        } else {
-          // Production: dispose immediately
-          doDispose();
-        }
-      },
-    };
+      if (!onDispose.size) {
+        onDispose = undefined;
+      }
+
+      if (typeof result === "object" && result && !("dispose" in result)) {
+        // keep it as it is
+        result = disposable(result as any) as T;
+      }
+
+      const dispose = () => {
+        if (disposed) return;
+        disposed = true;
+        onDispose?.emitAndClear();
+        tryDispose(result);
+      };
+
+      // Auto-dispose orphaned objects (dev mode only)
+      // In StrictMode, useMemo runs twice - the second object gets committed,
+      // the first one stays uncommitted and gets disposed by this microtask
+      if (dev()) {
+        Promise.resolve().then(() => {
+          if (!committed && !disposed) {
+            // Dispose and forget from DevTools in one call
+            emit.forgetDisposedSignals(dispose);
+          }
+        });
+      }
+
+      disposeRef.current = dispose;
+
+      return {
+        result,
+        dispose,
+        commit() {
+          committed = true;
+        },
+        scheduleDispose() {
+          if (disposed) return;
+
+          // Reset committed state for StrictMode remount detection
+          committed = false;
+
+          const doDispose = () => {
+            if (!committed) {
+              dispose();
+            }
+          };
+
+          if (dev()) {
+            // Dev mode: defer to allow StrictMode remount to re-commit
+            Promise.resolve().then(doDispose);
+          } else {
+            // Production: dispose immediately
+            doDispose();
+          }
+        },
+      };
+    } catch (error) {
+      onDispose?.emitAndClear();
+      throw error;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }

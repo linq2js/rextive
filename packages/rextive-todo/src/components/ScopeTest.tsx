@@ -9,6 +9,8 @@ import { signal, rx, useScope } from "rextive/react";
 // Child component with useScope signals
 function ScopedCounter({ id }: { id: string }) {
   const { count, doubled, increment, decrement } = useScope(() => {
+    // hidden signal to test auto-dispose
+    signal(100, { name: `hidden-${id}` });
     const count = signal(0, { name: `scopedCount-${id}` });
     const doubled = signal({ count }, ({ deps }) => deps.count * 2, {
       name: `scopedDoubled-${id}`,

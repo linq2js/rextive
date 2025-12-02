@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useSafeFactory } from "./useSafeFactory";
+import { signal } from "../signal";
 import React, { StrictMode, Fragment } from "react";
 import "@testing-library/jest-dom/vitest";
+import { Computed } from "../types";
 
 // Test modes: normal and StrictMode
 const testModes = [
@@ -352,6 +354,244 @@ describe.each(testModes)(
         expect(result.current.result.id).not.toBe(initialId);
         // First instance disposed from useEffect cleanup
         expect(disposeLog).toContain(initialId);
+      });
+    });
+
+    describe("signal auto-tracking", () => {
+      it("should auto-dispose signals created inside factory", async () => {
+        let createdSignal: ReturnType<typeof signal<number>> | null = null;
+
+        const { unmount } = renderHook(
+          () => {
+            const controller = useSafeFactory(() => {
+              // Create signal inside factory - should be auto-tracked
+              createdSignal = signal(0, { name: "autoTracked" });
+              return { value: 42 };
+            }, []);
+
+            React.useEffect(() => {
+              controller.commit();
+              return () => controller.scheduleDispose();
+            }, [controller]);
+
+            return controller;
+          },
+          { wrapper }
+        );
+
+        // Wait for effects
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // Signal should exist and not be disposed
+        expect(createdSignal).not.toBeNull();
+        expect(createdSignal!.disposed()).toBe(false);
+
+        // Unmount - should dispose the signal
+        unmount();
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // Signal should be disposed (set throws, disposed flag is true)
+        expect(createdSignal!.disposed()).toBe(true);
+        expect(() => createdSignal!.set(1)).toThrow();
+      });
+
+      it("should auto-dispose multiple signals created inside factory", async () => {
+        let sig1: ReturnType<typeof signal<number>> | null = null as any;
+        let sig2: ReturnType<typeof signal<string>> | null = null as any;
+        let computedSig: Computed<number> | null = null as any;
+
+        const { unmount } = renderHook(
+          () => {
+            const controller = useSafeFactory(() => {
+              sig1 = signal(1, { name: "sig1" });
+              sig2 = signal("hello", { name: "sig2" });
+              // Computed signal depends on sig1
+              computedSig = signal({ sig1 }, ({ deps }) => deps.sig1 * 2);
+              return { sig1, sig2, computedSig };
+            }, []);
+
+            React.useEffect(() => {
+              controller.commit();
+              return () => controller.scheduleDispose();
+            }, [controller]);
+
+            return controller;
+          },
+          { wrapper }
+        );
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // All signals should work before unmount
+        expect(sig1!()).toBe(1);
+        expect(sig2!()).toBe("hello");
+        expect(computedSig!()).toBe(2);
+        expect(sig1!.disposed()).toBe(false);
+        expect(sig2!.disposed()).toBe(false);
+        expect(computedSig!.disposed()).toBe(false);
+
+        unmount();
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // All signals should be disposed
+        expect(sig1!.disposed()).toBe(true);
+        expect(sig2!.disposed()).toBe(true);
+        expect(computedSig!.disposed()).toBe(true);
+      });
+
+      it("should not require explicit dispose array when signals are created inside factory", async () => {
+        let count: ReturnType<typeof signal<number>> | null = null;
+
+        const { unmount } = renderHook(
+          () => {
+            const controller = useSafeFactory(() => {
+              count = signal(0);
+              // No need to return { dispose: [count] } or disposable()
+              return { count };
+            }, []);
+
+            React.useEffect(() => {
+              controller.commit();
+              return () => controller.scheduleDispose();
+            }, [controller]);
+
+            return controller;
+          },
+          { wrapper }
+        );
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // Can use the signal normally
+        expect(count!()).toBe(0);
+        expect(count!.disposed()).toBe(false);
+        count!.set(5);
+        expect(count!()).toBe(5);
+
+        unmount();
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // Signal auto-disposed
+        expect(count!.disposed()).toBe(true);
+        expect(() => count!.set(10)).toThrow();
+      });
+
+      it("should dispose signals on deps change", async () => {
+        let prevSignal: ReturnType<typeof signal<number>> | null = null as any;
+
+        const { rerender } = renderHook(
+          ({ dep }) => {
+            const controller = useSafeFactory(() => {
+              prevSignal = signal(dep);
+              return { value: dep };
+            }, [dep]);
+
+            React.useEffect(() => {
+              controller.commit();
+              return () => controller.scheduleDispose();
+            }, [controller]);
+
+            return controller;
+          },
+          { initialProps: { dep: 1 }, wrapper }
+        );
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        const firstSignal = prevSignal;
+        expect(firstSignal!()).toBe(1);
+        expect(firstSignal!.disposed()).toBe(false);
+
+        // Change deps - should create new signal and dispose old one
+        rerender({ dep: 2 });
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // Old signal should be disposed (disposeRef.current?.() runs synchronously on deps change)
+        expect(firstSignal!.disposed()).toBe(true);
+        // New signal should work
+        expect(prevSignal!()).toBe(2);
+        expect(prevSignal!.disposed()).toBe(false);
+      });
+
+      it("should handle factory errors and still dispose tracked signals", async () => {
+        let trackedSignal: ReturnType<typeof signal<number>> | null = null;
+        let errorCaught = false;
+
+        renderHook(
+          () => {
+            try {
+              return useSafeFactory(() => {
+                trackedSignal = signal(42);
+                throw new Error("Factory error");
+              }, []);
+            } catch {
+              errorCaught = true;
+              return null;
+            }
+          },
+          { wrapper }
+        );
+
+        // Error should be caught
+        expect(errorCaught).toBe(true);
+
+        // Signal created before error should be disposed
+        expect(trackedSignal).not.toBeNull();
+        expect(trackedSignal!.disposed()).toBe(true);
+      });
+
+      it("should work with orphan disposal in StrictMode", async () => {
+        if (!isStrictMode) return; // Only test in StrictMode
+
+        let lastSignal: ReturnType<typeof signal<number>> | null = null;
+
+        const { result } = renderHook(
+          () => {
+            const controller = useSafeFactory(() => {
+              const sig = signal(0, {
+                name: `sig-${Math.random().toString(36).slice(2, 6)}`,
+              });
+              lastSignal = sig;
+              return { sig };
+            }, []);
+
+            React.useEffect(() => {
+              controller.commit();
+              return () => controller.scheduleDispose();
+            }, [controller]);
+
+            return controller;
+          },
+          { wrapper }
+        );
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // In StrictMode, first signal (orphan) should be disposed
+        // The committed signal should still work (not disposed)
+        expect(lastSignal!.disposed()).toBe(false);
       });
     });
   }

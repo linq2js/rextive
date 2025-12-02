@@ -62,6 +62,15 @@ export type UseScopeOptions<TScope = any> = {
  * 2. **Object lifecycle**: Track an object's lifecycle (recreate when object changes)
  * 3. **Factory mode**: Create scoped services with automatic cleanup
  *
+ * ## ⭐ Auto-Dispose Feature
+ *
+ * **Signals created inside the factory are automatically disposed** when:
+ * - The component unmounts
+ * - The watch dependencies change (scope recreated)
+ * - React StrictMode double-invokes (orphan signals cleaned up)
+ *
+ * This means you don't need to use `disposable()` wrapper for basic signal cleanup!
+ *
  * @example Mode 1: Component lifecycle
  * ```tsx
  * const getPhase = useScope({
@@ -91,17 +100,39 @@ export type UseScopeOptions<TScope = any> = {
  * // When user reference changes, old user is disposed and new user is initialized
  * ```
  *
- * @example Mode 3: Factory mode - Create scoped services
+ * @example Mode 3: Factory mode - Signals auto-dispose on unmount
  * ```tsx
+ * // ✅ Signals are auto-disposed - no wrapper needed!
  * const { count, doubled } = useScope(() => {
  *   const count = signal(0);
  *   const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+ *   return { count, doubled };
+ * });
+ * ```
+ *
+ * @example Factory mode with additional cleanup
+ * ```tsx
+ * // Simple case - just add dispose() method
+ * const { count } = useScope(() => {
+ *   const count = signal(0);
+ *   const subscription = someService.subscribe();
  *
  *   return {
  *     count,
- *     doubled,
- *     dispose: [count, doubled], // Explicit dispose list
+ *     dispose: () => subscription.unsubscribe(),
  *   };
+ * });
+ *
+ * // Multiple cleanup logic - use disposable() to combine them
+ * const { count } = useScope(() => {
+ *   const count = signal(0);
+ *   const sub1 = service1.subscribe();
+ *   const sub2 = service2.subscribe();
+ *
+ *   return disposable({
+ *     count,
+ *     dispose: [sub1, sub2, () => clearInterval(timer)],
+ *   });
  * });
  * ```
  *

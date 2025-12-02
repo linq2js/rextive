@@ -107,11 +107,11 @@ export function resetHooks(): void {
  * @overload withHooks(hooks, fn) - Merge partial hooks for duration of fn
  * @overload withHooks(override, fn) - Override function receives current hooks, returns partial to merge
  */
-export function withHooks<T>(hooks: Partial<Hooks>, fn: () => T): T;
 export function withHooks<T>(
   override: (current: Hooks) => Partial<Hooks>,
   fn: () => T
 ): T;
+export function withHooks<T>(hooks: Partial<Hooks>, fn: () => T): T;
 export function withHooks<T>(
   hooksOrOverride: Partial<Hooks> | ((current: Hooks) => Partial<Hooks>),
   fn: () => T

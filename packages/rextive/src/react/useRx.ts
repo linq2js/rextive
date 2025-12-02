@@ -69,6 +69,7 @@ class RxController implements Pick<Hooks, "onSignalAccess" | "onTaskAccess"> {
  * - **Automatic cleanup**: Subscriptions are cleaned up on unmount
  * - **Re-tracks on each render**: Supports conditional signal access
  * - **Handles tasks**: Async signals trigger re-render when they resolve
+ * - **⭐ Auto-dispose**: Signals created inside `fn` are automatically disposed on unmount
  *
  * @param fn - Function that accesses signals and returns a value
  * @returns The return value of `fn`

@@ -834,7 +834,9 @@ const user = signal({ name: "Alice", age: 30 });
 
 #### `rx.use()` - Reactive Hook ⭐ NEW
 
-Low-level hook for automatic signal tracking:
+Low-level hook for automatic signal tracking.
+
+**⭐ Auto-Dispose Feature**: Like `useScope()`, signals created inside `rx.use()` are **automatically disposed** on unmount.
 
 ```tsx
 function Component() {
@@ -854,21 +856,52 @@ function Component() {
 
 #### Mode 1: Factory (Most Common)
 
+**⭐ Auto-Dispose Feature**: Signals created inside the factory are **automatically disposed** when the component unmounts or deps change. No need for explicit `disposable()` wrapper!
+
 ```tsx
 function TodoList() {
+  // ✅ Signals are auto-disposed on unmount - no disposable() needed!
   const scope = useScope(() => {
     const todos = signal([]);
     const filter = signal("all");
     
-    return disposable({
+    return {
       todos,
       filter,
       addTodo: (text) => todos.set(prev => [...prev, text]),
-    });
+    };
   });
 
   return <div>{rx(scope.todos, (t) => t.length)} todos</div>;
 }
+```
+
+**Note**: For additional cleanup beyond signals:
+
+```tsx
+// Simple case - just add dispose() method
+const scope = useScope(() => {
+  const todos = signal([]);
+  const subscription = someExternalService.subscribe();
+  
+  return {
+    todos,
+    dispose: () => subscription.unsubscribe(),
+  };
+});
+
+// Multiple cleanup logic - use disposable() to combine them
+const scope = useScope(() => {
+  const todos = signal([]);
+  const sub1 = service1.subscribe();
+  const sub2 = service2.subscribe();
+  const timer = setInterval(() => {}, 1000);
+  
+  return disposable({
+    todos,
+    dispose: [sub1, sub2, () => clearInterval(timer)],
+  });
+});
 ```
 
 ---
@@ -1362,13 +1395,30 @@ signal({ searchTerm }, async ({ deps, abortSignal }) => {
 });
 ```
 
-3. **Use `disposable()` for auto-cleanup**
+3. **Signals in `useScope`/`rx.use` are auto-disposed**
 
 ```tsx
-// ✅ GOOD
+// ✅ GOOD - Signals auto-dispose on unmount (no wrapper needed!)
+useScope(() => {
+  const count = signal(0);
+  const doubled = count.to(x => x * 2);
+  return { count, doubled };
+});
+
+// ✅ Also GOOD - Add dispose() method for additional cleanup
+useScope(() => {
+  const count = signal(0);
+  const subscription = someService.subscribe();
+  return {
+    count,
+    dispose: () => subscription.unsubscribe(),
+  };
+});
+
+// ✅ Use disposable() to combine multiple cleanup logic
 useScope(() => disposable({
   count: signal(0),
-  doubled: count.to(x => x * 2),
+  dispose: [sub1, sub2, () => clearInterval(timer)],
 }));
 ```
 
@@ -1422,8 +1472,8 @@ function Component() {
   // ❌ Bad - memory leak
   const count = signal(0);
 
-  // ✅ Good
-  const { count } = useScope(() => disposable({ count: signal(0) }));
+  // ✅ Good - signals are auto-disposed on unmount
+  const { count } = useScope(() => ({ count: signal(0) }));
 }
 ```
 
@@ -1612,7 +1662,8 @@ emit.signalError(signalRef, error);
 
 - Use `.to()` for single-signal transforms
 - Use `signal({ deps }, compute)` for multi-signal
-- Use `disposable()` in `useScope()` for auto-cleanup
+- Signals in `useScope()`/`rx.use()` are auto-disposed on unmount
+- Add `dispose()` method for single cleanup, use `disposable()` to combine multiple
 - Use `rx()` for reactive rendering
 - Use `wait()` for Suspense-based async handling
 - Use `loadable()` for manual loading states
