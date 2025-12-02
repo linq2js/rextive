@@ -3934,6 +3934,34 @@ export function DevToolsPanel(): React.ReactElement | null {
                       >
                         Collapse All
                       </button>
+                      {stats.disposedCount > 0 && (
+                        <button
+                          style={{
+                            padding: "4px 10px",
+                            fontSize: "10px",
+                            backgroundColor: "#66666633",
+                            border: `1px solid #666`,
+                            borderRadius: "4px",
+                            color: "#888",
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            whiteSpace: "nowrap",
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearDisposed();
+                          }}
+                          title={`Clear all ${stats.disposedCount} disposed signal${
+                            stats.disposedCount !== 1 ? "s" : ""
+                          }`}
+                        >
+                          <IconTrash size={12} /> Remove Disposed (
+                          {stats.disposedCount})
+                        </button>
+                      )}
                     </>
                   ) : activeTab === "signals" &&
                     signalKindFilter === "disposed" &&
