@@ -395,6 +395,34 @@ export function createMutableSignal(
     return current!.value;
   };
 
+  /**
+   * Peek at current signal value WITHOUT triggering reactive tracking
+   *
+   * Same as get() but does NOT call getRenderHooks().onSignalAccess().
+   * Use this when you need to read a value without creating a dependency.
+   *
+   * - Lazily computes on first access (if lazy: true)
+   * - Throws if signal has error state
+   * - Can be called even after disposal (returns last value)
+   */
+  const peek = () => {
+    // NOTE: No getRenderHooks().onSignalAccess() call - this is the key difference from get()
+
+    // Lazy evaluation: compute on first access
+    // Allow reading last value even after disposal (but don't recompute)
+    if (!current && !disposed) {
+      recompute("compute:initial");
+    }
+
+    // Throw error if signal has error state
+    if (current?.error) {
+      throw current.error;
+    }
+
+    // Return current value (non-null assertion safe due to recompute above)
+    return current!.value;
+  };
+
   // ============================================================================
   // 5. MUTABLE SIGNAL METHODS
   // ============================================================================
@@ -449,7 +477,7 @@ export function createMutableSignal(
     (value: any) => {
       try {
         // Handle updater function vs direct value
-        const next = typeof value === "function" ? value(get()) : value;
+        const next = typeof value === "function" ? value(peek()) : value;
 
         // Skip if value unchanged (optimization)
         if (equals(current?.value, next)) return;
@@ -490,8 +518,10 @@ export function createMutableSignal(
    */
   const on = (listener: VoidFunction) => {
     // Eager computation for signals with dependencies (mutable signals have empty deps)
+    // Use peek() instead of get() to avoid triggering render tracking when subscribing.
+    // We just need to ensure the signal is computed, not to track it for render purposes.
     if (!current && Object.keys(deps).length > 0) {
-      get();
+      peek();
     }
     return onChange.on(listener);
   };
@@ -718,7 +748,8 @@ export function createMutableSignal(
     displayName,
 
     // Core methods
-    get, // Read value
+    get, // Read value (triggers tracking)
+    peek, // Read value (NO tracking)
     on, // Subscribe to changes
     dispose, // Clean up resources
     disposed: isDisposed, // Check if disposed

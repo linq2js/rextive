@@ -47,7 +47,8 @@ export function pace<T>(
     const baseName = options.name ?? `pace(${source.displayName})`;
 
     // Internal mutable signal holds the paced value (hidden from devtools by default)
-    const internal = signal(source(), {
+    // Use peek() to avoid triggering render tracking
+    const internal = signal(source.peek(), {
       name: autoPrefix(`${baseName}_internal`),
     });
 
@@ -62,7 +63,8 @@ export function pace<T>(
     // The notify function updates the internal signal with source's current value
     const notify = () => {
       if (!disposed) {
-        internal.set(source());
+        // Use peek() to avoid triggering render tracking
+        internal.set(source.peek());
       }
     };
 

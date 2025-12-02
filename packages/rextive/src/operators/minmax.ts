@@ -60,7 +60,8 @@ export function max<T>(options: MinMaxOptions<T> = {}): Operator<T> {
 
   return (source: Signal<T>): Computed<T> => {
     const baseName = name ?? `max(${source.displayName})`;
-    let maxValue = source();
+    // Use peek() to avoid triggering render tracking
+    let maxValue = source.peek();
 
     const internal = signal(maxValue, {
       name: autoPrefix(`${baseName}_internal`),
@@ -76,7 +77,8 @@ export function max<T>(options: MinMaxOptions<T> = {}): Operator<T> {
       source.on(() => {
         if (disposed()) return;
 
-        const value = source();
+        // Use peek() to avoid triggering render tracking
+        const value = source.peek();
         if (compare(value, maxValue) > 0) {
           maxValue = value;
           internal.set(maxValue);
@@ -120,7 +122,8 @@ export function min<T>(options: MinMaxOptions<T> = {}): Operator<T> {
 
   return (source: Signal<T>): Computed<T> => {
     const baseName = name ?? `min(${source.displayName})`;
-    let minValue = source();
+    // Use peek() to avoid triggering render tracking
+    let minValue = source.peek();
 
     const internal = signal(minValue, {
       name: autoPrefix(`${baseName}_internal`),
@@ -136,7 +139,8 @@ export function min<T>(options: MinMaxOptions<T> = {}): Operator<T> {
       source.on(() => {
         if (disposed()) return;
 
-        const value = source();
+        // Use peek() to avoid triggering render tracking
+        const value = source.peek();
         if (compare(value, minValue) < 0) {
           minValue = value;
           internal.set(minValue);

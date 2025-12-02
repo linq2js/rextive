@@ -326,6 +326,52 @@ const doubled = signal({ count }, ({ deps }) => deps.count * 2); // ✅
 
 ---
 
+#### `.peek()` - Read Value Without Tracking ⭐ NEW
+
+Read the current value **without** triggering reactive tracking:
+
+```tsx
+const value = count.peek();
+```
+
+**When to use:**
+- In event handlers where you don't want to create dependencies
+- Logging/debugging without affecting reactivity
+- Internal reads in computed signals that shouldn't trigger updates
+- Any place where you need the value but don't want reactive subscription
+
+**Examples:**
+
+```tsx
+// In a tracking context, peek() won't create dependencies
+rx(() => {
+  // This WILL create a dependency (triggers re-render when count changes)
+  console.log("Count:", count());
+  
+  // This WON'T create a dependency (no re-render when user changes)
+  console.log("User (peeked):", user.peek());
+});
+
+// Useful in event handlers
+const handleClick = () => {
+  const currentCount = count.peek(); // Read without tracking
+  console.log("Current count:", currentCount);
+};
+
+// Internal reads in operators/plugins
+const operator = (source) => {
+  // Use peek() to avoid creating unwanted dependencies
+  const initialValue = source.peek();
+  // ...
+};
+```
+
+**Key differences from `.get()`:**
+- `.get()` / `signal()` - triggers `onSignalAccess` in render hooks (creates dependencies)
+- `.peek()` - never triggers tracking (safe for internal use)
+
+---
+
 #### `.set(value)` - Update Value (Mutable Only)
 
 ```tsx
@@ -1383,7 +1429,8 @@ function Component() {
 - `signal(deps, compute, equals)` - Computed with equality
 - `signal(deps, compute, options)` - Computed with options
 - `.set(value)` - Update (mutable only)
-- `.get()` or `()` - Read value
+- `.get()` or `()` - Read value (triggers tracking)
+- `.peek()` - Read value without tracking ⭐
 - `.on(listener)` - Subscribe
 - `.dispose()` - Cleanup
 - `.reset()` - Reset to initial (mutable only)

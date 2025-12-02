@@ -271,8 +271,9 @@ export function persistor<
         loadForKey(key, signal);
 
         // Subscribe to changes - save only this key
+        // Use peek() to avoid triggering render tracking
         const unsub = signal.on(() => {
-          saveKey(key, signal());
+          saveKey(key, signal.peek());
         });
 
         // Store cleanup
@@ -291,10 +292,11 @@ export function persistor<
     const groupCleanups: VoidFunction[] = [];
 
     // Get current values of all signals
+    // Use peek() to avoid triggering render tracking
     const getCurrentValues = (): TData => {
       const values: Record<string, any> = {};
       for (const key in signals) {
-        values[key] = (signals[key] as Signal<any>)();
+        values[key] = (signals[key] as Signal<any>).peek();
       }
       return values as TData;
     };

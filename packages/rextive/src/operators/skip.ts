@@ -29,7 +29,8 @@ export function skip<T>(
   return (source: Signal<T>): Computed<T> => {
     const baseName = options.name ?? `skip(${source.displayName})`;
 
-    const internal = signal(source(), {
+    // Use peek() to avoid triggering render tracking
+    const internal = signal(source.peek(), {
       name: autoPrefix(`${baseName}_internal`),
     });
 
@@ -47,7 +48,8 @@ export function skip<T>(
           skipped++;
           return;
         }
-        internal.set(source());
+        // Use peek() to avoid triggering render tracking
+        internal.set(source.peek());
       })
     );
 
@@ -85,7 +87,8 @@ export function skipWhile<T>(
   return (source: Signal<T>): Computed<T> => {
     const baseName = options.name ?? `skipWhile(${source.displayName})`;
 
-    const internal = signal(source(), {
+    // Use peek() to avoid triggering render tracking
+    const internal = signal(source.peek(), {
       name: autoPrefix(`${baseName}_internal`),
     });
 
@@ -101,7 +104,8 @@ export function skipWhile<T>(
       source.on(() => {
         if (disposed()) return;
 
-        const value = source();
+        // Use peek() to avoid triggering render tracking
+        const value = source.peek();
 
         if (skipping) {
           if (predicate(value, index)) {
@@ -151,7 +155,8 @@ export function skipLast<T>(
 
     if (count === 0) {
       // Special case: skip nothing, just pass through
-      const internal = signal<T | undefined>(source(), {
+      // Use peek() to avoid triggering render tracking
+      const internal = signal<T | undefined>(source.peek(), {
         name: autoPrefix(`${baseName}_internal`),
       });
 
@@ -164,7 +169,8 @@ export function skipLast<T>(
       cleanup.on(
         source.on(() => {
           if (disposed()) return;
-          internal.set(source());
+          // Use peek() to avoid triggering render tracking
+          internal.set(source.peek());
         })
       );
 
@@ -177,7 +183,8 @@ export function skipLast<T>(
       return result;
     }
 
-    const buffer: T[] = [source()];
+    // Use peek() to avoid triggering render tracking
+    const buffer: T[] = [source.peek()];
 
     const internal = signal<T | undefined>(undefined, {
       name: autoPrefix(`${baseName}_internal`),
@@ -193,7 +200,8 @@ export function skipLast<T>(
       source.on(() => {
         if (disposed()) return;
 
-        buffer.push(source());
+        // Use peek() to avoid triggering render tracking
+        buffer.push(source.peek());
 
         if (buffer.length > count) {
           const emitValue = buffer.shift()!;
@@ -246,7 +254,8 @@ export function skipUntil<T>(
   return (source: Signal<T>): Computed<T> => {
     const baseName = options.name ?? `skipUntil(${source.displayName})`;
 
-    const internal = signal(source(), {
+    // Use peek() to avoid triggering render tracking
+    const internal = signal(source.peek(), {
       name: autoPrefix(`${baseName}_internal`),
     });
 
@@ -261,7 +270,8 @@ export function skipUntil<T>(
     cleanup.on(
       source.on(() => {
         if (disposed() || skipping) return;
-        internal.set(source());
+        // Use peek() to avoid triggering render tracking
+        internal.set(source.peek());
       })
     );
 

@@ -236,7 +236,8 @@ export function focus<T extends object, P extends Path<T>>(
       }
 
       // Use lodash get - returns undefined for invalid paths (doesn't throw)
-      const value = get(sourceRef(), path as string) as V | null | undefined;
+      // Use peek() to avoid triggering render tracking
+      const value = get(sourceRef.peek(), path as string) as V | null | undefined;
 
       // If value is nullish and we have fallback, use memoized fallback
       if ((value === null || value === undefined) && getFallbackValue) {

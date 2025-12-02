@@ -62,7 +62,8 @@ export function count<T>(
       source.on(() => {
         if (disposed()) return;
 
-        const value = source();
+        // Use peek() to avoid triggering render tracking
+        const value = source.peek();
         const shouldCount = predicate ? predicate(value, index) : true;
         index++;
 

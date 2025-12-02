@@ -10,17 +10,14 @@ describe("createSignalContext - dependency value caching", () => {
     const count = signal(1);
     let accessCount = 0;
 
-    // Wrap the signal to track accesses
-    const originalCount = count;
-    const wrappedCount = Object.assign(
-      () => {
-        accessCount++;
-        return originalCount();
-      },
-      originalCount
-    );
+    // Wrap the signal's peek() to track accesses (deps now uses peek() internally)
+    const originalPeek = count.peek.bind(count);
+    count.peek = () => {
+      accessCount++;
+      return originalPeek();
+    };
 
-    const computed = signal({ count: wrappedCount as any }, ({ deps }) => {
+    const computed = signal({ count }, ({ deps }) => {
       const v1 = deps.count; // First access - should read from signal
       const v2 = deps.count; // Second access - should use cache
       const v3 = deps.count; // Third access - should use cache
@@ -92,19 +89,23 @@ describe("createSignalContext - dependency value caching", () => {
   });
 
   it("should cache multiple dependencies independently", () => {
-    const aOrig = signal(1);
-    const bOrig = signal(2);
-    const cOrig = signal(3);
+    const a = signal(1);
+    const b = signal(2);
+    const c = signal(3);
 
     let aAccessCount = 0;
     let bAccessCount = 0;
     let cAccessCount = 0;
 
-    const a = Object.assign(() => { aAccessCount++; return aOrig(); }, aOrig);
-    const b = Object.assign(() => { bAccessCount++; return bOrig(); }, bOrig);
-    const c = Object.assign(() => { cAccessCount++; return cOrig(); }, cOrig);
+    // Wrap peek() to track accesses (deps now uses peek() internally)
+    const aPeek = a.peek.bind(a);
+    const bPeek = b.peek.bind(b);
+    const cPeek = c.peek.bind(c);
+    a.peek = () => { aAccessCount++; return aPeek(); };
+    b.peek = () => { bAccessCount++; return bPeek(); };
+    c.peek = () => { cAccessCount++; return cPeek(); };
 
-    const computed = signal({ a: a as any, b: b as any, c: c as any }, ({ deps }) => {
+    const computed = signal({ a, b, c }, ({ deps }) => {
       // Access each dependency multiple times
       const a1 = deps.a;
       const a2 = deps.a;
@@ -224,15 +225,17 @@ describe("createSignalContext - dependency value caching", () => {
   });
 
   it("should clear cache when context is disposed", () => {
-    const countOrig = signal(1);
+    const count = signal(1);
     let accessCount = 0;
 
-    const count = Object.assign(() => {
+    // Wrap peek() to track accesses (deps now uses peek() internally)
+    const originalPeek = count.peek.bind(count);
+    count.peek = () => {
       accessCount++;
-      return countOrig();
-    }, countOrig);
+      return originalPeek();
+    };
 
-    const computed = signal({ count: count as any }, ({ deps }) => {
+    const computed = signal({ count }, ({ deps }) => {
       return deps.count + deps.count;
     });
 

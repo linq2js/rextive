@@ -68,11 +68,38 @@ const userData = signal({ userId }, async ({ deps, abortSignal }) => {
 
 ### `.get()` / `signal()`
 
-Read the current value:
+Read the current value (triggers reactive tracking):
 
 ```tsx
 const value = count.get();
 const value = count(); // Shorthand
+```
+
+### `.peek()`
+
+Read the current value **without** triggering reactive tracking:
+
+```tsx
+const value = count.peek();
+```
+
+Use `peek()` when you need to read a value but don't want to create a reactive dependency - for example, in event handlers, logging, or when accessing values inside a computed signal that shouldn't trigger recomputation when that value changes.
+
+```tsx
+// In a tracking context, peek() won't create dependencies
+rx(() => {
+  // This WILL create a dependency (triggers re-render when count changes)
+  console.log("Count:", count());
+  
+  // This WON'T create a dependency (no re-render when user changes)
+  console.log("User (peeked):", user.peek());
+});
+
+// Useful in event handlers to avoid unexpected re-renders
+const handleClick = () => {
+  const currentCount = count.peek(); // Read without tracking
+  console.log("Current count:", currentCount);
+};
 ```
 
 ### `.set(value)` / `.set(fn)`

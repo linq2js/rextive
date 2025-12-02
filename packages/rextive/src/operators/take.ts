@@ -29,7 +29,8 @@ export function take<T>(
   return (source: Signal<T>): Computed<T> => {
     const baseName = options.name ?? `take(${source.displayName})`;
 
-    const internal = signal(source(), {
+    // Use peek() to avoid triggering render tracking
+    const internal = signal(source.peek(), {
       name: autoPrefix(`${baseName}_internal`),
     });
 
@@ -44,7 +45,8 @@ export function take<T>(
       source.on(() => {
         if (disposed() || emissions >= count) return;
         emissions++;
-        internal.set(source());
+        // Use peek() to avoid triggering render tracking
+        internal.set(source.peek());
       })
     );
 
@@ -98,7 +100,8 @@ export function takeWhile<T>(
   return (source: Signal<T>): Computed<T> => {
     const baseName = name ?? `takeWhile(${source.displayName})`;
 
-    const internal = signal(source(), {
+    // Use peek() to avoid triggering render tracking
+    const internal = signal(source.peek(), {
       name: autoPrefix(`${baseName}_internal`),
     });
 
@@ -114,7 +117,8 @@ export function takeWhile<T>(
       source.on(() => {
         if (disposed() || stopped) return;
 
-        const value = source();
+        // Use peek() to avoid triggering render tracking
+        const value = source.peek();
         const passes = predicate(value, index);
         index++;
 
@@ -162,7 +166,8 @@ export function takeLast<T>(
 ): (source: Signal<T>) => Computed<T[]> {
   return (source: Signal<T>): Computed<T[]> => {
     const baseName = options.name ?? `takeLast(${source.displayName})`;
-    const buffer: T[] = [source()];
+    // Use peek() to avoid triggering render tracking
+    const buffer: T[] = [source.peek()];
 
     const internal = signal<T[]>([...buffer], {
       name: autoPrefix(`${baseName}_internal`),
@@ -179,7 +184,8 @@ export function takeLast<T>(
       source.on(() => {
         if (disposed()) return;
 
-        buffer.push(source());
+        // Use peek() to avoid triggering render tracking
+        buffer.push(source.peek());
         if (buffer.length > count) {
           buffer.shift();
         }
@@ -230,7 +236,8 @@ export function takeUntil<T>(
   return (source: Signal<T>): Computed<T> => {
     const baseName = options.name ?? `takeUntil(${source.displayName})`;
 
-    const internal = signal(source(), {
+    // Use peek() to avoid triggering render tracking
+    const internal = signal(source.peek(), {
       name: autoPrefix(`${baseName}_internal`),
     });
 
@@ -245,7 +252,8 @@ export function takeUntil<T>(
     cleanup.on(
       source.on(() => {
         if (disposed() || stopped) return;
-        internal.set(source());
+        // Use peek() to avoid triggering render tracking
+        internal.set(source.peek());
       })
     );
 

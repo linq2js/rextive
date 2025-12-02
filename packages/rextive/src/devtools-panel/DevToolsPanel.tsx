@@ -419,7 +419,13 @@ export function DevToolsPanel(): React.ReactElement | null {
       snapshotCounterRef.current++;
       setSnapshots((prev) => [newSnapshot, ...prev]);
     },
-    [signals, snapshotBookmarkedOnly, bookmarkedSignals, snapshots, snapshotsAreEqual]
+    [
+      signals,
+      snapshotBookmarkedOnly,
+      bookmarkedSignals,
+      snapshots,
+      snapshotsAreEqual,
+    ]
   );
 
   // Take snapshot for specific tag
@@ -2680,7 +2686,7 @@ export function DevToolsPanel(): React.ReactElement | null {
             gap: "12px",
             padding: "6px 12px",
             borderBottom: `1px solid ${styles.colors.border}`,
-            backgroundColor: styles.colors.bgHeader,
+            backgroundColor: styles.colors.bgLight,
             fontSize: "10px",
             color: styles.colors.textMuted,
             flexShrink: 0,
@@ -2702,7 +2708,8 @@ export function DevToolsPanel(): React.ReactElement | null {
                   height: "6px",
                   borderRadius: "50%",
                   backgroundColor: color,
-                  boxShadow: label === "Updated" ? `0 0 4px ${color}` : undefined,
+                  boxShadow:
+                    label === "Updated" ? `0 0 4px ${color}` : undefined,
                 }}
               />
               <span>{label}</span>
@@ -3720,11 +3727,13 @@ export function DevToolsPanel(): React.ReactElement | null {
                           borderRadius: "4px",
                           color: styles.colors.error,
                           cursor:
-                            snapshotBookmarkedOnly && bookmarkedSignals.size === 0
+                            snapshotBookmarkedOnly &&
+                            bookmarkedSignals.size === 0
                               ? "not-allowed"
                               : "pointer",
                           opacity:
-                            snapshotBookmarkedOnly && bookmarkedSignals.size === 0
+                            snapshotBookmarkedOnly &&
+                            bookmarkedSignals.size === 0
                               ? 0.5
                               : 1,
                           fontFamily: "inherit",
@@ -3778,10 +3787,7 @@ export function DevToolsPanel(): React.ReactElement | null {
                             : "Click to snapshot bookmarked only"
                         }
                       >
-                        <IconStar
-                          size={10}
-                          filled={snapshotBookmarkedOnly}
-                        />
+                        <IconStar size={10} filled={snapshotBookmarkedOnly} />
                         <span style={{ fontSize: "9px" }}>
                           ⭐{bookmarkedSignals.size}
                         </span>
@@ -3954,7 +3960,9 @@ export function DevToolsPanel(): React.ReactElement | null {
                             e.stopPropagation();
                             clearDisposed();
                           }}
-                          title={`Clear all ${stats.disposedCount} disposed signal${
+                          title={`Clear all ${
+                            stats.disposedCount
+                          } disposed signal${
                             stats.disposedCount !== 1 ? "s" : ""
                           }`}
                         >

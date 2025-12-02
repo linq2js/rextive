@@ -118,7 +118,8 @@ function createDistinctConsecutive<T, K>(
   const compare = equals ?? ((a: K, b: K) => Object.is(a, b));
 
   return (source: Signal<T>): Computed<T> => {
-    const initialValue = source();
+    // Use peek() to avoid triggering render tracking
+    const initialValue = source.peek();
     let previousKey: K = getKey
       ? getKey(initialValue)
       : (initialValue as unknown as K);
@@ -139,7 +140,8 @@ function createDistinctConsecutive<T, K>(
       source.on(() => {
         if (disposed()) return;
 
-        const currentValue = source();
+        // Use peek() to avoid triggering render tracking
+        const currentValue = source.peek();
         const currentKey: K = getKey
           ? getKey(currentValue)
           : (currentValue as unknown as K);
@@ -171,7 +173,8 @@ function createDistinctAll<T, K>(
   name?: string
 ): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
-    const initialValue = source();
+    // Use peek() to avoid triggering render tracking
+    const initialValue = source.peek();
     const seen = new Set<K | T>();
 
     // Add initial value to seen set
@@ -194,7 +197,8 @@ function createDistinctAll<T, K>(
       source.on(() => {
         if (disposed()) return;
 
-        const currentValue = source();
+        // Use peek() to avoid triggering render tracking
+        const currentValue = source.peek();
         const key = getKey ? getKey(currentValue) : currentValue;
 
         if (!seen.has(key as K | T)) {

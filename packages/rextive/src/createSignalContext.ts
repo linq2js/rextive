@@ -257,6 +257,11 @@ export function createSignalContext(
               onCleanup.on(depSignal.on(onDepChange));
             }
           },
+          // Use peek() to read dependency values to avoid triggering render tracking.
+          // This ensures that when a computed signal reads its dependencies during
+          // recomputation, it doesn't inadvertently create render-level dependencies.
+          // Internal reactivity tracking still works via onSignalAccess callback above.
+          getValue: (signal) => signal.peek(),
         });
       }
       return depsProxy;

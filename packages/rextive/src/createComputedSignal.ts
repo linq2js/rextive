@@ -269,6 +269,28 @@ export function createComputedSignal(
     return current!.value;
   };
 
+  /**
+   * Peek at current signal value WITHOUT triggering reactive tracking
+   *
+   * Same as get() but does NOT call getRenderHooks().onSignalAccess().
+   * Use this when you need to read a value without creating a dependency.
+   */
+  const peek = () => {
+    // NOTE: No getRenderHooks().onSignalAccess() call - this is the key difference from get()
+
+    // Allow reading last value/error even after disposal
+    // Only recompute if not disposed and no current value
+    if (!current && !disposed) {
+      recompute("compute:initial");
+    }
+
+    if (current?.error) {
+      throw current.error;
+    }
+
+    return current!.value;
+  };
+
   const reset = guardDisposed(
     isDisposed,
     "Cannot reset disposed signal",
@@ -285,7 +307,10 @@ export function createComputedSignal(
 
   const on = (listener: VoidFunction) => {
     if (!current && Object.keys(deps).length > 0) {
-      get();
+      // Use peek() instead of get() to avoid triggering render tracking
+      // when subscribing. We just need to ensure the signal is computed,
+      // not to track it for render purposes.
+      peek();
     }
     return onChange.on(listener);
   };
@@ -428,6 +453,7 @@ export function createComputedSignal(
     [SIGNAL_TYPE]: true,
     displayName,
     get,
+    peek,
     on,
     dispose,
     disposed: isDisposed,

@@ -254,8 +254,12 @@ function Component() {
 // Create
 const count = signal(0);
 
-// Read
+// Read (triggers tracking)
 count(); // 0
+count.get(); // 0
+
+// Read WITHOUT tracking (use in event handlers, internal code)
+count.peek(); // 0 - does NOT create reactive dependencies
 
 // Update
 count.set(1);
@@ -271,6 +275,32 @@ const unsubscribe = count.on(() => console.log("changed"));
 
 // Dispose
 count.dispose();
+```
+
+### peek() vs get()
+
+```tsx
+// get() / signal() - triggers tracking in reactive contexts
+rx(() => {
+  console.log(count()); // Creates dependency, re-renders on change
+});
+
+// peek() - never triggers tracking
+rx(() => {
+  console.log(count.peek()); // No dependency, won't re-render
+});
+
+// Use peek() in event handlers to avoid unwanted dependencies
+const handleClick = () => {
+  const value = count.peek(); // Safe - no tracking
+  console.log("Clicked with count:", value);
+};
+
+// Use peek() in operators/plugins for internal reads
+const myOperator = (source) => {
+  const initialValue = source.peek(); // Internal read, no tracking
+  // ...
+};
 ```
 
 ### rx
@@ -389,6 +419,34 @@ const doubled = signal({ count }, ({ deps }) => deps.count * 2);
 ```tsx
 // Don't try to auto-track - dependencies must be explicit
 const doubled = signal(() => count() * 2); // Won't work
+```
+
+### 1.5. Use peek() for Internal Reads
+
+When writing operators, plugins, or internal code that reads signals without wanting to create reactive dependencies:
+
+✅ **Good:**
+```tsx
+// Internal reads use peek()
+const myOperator = (source) => {
+  const initialValue = source.peek(); // No tracking
+  return signal(initialValue);
+};
+
+// Event handlers use peek()
+const handleSubmit = () => {
+  const formValue = formSignal.peek(); // No accidental dependencies
+  submitForm(formValue);
+};
+```
+
+❌ **Bad:**
+```tsx
+// Calling source() in operators may create unwanted dependencies
+const myOperator = (source) => {
+  const initialValue = source(); // May trigger tracking!
+  return signal(initialValue);
+};
 ```
 
 ### 2. Lazy Tracking
@@ -647,4 +705,5 @@ const todos = signal({ userId }, async ({ deps, abortSignal }) => {
 - **Unified API**: Same `signal` for sync and async
 - **Component Scoping**: Use `useScope` for component-local state
 - **Service Pattern**: Works globally and with `useScope` for auto-cleanup
+- **Use `peek()` for Internal Reads**: Operators, plugins, and event handlers should use `peek()` to avoid creating unwanted dependencies
 

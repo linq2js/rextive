@@ -126,7 +126,9 @@ export function createSignalAccessProxy<
       return getValue(signal);
     }
 
-    const value = signal();
+    // Use peek() by default to avoid triggering render tracking
+    // when reading signal values through proxies
+    const value = signal.peek();
 
     if (type === "awaited") {
       if (isPromiseLike(value)) {

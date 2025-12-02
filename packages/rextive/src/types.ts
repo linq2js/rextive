@@ -300,6 +300,49 @@ export type Signal<TValue, TInit = TValue> = Observable &
     get(): TValue | TInit;
 
     /**
+     * Read the current signal value WITHOUT triggering reactive tracking.
+     *
+     * Unlike `get()` which registers the access for reactive updates,
+     * `peek()` returns the value silently without subscribing to changes.
+     *
+     * Use `peek()` when you need to read a value but don't want to create
+     * a reactive dependency - for example, in event handlers, logging,
+     * or when accessing values inside a computed signal that shouldn't
+     * trigger recomputation when that value changes.
+     *
+     * @returns The current value (same as get())
+     *
+     * @example
+     * ```ts
+     * const count = signal(0);
+     * const user = signal({ name: "Alice" });
+     *
+     * // In a tracking context, peek() won't create dependencies
+     * trackingContext(() => {
+     *   // This WILL create a dependency (triggers re-run when count changes)
+     *   console.log("Count:", count());
+     *
+     *   // This WON'T create a dependency (no re-run when user changes)
+     *   console.log("User (peeked):", user.peek());
+     * });
+     *
+     * // Useful in event handlers to avoid unexpected re-renders
+     * const handleClick = () => {
+     *   const currentCount = count.peek(); // Read without tracking
+     *   console.log("Current count:", currentCount);
+     * };
+     *
+     * // In computed signals - access without creating dependency
+     * const derived = signal({ count }, ({ deps }) => {
+     *   const c = deps.count; // Tracked dependency
+     *   const u = user.peek(); // NOT tracked - won't recompute when user changes
+     *   return `${u.name} clicked ${c} times`;
+     * });
+     * ```
+     */
+    peek(): TValue | TInit;
+
+    /**
      * Check if the signal has been disposed.
      *
      * @returns true if the signal has been disposed, false otherwise
