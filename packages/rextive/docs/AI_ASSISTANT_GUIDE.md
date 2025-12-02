@@ -254,6 +254,9 @@ function Component() {
 // Create
 const count = signal(0);
 
+// Unique ID (auto-generated, immutable)
+count.uid; // "sig-1" - perfect for React keys
+
 // Read (triggers tracking)
 count(); // 0
 count.get(); // 0

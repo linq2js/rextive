@@ -47,7 +47,7 @@ import { createComputedSignal } from "./createComputedSignal";
 import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
 import { getRenderHooks, hasDevTools, emit } from "./hooks";
-import { nextName } from "./utils/nameGenerator";
+import { nextName, nextUid } from "./utils/nameGenerator";
 import { resolveSelectorsRequired } from "./operators/resolveSelectors";
 import {
   trackAsyncError,
@@ -103,6 +103,9 @@ export function createMutableSignal(
   // Resolve equals option to actual comparison function
   // Supports: "strict", "shallow", "deep", custom function, or defaults to Object.is
   const equals = resolveEquals(equalsOption) || Object.is;
+
+  // Generate unique ID (immutable, auto-generated)
+  const uid = nextUid();
 
   // Generate display name: use provided name or auto-generate for devtools
   const displayName = name ?? nextName("mutable");
@@ -743,6 +746,9 @@ export function createMutableSignal(
   const instance = Object.assign(get, {
     // Type marker for runtime type checking
     [SIGNAL_TYPE]: true,
+
+    // Unique identifier (auto-generated, immutable)
+    uid,
 
     // Debug name for development/debugging
     displayName,

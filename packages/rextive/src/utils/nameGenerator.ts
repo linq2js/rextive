@@ -13,6 +13,27 @@
 let counter = 0;
 
 /**
+ * Separate counter for unique signal IDs.
+ * This counter is independent from name counter and should never be reset.
+ */
+let uidCounter = 0;
+
+/**
+ * Generate a unique signal ID.
+ * Format: "sig-{n}" (e.g., "sig-1", "sig-2", "sig-42")
+ *
+ * This ID is:
+ * - Auto-generated and immutable
+ * - Unique across all signals in the application lifecycle
+ * - Independent from displayName (which can be changed)
+ *
+ * @returns Unique signal ID
+ */
+export function nextUid(): string {
+  return `sig-${++uidCounter}`;
+}
+
+/**
  * Prefix for auto-generated names.
  * Used to distinguish from user-provided names.
  */

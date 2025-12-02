@@ -295,6 +295,29 @@ export type Pipe<TKind extends SignalKind, TValue, TInit> = {
 export type Signal<TValue, TInit = TValue> = Observable &
   Disposable &
   Accessor<TValue | TInit> & {
+    /**
+     * Unique identifier for this signal instance.
+     * Auto-generated and immutable - guaranteed unique across all signals.
+     * Useful for tracking, debugging, and as React keys.
+     *
+     * @example
+     * ```ts
+     * const count = signal(0);
+     * console.log(count.uid); // "sig-1"
+     *
+     * const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+     * console.log(doubled.uid); // "sig-2"
+     *
+     * // Use as React key
+     * signals.map(s => <div key={s.uid}>{s.displayName}</div>)
+     * ```
+     */
+    readonly uid: string;
+
+    /**
+     * Display name for this signal (for debugging/devtools).
+     * Can be auto-generated or user-provided via options.
+     */
     readonly displayName: string;
 
     get(): TValue | TInit;

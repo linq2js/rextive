@@ -66,6 +66,21 @@ const userData = signal({ userId }, async ({ deps, abortSignal }) => {
 
 ## Signal Instance Methods
 
+### `.uid`
+
+Every signal has a unique, auto-generated, immutable identifier:
+
+```tsx
+const count = signal(0);
+console.log(count.uid); // "sig-1"
+
+const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+console.log(doubled.uid); // "sig-2"
+
+// Perfect for React keys
+signals.map(s => <div key={s.uid}>{s.displayName}</div>)
+```
+
 ### `.get()` / `signal()`
 
 Read the current value (triggers reactive tracking):

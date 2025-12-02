@@ -67,8 +67,6 @@ const DEVTOOLS_STATE_KEY = "__REXTIVE_DEVTOOLS_STATE__";
 /** DevTools shared state structure */
 interface DevToolsState {
   signals: Map<string, SignalInfo>;
-  signalToId: WeakMap<Signal<any>, string>;
-  signalIdCounter: number;
   tags: Map<string, TagInfo>;
   listeners: Set<DevToolsEventListener>;
   eventCache: DevToolsEvent[];
@@ -88,8 +86,6 @@ function getState(): DevToolsState {
     console.log("[DevTools:getState] Creating new shared state instance");
     g[DEVTOOLS_STATE_KEY] = {
       signals: new Map(),
-      signalToId: new WeakMap(),
-      signalIdCounter: 0,
       tags: new Map(),
       listeners: new Set(),
       eventCache: [],
@@ -116,7 +112,6 @@ function getState(): DevToolsState {
 
 // Internal accessor functions (prefixed with $ to avoid conflicts with public API)
 const $signals = () => getState().signals;
-const $signalToId = () => getState().signalToId;
 const $tags = () => getState().tags;
 const $listeners = () => getState().listeners;
 const $eventCache = () => getState().eventCache;
@@ -448,20 +443,16 @@ const devToolsHooks: DevTools = {
         signal.displayName || "unnamed"
       );
     }
-    // Generate unique ID for this signal object
-    const id = `signal-${++getState().signalIdCounter}`;
+    // Use signal's built-in unique ID
+    const id = signal.uid;
     const name = signal.displayName || "unnamed";
     const now = Date.now();
 
-    // Check which tags already have this signal registered by NAME
+    // Check which tags already have this signal registered
     // (onTagAdd may have been called before onSignalCreate during initialization)
-    // Update tag's signals set to use unique ID instead of name
     const signalTags = new Set<string>();
     for (const [tagId, tagInfo] of $tags()) {
-      if (tagInfo.signals.has(name)) {
-        // Replace name with unique ID in tag's signals set
-        tagInfo.signals.delete(name);
-        tagInfo.signals.add(id);
+      if (tagInfo.signals.has(id)) {
         signalTags.add(tagId);
       }
     }
@@ -483,7 +474,6 @@ const devToolsHooks: DevTools = {
     };
 
     $signals().set(id, info);
-    $signalToId().set(signal, id); // Track signal → unique ID mapping
     const createEvent = { type: "signal:create" as const, signal: info };
     if ($config().logToConsole) {
       console.log(
@@ -496,8 +486,8 @@ const devToolsHooks: DevTools = {
   },
 
   onSignalDispose(signal: Signal<any>): void {
-    // Use reverse lookup to find current ID (handles renamed signals)
-    const id = $signalToId().get(signal) || signal.displayName || "unnamed";
+    // Use signal's built-in unique ID
+    const id = signal.uid;
     const now = Date.now();
 
     // Mark as disposed instead of deleting (keeps history visible)
@@ -524,10 +514,9 @@ const devToolsHooks: DevTools = {
     const forgottenIds: string[] = [];
 
     for (const signal of signalsToForget) {
-      const id = $signalToId().get(signal);
-      if (id) {
+      const id = signal.uid;
+      if ($signals().has(id)) {
         $signals().delete(id);
-        $signalToId().delete(signal);
         forgottenIds.push(id);
       }
     }
@@ -539,10 +528,8 @@ const devToolsHooks: DevTools = {
   },
 
   onSignalRename(signal: Signal<any>): void {
-    // Look up by signal reference (ID is unique per object, never changes)
-    const id = $signalToId().get(signal);
-    if (!id) return;
-
+    // Use signal's built-in unique ID
+    const id = signal.uid;
     const info = $signals().get(id);
     if (!info) return;
 
@@ -559,8 +546,8 @@ const devToolsHooks: DevTools = {
   },
 
   onSignalChange(signal: Signal<any>, value: unknown): void {
-    // Use reverse lookup to find current ID (handles renamed signals)
-    const id = $signalToId().get(signal) || signal.displayName || "unnamed";
+    // Use signal's built-in unique ID
+    const id = signal.uid;
     const info = $signals().get(id);
     const now = Date.now();
 
@@ -584,8 +571,8 @@ const devToolsHooks: DevTools = {
   },
 
   onSignalError(signal: Signal<any>, error: unknown): void {
-    // Use reverse lookup to find current ID (handles renamed signals)
-    const id = $signalToId().get(signal) || signal.displayName || "unnamed";
+    // Use signal's built-in unique ID
+    const id = signal.uid;
     const info = $signals().get(id);
     const now = Date.now();
 
@@ -645,9 +632,8 @@ const devToolsHooks: DevTools = {
 
   onTagAdd(tag: Tag<any>, signal: Signal<any>): void {
     const tagId = tag.displayName;
-    // Use unique ID from WeakMap, fall back to display name if signal not yet tracked
-    const signalId =
-      $signalToId().get(signal) || signal.displayName || "unnamed";
+    // Use signal's built-in unique ID
+    const signalId = signal.uid;
 
     const tagInfo = $tags().get(tagId);
     if (tagInfo) {
@@ -667,9 +653,8 @@ const devToolsHooks: DevTools = {
 
   onTagRemove(tag: Tag<any>, signal: Signal<any>): void {
     const tagId = tag.displayName;
-    // Use unique ID from WeakMap
-    const signalId =
-      $signalToId().get(signal) || signal.displayName || "unnamed";
+    // Use signal's built-in unique ID
+    const signalId = signal.uid;
 
     const tagInfo = $tags().get(tagId);
     const signalInfo = $signals().get(signalId);

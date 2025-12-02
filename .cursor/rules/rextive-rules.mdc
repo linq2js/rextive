@@ -305,7 +305,30 @@ const doubled = signal({ count }, ({ deps }) => deps.count * 2, {
 
 ### 2. Signal Instance Methods
 
-All signals have these methods:
+All signals have these properties and methods:
+
+#### `.uid` - Unique Identifier ⭐ NEW
+
+Every signal has a unique ID that is auto-generated and immutable:
+
+```tsx
+const count = signal(0);
+console.log(count.uid); // "sig-1"
+
+const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+console.log(doubled.uid); // "sig-2"
+
+// Use as React key
+signals.map(s => <div key={s.uid}>{s.displayName}</div>)
+```
+
+**Key characteristics:**
+- Auto-generated on signal creation
+- Immutable - never changes for the lifetime of the signal
+- Unique across all signals in the application
+- Format: `"sig-{n}"` (e.g., "sig-1", "sig-42")
+
+---
 
 #### `.get()` or `signal()` - Read Value
 
@@ -1428,6 +1451,8 @@ function Component() {
 - `signal(deps, compute)` - Computed signal
 - `signal(deps, compute, equals)` - Computed with equality
 - `signal(deps, compute, options)` - Computed with options
+- `.uid` - Unique ID (auto-generated, immutable) ⭐
+- `.displayName` - Debug name for devtools
 - `.set(value)` - Update (mutable only)
 - `.get()` or `()` - Read value (triggers tracking)
 - `.peek()` - Read value without tracking ⭐

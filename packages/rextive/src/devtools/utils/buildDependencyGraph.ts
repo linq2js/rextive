@@ -96,7 +96,10 @@ export function buildDependencyGraph(
       const parentName = parts[0];
       const focusPath = parts.slice(1).join(".");
 
-      // Find parent signal by name
+      // Find parent signal by name - prefer non-disposed signals
+      let matchedParentId: string | null = null;
+      let matchedParentDisposed = true;
+
       for (const [parentId, parentInfo] of signals) {
         const parentDisplayName =
           parentInfo.signal.displayName || parentInfo.name;
@@ -106,19 +109,31 @@ export function buildDependencyGraph(
           parentDisplayName.endsWith(`.${parentName}`) ||
           parentName === parentDisplayName.split(".")[0]
         ) {
-          const key = `${parentId}→${id}:focus`;
-          if (!edgeMap.has(key)) {
-            const edge: GraphEdge = {
-              from: parentId,
-              to: id,
-              type: "focus",
-              label: focusPath || undefined,
-              weight: 1,
-            };
-            edgeMap.set(key, edge);
-            edges.push(edge);
+          // Prefer non-disposed signals over disposed ones
+          if (!parentInfo.disposed) {
+            matchedParentId = parentId;
+            matchedParentDisposed = false;
+            break; // Found active parent, use it
+          } else if (matchedParentId === null) {
+            // First match is disposed, keep looking but remember it as fallback
+            matchedParentId = parentId;
           }
-          break;
+        }
+      }
+
+      // Create edge if parent found
+      if (matchedParentId) {
+        const key = `${matchedParentId}→${id}:focus`;
+        if (!edgeMap.has(key)) {
+          const edge: GraphEdge = {
+            from: matchedParentId,
+            to: id,
+            type: "focus",
+            label: focusPath || undefined,
+            weight: 1,
+          };
+          edgeMap.set(key, edge);
+          edges.push(edge);
         }
       }
     }
@@ -139,7 +154,9 @@ export function buildDependencyGraph(
       const operator = pipeMatch[1];
       const sourceName = pipeMatch[2];
 
-      // Find source signal
+      // Find source signal - prefer non-disposed signals
+      let matchedSourceId: string | null = null;
+
       for (const [sourceId, sourceInfo] of signals) {
         const sourceDisplayName =
           sourceInfo.signal.displayName || sourceInfo.name;
@@ -147,19 +164,30 @@ export function buildDependencyGraph(
           sourceDisplayName === sourceName ||
           sourceDisplayName.includes(sourceName)
         ) {
-          const key = `${sourceId}→${id}:pipe`;
-          if (!edgeMap.has(key)) {
-            const edge: GraphEdge = {
-              from: sourceId,
-              to: id,
-              type: "pipe",
-              label: operator,
-              weight: 1,
-            };
-            edgeMap.set(key, edge);
-            edges.push(edge);
+          // Prefer non-disposed signals over disposed ones
+          if (!sourceInfo.disposed) {
+            matchedSourceId = sourceId;
+            break; // Found active source, use it
+          } else if (matchedSourceId === null) {
+            // First match is disposed, keep looking but remember it as fallback
+            matchedSourceId = sourceId;
           }
-          break;
+        }
+      }
+
+      // Create edge if source found
+      if (matchedSourceId) {
+        const key = `${matchedSourceId}→${id}:pipe`;
+        if (!edgeMap.has(key)) {
+          const edge: GraphEdge = {
+            from: matchedSourceId,
+            to: id,
+            type: "pipe",
+            label: operator,
+            weight: 1,
+          };
+          edgeMap.set(key, edge);
+          edges.push(edge);
         }
       }
     }

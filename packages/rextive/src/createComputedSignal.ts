@@ -17,7 +17,7 @@ import { pipeSignals } from "./utils/pipeSignals";
 import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
 import { getRenderHooks, hasDevTools, emit } from "./hooks";
-import { nextName } from "./utils/nameGenerator";
+import { nextName, nextUid } from "./utils/nameGenerator";
 import { resolveSelectorsRequired } from "./operators/resolveSelectors";
 import {
   trackAsyncError,
@@ -61,6 +61,9 @@ export function createComputedSignal(
 
   // Resolve equals option to actual function (handles string shortcuts)
   const equals = resolveEquals(equalsOption) || Object.is;
+
+  // Generate unique ID (immutable, auto-generated)
+  const uid = nextUid();
 
   // Generate display name: use provided name or auto-generate for devtools
   const displayName = name ?? nextName("computed");
@@ -451,6 +454,7 @@ export function createComputedSignal(
 
   const instance: Computed<any> = Object.assign(get, {
     [SIGNAL_TYPE]: true,
+    uid,
     displayName,
     get,
     peek,
