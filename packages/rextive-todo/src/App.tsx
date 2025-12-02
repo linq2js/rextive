@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TodoInput } from "./components/TodoInput";
 import { TodoList } from "./components/TodoList";
 import { TodoFilters } from "./components/TodoFilters";
@@ -9,6 +9,79 @@ import { CounterDemo } from "./components/CounterDemo";
 import { FormEditor } from "./components/FormEditor";
 import { initializeStore } from "./store/todoStore";
 import "./App.css";
+
+// Table of Contents data
+const tocItems = [
+  { id: "todo-demo", label: "📝 Todo Demo", desc: "CRUD with sync" },
+  { id: "error-demo", label: "⚠️ Error Demo", desc: "Error boundaries" },
+  { id: "counter-demo", label: "🔢 Counter Demo", desc: "Basic signals" },
+  { id: "form-demo", label: "📋 Form Editor", desc: "Complex forms" },
+  { id: "scope-demo", label: "🔬 Scope Test", desc: "useScope lifecycle" },
+];
+
+function TableOfContents() {
+  const handleClick = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  return (
+    <nav className="toc-nav">
+      <div className="toc-title">Quick Navigation</div>
+      <div className="toc-links">
+        {tocItems.map((item) => (
+          <button
+            key={item.id}
+            className="toc-link"
+            onClick={() => handleClick(item.id)}
+          >
+            <span className="toc-link-label">{item.label}</span>
+            <span className="toc-link-desc">{item.desc}</span>
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function BackToTopButton() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setVisible(window.scrollY > 300);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  return (
+    <button
+      className={`back-to-top ${visible ? "visible" : ""}`}
+      onClick={scrollToTop}
+      aria-label="Back to top"
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M18 15l-6-6-6 6" />
+      </svg>
+    </button>
+  );
+}
 
 export function App() {
   const initializedRef = useRef(false);
@@ -51,25 +124,38 @@ export function App() {
           <span className="subtitle">Signal-powered</span>
         </header>
 
-        <div className="todo-card">
+        <TableOfContents />
+
+        <div id="todo-demo" className="todo-card">
           <h3 className="todo-card-title">📝 Todo Demo</h3>
           <SyncControls />
           <TodoInput />
           <TodoFilters />
           <TodoList />
         </div>
-        <ErrorDemo />
 
-        <CounterDemo />
+        <div id="error-demo">
+          <ErrorDemo />
+        </div>
 
-        <FormEditor />
+        <div id="counter-demo">
+          <CounterDemo />
+        </div>
 
-        <ScopeTest />
+        <div id="form-demo">
+          <FormEditor />
+        </div>
+
+        <div id="scope-demo">
+          <ScopeTest />
+        </div>
 
         <footer className="app-footer">
           <p>Built with Rextive signals</p>
         </footer>
       </main>
+
+      <BackToTopButton />
 
       {/* DevTools rendered in separate root - see main.tsx */}
     </div>
