@@ -30,7 +30,7 @@ let uidCounter = 0;
  * @returns Unique signal ID
  */
 export function nextUid(): string {
-  return `sig-${++uidCounter}`;
+  return `s:${++uidCounter}`;
 }
 
 /**

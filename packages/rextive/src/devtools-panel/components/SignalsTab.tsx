@@ -80,10 +80,10 @@ export function SignalsTab({
       // Get current display name from signal (may have been renamed)
       const displayName = info.signal.displayName || info.name;
 
-      // Build hover tooltip with signal name, ID, and source location
+      // Build hover tooltip with signal name, UID, and source location
       const hoverTitle = [
         displayName,
-        `ID: ${info.id}`,
+        `UID: ${info.id}`,
         info.source
           ? `📍 ${info.source.file}:${info.source.line}${
               info.source.functionName
@@ -277,7 +277,7 @@ export function SignalsTab({
                   style={{
                     fontSize: "10px",
                     color: styles.colors.text,
-                    marginBottom: "8px",
+                    marginBottom: "4px",
                     wordBreak: "break-all",
                     fontFamily: styles.fontMono,
                   }}
@@ -291,6 +291,25 @@ export function SignalsTab({
                     Name:{" "}
                   </span>
                   {displayName}
+                </div>
+
+                {/* Signal UID */}
+                <div
+                  style={{
+                    fontSize: "10px",
+                    color: styles.colors.textMuted,
+                    marginBottom: "8px",
+                    fontFamily: styles.fontMono,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "9px",
+                    }}
+                  >
+                    UID:{" "}
+                  </span>
+                  {info.id}
                 </div>
 
                 {/* Edit form for mutable signals - replaces readonly value display */}

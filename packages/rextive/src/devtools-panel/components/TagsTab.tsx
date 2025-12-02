@@ -182,7 +182,7 @@ export function TagsTab({
                             e.stopPropagation();
                             onNavigateToSignal(signalId);
                           }}
-                          title={`Go to signal: ${signalId}`}
+                          title={`${signalInfo?.name || signalId}\nUID: ${signalId}`}
                         >
                           <span
                             style={{

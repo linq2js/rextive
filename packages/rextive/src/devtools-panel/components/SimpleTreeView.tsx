@@ -147,9 +147,16 @@ export function SimpleTreeView({
   const expandedNodes = controlledExpandedNodes ?? internalExpandedNodes;
 
   // Expand all by default on mount (only if using internal state)
+  // Using ref to track if we've done initial expansion to avoid re-running
+  const hasInitialExpanded = React.useRef(false);
+
   React.useEffect(() => {
     if (controlledExpandedNodes !== undefined) {
       // Controlled mode - don't auto-expand
+      return;
+    }
+    if (hasInitialExpanded.current) {
+      // Already expanded once, don't repeat
       return;
     }
     const allNodesWithChildren = new Set<string>();
@@ -158,10 +165,11 @@ export function SimpleTreeView({
         allNodesWithChildren.add(item.node.id);
       }
     }
-    if (allNodesWithChildren.size > 0 && internalExpandedNodes.size === 0) {
+    if (allNodesWithChildren.size > 0) {
+      hasInitialExpanded.current = true;
       setInternalExpandedNodes(allNodesWithChildren);
     }
-  }, [tree, controlledExpandedNodes, internalExpandedNodes.size]);
+  }, [tree, controlledExpandedNodes]);
 
   const toggleExpand = (nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -291,9 +299,18 @@ export function SimpleTreeView({
             <span style={{ width: "12px", marginRight: "4px" }} />
           )}
           {/* Status indicator dot */}
-          <span style={statusDotStyle} title={
-            node.hasError ? "Error" : node.disposed ? "Disposed" : isRecentlyUpdated ? "Recently updated" : "Idle"
-          } />
+          <span
+            style={statusDotStyle}
+            title={
+              node.hasError
+                ? "Error"
+                : node.disposed
+                ? "Disposed"
+                : isRecentlyUpdated
+                ? "Recently updated"
+                : "Idle"
+            }
+          />
           <span
             style={{
               color: nodeColor,
@@ -321,13 +338,15 @@ export function SimpleTreeView({
               ...(node.hasError && {
                 color: styles.colors.errorText,
               }),
-              ...(isRecentlyUpdated && !node.hasError && !node.disposed && {
-                color: STATUS_COLORS.active,
-                fontWeight: 600,
-              }),
+              ...(isRecentlyUpdated &&
+                !node.hasError &&
+                !node.disposed && {
+                  color: STATUS_COLORS.active,
+                  fontWeight: 600,
+                }),
             }}
             onClick={() => onNodeClick?.(node.id)}
-            title={node.name}
+            title={`${node.name}\nUID: ${node.id}`}
           >
             {node.name}
           </span>

@@ -134,7 +134,7 @@ export function ChainsTab({
                           e.stopPropagation();
                           onNavigateToSignal(signalName);
                         }}
-                        title={`Go to signal: ${signalName}`}
+                        title={`${signalName}\nUID: ${signalId}`}
                       >
                         {signalName}
                         {chain.asyncSignals.has(signalId) && (

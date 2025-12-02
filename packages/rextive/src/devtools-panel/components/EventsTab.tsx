@@ -46,14 +46,17 @@ export function EventsTab({
 
   const renderEventItem = useCallback(
     (event: EventLogEntry) => {
-            // Get signal name for display (lookup by ID if needed)
+            // Get signal name and ID for display
             let signalName: string | null = null;
+            let signalUid: string | null = null;
             if ("signal" in event && event.signal) {
               signalName =
                 (event.signal as any).name || (event.signal as any).id;
+              signalUid = (event.signal as any).id || null;
             } else if ("signalId" in event) {
-              const info = signals.get(String(event.signalId));
-              signalName = info?.name || String(event.signalId);
+              signalUid = String(event.signalId);
+              const info = signals.get(signalUid);
+              signalName = info?.name || signalUid;
             }
             const tagId = "tagId" in event ? String(event.tagId) : null;
             const isEventExpanded = expandedEvents.has(event.id);
@@ -267,7 +270,7 @@ export function EventsTab({
                           e.stopPropagation();
                           onNavigateToSignal(signalName!);
                         }}
-                        title={`Go to signal: ${signalName}`}
+                        title={signalUid ? `${signalName}\nUID: ${signalUid}` : signalName!}
                       >
                         {signalName}
                       </span>
@@ -364,7 +367,7 @@ export function EventsTab({
                     </span>
                   )}
                 </div>
-                {/* Value on second line */}
+                {/* Value on second line - aligned with the tag */}
                 {valueStr && !isEventExpanded && (
                   <div
                     style={{
@@ -379,6 +382,7 @@ export function EventsTab({
                       whiteSpace: "nowrap",
                       width: "100%",
                       fontFamily: styles.fontMono,
+                      paddingLeft: "56px", // Align with tag (50px time + 6px gap)
                     }}
                   >
                     {event.type === "window:error" ||
@@ -391,6 +395,7 @@ export function EventsTab({
                   <pre
                     style={{
                       margin: "6px 0 0 0",
+                      marginLeft: "56px", // Align with tag (50px time + 6px gap)
                       padding: "6px",
                       backgroundColor: styles.colors.bg,
                       borderRadius: "4px",
@@ -398,7 +403,7 @@ export function EventsTab({
                       color: styles.colors.text,
                       overflow: "auto",
                       maxHeight: "200px",
-                      width: "100%",
+                      width: "calc(100% - 56px)",
                       whiteSpace: "pre-wrap",
                       wordBreak: "break-all",
                     }}

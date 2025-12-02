@@ -562,6 +562,8 @@ export function DependencyGraphView({
                 onMouseEnter={() => setHoveredNodeId(node.id)}
                 onMouseLeave={() => setHoveredNodeId(null)}
               >
+                {/* Tooltip */}
+                <title>{`${node.name}\nUID: ${node.id}`}</title>
                 {/* Node circle */}
                 <circle
                   cx={pos.x}

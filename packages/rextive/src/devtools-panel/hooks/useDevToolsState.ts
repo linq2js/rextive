@@ -78,23 +78,54 @@ export function useDevToolsState() {
   }, []);
 
   // Refresh data periodically when enabled
+  // Use refs to track previous values and avoid unnecessary re-renders
+  const prevSignalsRef = useRef<Map<string, SignalInfo>>(new Map());
+  const prevTagsRef = useRef<Map<string, TagInfo>>(new Map());
+
   useEffect(() => {
     if (!enabled) {
-      console.log("[rextive/devtools] Panel refresh disabled - DevTools not enabled");
       return;
     }
 
     const refresh = () => {
-      const signalsMap = new Map(getSignals());
-      const tagsMap = new Map(getTags());
+      const signalsMap = getSignals();
+      const tagsMap = getTags();
       const statsData = getStats();
       
-      if (signalsMap.size === 0 && tagsMap.size === 0) {
-        console.log("[rextive/devtools] No signals or tags found. Make sure enableDevTools() is called before creating signals.");
+      // Only update signals if content changed (compare by size and changeCount)
+      let signalsChanged = signalsMap.size !== prevSignalsRef.current.size;
+      if (!signalsChanged) {
+        for (const [id, info] of signalsMap) {
+          const prev = prevSignalsRef.current.get(id);
+          if (!prev || prev.changeCount !== info.changeCount || prev.disposed !== info.disposed) {
+            signalsChanged = true;
+            break;
+          }
+        }
       }
       
-      setSignals(signalsMap);
-      setTags(tagsMap);
+      if (signalsChanged) {
+        prevSignalsRef.current = signalsMap;
+        setSignals(new Map(signalsMap));
+      }
+      
+      // Only update tags if content changed
+      let tagsChanged = tagsMap.size !== prevTagsRef.current.size;
+      if (!tagsChanged) {
+        for (const [id, info] of tagsMap) {
+          const prev = prevTagsRef.current.get(id);
+          if (!prev || prev.signals.size !== info.signals.size) {
+            tagsChanged = true;
+            break;
+          }
+        }
+      }
+      
+      if (tagsChanged) {
+        prevTagsRef.current = tagsMap;
+        setTags(new Map(tagsMap));
+      }
+      
       setStats(statsData);
     };
 
