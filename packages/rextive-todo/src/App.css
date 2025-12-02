@@ -392,11 +392,11 @@ input {
 
 .todo-input {
   flex: 1;
-  padding: 14px 18px;
+  padding: 10px 14px;
   background: var(--bg-input);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-sm);
-  font-size: 1rem;
+  font-size: 0.9rem;
   color: var(--text-primary);
   transition: all var(--transition-fast);
 }
@@ -411,8 +411,8 @@ input {
 }
 
 .todo-add-btn {
-  width: 48px;
-  height: 48px;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;

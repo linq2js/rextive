@@ -10,6 +10,7 @@ import { BasicFields } from "./BasicFields";
 import { SettingsSection } from "./SettingsSection";
 import { TagsEditor } from "./TagsEditor";
 import { ContactsEditor } from "./ContactsEditor";
+import { Button } from "../Button";
 import "./FormEditor.css";
 
 function FormEditorContent() {
@@ -200,22 +201,20 @@ export function FormEditor() {
           Using <code>focus</code> operator with <code>provider</code> pattern
         </p>
         <div className="form-editor-actions">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={softReset}
-            className="btn-reset btn-soft"
             title="Reset values only (keeps components mounted)"
           >
             🔄 Soft Reset
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="danger"
             onClick={hardReset}
-            className="btn-reset btn-hard"
             title="Hard reset (remounts all components)"
           >
             💥 Hard Reset
-          </button>
+          </Button>
         </div>
       </div>
       <FormContextProvider

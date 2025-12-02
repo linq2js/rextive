@@ -4,6 +4,7 @@
 import { rx, useScope } from "rextive/react";
 import { focus } from "rextive/op";
 import { useFormContext } from "../../store/formStore";
+import { Button } from "../Button";
 import type { Contact, Address } from "../../types/form";
 
 // Generate unique ID for new items
@@ -46,13 +47,12 @@ export function ContactsEditor() {
           ))
       )}
 
-      <button
-        type="button"
+      <Button
+        variant="dashed"
         onClick={() => scope.addContact()}
-        className="btn-add-contact"
       >
         + Add Contact
-      </button>
+      </Button>
 
       {rx(() =>
         scope.contacts().length === 0 ? (
@@ -108,9 +108,9 @@ function ContactItem({ index, onRemove }: ContactItemProps) {
     <div className="contact-item">
       <div className="contact-header">
         <span className="contact-number">Contact #{index + 1}</span>
-        <button type="button" onClick={onRemove} className="btn-remove">
+        <Button variant="danger" size="sm" onClick={onRemove}>
           🗑️ Remove
-        </button>
+        </Button>
       </div>
 
       <div className="contact-fields">
@@ -194,13 +194,13 @@ function ContactItem({ index, onRemove }: ContactItemProps) {
                 />
               ))
           )}
-          <button
-            type="button"
+          <Button
+            variant="dashed"
+            size="sm"
             onClick={() => scope.addAddress()}
-            className="btn-add-small"
           >
             + Add Address
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -253,9 +253,9 @@ function AddressItem({
             Primary
           </label>
         ))}
-        <button type="button" onClick={onRemove} className="btn-remove-small">
+        <Button variant="danger" size="sm" iconOnly onClick={onRemove}>
           ×
-        </button>
+        </Button>
       </div>
 
       <div className="form-field">

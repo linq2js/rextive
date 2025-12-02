@@ -1,4 +1,5 @@
 import { signal, wait, task, rx, useScope } from "rextive/react";
+import { Button } from "./Button";
 
 /**
  * Factory function that creates an async signal that may throw
@@ -73,13 +74,13 @@ export const ErrorDemo = () => {
               </div>
             )}
 
-            <button
-              className="refresh-btn"
+            <Button
+              variant="primary"
               onClick={() => maybeError.refresh()}
               disabled={state.loading}
             >
               {state.loading ? "Loading..." : "🔄 Refresh"}
-            </button>
+            </Button>
           </div>
         );
       })}
@@ -171,27 +172,8 @@ export const ErrorDemo = () => {
           color: #4ade80;
         }
 
-        .refresh-btn {
+        .demo-content .btn {
           align-self: flex-start;
-          padding: 0.5rem 1rem;
-          background: linear-gradient(135deg, #6366f1, #8b5cf6);
-          border: none;
-          border-radius: 8px;
-          color: white;
-          font-size: 0.875rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .refresh-btn:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-        }
-
-        .refresh-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
         }
       `}</style>
     </div>

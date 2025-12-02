@@ -5,6 +5,7 @@ import { useState } from "react";
 import { rx, useScope, disposable } from "rextive/react";
 import { focus } from "rextive/op";
 import { useFormContext } from "../../store/formStore";
+import { Button } from "../Button";
 
 export function TagsEditor() {
   const { formData } = useFormContext();
@@ -39,9 +40,9 @@ export function TagsEditor() {
           placeholder="Add a tag..."
           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
         />
-        <button type="button" onClick={addTag} className="btn-add">
+        <Button variant="primary" size="sm" onClick={addTag}>
           + Add
-        </button>
+        </Button>
       </div>
 
       <div className="tags-list">

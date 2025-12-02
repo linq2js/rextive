@@ -1,4 +1,5 @@
 import { signal, rx } from "rextive/react";
+import { Button } from "./Button";
 
 // 🎯 One concept for everything
 const count = signal(0, { name: "demo:count" }); // Mutable state
@@ -50,15 +51,15 @@ export function CounterDemo() {
       </div>
 
       <div className="counter-controls">
-        <button onClick={decrement} className="btn-control">
+        <Button variant="primary" size="md" onClick={decrement}>
           −
-        </button>
-        <button onClick={increment} className="btn-control">
+        </Button>
+        <Button variant="primary" size="md" onClick={increment}>
           +
-        </button>
-        <button onClick={reset} className="btn-reset">
+        </Button>
+        <Button variant="outline" size="md" onClick={reset}>
           Reset
-        </button>
+        </Button>
       </div>
 
       <div className="auto-increment">
@@ -129,37 +130,6 @@ export function CounterDemo() {
           gap: 8px;
           justify-content: center;
           margin-bottom: 16px;
-        }
-        .btn-control {
-          width: 48px;
-          height: 48px;
-          border-radius: 12px;
-          border: none;
-          background: #6366f1;
-          color: white;
-          font-size: 24px;
-          cursor: pointer;
-          transition: all 0.15s;
-        }
-        .btn-control:hover {
-          background: #818cf8;
-          transform: scale(1.05);
-        }
-        .btn-control:active {
-          transform: scale(0.95);
-        }
-        .btn-reset {
-          padding: 12px 20px;
-          border-radius: 12px;
-          border: none;
-          background: rgba(255, 255, 255, 0.1);
-          color: #e0e7ff;
-          font-size: 14px;
-          cursor: pointer;
-          transition: all 0.15s;
-        }
-        .btn-reset:hover {
-          background: rgba(255, 255, 255, 0.2);
         }
         .auto-increment {
           display: flex;
