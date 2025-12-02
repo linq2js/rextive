@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState, useRef } from "react";
-import { RenderHooks, withRenderHooks } from "../hooks";
+import { Hooks, withHooks } from "../hooks";
 import { AnySignal, Task } from "../types";
 import { emitter } from "../utils/emitter";
 import { useSafeFactory } from "./useSafeFactory";
@@ -7,15 +7,15 @@ import { useSafeFactory } from "./useSafeFactory";
 /**
  * Internal controller for tracking signals accessed within useRx.
  *
- * Implements RenderHooks to integrate with the signal system's
+ * Implements Hooks interface to integrate with the signal system's
  * automatic tracking mechanism. When signals are read via get(), they
- * call getRenderHooks().onSignalAccess() which adds them to this controller.
+ * call getHooks().onSignalAccess() which adds them to this controller.
  *
  * **Important**: Methods are defined as arrow function class properties
  * (not prototype methods) to ensure they work correctly when spread by
- * `withRenderHooks`. Prototype methods are NOT copied during object spread.
+ * `withHooks`. Prototype methods are NOT copied during object spread.
  */
-class RxController implements RenderHooks {
+class RxController implements Pick<Hooks, "onSignalAccess" | "onTaskAccess"> {
   /** Set of signals accessed during the current render */
   signals = new Set<AnySignal<any>>();
 
@@ -28,7 +28,7 @@ class RxController implements RenderHooks {
 
   /**
    * Track a signal for subscription.
-   * Called automatically by signals when read via get() during withRenderHooks context.
+   * Called automatically by signals when read via get() during withHooks context.
    */
   onSignalAccess = (signal: AnySignal<any>) => {
     this.signals.add(signal);
@@ -157,7 +157,7 @@ export function useRx<T>(fn: () => T): T {
     };
   });
 
-  // Run fn within render hooks context
+  // Run fn within hooks context
   // Any signal.get() calls will trigger controller.onSignalAccess()
-  return withRenderHooks(controller, fn);
+  return withHooks(controller, fn);
 }

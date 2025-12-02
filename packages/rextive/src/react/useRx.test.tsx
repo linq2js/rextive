@@ -4,7 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { act } from "react";
 import { signal } from "../signal";
 import { useRx } from "./useRx";
-import { getRenderHooks } from "../hooks";
+import { getHooks } from "../hooks";
 import "@testing-library/jest-dom/vitest";
 
 describe("useRx", () => {
@@ -184,7 +184,7 @@ describe("useRx", () => {
 
       const TestComponent = () => {
         useRx(() => {
-          capturedHooks = getRenderHooks();
+          capturedHooks = getHooks();
           return "test";
         });
         return <div>Test</div>;
@@ -198,7 +198,7 @@ describe("useRx", () => {
     });
 
     it("should restore previous hooks after execution", () => {
-      const originalHooks = getRenderHooks();
+      const originalHooks = getHooks();
 
       const TestComponent = () => {
         useRx(() => "test");
@@ -208,7 +208,7 @@ describe("useRx", () => {
       render(<TestComponent />);
 
       // After render, hooks should be restored
-      expect(getRenderHooks()).toBe(originalHooks);
+      expect(getHooks()).toBe(originalHooks);
     });
   });
 

@@ -324,18 +324,24 @@
 
 .tags-input-row {
   display: flex;
+  align-items: stretch;
   gap: 10px;
   margin-bottom: 14px;
 }
 
 .tags-input-row input {
   flex: 1;
-  padding: 10px 14px;
+  height: 40px;
+  padding: 0 14px;
   background: rgba(15, 23, 42, 0.7);
   border: 1px solid rgba(71, 85, 105, 0.5);
   border-radius: 10px;
   color: #f1f5f9;
   font-size: 0.9rem;
+}
+
+.tags-input-row .btn {
+  height: 40px;
 }
 
 .btn-add {

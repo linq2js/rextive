@@ -16,7 +16,7 @@ import { resolveEquals } from "./utils/resolveEquals";
 import { pipeSignals } from "./utils/pipeSignals";
 import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
-import { getRenderHooks, hasDevTools, emit } from "./hooks";
+import { getHooks, emit } from "./hooks";
 import { nextName, nextUid } from "./utils/nameGenerator";
 import { resolveSelectorsRequired } from "./operators/resolveSelectors";
 import {
@@ -84,7 +84,7 @@ export function createComputedSignal(
     onChangeValue(onChangeCallbacks);
   }
   // Notify devtools on value change (only subscribe if devtools is enabled)
-  if (hasDevTools()) {
+  if (getHooks().hasDevTools()) {
     onChangeValue((value) => {
       emit.signalChange(instanceRef!, value);
     });
@@ -258,7 +258,7 @@ export function createComputedSignal(
   };
 
   const get = () => {
-    getRenderHooks().onSignalAccess(instance);
+    getHooks().onSignalAccess(instance);
     // Allow reading last value/error even after disposal
     // Only recompute if not disposed and no current value
     if (!current && !disposed) {
@@ -275,11 +275,11 @@ export function createComputedSignal(
   /**
    * Peek at current signal value WITHOUT triggering reactive tracking
    *
-   * Same as get() but does NOT call getRenderHooks().onSignalAccess().
+   * Same as get() but does NOT call getHooks().onSignalAccess().
    * Use this when you need to read a value without creating a dependency.
    */
   const peek = () => {
-    // NOTE: No getRenderHooks().onSignalAccess() call - this is the key difference from get()
+    // NOTE: No getHooks().onSignalAccess() call - this is the key difference from get()
 
     // Allow reading last value/error even after disposal
     // Only recompute if not disposed and no current value
@@ -462,7 +462,7 @@ export function createComputedSignal(
     dispose,
     disposed: isDisposed,
     error: () => {
-      getRenderHooks().onSignalAccess(instance);
+      getHooks().onSignalAccess(instance);
       // Ensure computation runs if lazy
       if (!current && !disposed) {
         recompute("compute:initial");
@@ -470,7 +470,7 @@ export function createComputedSignal(
       return current?.error;
     },
     tryGet: () => {
-      getRenderHooks().onSignalAccess(instance);
+      getHooks().onSignalAccess(instance);
       // Ensure computation runs if lazy
       if (!current && !disposed) {
         recompute("compute:initial");

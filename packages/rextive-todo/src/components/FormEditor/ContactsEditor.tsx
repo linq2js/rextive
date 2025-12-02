@@ -47,10 +47,7 @@ export function ContactsEditor() {
           ))
       )}
 
-      <Button
-        variant="dashed"
-        onClick={() => scope.addContact()}
-      >
+      <Button variant="dashed" onClick={() => scope.addContact()}>
         + Add Contact
       </Button>
 
@@ -194,11 +191,7 @@ function ContactItem({ index, onRemove }: ContactItemProps) {
                 />
               ))
           )}
-          <Button
-            variant="dashed"
-            size="sm"
-            onClick={() => scope.addAddress()}
-          >
+          <Button variant="dashed" size="sm" onClick={() => scope.addAddress()}>
             + Add Address
           </Button>
         </div>
@@ -253,9 +246,13 @@ function AddressItem({
             Primary
           </label>
         ))}
-        <Button variant="danger" size="sm" iconOnly onClick={onRemove}>
-          ×
-        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          iconOnly
+          icon="×"
+          onClick={onRemove}
+        />
       </div>
 
       <div className="form-field">

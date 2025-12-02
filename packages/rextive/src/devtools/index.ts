@@ -23,7 +23,7 @@
  */
 
 import type { Signal, Tag, DevTools } from "../types";
-import { setDevToolsHooks } from "../hooks";
+import { setHooks, resetHooks } from "../hooks";
 import { getErrorTrace } from "../utils/errorTracking";
 import type {
   SignalInfo,
@@ -707,9 +707,11 @@ export function enableDevTools(options: DevToolsOptions = {}): void {
     logToConsole: options.logToConsole ?? false,
   };
 
-  // Set hooks via both mechanisms for backwards compatibility
-  globalThis.__REXTIVE_DEVTOOLS__ = devToolsHooks;
-  setDevToolsHooks(devToolsHooks);
+  // Set hooks - includes hasDevTools: () => true
+  setHooks({
+    ...devToolsHooks,
+    hasDevTools: () => true,
+  });
   getState().enabled = true;
 
   // Set up window error listeners
@@ -728,10 +730,8 @@ export function disableDevTools(): void {
     return;
   }
 
-  // Clear hooks via both mechanisms
-  setDevToolsHooks(null);
-  // Set to undefined after setDevToolsHooks to ensure consistency
-  globalThis.__REXTIVE_DEVTOOLS__ = undefined;
+  // Clear hooks
+  resetHooks();
   getState().enabled = false;
 
   // Remove window error listeners

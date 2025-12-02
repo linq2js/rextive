@@ -8,7 +8,7 @@ import {
   Signal,
   SignalContext,
 } from "../types";
-import { getRenderHooks } from "../hooks";
+import { getHooks } from "../hooks";
 import { is as signalIs } from "../is";
 
 /**
@@ -300,7 +300,7 @@ export namespace task {
     }
     const t = toTaskImpl(value) as any;
 
-    getRenderHooks().onTaskAccess(t);
+    getHooks().onTaskAccess(t);
 
     return t;
   }

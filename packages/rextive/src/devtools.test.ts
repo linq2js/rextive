@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { signal } from "./signal";
 import { tag } from "./tag";
 import type { DevTools } from "./types";
-import { setDevToolsHooks } from "./hooks";
+import { setHooks, resetHooks } from "./hooks";
 
 describe("DevTools integration", () => {
   let devtools: DevTools;
@@ -16,13 +16,14 @@ describe("DevTools integration", () => {
       onTagAdd: vi.fn(),
       onTagRemove: vi.fn(),
     };
-    globalThis.__REXTIVE_DEVTOOLS__ = devtools;
-    setDevToolsHooks(devtools);
+    setHooks({
+      ...devtools,
+      hasDevTools: () => true,
+    });
   });
 
   afterEach(() => {
-    globalThis.__REXTIVE_DEVTOOLS__ = undefined;
-    setDevToolsHooks(null);
+    resetHooks();
   });
 
   describe("signal lifecycle", () => {
@@ -159,8 +160,7 @@ describe("DevTools integration", () => {
 
   describe("no devtools", () => {
     beforeEach(() => {
-      globalThis.__REXTIVE_DEVTOOLS__ = undefined;
-      setDevToolsHooks(null);
+      resetHooks();
     });
 
     it("should not throw when devtools is undefined", () => {
@@ -186,8 +186,10 @@ describe("DevTools integration", () => {
         onSignalCreate: vi.fn(),
         // Other hooks not implemented
       };
-      globalThis.__REXTIVE_DEVTOOLS__ = partialDevtools;
-      setDevToolsHooks(partialDevtools);
+      setHooks({
+        ...partialDevtools,
+        hasDevTools: () => true,
+      });
 
       expect(() => {
         const sig = signal(0);

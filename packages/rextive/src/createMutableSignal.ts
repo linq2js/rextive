@@ -46,7 +46,7 @@ import { pipeSignals } from "./utils/pipeSignals";
 import { createComputedSignal } from "./createComputedSignal";
 import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
-import { getRenderHooks, hasDevTools, emit } from "./hooks";
+import { getHooks, emit } from "./hooks";
 import { nextName, nextUid } from "./utils/nameGenerator";
 import { resolveSelectorsRequired } from "./operators/resolveSelectors";
 import {
@@ -131,7 +131,7 @@ export function createMutableSignal(
     onChangeValue(onChangeCallbacks);
   }
   // Notify devtools on value change (only subscribe if devtools is enabled)
-  if (hasDevTools()) {
+  if (getHooks().hasDevTools()) {
     onChangeValue((value) => {
       emit.signalChange(instanceRef!, value);
     });
@@ -382,7 +382,7 @@ export function createMutableSignal(
    * - The call signature of the signal: signal()
    */
   const get = () => {
-    getRenderHooks().onSignalAccess(instance);
+    getHooks().onSignalAccess(instance);
     // Lazy evaluation: compute on first access
     // Allow reading last value even after disposal (but don't recompute)
     if (!current && !disposed) {
@@ -401,7 +401,7 @@ export function createMutableSignal(
   /**
    * Peek at current signal value WITHOUT triggering reactive tracking
    *
-   * Same as get() but does NOT call getRenderHooks().onSignalAccess().
+   * Same as get() but does NOT call getHooks().onSignalAccess().
    * Use this when you need to read a value without creating a dependency.
    *
    * - Lazily computes on first access (if lazy: true)
@@ -409,7 +409,7 @@ export function createMutableSignal(
    * - Can be called even after disposal (returns last value)
    */
   const peek = () => {
-    // NOTE: No getRenderHooks().onSignalAccess() call - this is the key difference from get()
+    // NOTE: No getHooks().onSignalAccess() call - this is the key difference from get()
 
     // Lazy evaluation: compute on first access
     // Allow reading last value even after disposal (but don't recompute)
@@ -760,7 +760,7 @@ export function createMutableSignal(
     dispose, // Clean up resources
     disposed: isDisposed, // Check if disposed
     error: () => {
-      getRenderHooks().onSignalAccess(instance);
+      getHooks().onSignalAccess(instance);
       // Ensure computation runs if lazy
       if (!current && !disposed) {
         recompute("compute:initial");
@@ -768,7 +768,7 @@ export function createMutableSignal(
       return current?.error;
     },
     tryGet: () => {
-      getRenderHooks().onSignalAccess(instance);
+      getHooks().onSignalAccess(instance);
       // Ensure computation runs if lazy
       if (!current && !disposed) {
         recompute("compute:initial");

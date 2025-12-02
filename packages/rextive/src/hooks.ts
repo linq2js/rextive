@@ -1,81 +1,57 @@
 /**
  * Centralized hooks for signal lifecycle and access tracking.
  *
- * Two types of hooks:
- * 1. Render hooks - for tracking signal access during render (used by rx())
- * 2. DevTools hooks - for debugging/monitoring (used by DevTools)
+ * Unified hooks system that supports:
+ * - Render-time tracking (scoped via withHooks)
+ * - DevTools/monitoring (global via setHooks)
  */
 
 import type { AnySignal, Task, Tag } from "./types";
+import { getGlobalThisAccessor } from "./utils/globalThisAccessor";
 
 // ============================================
 // Types
 // ============================================
 
-/** Render-time hooks for tracking signal access */
-export interface RenderHooks {
+/** Unified hooks interface for all signal lifecycle events */
+export interface Hooks {
+  // Render-time tracking (typically scoped via withHooks)
   onSignalAccess: (signal: AnySignal<any>) => void;
   onTaskAccess: (task: Task<any>) => void;
-}
 
-/** DevTools hooks for monitoring signal lifecycle */
-export interface DevToolsHooks {
-  onSignalCreate: (signal: AnySignal<any>) => void;
-  onSignalChange: (signal: AnySignal<any>, value: unknown) => void;
-  onSignalError: (signal: AnySignal<any>, error: unknown) => void;
-  onSignalDispose: (signal: AnySignal<any>) => void;
-  onSignalRename: (signal: AnySignal<any>) => void;
-  onForgetSignals: (signals: AnySignal<any>[]) => void;
-  onTagCreate: (tag: Tag<any, any>) => void;
-  onTagAdd: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
-  onTagRemove: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
+  // Lifecycle monitoring (typically global via setHooks)
+  onSignalCreate?: (signal: AnySignal<any>) => void;
+  onSignalChange?: (signal: AnySignal<any>, value: unknown) => void;
+  onSignalError?: (signal: AnySignal<any>, error: unknown) => void;
+  onSignalDispose?: (signal: AnySignal<any>) => void;
+  onSignalRename?: (signal: AnySignal<any>) => void;
+  onForgetSignals?: (signals: AnySignal<any>[]) => void;
+  onTagCreate?: (tag: Tag<any, any>) => void;
+  onTagAdd?: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
+  onTagRemove?: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
+
+  /** Check if devtools-level monitoring is enabled */
+  hasDevTools: () => boolean;
 }
 
 // ============================================
-// Render Hooks (scoped per render)
+// Default Hooks
 // ============================================
 
-const noopRenderHooks: RenderHooks = {
+const defaultHooks: Hooks = {
   onSignalAccess: () => {},
   onTaskAccess: () => {},
+  hasDevTools: () => false,
 };
 
-let activeRenderHooks: RenderHooks = noopRenderHooks;
-
-/** Get current render hooks */
-export function getRenderHooks(): RenderHooks {
-  return activeRenderHooks;
-}
-
-/** Execute fn with custom render hooks (for rx() tracking) */
-export function withRenderHooks<T>(
-  hooks: Partial<RenderHooks>,
-  fn: () => T
-): T {
-  const prev = activeRenderHooks;
-  activeRenderHooks = { ...prev, ...hooks };
-  try {
-    return fn();
-  } finally {
-    activeRenderHooks = prev;
-  }
-}
+const hooksAccessor = getGlobalThisAccessor<Hooks>(
+  "__REXTIVE_HOOKS__",
+  defaultHooks
+);
 
 // ============================================
-// DevTools Hooks (global, set once)
+// Hooks State
 // ============================================
-
-let devToolsHooks: Partial<DevToolsHooks> | null = null;
-
-/** Get hooks from globalThis (shared across all module instances) or local fallback */
-function getDevToolsHooks(): Partial<DevToolsHooks> | null {
-  // Check globalThis first (shared across all module instances)
-  if (typeof globalThis !== "undefined" && (globalThis as any).__REXTIVE_DEVTOOLS__) {
-    return (globalThis as any).__REXTIVE_DEVTOOLS__;
-  }
-  // Fallback to local instance (for backwards compatibility)
-  return devToolsHooks;
-}
 
 /** Get or create global queue (shared across all module instances) */
 function getGlobalQueue(): AnySignal<any>[] {
@@ -90,29 +66,112 @@ function getGlobalQueue(): AnySignal<any>[] {
   return fallback;
 }
 
-/** Set devtools hooks (called by enableDevTools) */
-export function setDevToolsHooks(hooks: Partial<DevToolsHooks> | null): void {
-  devToolsHooks = hooks;
-  
-  // Also set in globalThis for cross-module-instance sharing
-  if (typeof globalThis !== "undefined") {
-    (globalThis as any).__REXTIVE_DEVTOOLS__ = hooks ?? undefined;
-  }
-  
-  // Replay queued signal creations from global queue now that hooks are set
+// ============================================
+// Public API
+// ============================================
+
+/** Get current hooks */
+export const getHooks = hooksAccessor.get;
+
+/**
+ * Set/merge global hooks.
+ *
+ * @overload setHooks(hooks) - Merge partial hooks into current hooks
+ * @overload setHooks(override) - Override function receives current hooks, returns partial to merge
+ */
+export function setHooks(hooks: Partial<Hooks>): void;
+export function setHooks(override: (current: Hooks) => Partial<Hooks>): void;
+export function setHooks(
+  hooksOrOverride: Partial<Hooks> | ((current: Hooks) => Partial<Hooks>)
+): void {
+  const current = getHooks();
+  const partial =
+    typeof hooksOrOverride === "function"
+      ? hooksOrOverride(current)
+      : hooksOrOverride;
+
+  const newHooks = hooksAccessor.set({ ...current, ...partial });
+
+  // Replay queued signal creations now that hooks are set
   const globalQueue = getGlobalQueue();
-  if (hooks?.onSignalCreate && globalQueue.length > 0) {
+  if (newHooks.onSignalCreate && globalQueue.length > 0) {
     const signals = [...globalQueue];
     globalQueue.length = 0; // Clear queue
     for (const signal of signals) {
-      hooks.onSignalCreate(signal);
+      newHooks.onSignalCreate?.(signal);
     }
   }
 }
 
-/** Check if devtools is enabled */
+/**
+ * Reset hooks to defaults.
+ * Used for cleanup (e.g., disabling devtools).
+ */
+export function resetHooks(): void {
+  hooksAccessor.set(defaultHooks);
+}
+
+/**
+ * Temporarily override hooks within a scope.
+ *
+ * @overload withHooks(hooks, fn) - Merge partial hooks for duration of fn
+ * @overload withHooks(override, fn) - Override function receives current hooks, returns partial to merge
+ */
+export function withHooks<T>(hooks: Partial<Hooks>, fn: () => T): T;
+export function withHooks<T>(
+  override: (current: Hooks) => Partial<Hooks>,
+  fn: () => T
+): T;
+export function withHooks<T>(
+  hooksOrOverride: Partial<Hooks> | ((current: Hooks) => Partial<Hooks>),
+  fn: () => T
+): T {
+  const prev = getHooks();
+  const partial =
+    typeof hooksOrOverride === "function"
+      ? hooksOrOverride(prev)
+      : hooksOrOverride;
+
+  hooksAccessor.set({ ...prev, ...partial });
+  try {
+    return fn();
+  } finally {
+    hooksAccessor.set(prev);
+  }
+}
+
+// ============================================
+// Legacy Exports (for backwards compatibility)
+// ============================================
+
+/** @deprecated Use getHooks() instead */
+export function getRenderHooks(): Pick<
+  Hooks,
+  "onSignalAccess" | "onTaskAccess"
+> {
+  return getHooks();
+}
+
+/** @deprecated Use withHooks() instead */
+export function withRenderHooks<T>(
+  hooks: Partial<Pick<Hooks, "onSignalAccess" | "onTaskAccess">>,
+  fn: () => T
+): T {
+  return withHooks(hooks, fn);
+}
+
+/** @deprecated Use setHooks() instead */
+export function setDevToolsHooks(hooks: Partial<Hooks> | null): void {
+  if (hooks === null) {
+    resetHooks();
+  } else {
+    setHooks(hooks);
+  }
+}
+
+/** @deprecated Use getHooks().hasDevTools() instead */
 export function hasDevTools(): boolean {
-  return getDevToolsHooks() !== null;
+  return getHooks().hasDevTools();
 }
 
 // ============================================
@@ -124,25 +183,29 @@ let forgetModeSignals: Set<AnySignal<any>> | null = null;
 /** Nesting depth for forgetDisposedSignals calls */
 let forgetModeDepth = 0;
 
+// ============================================
+// Emit Helpers
+// ============================================
+
 /** Emit devtools events */
 export const emit = {
   signalCreate: (signal: AnySignal<any>) => {
-    const hooks = getDevToolsHooks();
-    const onSignalCreate = hooks?.onSignalCreate;
-    
+    const hooks = getHooks();
+    const onSignalCreate = hooks.onSignalCreate;
+
     if (!onSignalCreate) {
       // DevTools not enabled yet - queue for later replay in global queue
       getGlobalQueue().push(signal);
       return;
     }
-    
+
     onSignalCreate(signal);
   },
   signalChange: (signal: AnySignal<any>, value: unknown) => {
-    getDevToolsHooks()?.onSignalChange?.(signal, value);
+    getHooks().onSignalChange?.(signal, value);
   },
   signalError: (signal: AnySignal<any>, error: unknown) => {
-    getDevToolsHooks()?.onSignalError?.(signal, error);
+    getHooks().onSignalError?.(signal, error);
   },
   signalDispose: (signal: AnySignal<any>) => {
     if (forgetModeSignals !== null) {
@@ -150,11 +213,11 @@ export const emit = {
       forgetModeSignals.add(signal);
     } else {
       // Normal mode - mark as disposed (keeps history)
-      getDevToolsHooks()?.onSignalDispose?.(signal);
+      getHooks().onSignalDispose?.(signal);
     }
   },
   signalRename: (signal: AnySignal<any>) => {
-    getDevToolsHooks()?.onSignalRename?.(signal);
+    getHooks().onSignalRename?.(signal);
   },
   /**
    * Execute disposal within "forget mode" - all signals disposed
@@ -180,19 +243,19 @@ export const emit = {
       // Only flush and reset when outermost call completes
       if (forgetModeDepth === 0) {
         if (forgetModeSignals && forgetModeSignals.size > 0) {
-          getDevToolsHooks()?.onForgetSignals?.([...forgetModeSignals]);
+          getHooks().onForgetSignals?.([...forgetModeSignals]);
         }
         forgetModeSignals = null;
       }
     }
   },
   tagCreate: (tag: Tag<any, any>) => {
-    getDevToolsHooks()?.onTagCreate?.(tag);
+    getHooks().onTagCreate?.(tag);
   },
   tagAdd: (tag: Tag<any, any>, signal: AnySignal<any>) => {
-    getDevToolsHooks()?.onTagAdd?.(tag, signal);
+    getHooks().onTagAdd?.(tag, signal);
   },
   tagRemove: (tag: Tag<any, any>, signal: AnySignal<any>) => {
-    getDevToolsHooks()?.onTagRemove?.(tag, signal);
+    getHooks().onTagRemove?.(tag, signal);
   },
 };

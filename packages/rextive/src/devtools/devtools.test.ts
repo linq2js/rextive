@@ -33,7 +33,7 @@ describe("rextive/devtools", () => {
       enableDevTools();
 
       expect(isDevToolsEnabled()).toBe(true);
-      expect(globalThis.__REXTIVE_DEVTOOLS__).toBeDefined();
+      expect(globalThis.__REXTIVE_HOOKS__).toBeDefined();
     });
 
     it("should disable devtools", () => {
@@ -41,7 +41,7 @@ describe("rextive/devtools", () => {
       disableDevTools();
 
       expect(isDevToolsEnabled()).toBe(false);
-      expect(globalThis.__REXTIVE_DEVTOOLS__).toBeUndefined();
+      expect(globalThis.__REXTIVE_HOOKS__).toBeUndefined();
     });
 
     it("should warn when enabling twice", () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { signal } from "./index";
-import { withRenderHooks, getRenderHooks } from "./hooks";
+import { withHooks, getHooks } from "./hooks";
 
 describe("signal.peek()", () => {
   describe("basic peek functionality", () => {
@@ -44,7 +44,7 @@ describe("signal.peek()", () => {
       const count = signal(42);
       const onSignalAccess = vi.fn();
 
-      withRenderHooks({ onSignalAccess, onLoadableAccess: () => {} }, () => {
+      withHooks({ onSignalAccess, onTaskAccess: () => {} }, () => {
         // peek() should NOT trigger onSignalAccess
         count.peek();
       });
@@ -57,7 +57,7 @@ describe("signal.peek()", () => {
       const sum = signal({ a }, ({ deps }) => deps.a * 2);
       const onSignalAccess = vi.fn();
 
-      withRenderHooks({ onSignalAccess, onLoadableAccess: () => {} }, () => {
+      withHooks({ onSignalAccess, onTaskAccess: () => {} }, () => {
         // peek() should NOT trigger onSignalAccess
         sum.peek();
       });
@@ -69,7 +69,7 @@ describe("signal.peek()", () => {
       const count = signal(42);
       const onSignalAccess = vi.fn();
 
-      withRenderHooks({ onSignalAccess, onLoadableAccess: () => {} }, () => {
+      withHooks({ onSignalAccess, onTaskAccess: () => {} }, () => {
         // get() SHOULD trigger onSignalAccess
         count.get();
       });
@@ -81,7 +81,7 @@ describe("signal.peek()", () => {
       const count = signal(42);
       const onSignalAccess = vi.fn();
 
-      withRenderHooks({ onSignalAccess, onLoadableAccess: () => {} }, () => {
+      withHooks({ onSignalAccess, onTaskAccess: () => {} }, () => {
         // signal() SHOULD trigger onSignalAccess
         count();
       });
@@ -98,9 +98,9 @@ describe("signal.peek()", () => {
 
       const trackedSignals: any[] = [];
 
-      withRenderHooks({ 
+      withHooks({ 
         onSignalAccess: (sig) => trackedSignals.push(sig.displayName),
-        onLoadableAccess: () => {} 
+        onTaskAccess: () => {} 
       }, () => {
         // peek() on nested computed
         const value = greeting.peek();
@@ -126,7 +126,7 @@ describe("signal.peek()", () => {
 
       // Use peek() in a tracking context - should NOT trigger recomputation
       const onSignalAccess = vi.fn();
-      withRenderHooks({ onSignalAccess, onLoadableAccess: () => {} }, () => {
+      withHooks({ onSignalAccess, onTaskAccess: () => {} }, () => {
         // Reading userProfile via peek() - no tracking
         const profile = userProfile.peek();
         expect(profile.address.city).toBe("NYC");
@@ -146,7 +146,7 @@ describe("signal.peek()", () => {
 
       const onSignalAccess = vi.fn();
 
-      withRenderHooks({ onSignalAccess, onLoadableAccess: () => {} }, () => {
+      withHooks({ onSignalAccess, onTaskAccess: () => {} }, () => {
         // peek() on derived signal - NO tracking
         const address = userAddress.peek();
         expect(address.city).toBe("NYC");
@@ -162,10 +162,10 @@ describe("signal.peek()", () => {
 
       const trackedSignals: any[] = [];
 
-      withRenderHooks(
+      withHooks(
         {
           onSignalAccess: (sig) => trackedSignals.push(sig),
-          onLoadableAccess: () => {},
+          onTaskAccess: () => {},
         },
         () => {
           // Using () - creates tracking
@@ -179,10 +179,10 @@ describe("signal.peek()", () => {
       // Reset
       trackedSignals.length = 0;
 
-      withRenderHooks(
+      withHooks(
         {
           onSignalAccess: (sig) => trackedSignals.push(sig),
-          onLoadableAccess: () => {},
+          onTaskAccess: () => {},
         },
         () => {
           // Using peek() - NO tracking
@@ -218,10 +218,10 @@ describe("signal.peek()", () => {
       // Simulate a tracking context (like rx() in React)
       const runWithTracking = (fn: () => void) => {
         trackingContextRuns++;
-        withRenderHooks(
+        withHooks(
           {
             onSignalAccess: (sig) => trackedSignals.push(sig),
-            onLoadableAccess: () => {},
+            onTaskAccess: () => {},
           },
           fn
         );
@@ -289,7 +289,7 @@ describe("signal.peek()", () => {
       });
       const onSignalAccess = vi.fn();
 
-      withRenderHooks({ onSignalAccess, onLoadableAccess: () => {} }, () => {
+      withHooks({ onSignalAccess, onTaskAccess: () => {} }, () => {
         try {
           errorSignal.peek();
         } catch {
