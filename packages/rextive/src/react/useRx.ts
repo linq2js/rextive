@@ -151,9 +151,7 @@ export function useRx<T>(fn: () => T): T {
     // or when the effect re-runs (on each render)
     return () => {
       onCleanup.emitAndClear();
-      factory.scheduleDispose(() => {
-        // No additional cleanup needed - subscriptions already cleared above
-      });
+      factory.scheduleDispose();
     };
   });
 

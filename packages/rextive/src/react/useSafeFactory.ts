@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { dev } from "../utils/dev";
+import { disposable, tryDispose } from "../disposable";
 
 export interface SafeFactoryController<T> {
   /** The created object */
   result: T;
+  dispose(): void;
   /** Mark as committed - prevents auto-disposal */
   commit(): void;
   /**
@@ -11,7 +13,7 @@ export interface SafeFactoryController<T> {
    * - Dev mode: defers via microtask (handles StrictMode remount)
    * - Production: executes immediately
    */
-  scheduleDispose(callback: () => void): void;
+  scheduleDispose(): void;
 }
 
 /**
@@ -38,7 +40,11 @@ export function useSafeFactory<T>(
   return useMemo(() => {
     let committed = false;
     let disposed = false;
-    const result = factory();
+    let result = factory();
+    if (typeof result === "object" && result && !("dispose" in result)) {
+      // keep it as it is
+      result = disposable(result as any) as T;
+    }
 
     // Auto-dispose orphaned objects (dev mode only)
     // In StrictMode, useMemo runs twice - the second object gets committed,
@@ -52,12 +58,17 @@ export function useSafeFactory<T>(
       });
     }
 
+    const dispose = () => {
+      tryDispose(result);
+    };
+
     return {
       result,
+      dispose,
       commit() {
         committed = true;
       },
-      scheduleDispose(callback: () => void) {
+      scheduleDispose() {
         if (disposed) return;
 
         // Reset committed state for StrictMode remount detection
@@ -66,7 +77,7 @@ export function useSafeFactory<T>(
         const doDispose = () => {
           if (!committed && !disposed) {
             disposed = true;
-            callback();
+            dispose();
           }
         };
 

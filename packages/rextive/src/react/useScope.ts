@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { ExDisposable } from "../types";
-import { tryDispose, disposable } from "../disposable";
+import { tryDispose } from "../disposable";
 
 import {
   useLifecycle,
@@ -212,19 +212,16 @@ export function useScope<TScope extends Record<string, any>>(
   // Use useSafeFactory for StrictMode-safe scope creation
   const controller = useSafeFactory(
     () => {
-      let scope = isArgsMode ? create(...(args || [])) : create();
-      // Auto-wrap with disposable() if scope doesn't have dispose prop
-      if (!("dispose" in scope)) {
-        scope = disposable(scope) as TScope;
-      }
+      const scope = isArgsMode ? create(...(args || [])) : create();
+
       init?.(scope);
       return scope as ExDisposable & TScope;
     },
-    (scope) => {
+    () => {
       // Only called for orphaned scopes (StrictMode double-invoke)
       // Forget signals from DevTools completely
       emit.forgetDisposedSignals(() => {
-        tryDispose(scope);
+        controller.dispose();
       });
     },
     watchDeps
@@ -246,9 +243,7 @@ export function useScope<TScope extends Record<string, any>>(
       // Call user's dispose callback
       optionsRef.current?.dispose?.(scope);
       // Schedule scope disposal (normal disposal - keeps signals in DevTools as "disposed")
-      controller.scheduleDispose(() => {
-        tryDispose(scope);
-      });
+      controller.scheduleDispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [controller]);
