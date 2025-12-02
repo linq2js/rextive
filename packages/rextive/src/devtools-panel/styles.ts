@@ -141,7 +141,7 @@ export const headerRightStyles: React.CSSProperties = {
 
 export const tabsContainerStyles: React.CSSProperties = {
   display: "flex",
-  gap: "2px",
+  gap: "0px",
   padding: "6px 8px",
   backgroundColor: colors.bgLight,
   borderBottom: `1px solid ${colors.border}`,
@@ -151,7 +151,7 @@ export const tabsContainerStyles: React.CSSProperties = {
 };
 
 export const tabStyles = (active: boolean): React.CSSProperties => ({
-  padding: "5px 10px",
+  padding: "4px 8px",
   backgroundColor: active ? colors.bgHover : "transparent",
   color: active ? colors.text : colors.textMuted,
   border: "none",
