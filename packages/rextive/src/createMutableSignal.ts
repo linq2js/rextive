@@ -289,6 +289,11 @@ export function createMutableSignal(
       throw new Error("Cannot recompute disposed signal");
     }
 
+    // Increment recomputation count (unless it's the initial computation)
+    if (when !== "compute:initial") {
+      recomputationCount++;
+    }
+
     // Clean up previous computation
     onCleanup.emitAndClear();
     context?.dispose();
