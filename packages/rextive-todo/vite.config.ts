@@ -14,8 +14,18 @@ export default defineConfig({
     alias: [
       // Ensure workspace package subpath exports resolve correctly
       {
+        find: "rextive/devtools-panel",
+        replacement: resolve(
+          __dirname,
+          "../rextive/dist/devtools-panel/index.js"
+        ),
+      },
+      {
         find: "rextive/devtools/panel",
-        replacement: resolve(__dirname, "../rextive/dist/devtools/panel/index.js"),
+        replacement: resolve(
+          __dirname,
+          "../rextive/dist/devtools/panel/index.js"
+        ),
       },
       {
         find: "rextive/devtools",
@@ -24,7 +34,6 @@ export default defineConfig({
     ],
   },
   optimizeDeps: {
-    include: ["rextive/devtools", "rextive/devtools/panel"],
+    include: ["rextive/devtools", "rextive/devtools-panel"],
   },
 });
-

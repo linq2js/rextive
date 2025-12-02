@@ -31,7 +31,14 @@ export default defineConfig({
         "cache/index": resolve(__dirname, "src/cache/index.ts"),
         "plugins/index": resolve(__dirname, "src/plugins/index.ts"),
         "devtools/index": resolve(__dirname, "src/devtools/index.ts"),
-        "devtools/panel/index": resolve(__dirname, "src/devtools/panel/index.ts"),
+        "devtools-panel/index": resolve(
+          __dirname,
+          "src/devtools-panel/index.ts"
+        ),
+        "devtools/panel/index": resolve(
+          __dirname,
+          "src/devtools/panel/index.ts"
+        ),
         "operators/index": resolve(__dirname, "src/operators/index.ts"),
         op: resolve(__dirname, "src/op.ts"),
       },

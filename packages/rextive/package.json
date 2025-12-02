@@ -35,6 +35,10 @@
       "types": "./dist/devtools/index.d.ts",
       "default": "./dist/devtools/index.js"
     },
+    "./devtools-panel": {
+      "types": "./dist/devtools-panel/index.d.ts",
+      "default": "./dist/devtools-panel/index.js"
+    },
     "./devtools/panel": {
       "types": "./dist/devtools/panel/index.d.ts",
       "default": "./dist/devtools/panel/index.js"

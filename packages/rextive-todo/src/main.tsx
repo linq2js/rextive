@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { enableDevTools } from "rextive/devtools";
-import { DevToolsPanel } from "rextive/devtools/panel";
+import { DevToolsPanel } from "rextive/devtools-panel";
 
 // Enable devtools BEFORE any signals are created (must be before App import!)
 enableDevTools({ name: "rextive-todo", logToConsole: false });

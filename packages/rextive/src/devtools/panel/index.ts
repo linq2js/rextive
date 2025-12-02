@@ -1,29 +1,18 @@
 /**
  * Rextive DevTools Panel
  *
- * An overlay panel for inspecting signals and tags during development.
+ * @deprecated Use `rextive/devtools-panel` instead.
  *
  * @example
  * ```tsx
+ * // Preferred import:
+ * import { DevToolsPanel } from 'rextive/devtools-panel';
+ *
+ * // Legacy import (still works):
  * import { DevToolsPanel } from 'rextive/devtools/panel';
- * import { enableDevTools } from 'rextive/devtools';
- *
- * // Enable devtools first
- * enableDevTools();
- *
- * function App() {
- *   return (
- *     <>
- *       <YourApp />
- *       {import.meta.env.DEV && <DevToolsPanel />}
- *     </>
- *   );
- * }
  * ```
  *
  * @module devtools/panel
  */
 
-
 export { DevToolsPanel } from "./DevToolsPanel";
-
