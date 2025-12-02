@@ -1355,6 +1355,14 @@ export interface SignalContext {
   abortSignal: AbortSignal;
 
   /**
+   * The nth recomputation (0-indexed).
+   * - First computation: 0
+   * - After each recomputation: 1, 2, 3, ...
+   * - After reset: resets to 0
+   */
+  nth: number;
+
+  /**
    * Register a cleanup function that runs when:
    * - Signal recomputes (cleanup previous side effects)
    * - Signal is disposed

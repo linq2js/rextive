@@ -39,7 +39,8 @@ export function createComputedSignal(
     onCleanup: Emitter,
     onDepChange: VoidFunction,
     onRefresh?: () => void,
-    onStale?: () => void
+    onStale?: () => void,
+    nth?: number
   ) => any,
   _signal: any // Pass signal function to avoid circular dependency (unused here)
 ): Computed<any> {
@@ -118,6 +119,7 @@ export function createComputedSignal(
   let isPaused = false;
   let hasComputed = false; // Track if signal has been computed (for hydrate)
   let refreshScheduled = false; // Track if refresh is scheduled (for batching)
+  let recomputationCount = 0; // Track number of recomputations (0 = first computation)
   const onDispose = emitter<void>();
 
   /**
@@ -164,6 +166,11 @@ export function createComputedSignal(
       throw new Error("Cannot recompute disposed signal");
     }
 
+    // Increment recomputation count (unless it's the initial computation)
+    if (hasComputed) {
+      recomputationCount++;
+    }
+
     onCleanup.emitAndClear();
     context?.dispose();
 
@@ -182,7 +189,8 @@ export function createComputedSignal(
       },
       () => {
         current = undefined;
-      } // onStale
+      }, // onStale
+      recomputationCount // Pass nth recomputation to context
     );
 
     try {
@@ -267,6 +275,7 @@ export function createComputedSignal(
     () => {
       current = undefined;
       hasComputed = false;
+      recomputationCount = 0; // Reset recomputation count
       recompute("compute:initial");
 
       // Always notify on reset (value changed, error state changed, or recomputed)

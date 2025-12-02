@@ -1,64 +1,100 @@
 import { isPromiseLike } from "./isPromiseLike";
 import {
   TASK_TYPE,
-  type TaskStatus,
   type LoadingTask,
   type SuccessTask,
   type ErrorTask,
   type Task,
   Signal,
+  SignalContext,
 } from "../types";
 import { getRenderHooks } from "../hooks";
-import { is } from "../is";
-
-// Re-export types
-export { TASK_TYPE };
-export type { TaskStatus, LoadingTask, SuccessTask, ErrorTask, Task };
+import { is as signalIs } from "../is";
 
 /**
- * Normalizes an arbitrary value into a Task.
+ * Creates a selector function that transforms a Promise into a Task with overridden `value`.
  *
- * - If the value is already a Task, returns it as-is.
- * - If the value is a PromiseLike, wraps or reuses a cached Task.
- * - Otherwise, wraps the value in a "success" Task.
+ * Overrides the Task's `value` property to ensure it's always defined (never undefined),
+ * implementing a stale-while-revalidate pattern:
+ * - **First load** (`context.nth === 0`): Uses `initial` value while loading
+ * - **Loading after success**: Shows previous successful value (stale data)
+ * - **Success**: Shows current value (fresh data)
+ *
+ * This prevents UI flickering by always having a value to display, even during
+ * loading states or when refreshing data. The `value` property is guaranteed to be
+ * defined, unlike the standard Task where `value` is `undefined` in loading/error states.
  *
  * @template TValue - The type of the value
- * @param value - The value to convert to a Task
- * @returns A Task wrapping the value
+ * @param initial - Initial value to use on first load
+ * @returns A selector function that can be used with `signal.to()`
  *
- * @example
+ * @example Basic usage
  * ```typescript
- * // Convert promise to task
- * const userTask = task.from(fetchUser(1));
+ * const remoteData = signal(() => fetch("/api/user"));
+ * const taskSignal = remoteData.to(task({ name: "Guest" }));
  *
- * // Convert plain value to task
- * const dataTask = task.from({ id: 1, name: "Alice" });
+ * // In UI - value is always defined
+ * const t = taskSignal();
+ * return <div>{t.value.name}</div>; // Never undefined!
+ * ```
  *
- * // Already a task? Returns as-is
- * const t = task.success(42);
- * const same = task.from(t); // same === t
+ * @example Stale-while-revalidate pattern
+ * ```typescript
+ * const userData = signal(() => fetchUser(1));
+ * const userTask = userData.to(task({ id: 0, name: "Loading..." }));
+ *
+ * // First load: t.value = { id: 0, name: "Loading..." } (initial)
+ * // After success: t.value = { id: 1, name: "Alice" } (fresh)
+ * // On refresh: t.value = { id: 1, name: "Alice" } (stale, while loading new data)
  * ```
  */
 export function task<TValue>(
-  value: TValue
-): TValue extends Signal<infer T>
-  ? Task<Awaited<T>>
-  : TValue extends Task<any>
-  ? TValue
-  : TValue extends PromiseLike<infer T>
-  ? Task<T>
-  : Task<TValue> {
-  if (is(value)) {
-    if (value.error()) {
-      return task.error(value.error()) as any;
+  initial: TValue
+): (
+  source: PromiseLike<TValue>,
+  context: SignalContext
+) => Task<TValue> & { value: TValue };
+export function task<TValue>(initial: TValue): any {
+  // Store previous successful value for stale-while-revalidate pattern
+  let prev: { value: TValue } | undefined;
+
+  return (source: PromiseLike<TValue>, context: SignalContext) => {
+    // Reset previous value on first computation (when signal is first created)
+    // This ensures we start fresh with the initial value
+    if (context.nth === 0) {
+      prev = undefined;
     }
-    value = (value as Signal<any>)();
-  }
-  const t = toTaskImpl(value) as any;
 
-  getRenderHooks().onTaskAccess(t);
+    // Get or create task from promise (uses promise cache internally)
+    const t = task.from(source);
 
-  return t;
+    if (t.loading) {
+      // Promise is still loading - set up handler to cache value when it resolves
+      // Use context.safe() to prevent race conditions:
+      // - If computation is aborted, the promise handler won't execute
+      // - Prevents updating stale state after a new computation has started
+      context.safe(t.promise).then((value) => {
+        prev = { value };
+      });
+    } else if (t.status === "success") {
+      // Promise already resolved - cache the value immediately
+      prev = { value: t.value };
+    }
+    // Note: Error state is not handled - error tasks are returned as-is without overridden value
+    if (t.status === "error") {
+      return t; // Return error task as-is (value remains undefined as per standard Task)
+    }
+
+    // Override the task's value property to ensure it's always defined
+    // This overrides the standard Task behavior where value is undefined in loading state
+    // value is always defined:
+    // - If we have a previous value: use it (stale-while-revalidate)
+    // - Otherwise: use initial value (first load)
+    return {
+      ...t,
+      value: prev ? prev.value : initial, // Override: always defined, never undefined
+    };
+  };
 }
 
 // Namespace with factory and helper methods
@@ -256,7 +292,17 @@ export namespace task {
     : TValue extends PromiseLike<infer T>
     ? Task<T>
     : Task<TValue> {
-    return task(value) as any;
+    if (signalIs(value)) {
+      if (value.error()) {
+        return task.error(value.error()) as any;
+      }
+      value = (value as Signal<any>)();
+    }
+    const t = toTaskImpl(value) as any;
+
+    getRenderHooks().onTaskAccess(t);
+
+    return t;
   }
 }
 

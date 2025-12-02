@@ -4,7 +4,7 @@
   "description": "Todo app with offline-first sync using rextive and miragejs",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "rm -rf .vite node_modules/.vite && vite",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

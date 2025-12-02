@@ -47,10 +47,10 @@ const persist = persistor<PersistedData>({
 // ==================== SIGNALS ====================
 
 // Test signals without names (auto-generated) - for testing DevTools "Show all" toggle
-// These will appear as #mutable-X in devtools
-const _tempSignal1 = signal(0, { use: [numberTag] }); // #mutable-X
-const _tempSignal2 = signal("test", { use: [stringTag] }); // #mutable-X
-const _tempComputed = signal(
+// These will appear as #mutable-X in devtools (exported to avoid TS6133)
+export const _tempSignal1 = signal(0, { use: [numberTag] }); // #mutable-X
+export const _tempSignal2 = signal("test", { use: [stringTag] }); // #mutable-X
+export const _tempComputed = signal(
   { _tempSignal1 },
   ({ deps }) => deps._tempSignal1 * 2
 ); // #computed-X

@@ -24,5 +24,6 @@
  * @module devtools/panel
  */
 
+
 export { DevToolsPanel } from "./DevToolsPanel";
 

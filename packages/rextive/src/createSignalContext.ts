@@ -39,7 +39,8 @@ export function createSignalContext(
   onCleanup: Emitter,
   onDepChange: VoidFunction,
   onRefresh?: () => void,
-  onStale?: () => void
+  onStale?: () => void,
+  nth: number = 0
 ): InternalComputedSignalContext {
   let abortController: AbortController | undefined;
   let trackedDeps: Set<Signal<any>> | undefined;
@@ -223,6 +224,7 @@ export function createSignalContext(
     get abortSignal() {
       return getAbortController().signal;
     },
+    nth,
     onCleanup: onCleanup.on,
     use: use as any,
     safe: safe as any,

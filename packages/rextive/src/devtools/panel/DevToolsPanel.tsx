@@ -416,13 +416,16 @@ export function DevToolsPanel(): React.ReactElement | null {
     return () => clearInterval(interval);
   }, []);
 
-  // Refresh data periodically when expanded
+  // Refresh data periodically when enabled
   useEffect(() => {
     if (!enabled) return;
 
     const refresh = () => {
-      setSignals(new Map(getSignals()));
-      setTags(new Map(getTags()));
+      const existingSignals = getSignals();
+      const existingTags = getTags();
+
+      setSignals(new Map(existingSignals));
+      setTags(new Map(existingTags));
       setStats(getStats());
     };
 
@@ -431,19 +434,30 @@ export function DevToolsPanel(): React.ReactElement | null {
     return () => clearInterval(interval);
   }, [enabled]);
 
-  // Subscribe to events
+  // Subscribe to events (cached events will be automatically replayed)
   useEffect(() => {
     if (!enabled) return;
 
     const unsubscribe = onDevToolsEvent((event) => {
-      // Handle signals:forget - remove all events related to forgotten signals
+      // After initial subscription, process events normally
+      // Handle signals:forget - remove events related to forgotten signals
+      // BUT preserve create events as they are historical records
       if (event.type === "signals:forget") {
         const forgottenIds = new Set(event.signalIds);
         setEvents((prev) =>
           prev.filter((e) => {
-            // Filter out events related to forgotten signals
-            if ("signalId" in e && forgottenIds.has(e.signalId)) return false;
-            if ("signal" in e && forgottenIds.has(e.signal.id)) return false;
+            // Don't remove create events - they are historical records
+            // even if the signal was later forgotten (e.g., React StrictMode)
+            if (e.type === "signal:create" || e.type === "tag:create") {
+              return true;
+            }
+            // Filter out other events related to forgotten signals
+            if (
+              "signalId" in e &&
+              typeof e.signalId === "string" &&
+              forgottenIds.has(e.signalId)
+            )
+              return false;
             return true;
           })
         );
@@ -483,7 +497,15 @@ export function DevToolsPanel(): React.ReactElement | null {
         timestamp: Date.now(),
         isError,
       };
-      setEvents((prev) => [entry, ...prev].slice(0, 100));
+
+      // Use functional update to ensure we're working with latest state
+      // This is especially important when replaying cached events
+      setEvents((prev) => {
+        // Check if this event would be immediately removed by a pending forget
+        // (This shouldn't happen, but helps with race conditions during replay)
+        const newEvents = [entry, ...prev];
+        return newEvents.slice(0, 100);
+      });
 
       const flashSignal = (signalId: string, type: "change" | "create") => {
         const existingTimeout = flashTimeoutsRef.current.get(signalId);

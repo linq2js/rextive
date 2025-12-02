@@ -81,7 +81,8 @@ export function createMutableSignal(
     onCleanup: Emitter,
     onDepChange: VoidFunction,
     onRefresh?: () => void,
-    onStale?: () => void
+    onStale?: () => void,
+    nth?: number
   ) => any
 ): Mutable<any> {
   // ============================================================================
@@ -176,6 +177,7 @@ export function createMutableSignal(
 
   /** Disposal flag - once true, signal cannot be recomputed */
   let disposed = false;
+  let recomputationCount = 0; // Track number of recomputations (0 = first computation)
 
   /** Signal context for lifecycle management */
   let context: ReturnType<typeof createContext> | undefined;
@@ -302,7 +304,8 @@ export function createMutableSignal(
       },
       () => {
         current = undefined; // onStale callback - mark for lazy recompute
-      }
+      },
+      recomputationCount // Pass nth recomputation to context
     );
 
     try {
@@ -414,6 +417,7 @@ export function createMutableSignal(
       const prevValue = current?.value;
       current = initialValue; // Restore initial value wrapper
       hasBeenModified = false; // Clear modified flag (allows hydrate again)
+      recomputationCount = 0; // Reset recomputation count
 
       // Recompute to get new value from factory function
       recompute("compute:initial");

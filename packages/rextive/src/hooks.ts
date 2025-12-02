@@ -96,7 +96,7 @@ export function setDevToolsHooks(hooks: Partial<DevToolsHooks> | null): void {
   
   // Also set in globalThis for cross-module-instance sharing
   if (typeof globalThis !== "undefined") {
-    (globalThis as any).__REXTIVE_DEVTOOLS__ = hooks;
+    (globalThis as any).__REXTIVE_DEVTOOLS__ = hooks ?? undefined;
   }
   
   // Replay queued signal creations from global queue now that hooks are set

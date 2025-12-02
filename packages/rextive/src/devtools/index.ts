@@ -55,49 +55,83 @@ export type {
 };
 
 // ============================================================================
-// STATE
+// STATE (shared via globalThis for cross-module compatibility)
 // ============================================================================
 
-/** Registry of all tracked signals (keyed by unique ID, not name) */
-const signals = new Map<string, SignalInfo>();
+/** Maximum number of events to cache (to prevent memory issues) */
+const MAX_EVENT_CACHE = 1000;
 
-/** Reverse lookup: signal reference → unique ID */
-const signalToId = new WeakMap<Signal<any>, string>();
+/** Global key for DevTools shared state */
+const DEVTOOLS_STATE_KEY = "__REXTIVE_DEVTOOLS_STATE__";
 
-/** Counter for generating unique signal IDs */
-let signalIdCounter = 0;
+/** DevTools shared state structure */
+interface DevToolsState {
+  signals: Map<string, SignalInfo>;
+  signalToId: WeakMap<Signal<any>, string>;
+  signalIdCounter: number;
+  tags: Map<string, TagInfo>;
+  listeners: Set<DevToolsEventListener>;
+  eventCache: DevToolsEvent[];
+  config: Required<DevToolsOptions>;
+  enabled: boolean;
+  chainState: ChainTrackingState;
+  windowErrorHandler: ((event: ErrorEvent) => void) | null;
+  windowRejectionHandler: ((event: PromiseRejectionEvent) => void) | null;
+}
 
-/** Registry of all tracked tags */
-const tags = new Map<string, TagInfo>();
+/** Get or create the shared DevTools state */
+function getState(): DevToolsState {
+  const g = globalThis as typeof globalThis & {
+    [DEVTOOLS_STATE_KEY]?: DevToolsState;
+  };
+  if (!g[DEVTOOLS_STATE_KEY]) {
+    console.log("[DevTools:getState] Creating new shared state instance");
+    g[DEVTOOLS_STATE_KEY] = {
+      signals: new Map(),
+      signalToId: new WeakMap(),
+      signalIdCounter: 0,
+      tags: new Map(),
+      listeners: new Set(),
+      eventCache: [],
+      config: {
+        maxHistory: 50,
+        name: "rextive",
+        logToConsole: false,
+      },
+      enabled: false,
+      chainState: {
+        enabled: false,
+        currentChain: null,
+        currentChainStartTime: null,
+        chainTimeout: null,
+        chains: new Map(),
+        minChainLength: 2,
+      },
+      windowErrorHandler: null,
+      windowRejectionHandler: null,
+    };
+  }
+  return g[DEVTOOLS_STATE_KEY];
+}
 
-/** Event listeners */
-const listeners = new Set<DevToolsEventListener>();
-
-/** Current configuration */
-let config: Required<DevToolsOptions> = {
-  maxHistory: 50,
-  name: "rextive",
-  logToConsole: false,
-};
-
-/** Whether devtools is enabled */
-let enabled = false;
-
-/** Chain tracking state */
-const chainState: ChainTrackingState = {
-  enabled: false,
-  currentChain: null,
-  currentChainStartTime: null,
-  chainTimeout: null,
-  chains: new Map(),
-  minChainLength: 2,
-};
+// Internal accessor functions (prefixed with $ to avoid conflicts with public API)
+const $signals = () => getState().signals;
+const $signalToId = () => getState().signalToId;
+const $tags = () => getState().tags;
+const $listeners = () => getState().listeners;
+const $eventCache = () => getState().eventCache;
+const $config = () => getState().config;
+const $chainState = () => getState().chainState;
 
 // ============================================================================
 // INTERNAL HELPERS
 // ============================================================================
 
 function emit(event: DevToolsEvent): void {
+  const config = $config();
+  const listeners = $listeners();
+  const eventCache = $eventCache();
+
   if (config.logToConsole) {
     // Filter out noisy events that aren't useful for console logging
     // (they're still emitted to listeners, just not logged to console)
@@ -106,11 +140,22 @@ function emit(event: DevToolsEvent): void {
       console.log(`[${config.name}]`, event.type, event);
     }
   }
-  for (const listener of listeners) {
-    try {
-      listener(event);
-    } catch (error) {
-      console.error("[rextive/devtools] Error in event listener:", error);
+
+  // If there are listeners, emit immediately
+  if ($listeners().size > 0) {
+    for (const listener of listeners) {
+      try {
+        listener(event);
+      } catch (error) {
+        console.error("[rextive/devtools] Error in event listener:", error);
+      }
+    }
+  } else {
+    // No listeners yet - cache the event for later replay
+    eventCache.push(event);
+    // Limit cache size to prevent memory issues
+    if ($eventCache().length > MAX_EVENT_CACHE) {
+      eventCache.shift(); // Remove oldest event
     }
   }
 }
@@ -120,10 +165,7 @@ function getSignalKind(signal: Signal<any>): "mutable" | "computed" {
   return "set" in signal ? "mutable" : "computed";
 }
 
-// Window error listeners
-let windowErrorHandler: ((event: ErrorEvent) => void) | null = null;
-let windowRejectionHandler: ((event: PromiseRejectionEvent) => void) | null =
-  null;
+// Window error listeners are now stored in getState()
 
 /**
  * Set up window error and unhandled rejection listeners
@@ -134,8 +176,10 @@ function setupWindowErrorListeners(): void {
   // Remove existing listeners if any
   removeWindowErrorListeners();
 
+  const state = getState();
+
   // Window error handler
-  windowErrorHandler = (event: ErrorEvent) => {
+  state.windowErrorHandler = (event: ErrorEvent) => {
     emit({
       type: "window:error",
       message: event.message,
@@ -148,7 +192,7 @@ function setupWindowErrorListeners(): void {
   };
 
   // Unhandled promise rejection handler
-  windowRejectionHandler = (event: PromiseRejectionEvent) => {
+  state.windowRejectionHandler = (event: PromiseRejectionEvent) => {
     emit({
       type: "window:unhandledrejection",
       reason: event.reason,
@@ -157,8 +201,8 @@ function setupWindowErrorListeners(): void {
     });
   };
 
-  window.addEventListener("error", windowErrorHandler);
-  window.addEventListener("unhandledrejection", windowRejectionHandler);
+  window.addEventListener("error", state.windowErrorHandler);
+  window.addEventListener("unhandledrejection", state.windowRejectionHandler);
 }
 
 /**
@@ -167,14 +211,19 @@ function setupWindowErrorListeners(): void {
 function removeWindowErrorListeners(): void {
   if (typeof window === "undefined") return;
 
-  if (windowErrorHandler) {
-    window.removeEventListener("error", windowErrorHandler);
-    windowErrorHandler = null;
+  const state = getState();
+
+  if (state.windowErrorHandler) {
+    window.removeEventListener("error", state.windowErrorHandler);
+    state.windowErrorHandler = null;
   }
 
-  if (windowRejectionHandler) {
-    window.removeEventListener("unhandledrejection", windowRejectionHandler);
-    windowRejectionHandler = null;
+  if (state.windowRejectionHandler) {
+    window.removeEventListener(
+      "unhandledrejection",
+      state.windowRejectionHandler
+    );
+    state.windowRejectionHandler = null;
   }
 }
 
@@ -286,6 +335,8 @@ function hashChainPath(path: string[]): string {
  * Finalize the current chain if it meets minimum length.
  */
 function finalizeCurrentChain(): void {
+  const chainState = $chainState();
+
   if (!chainState.currentChain || !chainState.currentChainStartTime) {
     chainState.currentChain = null;
     chainState.currentChainStartTime = null;
@@ -305,7 +356,7 @@ function finalizeCurrentChain(): void {
       // Determine which signals are async (computed signals)
       const asyncSignals = new Set<string>();
       for (const signalId of path) {
-        const info = signals.get(signalId);
+        const info = $signals().get(signalId);
         if (info && info.kind === "computed") {
           // Check if signal has async value (promise)
           try {
@@ -354,6 +405,8 @@ function finalizeCurrentChain(): void {
  * Add a signal to the current chain.
  */
 function addToChain(signalId: string): void {
+  const chainState = $chainState();
+
   if (!chainState.enabled) return;
 
   const now = Date.now();
@@ -389,14 +442,14 @@ function addToChain(signalId: string): void {
 
 const devToolsHooks: DevTools = {
   onSignalCreate(signal: Signal<any>): void {
-    if (config.logToConsole) {
+    if ($config().logToConsole) {
       console.log(
-        `[${config.name}] onSignalCreate called for:`,
+        `[${$config().name}] onSignalCreate called for:`,
         signal.displayName || "unnamed"
       );
     }
     // Generate unique ID for this signal object
-    const id = `signal-${++signalIdCounter}`;
+    const id = `signal-${++getState().signalIdCounter}`;
     const name = signal.displayName || "unnamed";
     const now = Date.now();
 
@@ -404,7 +457,7 @@ const devToolsHooks: DevTools = {
     // (onTagAdd may have been called before onSignalCreate during initialization)
     // Update tag's signals set to use unique ID instead of name
     const signalTags = new Set<string>();
-    for (const [tagId, tagInfo] of tags) {
+    for (const [tagId, tagInfo] of $tags()) {
       if (tagInfo.signals.has(name)) {
         // Replace name with unique ID in tag's signals set
         tagInfo.signals.delete(name);
@@ -429,25 +482,33 @@ const devToolsHooks: DevTools = {
       source: captureSourceLocation(),
     };
 
-    signals.set(id, info);
-    signalToId.set(signal, id); // Track signal → unique ID mapping
-    emit({ type: "signal:create", signal: info });
+    $signals().set(id, info);
+    $signalToId().set(signal, id); // Track signal → unique ID mapping
+    const createEvent = { type: "signal:create" as const, signal: info };
+    if ($config().logToConsole) {
+      console.log(
+        `[${$config().name}] Emitting signal:create for ${id}, listeners: ${
+          $listeners().size
+        }, cache: ${$eventCache().length}`
+      );
+    }
+    emit(createEvent);
   },
 
   onSignalDispose(signal: Signal<any>): void {
     // Use reverse lookup to find current ID (handles renamed signals)
-    const id = signalToId.get(signal) || signal.displayName || "unnamed";
+    const id = $signalToId().get(signal) || signal.displayName || "unnamed";
     const now = Date.now();
 
     // Mark as disposed instead of deleting (keeps history visible)
-    const info = signals.get(id);
+    const info = $signals().get(id);
     if (info) {
       info.disposed = true;
       info.disposedAt = now;
 
       // Remove from all tags
       for (const tagId of info.tags) {
-        const tagInfo = tags.get(tagId);
+        const tagInfo = $tags().get(tagId);
         if (tagInfo) {
           tagInfo.signals.delete(id);
         }
@@ -463,10 +524,10 @@ const devToolsHooks: DevTools = {
     const forgottenIds: string[] = [];
 
     for (const signal of signalsToForget) {
-      const id = signalToId.get(signal);
+      const id = $signalToId().get(signal);
       if (id) {
-        signals.delete(id);
-        signalToId.delete(signal);
+        $signals().delete(id);
+        $signalToId().delete(signal);
         forgottenIds.push(id);
       }
     }
@@ -479,10 +540,10 @@ const devToolsHooks: DevTools = {
 
   onSignalRename(signal: Signal<any>): void {
     // Look up by signal reference (ID is unique per object, never changes)
-    const id = signalToId.get(signal);
+    const id = $signalToId().get(signal);
     if (!id) return;
 
-    const info = signals.get(id);
+    const info = $signals().get(id);
     if (!info) return;
 
     const newName = signal.displayName || "unnamed";
@@ -499,8 +560,8 @@ const devToolsHooks: DevTools = {
 
   onSignalChange(signal: Signal<any>, value: unknown): void {
     // Use reverse lookup to find current ID (handles renamed signals)
-    const id = signalToId.get(signal) || signal.displayName || "unnamed";
-    const info = signals.get(id);
+    const id = $signalToId().get(signal) || signal.displayName || "unnamed";
+    const info = $signals().get(id);
     const now = Date.now();
 
     if (info) {
@@ -511,7 +572,7 @@ const devToolsHooks: DevTools = {
       info.history.unshift({ value, timestamp: now });
 
       // Trim history to max size
-      if (info.history.length > config.maxHistory) {
+      if (info.history.length > $config().maxHistory) {
         info.history.pop();
       }
     }
@@ -524,8 +585,8 @@ const devToolsHooks: DevTools = {
 
   onSignalError(signal: Signal<any>, error: unknown): void {
     // Use reverse lookup to find current ID (handles renamed signals)
-    const id = signalToId.get(signal) || signal.displayName || "unnamed";
-    const info = signals.get(id);
+    const id = $signalToId().get(signal) || signal.displayName || "unnamed";
+    const info = $signals().get(id);
     const now = Date.now();
 
     // Extract trace info if available (from errorTracking)
@@ -546,7 +607,7 @@ const devToolsHooks: DevTools = {
       info.errors.unshift(signalError);
 
       // Trim errors to max size (same as history)
-      if (info.errors.length > config.maxHistory) {
+      if (info.errors.length > $config().maxHistory) {
         info.errors.pop();
       }
     }
@@ -554,14 +615,14 @@ const devToolsHooks: DevTools = {
     emit({ type: "signal:error", signalId: id, error: signalError });
 
     // Always log errors to console for visibility
-    if (config.logToConsole) {
+    if ($config().logToConsole) {
       const contextInfo = signalError.context
         ? ` (${signalError.context.when}${
             signalError.context.async ? ", async" : ""
           })`
         : "";
       console.error(
-        `[${config.name}] Signal error in "${id}"${contextInfo}:`,
+        `[${$config().name}] Signal error in "${id}"${contextInfo}:`,
         error
       );
     }
@@ -578,16 +639,17 @@ const devToolsHooks: DevTools = {
       signals: new Set(),
     };
 
-    tags.set(id, info);
+    $tags().set(id, info);
     emit({ type: "tag:create", tag: info });
   },
 
   onTagAdd(tag: Tag<any>, signal: Signal<any>): void {
     const tagId = tag.displayName;
     // Use unique ID from WeakMap, fall back to display name if signal not yet tracked
-    const signalId = signalToId.get(signal) || signal.displayName || "unnamed";
+    const signalId =
+      $signalToId().get(signal) || signal.displayName || "unnamed";
 
-    const tagInfo = tags.get(tagId);
+    const tagInfo = $tags().get(tagId);
     if (tagInfo) {
       tagInfo.signals.add(signalId);
     }
@@ -595,7 +657,7 @@ const devToolsHooks: DevTools = {
     // Note: signalInfo might not exist yet if onTagAdd is called before onSignalCreate
     // (which happens during signal initialization). We'll update the signal's tags
     // in onSignalCreate if it has tags already registered.
-    const signalInfo = signals.get(signalId);
+    const signalInfo = $signals().get(signalId);
     if (signalInfo) {
       signalInfo.tags.add(tagId);
     }
@@ -606,10 +668,11 @@ const devToolsHooks: DevTools = {
   onTagRemove(tag: Tag<any>, signal: Signal<any>): void {
     const tagId = tag.displayName;
     // Use unique ID from WeakMap
-    const signalId = signalToId.get(signal) || signal.displayName || "unnamed";
+    const signalId =
+      $signalToId().get(signal) || signal.displayName || "unnamed";
 
-    const tagInfo = tags.get(tagId);
-    const signalInfo = signals.get(signalId);
+    const tagInfo = $tags().get(tagId);
+    const signalInfo = $signals().get(signalId);
 
     if (tagInfo) {
       tagInfo.signals.delete(signalId);
@@ -647,12 +710,13 @@ const devToolsHooks: DevTools = {
  * ```
  */
 export function enableDevTools(options: DevToolsOptions = {}): void {
-  if (enabled) {
+  if (getState().enabled) {
     console.warn("[rextive/devtools] DevTools already enabled");
     return;
   }
 
-  config = {
+  const state = getState();
+  state.config = {
     maxHistory: options.maxHistory ?? 50,
     name: options.name ?? "rextive",
     logToConsole: options.logToConsole ?? false,
@@ -661,13 +725,13 @@ export function enableDevTools(options: DevToolsOptions = {}): void {
   // Set hooks via both mechanisms for backwards compatibility
   globalThis.__REXTIVE_DEVTOOLS__ = devToolsHooks;
   setDevToolsHooks(devToolsHooks);
-  enabled = true;
+  getState().enabled = true;
 
   // Set up window error listeners
   setupWindowErrorListeners();
 
-  if (config.logToConsole) {
-    console.log(`[${config.name}] DevTools enabled`);
+  if ($config().logToConsole) {
+    console.log(`[${$config().name}] DevTools enabled`);
   }
 }
 
@@ -675,25 +739,27 @@ export function enableDevTools(options: DevToolsOptions = {}): void {
  * Disable devtools and clear all tracked data.
  */
 export function disableDevTools(): void {
-  if (!enabled) {
+  if (!getState().enabled) {
     return;
   }
 
   // Clear hooks via both mechanisms
-  globalThis.__REXTIVE_DEVTOOLS__ = undefined;
   setDevToolsHooks(null);
-  enabled = false;
+  // Set to undefined after setDevToolsHooks to ensure consistency
+  globalThis.__REXTIVE_DEVTOOLS__ = undefined;
+  getState().enabled = false;
 
   // Remove window error listeners
   removeWindowErrorListeners();
 
   // Clear registries
-  signals.clear();
-  tags.clear();
-  listeners.clear();
+  $signals().clear();
+  $tags().clear();
+  $listeners().clear();
+  $eventCache().length = 0; // Clear event cache
 
-  if (config.logToConsole) {
-    console.log(`[${config.name}] DevTools disabled`);
+  if ($config().logToConsole) {
+    console.log(`[${$config().name}] DevTools disabled`);
   }
 }
 
@@ -701,7 +767,7 @@ export function disableDevTools(): void {
  * Check if devtools is enabled.
  */
 export function isDevToolsEnabled(): boolean {
-  return enabled;
+  return getState().enabled;
 }
 
 /**
@@ -710,7 +776,7 @@ export function isDevToolsEnabled(): boolean {
  * @returns Map of signal ID to SignalInfo
  */
 export function getSignals(): ReadonlyMap<string, SignalInfo> {
-  return signals;
+  return $signals();
 }
 
 /**
@@ -721,10 +787,10 @@ export function getSignals(): ReadonlyMap<string, SignalInfo> {
  */
 export function getSignal(nameOrId: string): SignalInfo | undefined {
   // First try exact ID match
-  const byId = signals.get(nameOrId);
+  const byId = $signals().get(nameOrId);
   if (byId) return byId;
   // Then search by name
-  for (const info of signals.values()) {
+  for (const info of $signals().values()) {
     if (info.name === nameOrId) return info;
   }
   return undefined;
@@ -736,7 +802,7 @@ export function getSignal(nameOrId: string): SignalInfo | undefined {
  * @returns Map of tag ID to TagInfo
  */
 export function getTags(): ReadonlyMap<string, TagInfo> {
-  return tags;
+  return $tags();
 }
 
 /**
@@ -746,7 +812,7 @@ export function getTags(): ReadonlyMap<string, TagInfo> {
  * @returns TagInfo or undefined
  */
 export function getTag(id: string): TagInfo | undefined {
-  return tags.get(id);
+  return $tags().get(id);
 }
 
 /**
@@ -773,9 +839,42 @@ export function getTag(id: string): TagInfo | undefined {
  * ```
  */
 export function onDevToolsEvent(listener: DevToolsEventListener): () => void {
-  listeners.add(listener);
+  $listeners().add(listener);
+
+  // Replay cached events to the new listener
+  // This ensures events emitted before the listener subscribed are still received
+  const cachedEvents = $eventCache();
+  if (cachedEvents.length > 0) {
+    // Debug: log replay (always log, not just when logToConsole is true)
+    console.log(
+      `[${$config().name}] Replaying ${
+        cachedEvents.length
+      } cached events to new listener`
+    );
+    // Log what types of events are being replayed
+    const eventTypes = cachedEvents.map((e) => e.type);
+    const typeCounts = eventTypes.reduce((acc, type) => {
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log(`[${$config().name}] Cached event types:`, typeCounts);
+    // Replay events in order (oldest first)
+    for (const cachedEvent of cachedEvents) {
+      try {
+        listener(cachedEvent);
+      } catch (error) {
+        console.error(
+          "[rextive/devtools] Error replaying cached event:",
+          error
+        );
+      }
+    }
+    // Note: We don't clear the cache here because other listeners might subscribe later
+    // The cache will be cleared when DevTools is disabled
+  }
+
   return () => {
-    listeners.delete(listener);
+    $listeners().delete(listener);
   };
 }
 
@@ -799,7 +898,7 @@ export function getStats(): {
   let signalsWithErrors = 0;
   let disposedCount = 0;
 
-  for (const info of signals.values()) {
+  for (const info of $signals().values()) {
     if (info.disposed) {
       disposedCount++;
       continue; // Don't count disposed signals in active stats
@@ -817,10 +916,10 @@ export function getStats(): {
   }
 
   return {
-    signalCount: signals.size - disposedCount, // Active signals only
+    signalCount: $signals().size - disposedCount, // Active signals only
     mutableCount,
     computedCount,
-    tagCount: tags.size,
+    tagCount: $tags().size,
     totalChanges,
     totalErrors,
     signalsWithErrors,
@@ -836,7 +935,7 @@ export function getStats(): {
 export function getSnapshot(): Record<string, unknown> {
   const snapshot: Record<string, unknown> = {};
 
-  for (const [, info] of signals) {
+  for (const [, info] of $signals()) {
     try {
       snapshot[info.name] = info.signal();
     } catch {
@@ -851,12 +950,12 @@ export function getSnapshot(): Record<string, unknown> {
  * Log current state to console (pretty printed).
  */
 export function logState(): void {
-  console.group(`[${config.name}] DevTools State`);
+  console.group(`[${$config().name}] DevTools State`);
 
   console.log("Stats:", getStats());
 
   console.groupCollapsed("Signals");
-  for (const [id, info] of signals) {
+  for (const [id, info] of $signals()) {
     let currentValue: unknown;
     try {
       currentValue = info.signal();
@@ -873,7 +972,7 @@ export function logState(): void {
   console.groupEnd();
 
   console.groupCollapsed("Tags");
-  for (const [id, info] of tags) {
+  for (const [id, info] of $tags()) {
     console.log(`🏷️ ${id}:`, {
       size: info.signals.size,
       signals: Array.from(info.signals),
@@ -888,7 +987,7 @@ export function logState(): void {
  * Clear history for all signals.
  */
 export function clearHistory(): void {
-  for (const info of signals.values()) {
+  for (const info of $signals().values()) {
     info.history = [];
     info.changeCount = 0;
   }
@@ -899,8 +998,8 @@ export function clearHistory(): void {
  * Devtools remains enabled.
  */
 export function reset(): void {
-  signals.clear();
-  tags.clear();
+  $signals().clear();
+  $tags().clear();
 }
 
 /**
@@ -908,9 +1007,9 @@ export function reset(): void {
  * Useful for cleaning up the devtools UI.
  */
 export function clearDisposed(): void {
-  for (const [id, info] of signals) {
+  for (const [id, info] of $signals()) {
     if (info.disposed) {
-      signals.delete(id);
+      $signals().delete(id);
     }
   }
 }
@@ -923,9 +1022,9 @@ export function clearDisposed(): void {
  * @returns true if signal was deleted, false otherwise
  */
 export function deleteSignal(id: string): boolean {
-  const info = signals.get(id);
+  const info = $signals().get(id);
   if (info && info.disposed) {
-    signals.delete(id);
+    $signals().delete(id);
     return true;
   }
   return false;
@@ -940,7 +1039,7 @@ export function deleteSignal(id: string): boolean {
  * Call this when the Chains tab becomes active.
  */
 export function enableChainTracking(): void {
-  chainState.enabled = true;
+  $chainState().enabled = true;
 }
 
 /**
@@ -948,6 +1047,7 @@ export function enableChainTracking(): void {
  * Call this when the Chains tab becomes inactive.
  */
 export function disableChainTracking(): void {
+  const chainState = $chainState();
   chainState.enabled = false;
   // Clear any pending chain
   if (chainState.chainTimeout) {
@@ -962,7 +1062,7 @@ export function disableChainTracking(): void {
  * Check if chain tracking is enabled.
  */
 export function isChainTrackingEnabled(): boolean {
-  return chainState.enabled;
+  return $chainState().enabled;
 }
 
 /**
@@ -970,14 +1070,14 @@ export function isChainTrackingEnabled(): boolean {
  * @returns Map of chain ID to ChainReaction
  */
 export function getChains(): ReadonlyMap<string, ChainReaction> {
-  return chainState.chains;
+  return $chainState().chains;
 }
 
 /**
  * Get chains as an array sorted by last triggered time (most recent first).
  */
 export function getChainsList(): ChainReaction[] {
-  return Array.from(chainState.chains.values()).sort(
+  return Array.from($chainState().chains.values()).sort(
     (a, b) => b.lastTriggered - a.lastTriggered
   );
 }
@@ -986,7 +1086,7 @@ export function getChainsList(): ChainReaction[] {
  * Clear all tracked chain reactions.
  */
 export function clearChains(): void {
-  chainState.chains.clear();
+  $chainState().chains.clear();
 }
 
 /**
@@ -995,7 +1095,7 @@ export function clearChains(): void {
  * @returns true if chain was deleted
  */
 export function deleteChain(id: string): boolean {
-  return chainState.chains.delete(id);
+  return $chainState().chains.delete(id);
 }
 
 /**
