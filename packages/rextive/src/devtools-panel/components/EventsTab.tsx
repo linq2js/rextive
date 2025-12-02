@@ -1,13 +1,14 @@
 /**
  * Events Tab Component
- * Displays the event log
+ * Displays the event log with virtualization for performance
  */
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import type { SignalInfo } from "@/devtools/types";
 import * as styles from "../styles";
 import { IconCopy, IconChevronRight, IconChevronDown } from "../icons";
 import { formatValue, formatTime } from "../utils/formatUtils";
+import { VirtualizedList } from "./shared";
 
 type EventLogEntry = {
   id: number;
@@ -38,22 +39,13 @@ export function EventsTab({
 }: EventsTabProps): React.ReactElement {
   const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {filteredEvents.length === 0 ? (
-        <div style={styles.emptyStateStyles}>
-          {events.length === 0 ? "No events yet" : "No matching events"}
-        </div>
-      ) : (
-        <div
-          style={{
-            ...styles.eventLogStyles,
-            flex: 1,
-            overflowY: "auto",
-            maxHeight: "none",
-          }}
-        >
-          {filteredEvents.map((event) => {
+  const getEventKey = useCallback(
+    (event: EventLogEntry) => event.id,
+    []
+  );
+
+  const renderEventItem = useCallback(
+    (event: EventLogEntry) => {
             // Get signal name for display (lookup by ID if needed)
             let signalName: string | null = null;
             if ("signal" in event && event.signal) {
@@ -183,7 +175,6 @@ export function EventsTab({
 
             return (
               <div
-                key={event.id}
                 style={{
                   ...styles.eventItemStyles,
                   cursor: valueStr ? "pointer" : "default",
@@ -417,9 +408,29 @@ export function EventsTab({
                 )}
               </div>
             );
-          })}
-        </div>
-      )}
+    },
+    [expandedEvents, signals, onNavigateToSignal, onNavigateToTag]
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <VirtualizedList
+        items={filteredEvents}
+        estimatedItemHeight={56}
+        overscan={5}
+        getItemKey={getEventKey}
+        renderItem={renderEventItem}
+        emptyContent={
+          <div style={styles.emptyStateStyles}>
+            {events.length === 0 ? "No events yet" : "No matching events"}
+          </div>
+        }
+        style={{
+          ...styles.eventLogStyles,
+          flex: 1,
+          maxHeight: "none",
+        }}
+      />
     </div>
   );
 }

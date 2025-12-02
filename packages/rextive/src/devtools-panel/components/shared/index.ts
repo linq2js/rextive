@@ -8,4 +8,6 @@ export { SearchBox } from "./SearchBox";
 export { FilterBar, FilterSeparator, FilterGroup } from "./FilterBar";
 export { ActionBar } from "./ActionBar";
 export { TabContent } from "./TabContent";
+export { VirtualizedList, useItemKey } from "./VirtualizedList";
+export type { VirtualizedListProps } from "./VirtualizedList";
 

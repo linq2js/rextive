@@ -1,9 +1,9 @@
 /**
  * Signals Tab Component
- * Displays and manages the signals list
+ * Displays and manages the signals list with virtualization for performance
  */
 
-import React, { useState } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import type { SignalInfo } from "@/devtools/types";
 import type { PanelPosition } from "../styles";
 import * as styles from "../styles";
@@ -21,6 +21,7 @@ import {
 import { formatValue, formatValueFull, formatTime } from "../utils/formatUtils";
 import { extractSignalValue } from "../utils/signalUtils";
 import { deleteSignal } from "@/devtools";
+import { VirtualizedList } from "./shared";
 
 interface SignalsTabProps {
   signals: Map<string, SignalInfo>;
@@ -49,63 +50,53 @@ export function SignalsTab({
   const [editValue, setEditValue] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
 
-  if (signals.size === 0) {
-    return <div style={styles.emptyStateStyles}>No signals tracked</div>;
-  }
-
-  if (filteredSignals.length === 0) {
-    return (
-      <div style={styles.emptyStateStyles}>
-        No user-named signals
-        <div style={{ fontSize: "9px", marginTop: "4px", opacity: 0.7 }}>
-          Check "Show #auto" to see {signals.size} auto-generated
-        </div>
-      </div>
-    );
-  }
-
   // Sort signals based on mode
-  const sortedSignals = [...filteredSignals].sort((a, b) => {
-    if (recentActivitySort) {
-      // Sort by last activity time (updatedAt), latest first
-      return b.updatedAt - a.updatedAt;
-    }
-    // Default: active signals first, then disposed
-    if (a.disposed !== b.disposed) return a.disposed ? 1 : -1;
-    return 0;
-  });
+  const sortedSignals = useMemo(() => {
+    return [...filteredSignals].sort((a, b) => {
+      if (recentActivitySort) {
+        // Sort by last activity time (updatedAt), latest first
+        return b.updatedAt - a.updatedAt;
+      }
+      // Default: active signals first, then disposed
+      if (a.disposed !== b.disposed) return a.disposed ? 1 : -1;
+      return 0;
+    });
+  }, [filteredSignals, recentActivitySort]);
 
-  return (
-    <div style={styles.contentGridStyles(position)}>
-      {sortedSignals.map((info) => {
-        const { value: currentValue, error: signalError } =
-          extractSignalValue(info);
+  const getSignalKey = useCallback(
+    (info: SignalInfo) => info.id,
+    []
+  );
 
-        const isExpanded = expandedSignal === info.id;
-        const isHovered = hoveredItem === `signal-${info.id}`;
-        const hasError = !info.disposed && signalError !== undefined;
+  const renderSignalItem = useCallback(
+    (info: SignalInfo) => {
+      const { value: currentValue, error: signalError } =
+        extractSignalValue(info);
 
-        // Get current display name from signal (may have been renamed)
-        const displayName = info.signal.displayName || info.name;
+      const isExpanded = expandedSignal === info.id;
+      const isHovered = hoveredItem === `signal-${info.id}`;
+      const hasError = !info.disposed && signalError !== undefined;
 
-        // Build hover tooltip with signal name, ID, and source location
-        const hoverTitle = [
-          displayName,
-          `ID: ${info.id}`,
-          info.source
-            ? `📍 ${info.source.file}:${info.source.line}${
-                info.source.functionName
-                  ? ` (${info.source.functionName})`
-                  : ""
-              }`
-            : null,
-        ]
-          .filter(Boolean)
-          .join("\n");
+      // Get current display name from signal (may have been renamed)
+      const displayName = info.signal.displayName || info.name;
 
-        return (
-          <div
-            key={info.id}
+      // Build hover tooltip with signal name, ID, and source location
+      const hoverTitle = [
+        displayName,
+        `ID: ${info.id}`,
+        info.source
+          ? `📍 ${info.source.file}:${info.source.line}${
+              info.source.functionName
+                ? ` (${info.source.functionName})`
+                : ""
+            }`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      return (
+        <div
             style={{
               ...styles.itemStyles(isHovered, null, hasError),
               ...(info.disposed && {
@@ -656,8 +647,48 @@ export function SignalsTab({
             )}
           </div>
         );
-      })}
-    </div>
+    },
+    [
+      expandedSignal,
+      hoveredItem,
+      editingSignal,
+      editValue,
+      editError,
+      bookmarkedSignals,
+      toggleBookmark,
+      onNavigateToEvents,
+      onCompare,
+    ]
+  );
+
+  // Empty states
+  const emptyContent = useMemo(() => {
+    if (signals.size === 0) {
+      return <div style={styles.emptyStateStyles}>No signals tracked</div>;
+    }
+    if (filteredSignals.length === 0) {
+      return (
+        <div style={styles.emptyStateStyles}>
+          No user-named signals
+          <div style={{ fontSize: "9px", marginTop: "4px", opacity: 0.7 }}>
+            Check "Show #auto" to see {signals.size} auto-generated
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }, [signals.size, filteredSignals.length]);
+
+  return (
+    <VirtualizedList
+      items={sortedSignals}
+      estimatedItemHeight={64}
+      overscan={5}
+      getItemKey={getSignalKey}
+      renderItem={renderSignalItem}
+      emptyContent={emptyContent}
+      style={styles.contentGridStyles(position)}
+    />
   );
 }
 

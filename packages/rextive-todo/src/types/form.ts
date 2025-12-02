@@ -1,7 +1,7 @@
 // Form model types for the complex form editor demo
 
 export interface Address {
-  id?: string; // local-temp id for repeatable lists
+  id: string; // local-temp id for repeatable lists (always assigned at creation)
   street: string;
   city: string;
   state?: string;
@@ -11,7 +11,7 @@ export interface Address {
 }
 
 export interface Contact {
-  id?: string;
+  id: string; // local-temp id for repeatable lists (always assigned at creation)
   firstName: string;
   lastName: string;
   email: string;
