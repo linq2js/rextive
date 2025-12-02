@@ -5,9 +5,12 @@
  */
 
 import React, { useState, useMemo } from "react";
-import type { DependencyGraph, GraphNode, GraphEdge } from "@/devtools/utils/buildDependencyGraph";
+import type {
+  DependencyGraph,
+  GraphNode,
+  GraphEdge,
+} from "../../utils/buildDependencyGraph";
 import * as styles from "../styles";
-
 
 /**
  * Count dependents for each node
@@ -17,18 +20,18 @@ function countDependents(
   edges: GraphEdge[]
 ): Map<string, number> {
   const counts = new Map<string, number>();
-  
+
   // Initialize all nodes with 0
   for (const id of nodes.keys()) {
     counts.set(id, 0);
   }
-  
+
   // Count dependents (edges where this node is the source)
   for (const edge of edges) {
     const current = counts.get(edge.from) || 0;
     counts.set(edge.from, current + 1);
   }
-  
+
   return counts;
 }
 
@@ -40,13 +43,13 @@ function buildTree(
   edges: GraphEdge[]
 ): Array<{ node: GraphNode; children: string[]; level: number }> {
   const dependentsCount = countDependents(nodes, edges);
-  
+
   // Build parent-child relationships
   const children = new Map<string, string[]>();
   for (const id of nodes.keys()) {
     children.set(id, []);
   }
-  
+
   // edge.from is parent, edge.to is child
   for (const edge of edges) {
     const parent = edge.from;
@@ -55,28 +58,29 @@ function buildTree(
       children.get(parent)!.push(child);
     }
   }
-  
+
   // Sort nodes by dependents count (descending)
   const sortedNodes = Array.from(nodes.keys()).sort((a, b) => {
     const countA = dependentsCount.get(a) || 0;
     const countB = dependentsCount.get(b) || 0;
     return countB - countA; // Most dependents first
   });
-  
+
   // Build tree structure with levels
-  const tree: Array<{ node: GraphNode; children: string[]; level: number }> = [];
+  const tree: Array<{ node: GraphNode; children: string[]; level: number }> =
+    [];
   const visited = new Set<string>();
   const nodeLevel = new Map<string, number>();
-  
+
   function addNode(id: string, level: number) {
     if (visited.has(id)) return;
-    
+
     const node = nodes.get(id);
     if (!node) return;
-    
+
     visited.add(id);
     nodeLevel.set(id, level);
-    
+
     const nodeChildren = children.get(id) || [];
     // Sort children by dependents count
     nodeChildren.sort((a, b) => {
@@ -84,22 +88,22 @@ function buildTree(
       const countB = dependentsCount.get(b) || 0;
       return countB - countA;
     });
-    
+
     tree.push({ node, children: nodeChildren, level });
-    
+
     // Add children recursively
     for (const childId of nodeChildren) {
       addNode(childId, level + 1);
     }
   }
-  
+
   // Start with nodes that have most dependents
   for (const id of sortedNodes) {
     if (!visited.has(id)) {
       addNode(id, 0);
     }
   }
-  
+
   return tree;
 }
 
@@ -118,17 +122,19 @@ export function SimpleTreeView({
   expandedNodes: controlledExpandedNodes,
   onExpandedNodesChange,
 }: SimpleTreeViewProps): React.ReactElement {
-  const [internalExpandedNodes, setInternalExpandedNodes] = useState<Set<string>>(new Set());
+  const [internalExpandedNodes, setInternalExpandedNodes] = useState<
+    Set<string>
+  >(new Set());
   const dependentsCount = useMemo(
     () => countDependents(graph.nodes, graph.edges),
     [graph]
   );
-  
+
   const tree = useMemo(() => buildTree(graph.nodes, graph.edges), [graph]);
-  
+
   // Use controlled or internal state
   const expandedNodes = controlledExpandedNodes ?? internalExpandedNodes;
-  
+
   // Expand all by default on mount (only if using internal state)
   React.useEffect(() => {
     if (controlledExpandedNodes !== undefined) {
@@ -145,7 +151,7 @@ export function SimpleTreeView({
       setInternalExpandedNodes(allNodesWithChildren);
     }
   }, [tree, controlledExpandedNodes, internalExpandedNodes.size]);
-  
+
   const toggleExpand = (nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (onExpandedNodesChange) {
@@ -170,20 +176,14 @@ export function SimpleTreeView({
       });
     }
   };
-  
-  const renderNode = (
-    node: GraphNode,
-    level: number,
-    hasChildren: boolean
-  ) => {
+
+  const renderNode = (node: GraphNode, level: number, hasChildren: boolean) => {
     const isExpanded = expandedNodes.has(node.id);
     const isSelected = node.id === selectedNodeId;
     const dependents = dependentsCount.get(node.id) || 0;
     const nodeColor =
-      node.kind === "mutable"
-        ? styles.colors.mutable
-        : styles.colors.computed;
-    
+      node.kind === "mutable" ? styles.colors.mutable : styles.colors.computed;
+
     return (
       <div key={node.id}>
         <div
@@ -191,9 +191,7 @@ export function SimpleTreeView({
             display: "flex",
             alignItems: "center",
             padding: "4px 8px",
-            backgroundColor: isSelected
-              ? styles.colors.bgHover
-              : "transparent",
+            backgroundColor: isSelected ? styles.colors.bgHover : "transparent",
             borderRadius: "4px",
             fontFamily: styles.fontMono,
             fontSize: "11px",
@@ -231,7 +229,9 @@ export function SimpleTreeView({
               {isExpanded ? "▼" : "▶"}
             </button>
           )}
-          {!hasChildren && <span style={{ width: "12px", marginRight: "4px" }} />}
+          {!hasChildren && (
+            <span style={{ width: "12px", marginRight: "4px" }} />
+          )}
           <span
             style={{
               color: nodeColor,
@@ -301,59 +301,53 @@ export function SimpleTreeView({
       </div>
     );
   };
-  
+
   const renderTree = () => {
     const result: React.ReactElement[] = [];
     const visibleNodes = new Set<string>();
     const parentMap = new Map<string, string>(); // child -> parent
-    
+
     // Build parent map
     for (const edge of graph.edges) {
       parentMap.set(edge.to, edge.from);
     }
-    
+
     // Determine visible nodes (expanded path from root)
-    function markVisible(nodeId: string) {
+    // Use visited set to prevent infinite recursion from circular dependencies
+    function markVisible(nodeId: string, visited = new Set<string>()) {
+      if (visited.has(nodeId)) return; // Prevent infinite recursion
+      visited.add(nodeId);
       visibleNodes.add(nodeId);
+
       const item = tree.find((t) => t.node.id === nodeId);
       if (item && expandedNodes.has(nodeId)) {
         for (const childId of item.children) {
-          markVisible(childId);
+          markVisible(childId, visited);
         }
       }
     }
-    
+
     // Start from root nodes (level 0)
     for (const item of tree) {
       if (item.level === 0) {
         markVisible(item.node.id);
       }
     }
-    
+
     // Render visible nodes
     for (const item of tree) {
       if (!visibleNodes.has(item.node.id)) continue;
-      
-      result.push(
-        renderNode(
-          item.node,
-          item.level,
-          item.children.length > 0
-        )
-      );
+
+      result.push(renderNode(item.node, item.level, item.children.length > 0));
     }
-    
+
     return result;
   };
-  
+
   if (tree.length === 0) {
-    return (
-      <div style={styles.emptyStateStyles}>
-        No signals to display
-      </div>
-    );
+    return <div style={styles.emptyStateStyles}>No signals to display</div>;
   }
-  
+
   return (
     <div
       style={{
@@ -367,4 +361,3 @@ export function SimpleTreeView({
     </div>
   );
 }
-
