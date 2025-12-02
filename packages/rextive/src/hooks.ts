@@ -44,27 +44,17 @@ const defaultHooks: Hooks = {
   hasDevTools: () => false,
 };
 
-const hooksAccessor = getGlobalThisAccessor<Hooks>(
-  "__REXTIVE_HOOKS__",
-  defaultHooks
-);
+const hooksAccessor = getGlobalThisAccessor("__REXTIVE_HOOKS__", defaultHooks);
 
 // ============================================
 // Hooks State
 // ============================================
 
-/** Get or create global queue (shared across all module instances) */
-function getGlobalQueue(): AnySignal<any>[] {
-  if (typeof globalThis !== "undefined") {
-    if (!(globalThis as any).__REXTIVE_QUEUE__) {
-      (globalThis as any).__REXTIVE_QUEUE__ = [];
-    }
-    return (globalThis as any).__REXTIVE_QUEUE__;
-  }
-  // Fallback for environments without globalThis (shouldn't happen in modern JS)
-  const fallback: AnySignal<any>[] = [];
-  return fallback;
-}
+/** Accessor for global queue (shared across all module instances) */
+const queueAccessor = getGlobalThisAccessor(
+  "__REXTIVE_QUEUE__",
+  [] as AnySignal<any>[]
+);
 
 // ============================================
 // Public API
@@ -93,7 +83,7 @@ export function setHooks(
   const newHooks = hooksAccessor.set({ ...current, ...partial });
 
   // Replay queued signal creations now that hooks are set
-  const globalQueue = getGlobalQueue();
+  const globalQueue = queueAccessor.get();
   if (newHooks.onSignalCreate && globalQueue.length > 0) {
     const signals = [...globalQueue];
     globalQueue.length = 0; // Clear queue
@@ -195,7 +185,7 @@ export const emit = {
 
     if (!onSignalCreate) {
       // DevTools not enabled yet - queue for later replay in global queue
-      getGlobalQueue().push(signal);
+      queueAccessor.get().push(signal);
       return;
     }
 
