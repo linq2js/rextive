@@ -18,7 +18,7 @@ export interface DevToolsSettings {
 
 export const DEFAULT_SETTINGS: DevToolsSettings = {
   autoRemoveDisposedTimer: 3,
-  autoSnapshotInterval: 10,
+  autoSnapshotInterval: 5,
   signalHistoryLimit: 5,
 };
 
@@ -39,10 +39,13 @@ export function ConfigModal({
   const [localSettings, setLocalSettings] =
     useState<DevToolsSettings>(settings);
 
-  // Sync local state when settings prop changes
+  // Sync local state only when modal opens (not on every settings change)
   useEffect(() => {
-    setLocalSettings(settings);
-  }, [settings]);
+    if (isOpen) {
+      setLocalSettings(settings);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]); // Only depend on isOpen, not settings
 
   const handleSave = () => {
     onSettingsChange(localSettings);
@@ -235,7 +238,11 @@ export function ConfigModal({
                   min="0"
                   value={localSettings.autoSnapshotInterval}
                   onChange={(e) =>
-                    handleNumberChange("autoSnapshotInterval", e.target.value, 0)
+                    handleNumberChange(
+                      "autoSnapshotInterval",
+                      e.target.value,
+                      0
+                    )
                   }
                   style={inputStyles}
                 />
@@ -308,4 +315,3 @@ export function ConfigModal({
     </div>
   );
 }
-

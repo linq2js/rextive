@@ -18,7 +18,11 @@
  * shallowEquals([1, { x: 1 }], [1, { x: 1 }]) // false (nested objects not deeply compared)
  * ```
  */
-export function shallowEquals(a: any, b: any): boolean {
+export function shallowEquals(
+  a: any,
+  b: any,
+  equals: (a: any, b: any) => boolean = Object.is
+): boolean {
   // Same reference or both primitives equal
   if (Object.is(a, b)) {
     return true;
@@ -40,7 +44,7 @@ export function shallowEquals(a: any, b: any): boolean {
       return false;
     }
     for (let i = 0; i < a.length; i++) {
-      if (!Object.is(a[i], b[i])) {
+      if (!equals(a[i], b[i])) {
         return false;
       }
     }
@@ -64,7 +68,7 @@ export function shallowEquals(a: any, b: any): boolean {
     const key = keysA[i];
     if (
       !Object.prototype.hasOwnProperty.call(b, key) ||
-      !Object.is(a[key], b[key])
+      !equals(a[key], b[key])
     ) {
       return false;
     }
@@ -72,4 +76,3 @@ export function shallowEquals(a: any, b: any): boolean {
 
   return true;
 }
-

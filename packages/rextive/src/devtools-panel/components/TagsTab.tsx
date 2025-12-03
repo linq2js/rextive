@@ -18,7 +18,7 @@ interface TagsTabProps {
   signals: Map<string, SignalInfo>;
   position: PanelPosition;
   searchQuery: string;
-  onNavigateToSignal: (signalId: string) => void;
+  onNavigateToSignal: (signalName: string) => void;
   onTakeSnapshotForTag?: (tagId: string, signalIds: string[]) => void;
 }
 
@@ -183,9 +183,11 @@ export function TagsTab({
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            onNavigateToSignal(signalId);
+                            onNavigateToSignal(signalInfo?.name || signalId);
                           }}
-                          title={`${signalInfo?.name || signalId}\nUID: ${signalId}`}
+                          title={`${
+                            signalInfo?.name || signalId
+                          }\nUID: ${signalId}`}
                         >
                           <span
                             style={{

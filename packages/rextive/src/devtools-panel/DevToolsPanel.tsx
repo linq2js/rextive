@@ -117,7 +117,7 @@ const DEFAULT_CONFIG: DevToolsConfig = {
   snapshotAutoInterval: false,
   snapshotBookmarkedOnly: false,
   autoRemoveDisposedTimer: 3,
-  autoSnapshotIntervalSeconds: 10,
+  autoSnapshotIntervalSeconds: 5,
   signalHistoryLimit: 5,
 };
 
@@ -295,6 +295,10 @@ export function DevToolsPanel(): React.ReactElement | null {
   const snapshotCounterRef = useRef(1);
   const snapshotInitDoneRef = useRef(false);
   const snapshotIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref to store latest takeSnapshot function for interval (avoids restarting interval on every change)
+  const takeSnapshotRef = useRef<(options?: { skipIfNoDiff?: boolean }) => void>(
+    () => {}
+  );
 
   // Config modal state
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -506,6 +510,11 @@ export function DevToolsPanel(): React.ReactElement | null {
       flashTab,
     ]
   );
+
+  // Keep ref updated with latest takeSnapshot (for interval to use without restarting)
+  useEffect(() => {
+    takeSnapshotRef.current = takeSnapshot;
+  }, [takeSnapshot]);
 
   // Take snapshot for specific tag
   const takeSnapshotForTag = useCallback(
@@ -1034,10 +1043,11 @@ export function DevToolsPanel(): React.ReactElement | null {
   }, [snapshotOnInit, enabled, signals.size, takeSnapshot]);
 
   // Auto snapshot interval
+  // Uses takeSnapshotRef to avoid restarting interval when takeSnapshot changes
   useEffect(() => {
     if (snapshotAutoInterval && enabled && autoSnapshotIntervalSeconds > 0) {
       snapshotIntervalRef.current = setInterval(() => {
-        takeSnapshot({ skipIfNoDiff: true }); // Skip if no changes
+        takeSnapshotRef.current({ skipIfNoDiff: true }); // Skip if no changes
       }, autoSnapshotIntervalSeconds * 1000);
       return () => {
         if (snapshotIntervalRef.current) {
@@ -1051,12 +1061,7 @@ export function DevToolsPanel(): React.ReactElement | null {
         snapshotIntervalRef.current = null;
       }
     }
-  }, [
-    snapshotAutoInterval,
-    enabled,
-    takeSnapshot,
-    autoSnapshotIntervalSeconds,
-  ]);
+  }, [snapshotAutoInterval, enabled, autoSnapshotIntervalSeconds]);
 
   const togglePanel = useCallback(() => {
     setIsExpanded((prev) => {
@@ -2053,7 +2058,7 @@ export function DevToolsPanel(): React.ReactElement | null {
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSearchQuery(signalId);
+                              setSearchQuery(signalInfo?.name || signalId);
                               setSignalKindFilter("all");
                               updateActiveTab("signals");
                             }}

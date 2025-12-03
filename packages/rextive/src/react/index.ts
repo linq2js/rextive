@@ -52,3 +52,4 @@ export type { UseScopeOptions } from "./useScope";
 export { rx } from "./rx";
 export { useScope } from "./useScope";
 export * from "./provider";
+export { useStable } from "./useStable";

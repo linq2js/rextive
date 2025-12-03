@@ -12,7 +12,7 @@ import * as styles from "../styles";
 interface GraphTabProps {
   signals: Map<string, SignalInfo>;
   chains: ChainReaction[];
-  onNavigateToSignal: (signalId: string) => void;
+  onNavigateToSignal: (signalName: string) => void;
 }
 
 export function GraphTab({
