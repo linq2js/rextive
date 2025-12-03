@@ -40,15 +40,16 @@ export default defineConfig({
         find: /^rextive$/,
         replacement: resolve(rextiveSrc, "index.ts"),
       },
-      // Internal alias used by rextive source files
-      {
-        find: "@",
-        replacement: rextiveSrc,
-      },
     ],
   },
   optimizeDeps: {
     // Exclude rextive from pre-bundling to enable HMR
-    exclude: ["rextive", "rextive/devtools", "rextive/devtools-panel", "rextive/react", "rextive/op"],
+    exclude: [
+      "rextive",
+      "rextive/devtools",
+      "rextive/devtools-panel",
+      "rextive/react",
+      "rextive/op",
+    ],
   },
 });

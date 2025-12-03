@@ -83,7 +83,7 @@ importers:
         specifier: ^4.1.13
         version: 4.1.13
 
-  packages/rextive-todo:
+  packages/rextive-demo:
     dependencies:
       miragejs:
         specifier: ^0.1.48
