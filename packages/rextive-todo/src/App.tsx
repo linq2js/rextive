@@ -7,12 +7,14 @@ import { ScopeTest } from "./components/ScopeTest";
 import { ErrorDemo } from "./components/ErrorDemo";
 import { CounterDemo } from "./components/CounterDemo";
 import { FormEditor } from "./components/FormEditor";
+import { PokemonSearch } from "./components/PokemonSearch";
 import { initializeStore } from "./store/todoStore";
 import "./App.css";
 
 // Table of Contents data
 const tocItems = [
   { id: "todo-demo", label: "📝 Todo Demo", desc: "CRUD with sync" },
+  { id: "pokemon-demo", label: "🔍 Pokemon Search", desc: "debounce + task" },
   { id: "error-demo", label: "⚠️ Error Demo", desc: "Error boundaries" },
   { id: "counter-demo", label: "🔢 Counter Demo", desc: "Basic signals" },
   { id: "form-demo", label: "📋 Form Editor", desc: "Complex forms" },
@@ -132,6 +134,10 @@ export function App() {
           <TodoInput />
           <TodoFilters />
           <TodoList />
+        </div>
+
+        <div id="pokemon-demo">
+          <PokemonSearch />
         </div>
 
         <div id="error-demo">

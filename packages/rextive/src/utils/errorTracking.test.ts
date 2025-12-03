@@ -1,109 +1,133 @@
 import { describe, it, expect, vi } from "vitest";
-import {
-  trackAsyncError,
-  CurrentState,
-  addErrorTrace,
-  getErrorTrace,
-} from "./errorTracking";
+import { trackAsync, addErrorTrace, getErrorTrace } from "./errorTracking";
 
-describe("trackAsyncError", () => {
-  it("should not call onError for non-promise values", () => {
-    const onError = vi.fn();
-    const current: CurrentState = { value: 42 };
+describe("trackAsync", () => {
+  it("should not call onSettled for non-promise values", () => {
+    const onSettled = vi.fn();
 
-    trackAsyncError(() => current, onError);
+    trackAsync(() => 42, onSettled);
 
-    expect(onError).not.toHaveBeenCalled();
+    expect(onSettled).not.toHaveBeenCalled();
   });
 
-  it("should not call onError for undefined current", () => {
-    const onError = vi.fn();
+  it("should not call onSettled for undefined", () => {
+    const onSettled = vi.fn();
 
-    trackAsyncError(() => undefined, onError);
+    trackAsync(() => undefined, onSettled);
 
-    expect(onError).not.toHaveBeenCalled();
+    expect(onSettled).not.toHaveBeenCalled();
   });
 
-  it("should call onError when promise rejects", async () => {
-    const onError = vi.fn();
-    const error = new Error("test error");
-    const rejectedPromise = Promise.reject(error);
-    const current: CurrentState = { value: rejectedPromise };
-
-    trackAsyncError(() => current, onError);
-
-    // Wait for promise to reject
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(onError).toHaveBeenCalledWith(error);
-  });
-
-  it("should not call onError when promise resolves", async () => {
-    const onError = vi.fn();
+  it("should call onSettled when promise resolves", async () => {
+    const onSettled = vi.fn();
     const resolvedPromise = Promise.resolve(42);
-    const current: CurrentState = { value: resolvedPromise };
 
-    trackAsyncError(() => current, onError);
+    trackAsync(() => resolvedPromise, onSettled);
 
     // Wait for promise to resolve
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(onError).not.toHaveBeenCalled();
+    expect(onSettled).toHaveBeenCalledTimes(1);
   });
 
-  it("should not call onError if current has changed (stale)", async () => {
-    const onError = vi.fn();
+  it("should call onSettled when promise rejects", async () => {
+    const onSettled = vi.fn();
     const error = new Error("test error");
     const rejectedPromise = Promise.reject(error);
-    let current: CurrentState | undefined = { value: rejectedPromise };
 
-    trackAsyncError(() => current, onError);
-
-    // Simulate refresh - current changes
-    current = { value: Promise.resolve("new value") };
-
-    // Wait for original promise to reject
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    // Should not call onError because current has changed
-    expect(onError).not.toHaveBeenCalled();
-  });
-
-  it("should call onError if current is same reference", async () => {
-    const onError = vi.fn();
-    const error = new Error("test error");
-    const rejectedPromise = Promise.reject(error);
-    const current: CurrentState = { value: rejectedPromise };
-
-    trackAsyncError(() => current, onError);
+    trackAsync(() => rejectedPromise, onSettled);
 
     // Wait for promise to reject
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    // Should call onError because current is same reference
-    expect(onError).toHaveBeenCalledWith(error);
+    expect(onSettled).toHaveBeenCalledTimes(1);
   });
 
-  it("should handle promise-like objects", async () => {
-    const onError = vi.fn();
+  it("should not call onSettled if value has changed (stale resolve)", async () => {
+    const onSettled = vi.fn();
+    const originalPromise = Promise.resolve(42);
+    let current: Promise<number> | undefined = originalPromise;
+
+    trackAsync(() => current, onSettled);
+
+    // Simulate refresh - value changes before promise settles
+    current = Promise.resolve(100);
+
+    // Wait for original promise to resolve
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Should not call onSettled because value has changed
+    expect(onSettled).not.toHaveBeenCalled();
+  });
+
+  it("should not call onSettled if value has changed (stale reject)", async () => {
+    const onSettled = vi.fn();
+    const error = new Error("test error");
+    const rejectedPromise = Promise.reject(error);
+    let current: Promise<any> | undefined = rejectedPromise;
+
+    trackAsync(() => current, onSettled);
+
+    // Simulate refresh - value changes before promise settles
+    current = Promise.resolve("new value");
+
+    // Wait for original promise to reject
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Should not call onSettled because value has changed
+    expect(onSettled).not.toHaveBeenCalled();
+  });
+
+  it("should call onSettled if value is same reference", async () => {
+    const onSettled = vi.fn();
+    const promise = Promise.resolve(42);
+
+    trackAsync(() => promise, onSettled);
+
+    // Wait for promise to resolve
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Should call onSettled because value is same reference
+    expect(onSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it("should handle promise-like objects (resolve)", async () => {
+    const onSettled = vi.fn();
+
+    // Create a promise-like object (thenable) that resolves
+    const thenable = {
+      then(onResolve: any) {
+        setTimeout(() => onResolve(42), 0);
+        return this;
+      },
+    };
+
+    trackAsync(() => thenable, onSettled);
+
+    // Wait for thenable to resolve
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(onSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it("should handle promise-like objects (reject)", async () => {
+    const onSettled = vi.fn();
     const error = new Error("test error");
 
-    // Create a promise-like object (thenable)
+    // Create a promise-like object (thenable) that rejects
     const thenable = {
-      then(onResolve: any, onReject: any) {
+      then(_onResolve: any, onReject: any) {
         setTimeout(() => onReject(error), 0);
         return this;
       },
     };
 
-    const current: CurrentState = { value: thenable };
-
-    trackAsyncError(() => current, onError);
+    trackAsync(() => thenable, onSettled);
 
     // Wait for thenable to reject
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(onError).toHaveBeenCalledWith(error);
+    expect(onSettled).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -85,6 +85,9 @@ export function makeServer() {
       this.namespace = "api";
       this.timing = LATENCY;
 
+      // Allow external API requests to pass through
+      this.passthrough("https://pokeapi.co/**");
+
       // Helper to persist current state
       const persistState = (schema: any) => {
         const todos = schema.all("todo").models.map((m: any) => m.attrs);

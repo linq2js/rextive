@@ -98,7 +98,6 @@ export function buildDependencyGraph(
 
       // Find parent signal by name - prefer non-disposed signals
       let matchedParentId: string | null = null;
-      let matchedParentDisposed = true;
 
       for (const [parentId, parentInfo] of signals) {
         const parentDisplayName =
@@ -112,7 +111,6 @@ export function buildDependencyGraph(
           // Prefer non-disposed signals over disposed ones
           if (!parentInfo.disposed) {
             matchedParentId = parentId;
-            matchedParentDisposed = false;
             break; // Found active parent, use it
           } else if (matchedParentId === null) {
             // First match is disposed, keep looking but remember it as fallback

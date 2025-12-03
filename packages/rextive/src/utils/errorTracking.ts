@@ -1,4 +1,5 @@
 import { isPromiseLike } from "./isPromiseLike";
+import { task } from "./task";
 
 // ============================================================================
 // ERROR TRACING
@@ -71,26 +72,22 @@ export function getErrorTrace(error: unknown): SignalErrorTrace[] | undefined {
 }
 
 // ============================================================================
-// ASYNC ERROR TRACKING
+// ASYNC TRACKING
 // ============================================================================
 
 /**
- * Represents the current state of a signal value.
- */
-export interface CurrentState {
-  value: unknown;
-  error?: unknown;
-}
-
-/**
- * Tracks async errors for signal values.
+ * Tracks when a Promise value settles (resolves or rejects).
  *
- * When the current value is a Promise, this attaches a rejection handler.
- * The error callback only fires if the current state hasn't changed since
- * the Promise was captured (i.e., it's not stale).
+ * When the current value is a Promise, this attaches handlers for both
+ * resolve and reject. The onSettled callback only fires if the value
+ * hasn't changed since the Promise was captured (i.e., it's not stale).
  *
- * @param getCurrent - Function that returns the current state
- * @param onError - Callback fired when Promise rejects (if not stale)
+ * This enables auto-notification to dependents when async signals complete.
+ * Error information can be retrieved via `task.from(promise)` - no need to
+ * store errors separately.
+ *
+ * @param getCurrent - Function that returns the current value
+ * @param onSettled - Callback fired when Promise settles (if not stale)
  *
  * @example
  * ```ts
@@ -98,42 +95,45 @@ export interface CurrentState {
  * current = { value: result };
  * notifyChange();
  *
- * trackAsyncError(
- *   () => current,
- *   (error) => {
- *     current = { ...current!, error };
- *     onErrorValue.emit(error);
- *     notifyChange();
- *   }
+ * // Auto-notify dependents when promise settles
+ * trackAsync(
+ *   () => current?.value,
+ *   () => notifyChange()
  * );
  * ```
  */
-export function trackAsyncError(
-  getCurrent: () => CurrentState | undefined,
-  onError: (error: unknown) => void
+export function trackAsync<T>(
+  getCurrent: () => T | undefined,
+  onSettled: () => void
 ): void {
-  const prevCurrent = getCurrent();
+  const prevValue = getCurrent();
 
   // Only track if value is a Promise
-  if (!prevCurrent || !isPromiseLike(prevCurrent.value)) {
+  if (!isPromiseLike(prevValue)) {
     return;
   }
 
-  const promise = prevCurrent.value;
-
   // Prevent unhandled rejection warning
-  if (promise instanceof Promise) {
-    promise.catch(() => {});
+  if (prevValue instanceof Promise) {
+    prevValue.catch(() => {});
   }
 
-  promise.then(undefined, (error) => {
-    const nextCurrent = getCurrent();
+  // cache promise
+  task.from(prevValue);
 
-    // Stale - current has changed (e.g., refresh was called)
-    if (prevCurrent !== nextCurrent) {
-      return;
+  // Call onSettled when promise settles (resolve or reject)
+  prevValue.then(
+    () => {
+      // Check staleness - only notify if still current
+      if (getCurrent() === prevValue) {
+        onSettled();
+      }
+    },
+    () => {
+      // Same for rejection
+      if (getCurrent() === prevValue) {
+        onSettled();
+      }
     }
-
-    onError(error);
-  });
+  );
 }

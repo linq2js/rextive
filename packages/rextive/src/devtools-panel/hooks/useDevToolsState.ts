@@ -79,8 +79,8 @@ export function useDevToolsState() {
 
   // Refresh data periodically when enabled
   // Use refs to track previous values and avoid unnecessary re-renders
-  const prevSignalsRef = useRef<Map<string, SignalInfo>>(new Map());
-  const prevTagsRef = useRef<Map<string, TagInfo>>(new Map());
+  const prevSignalsRef = useRef<ReadonlyMap<string, SignalInfo>>(new Map());
+  const prevTagsRef = useRef<ReadonlyMap<string, TagInfo>>(new Map());
 
   useEffect(() => {
     if (!enabled) {

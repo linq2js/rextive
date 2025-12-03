@@ -20,7 +20,7 @@ import { getHooks, emit } from "./hooks";
 import { nextName, nextUid } from "./utils/nameGenerator";
 import { resolveSelectorsRequired } from "./operators/resolveSelectors";
 import {
-  trackAsyncError,
+  trackAsync,
   addErrorTrace,
   type SignalErrorWhen,
 } from "./utils/errorTracking";
@@ -126,21 +126,17 @@ export function createComputedSignal(
   const onDispose = emitter<void>();
 
   /**
-   * Track async errors for Promise values.
-   * When signal value is a Promise, this attaches a rejection handler.
-   * The error is only captured if the Promise is still current (not stale from refresh).
+   * Track async settlement for Promise values.
+   * When signal value is a Promise, this attaches handlers for resolve/reject.
+   * Auto-notifies subscribers when the promise settles so dependents can react.
+   * Error info can be read via task.from(promise) - no need to store separately.
    */
-  const handleAsyncError = (when: SignalErrorWhen) => {
-    trackAsyncError(
-      () => current,
-      (error) => {
-        // Update current with error (no need to keep Promise value since signal() throws anyway)
-        current = { value: undefined, error };
-
-        // Trigger error callbacks and devtools (async = true)
-        throwError(error, when, true);
-
-        // Notify subscribers that error state changed
+  const handleAsyncSettlement = (_when: SignalErrorWhen) => {
+    trackAsync(
+      () => current?.value,
+      () => {
+        // Auto-notify subscribers when promise settles
+        // This enables reactive updates for dependents using task.from()
         scheduleNotification(() => {
           onChange.emit();
         });
@@ -207,8 +203,8 @@ export function createComputedSignal(
       if (changed) {
         current = { value: result };
 
-        // Track async errors for Promise values
-        handleAsyncError(when);
+        // Track async settlement for Promise values
+        handleAsyncSettlement(when);
       }
 
       if (changed) {
@@ -343,8 +339,8 @@ export function createComputedSignal(
     current = { value };
     hasComputed = true;
 
-    // Track async errors for Promise values (hydrate is like initial compute)
-    handleAsyncError("compute:initial");
+    // Track async settlement for Promise values (hydrate is like initial compute)
+    handleAsyncSettlement("compute:initial");
 
     return "success" as const;
   };

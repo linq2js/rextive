@@ -80,10 +80,6 @@ export function task<TValue>(initial: TValue): any {
       // Promise already resolved - cache the value immediately
       prev = { value: t.value };
     }
-    // Note: Error state is not handled - error tasks are returned as-is without overridden value
-    if (t.status === "error") {
-      return t; // Return error task as-is (value remains undefined as per standard Task)
-    }
 
     // Override the task's value property to ensure it's always defined
     // This overrides the standard Task behavior where value is undefined in loading state
