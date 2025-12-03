@@ -1,5 +1,5 @@
 import { signal, wait, task, rx, useScope } from "rextive/react";
-import { debounce } from "rextive/op";
+import { debounce, to } from "rextive/op";
 import { Button } from "./Button";
 
 /**
@@ -37,60 +37,55 @@ function createPokemonSearch() {
   // Input signal for pokemon name
   const pokemonName = signal("", { name: "pokemonName" });
 
-  // Debounce the input
-  const debouncedName = pokemonName.pipe(debounce(300));
-
-  // Async signal that fetches pokemon data
-  // - Depends on debounced name
-  // - Adds 1s delay for demo effect
-  // - Calls the Pokemon API
-  const pokemonProfile = signal(
-    { debouncedName },
-    async ({ deps, safe, abortSignal }) => {
-      const name = deps.debouncedName.trim().toLowerCase();
-
-      // Return default if no name
-      if (!name) {
-        return DEFAULT_PROFILE;
-      }
-
-      // Simulate additional delay (1 second)
-      await safe(wait.delay(1000));
-
-      // Random error for demo (10% chance)
-      if (Math.random() < 0.1) {
-        throw new Error("Random API error! Try again.");
-      }
-
-      // Fetch from Pokemon API
-      const res = await fetch(
-        `https://pokeapi.co/api/v2/pokemon/${encodeURIComponent(name)}`,
-        { signal: abortSignal }
-      );
-
-      if (!res.ok) {
-        if (res.status === 404) {
-          throw new Error(`Pokemon "${name}" not found`);
+  const pokemonProfileApi = pokemonName
+    // Debounce the input
+    .pipe(
+      debounce(300),
+      // Async signal that fetches pokemon data
+      // - Depends on debounced name
+      // - Adds 1s delay for demo effect
+      // - Calls the Pokemon API
+      to(async (name, { safe, abortSignal }) => {
+        // Return default if no name
+        if (!name) {
+          return DEFAULT_PROFILE;
         }
-        throw new Error(`API error: ${res.status}`);
-      }
 
-      const data: PokemonData = await res.json();
-      return { name: data.name, data };
-    },
-    { name: "pokemonProfile" }
-  );
+        // Simulate additional delay (1 second)
+        await safe(wait.delay(1000));
+
+        // Random error for demo (10% chance)
+        if (Math.random() < 0.1) {
+          throw new Error("Random API error! Try again.");
+        }
+
+        // Fetch from Pokemon API
+        const res = await fetch(
+          `https://pokeapi.co/api/v2/pokemon/${encodeURIComponent(name)}`,
+          { signal: abortSignal }
+        );
+
+        if (!res.ok) {
+          if (res.status === 404) {
+            throw new Error(`Pokemon "${name}" not found`);
+          }
+          throw new Error(`API error: ${res.status}`);
+        }
+
+        const data: PokemonData = await res.json();
+        return { name: data.name, data };
+      })
+    );
 
   // Transform to task for loading/error/success states
   // Pass DEFAULT_PROFILE as the initial value before first computation
-  const pokemonProfileTask = pokemonProfile.to(task(DEFAULT_PROFILE), {
-    name: "pokemonTask",
-  });
+  const pokemonProfileTask = pokemonProfileApi.pipe(
+    task(DEFAULT_PROFILE, { name: "pokemonProfileTask" })
+  );
 
   return {
     pokemonName,
-    debouncedName,
-    pokemonProfile,
+    pokemonProfile: pokemonProfileApi,
     pokemonProfileTask,
   };
 }
@@ -152,8 +147,6 @@ export function PokemonSearch() {
       {rx(() => {
         const { status, loading, error, value } = pokemonProfileTask();
         const name = pokemonName().trim();
-
-        console.log("value", value);
 
         // Only show loading if we have a name to search
         const showLoading = loading && name.length > 0;

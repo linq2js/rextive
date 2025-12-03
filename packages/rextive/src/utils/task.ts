@@ -7,12 +7,15 @@ import {
   type Task,
   Signal,
   SignalContext,
+  SignalOptions,
+  Computed,
 } from "../types";
 import { getHooks } from "../hooks";
 import { is as signalIs } from "../is";
+import { autoPrefix } from "./nameGenerator";
 
 /**
- * Creates a selector function that transforms a Promise into a Task with overridden `value`.
+ * Creates an operator that transforms an async signal into a Task signal with guaranteed `value`.
  *
  * Overrides the Task's `value` property to ensure it's always defined (never undefined),
  * implementing a stale-while-revalidate pattern:
@@ -26,12 +29,13 @@ import { is as signalIs } from "../is";
  *
  * @template TValue - The type of the value
  * @param initial - Initial value to use on first load
- * @returns A selector function that can be used with `signal.to()`
+ * @param options - Optional signal options
+ * @returns An operator function for use with `.pipe()`
  *
  * @example Basic usage
  * ```typescript
- * const remoteData = signal(() => fetch("/api/user"));
- * const taskSignal = remoteData.to(task({ name: "Guest" }));
+ * const remoteData = signal(async () => fetch("/api/user").then(r => r.json()));
+ * const taskSignal = remoteData.pipe(task({ name: "Guest" }));
  *
  * // In UI - value is always defined
  * const t = taskSignal();
@@ -40,8 +44,8 @@ import { is as signalIs } from "../is";
  *
  * @example Stale-while-revalidate pattern
  * ```typescript
- * const userData = signal(() => fetchUser(1));
- * const userTask = userData.to(task({ id: 0, name: "Loading..." }));
+ * const userData = signal(async () => fetchUser(1));
+ * const userTask = userData.pipe(task({ id: 0, name: "Loading..." }));
  *
  * // First load: t.value = { id: 0, name: "Loading..." } (initial)
  * // After success: t.value = { id: 1, name: "Alice" } (fresh)
@@ -49,47 +53,54 @@ import { is as signalIs } from "../is";
  * ```
  */
 export function task<TValue>(
-  initial: TValue
+  initial: NoInfer<TValue>,
+  options?: SignalOptions<Task<TValue> & { value: TValue }>
 ): (
-  source: PromiseLike<TValue>,
-  context: SignalContext
-) => Task<TValue> & { value: TValue };
-export function task<TValue>(initial: TValue): any {
-  // Store previous successful value for stale-while-revalidate pattern
-  let prev: { value: TValue } | undefined;
+  source: Signal<PromiseLike<TValue>>
+) => Computed<Task<TValue> & { value: TValue }> {
+  return (source) => {
+    // Store previous successful value for stale-while-revalidate pattern
+    let prev: { value: TValue } | undefined;
 
-  return (source: PromiseLike<TValue>, context: SignalContext) => {
-    // Reset previous value on first computation (when signal is first created)
-    // This ensures we start fresh with the initial value
-    if (context.nth === 0) {
-      prev = undefined;
-    }
+    return source.to(
+      (value, context: SignalContext): Task<TValue> & { value: TValue } => {
+        // Reset previous value on first computation (when signal is first created)
+        // This ensures we start fresh with the initial value
+        if (context.nth === 0) {
+          prev = undefined;
+        }
 
-    // Get or create task from promise (uses promise cache internally)
-    const t = task.from(source);
+        // Get or create task from promise (uses promise cache internally)
+        const t = task.from(value);
 
-    if (t.loading) {
-      // Promise is still loading - set up handler to cache value when it resolves
-      // Use context.safe() to prevent race conditions:
-      // - If computation is aborted, the promise handler won't execute
-      // - Prevents updating stale state after a new computation has started
-      context.safe(t.promise).then((value) => {
-        prev = { value };
-      });
-    } else if (t.status === "success") {
-      // Promise already resolved - cache the value immediately
-      prev = { value: t.value };
-    }
+        if (t.loading) {
+          // Promise is still loading - set up handler to cache value when it resolves
+          // Use context.safe() to prevent race conditions:
+          // - If computation is aborted, the promise handler won't execute
+          // - Prevents updating stale state after a new computation has started
+          context.safe(t.promise).then((value) => {
+            prev = { value };
+          });
+        } else if (t.status === "success") {
+          // Promise already resolved - cache the value immediately
+          prev = { value: t.value };
+        }
 
-    // Override the task's value property to ensure it's always defined
-    // This overrides the standard Task behavior where value is undefined in loading state
-    // value is always defined:
-    // - If we have a previous value: use it (stale-while-revalidate)
-    // - Otherwise: use initial value (first load)
-    return {
-      ...t,
-      value: prev ? prev.value : initial, // Override: always defined, never undefined
-    };
+        // Override the task's value property to ensure it's always defined
+        // This overrides the standard Task behavior where value is undefined in loading state
+        // value is always defined:
+        // - If we have a previous value: use it (stale-while-revalidate)
+        // - Otherwise: use initial value (first load)
+        return {
+          ...t,
+          value: prev ? prev.value : initial, // Override: always defined, never undefined
+        } as Task<TValue> & { value: TValue };
+      },
+      {
+        ...options,
+        name: options?.name ?? autoPrefix(`task(${source.displayName})`),
+      }
+    );
   };
 }
 

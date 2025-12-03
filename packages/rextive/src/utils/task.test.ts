@@ -589,250 +589,141 @@ describe("task", () => {
     });
   });
 
-  describe("task() - selector with value", () => {
-    it("should return task with value on first load (loading state)", async () => {
-      const { createSignalContext } = await import("../createSignalContext");
-      const { emitter } = await import("../utils/emitter");
+  describe("task() - pipe operator with initial value", () => {
+    it("should work with .pipe() and return task with value", async () => {
+      const { signal } = await import("../signal");
 
-      const promise = new Promise<number>((resolve) => {
-        setTimeout(() => resolve(42), 10);
+      // Create async signal that returns a promise
+      const asyncSignal = signal(async () => {
+        return 42;
       });
 
-      const selector = task(0); // Initial value
-      const context = createSignalContext(
-        {},
-        emitter(),
-        () => {},
-        undefined,
-        undefined,
-        0 // First computation
-      );
+      // Use pipe with task operator
+      const taskSignal = asyncSignal.pipe(task(0));
 
-      const result = selector(promise, context);
-
+      // Initial state should be loading with initial value
+      const result = taskSignal();
       expect(result.status).toBe("loading");
       expect(result.value).toBe(0); // Uses initial value on first load
       expect("value" in result).toBe(true);
     });
 
     it("should return task with value on success state", async () => {
-      const { createSignalContext } = await import("../createSignalContext");
-      const { emitter } = await import("../utils/emitter");
+      const { signal } = await import("../signal");
 
-      // Create a success task directly to test the logic
-      const successTask = task.success(42);
-      const promise = Promise.resolve(42);
+      // Create async signal with immediate resolve
+      const asyncSignal = signal(async () => 42);
 
-      const selector = task(0); // Initial value
-      const context = createSignalContext(
-        {},
-        emitter(),
-        () => {},
-        undefined,
-        undefined,
-        0 // First computation
-      );
+      // Use pipe with task operator
+      const taskSignal = asyncSignal.pipe(task(0));
 
-      // Mock task.from to return success task
-      const originalFrom = task.from;
-      (task as any).from = () => successTask;
+      // Wait for promise to resolve and for signal to update
+      await asyncSignal(); // Wait for the async computation
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      try {
-        const result = selector(promise, context);
-
-        expect(result.status).toBe("success");
-        expect(result.value).toBe(42); // Uses actual value
-        expect(result.value).toBe(42);
-      } finally {
-        (task as any).from = originalFrom;
-      }
+      const result = taskSignal();
+      expect(result.status).toBe("success");
+      expect(result.value).toBe(42);
     });
 
     it("should show previous value on refresh (stale-while-revalidate)", async () => {
-      const { createSignalContext } = await import("../createSignalContext");
-      const { emitter } = await import("../utils/emitter");
+      const { signal } = await import("../signal");
 
-      const selector = task(0);
+      let resolveValue = 42;
+      const trigger = signal(0);
 
-      // First computation: success
-      const successTask1 = task.success(42);
-      const promise1 = Promise.resolve(42);
-      const context1 = createSignalContext(
-        {},
-        emitter(),
-        () => {},
-        undefined,
-        undefined,
-        0 // First computation
-      );
-
-      const originalFrom = task.from;
-      (task as any).from = () => successTask1;
-
-      try {
-        const result1 = selector(promise1, context1);
-        expect(result1.status).toBe("success");
-        expect(result1.value).toBe(42);
-
-        // Second computation: loading (refresh)
-        const loadingTask = task.loading(Promise.resolve(100));
-        const promise2 = new Promise<number>((resolve) => {
-          setTimeout(() => resolve(100), 10);
-        });
-        (task as any).from = () => loadingTask;
-
-        const context2 = createSignalContext(
-          {},
-          emitter(),
-          () => {},
-          undefined,
-          undefined,
-          1 // Second computation (refresh)
-        );
-
-        const result2 = selector(promise2, context2);
-        expect(result2.status).toBe("loading");
-        expect(result2.value).toBe(42); // Shows previous value (stale)
-      } finally {
-        (task as any).from = originalFrom;
-      }
-    });
-
-    it("should reset to initial value on first computation after reset", async () => {
-      const { createSignalContext } = await import("../createSignalContext");
-      const { emitter } = await import("../utils/emitter");
-
-      const promise = new Promise<number>((resolve) => {
-        setTimeout(() => resolve(42), 10);
+      // Create async signal that depends on trigger
+      const asyncSignal = signal({ trigger }, async () => {
+        await new Promise((r) => setTimeout(r, 5));
+        return resolveValue;
       });
 
-      const selector = task(0);
+      // Use pipe with task operator
+      const taskSignal = asyncSignal.pipe(task(0));
 
-      // First computation: loading
-      const loadingTask = task.loading(promise);
-      const context1 = createSignalContext(
-        {},
-        emitter(),
-        () => {},
-        undefined,
-        undefined,
-        0 // First computation
-      );
+      // Initial load
+      let result = taskSignal();
+      expect(result.status).toBe("loading");
+      expect(result.value).toBe(0); // Initial value
 
-      const originalFrom = task.from;
-      (task as any).from = () => loadingTask;
+      // Wait for first resolve
+      await asyncSignal();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      result = taskSignal();
+      expect(result.status).toBe("success");
+      expect(result.value).toBe(42);
 
-      try {
-        const result1 = selector(promise, context1);
-        expect(result1.value).toBe(0); // Initial value on first load
+      // Trigger refresh
+      resolveValue = 100;
+      trigger.set(1);
 
-        // Simulate reset (nth back to 0) - prev should be reset
-        const context2 = createSignalContext(
-          {},
-          emitter(),
-          () => {},
-          undefined,
-          undefined,
-          0 // Reset - back to first computation
-        );
-        const result2 = selector(promise, context2);
-        expect(result2.value).toBe(0); // Back to initial (prev was reset)
-      } finally {
-        (task as any).from = originalFrom;
-      }
+      // Access immediately - during refresh, should show stale value
+      // Need to yield to allow the signal to start refreshing
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      result = taskSignal();
+      // During loading, value should still be available (stale-while-revalidate)
+      expect(result.value).toBe(42); // Shows previous value
+    });
+
+    it("should reset to initial value when new signal chain is created", async () => {
+      const { signal } = await import("../signal");
+
+      // Create async signal
+      const asyncSignal = signal(async () => 42);
+
+      // Use pipe with task operator
+      const taskSignal = asyncSignal.pipe(task(0));
+
+      // Wait for resolve
+      await asyncSignal();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      let result = taskSignal();
+      expect(result.value).toBe(42);
+
+      // Create new signal chain (separate from the first)
+      const asyncSignal2 = signal(async () => 100);
+      const taskSignal2 = asyncSignal2.pipe(task(0));
+
+      // New chain should start with initial value
+      result = taskSignal2();
+      expect(result.status).toBe("loading");
+      expect(result.value).toBe(0); // Initial value for new chain
     });
 
     it("should work with object values", async () => {
-      const { createSignalContext } = await import("../createSignalContext");
-      const { emitter } = await import("../utils/emitter");
+      const { signal } = await import("../signal");
 
       const initialUser = { id: 0, name: "Guest" };
       const userData = { id: 1, name: "Alice" };
-      const successTask = task.success(userData);
-      const promise = Promise.resolve(userData);
 
-      const selector = task(initialUser);
-      const context = createSignalContext(
-        {},
-        emitter(),
-        () => {},
-        undefined,
-        undefined,
-        0
-      );
+      // Create async signal
+      const asyncSignal = signal(async () => userData);
 
-      const originalFrom = task.from;
-      (task as any).from = () => successTask;
+      // Use pipe with task operator
+      const taskSignal = asyncSignal.pipe(task(initialUser));
 
-      try {
-        const result = selector(promise, context);
+      // Wait for resolve
+      await asyncSignal();
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-        expect(result.status).toBe("success");
-        expect(result.value).toEqual({ id: 1, name: "Alice" });
-        expect(result.value.id).toBe(1);
-        expect(result.value.name).toBe("Alice");
-      } finally {
-        (task as any).from = originalFrom;
-      }
+      const result = taskSignal();
+      expect(result.status).toBe("success");
+      expect(result.value).toEqual({ id: 1, name: "Alice" });
+      expect(result.value.id).toBe(1);
+      expect(result.value.name).toBe("Alice");
     });
 
-    it("should handle multiple recomputations correctly", async () => {
-      const { createSignalContext } = await import("../createSignalContext");
-      const { emitter } = await import("../utils/emitter");
+    it("should properly dispose intermediate signals", async () => {
+      const { signal } = await import("../signal");
 
-      const selector = task(0);
-      const originalFrom = task.from;
+      const asyncSignal = signal(async () => 42);
+      const taskSignal = asyncSignal.pipe(task(0));
 
-      try {
-        // Computation 1: Loading
-        const loadingTask1 = task.loading(Promise.resolve(10));
-        const promise1 = Promise.resolve(10);
-        (task as any).from = () => loadingTask1;
+      // Access value
+      taskSignal();
 
-        const context1 = createSignalContext(
-          {},
-          emitter(),
-          () => {},
-          undefined,
-          undefined,
-          0
-        );
-        const result1 = selector(promise1, context1);
-        expect(result1.value).toBe(0); // Initial
-
-        // Computation 2: Success (prev should be set from previous success)
-        const successTask = task.success(10);
-        (task as any).from = () => successTask;
-
-        const context2 = createSignalContext(
-          {},
-          emitter(),
-          () => {},
-          undefined,
-          undefined,
-          1
-        );
-        const result2 = selector(promise1, context2);
-        expect(result2.value).toBe(10); // Uses actual value
-
-        // Computation 3: New loading (refresh) - should use previous value
-        const loadingTask2 = task.loading(Promise.resolve(20));
-        const promise2 = Promise.resolve(20);
-        (task as any).from = () => loadingTask2;
-
-        const context3 = createSignalContext(
-          {},
-          emitter(),
-          () => {},
-          undefined,
-          undefined,
-          2
-        );
-        const result3 = selector(promise2, context3);
-        expect(result3.value).toBe(10); // Previous value (stale)
-      } finally {
-        (task as any).from = originalFrom;
-      }
+      // Dispose should not throw
+      expect(() => taskSignal.dispose()).not.toThrow();
     });
   });
 });

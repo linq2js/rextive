@@ -3,11 +3,10 @@
  *
  * This example demonstrates two approaches for handling async task status:
  * 1. `task.from(signal)` - Value may be undefined during loading/error
- * 2. `signal.to(task(defaultValue))` - Value is never undefined
+ * 2. `signal.pipe(task(defaultValue))` - Value is never undefined
  */
 
-import { signal, rx } from "rextive/react";
-import { task } from "rextive/op";
+import { signal, rx, task } from "rextive/react";
 
 // =============================================================================
 // Example Data Types
@@ -75,11 +74,11 @@ function UserProfileWithTaskFrom() {
 }
 
 // =============================================================================
-// Approach 2: signal.to(task()) - Value is never undefined
+// Approach 2: signal.pipe(task()) - Value is never undefined
 // =============================================================================
 
 /**
- * Using signal.to(task(defaultValue)) - The value is ALWAYS defined:
+ * Using signal.pipe(task(defaultValue)) - The value is ALWAYS defined:
  * - Initially: uses the default value
  * - During loading: keeps the previous successful value (or default)
  * - On error: keeps the previous successful value (or default)
@@ -100,7 +99,7 @@ const DEFAULT_USER: User = {
 };
 
 // Create a task signal with a default value
-const userProfileTask = userProfileAsync.to(task(DEFAULT_USER));
+const userProfileTask = userProfileAsync.pipe(task(DEFAULT_USER));
 
 function UserProfileWithTaskOperator() {
   return rx(() => {
@@ -177,7 +176,7 @@ function SearchWithTaskFrom() {
 }
 
 // Approach 2: task() operator - Keep showing previous results while searching
-const searchResultsTask = searchResults.to(task<Post[]>([]));
+const searchResultsTask = searchResults.pipe(task<Post[]>([]));
 
 function SearchWithTaskOperator() {
   return (
@@ -219,9 +218,9 @@ function SearchWithTaskOperator() {
 
 /**
  * ┌─────────────────────────────────────────────────────────────────────────────┐
- * │                    task.from(signal) vs signal.to(task())                   │
+ * │                  task.from(signal) vs signal.pipe(task())                   │
  * ├─────────────────────────────────────────────────────────────────────────────┤
- * │ Feature              │ task.from()         │ signal.to(task())              │
+ * │ Feature              │ task.from()         │ signal.pipe(task())            │
  * ├─────────────────────────────────────────────────────────────────────────────┤
  * │ Value type           │ T | undefined       │ T (always defined)             │
  * │ Initial state        │ undefined           │ default value                  │
@@ -232,8 +231,8 @@ function SearchWithTaskOperator() {
  * │                      │ of all states       │ revalidate patterns            │
  * ├─────────────────────────────────────────────────────────────────────────────┤
  * │ Best for:                                                                   │
- * │ • task.from():       First-time data loading, authentication checks        │
- * │ • signal.to(task()): Data refreshing, search, infinite scroll, dashboards  │
+ * │ • task.from():         First-time data loading, authentication checks      │
+ * │ • signal.pipe(task()): Data refreshing, search, infinite scroll, dashboards│
  * └─────────────────────────────────────────────────────────────────────────────┘
  */
 

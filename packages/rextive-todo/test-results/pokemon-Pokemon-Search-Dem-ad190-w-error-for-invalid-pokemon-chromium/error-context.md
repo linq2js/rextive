@@ -1,0 +1,217 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - main [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - img [ref=e7]
+          - heading "Reactive Live Demo" [level=1] [ref=e10]
+        - text: Signal-powered
+      - navigation [ref=e11]:
+        - generic [ref=e12]: Quick Navigation
+        - generic [ref=e13]:
+          - button "📝 Todo Demo CRUD with sync" [ref=e14] [cursor=pointer]:
+            - generic [ref=e15]: 📝 Todo Demo
+            - generic [ref=e16]: CRUD with sync
+          - button "🔍 Pokemon Search debounce + task" [ref=e17] [cursor=pointer]:
+            - generic [ref=e18]: 🔍 Pokemon Search
+            - generic [ref=e19]: debounce + task
+          - button "⚠️ Error Demo Error boundaries" [ref=e20] [cursor=pointer]:
+            - generic [ref=e21]: ⚠️ Error Demo
+            - generic [ref=e22]: Error boundaries
+          - button "🔢 Counter Demo Basic signals" [ref=e23] [cursor=pointer]:
+            - generic [ref=e24]: 🔢 Counter Demo
+            - generic [ref=e25]: Basic signals
+          - button "📋 Form Editor Complex forms" [ref=e26] [cursor=pointer]:
+            - generic [ref=e27]: 📋 Form Editor
+            - generic [ref=e28]: Complex forms
+          - button "🔬 Scope Test useScope lifecycle" [ref=e29] [cursor=pointer]:
+            - generic [ref=e30]: 🔬 Scope Test
+            - generic [ref=e31]: useScope lifecycle
+      - generic [ref=e32]:
+        - heading "📝 Todo Demo" [level=3] [ref=e33]
+        - generic [ref=e34]:
+          - generic [ref=e36]:
+            - img [ref=e37]
+            - generic [ref=e39]: "Last sync: Just now"
+          - generic [ref=e40]:
+            - button "Pull" [ref=e41] [cursor=pointer]:
+              - img [ref=e42]
+              - text: Pull
+            - button "Push" [disabled] [ref=e45]:
+              - img [ref=e46]
+              - text: Push
+            - button "Reset" [ref=e50] [cursor=pointer]:
+              - img [ref=e51]
+              - text: Reset
+        - generic [ref=e54]:
+          - textbox "What needs to be done?" [ref=e55]
+          - button [disabled] [ref=e56]:
+            - img [ref=e57]
+        - generic [ref=e58]:
+          - generic [ref=e61]:
+            - img
+            - textbox "Search todos..." [ref=e62]
+          - generic [ref=e63]:
+            - generic [ref=e64]: 2 items left
+            - generic [ref=e65]:
+              - button "All 3" [ref=e66] [cursor=pointer]:
+                - text: All
+                - generic [ref=e67]: "3"
+              - button "Active 2" [ref=e68] [cursor=pointer]:
+                - text: Active
+                - generic [ref=e69]: "2"
+              - button "Done 1" [ref=e70] [cursor=pointer]:
+                - text: Done
+                - generic [ref=e71]: "1"
+            - button "Clear completed (1)" [ref=e72] [cursor=pointer]
+        - list [ref=e74]:
+          - listitem [ref=e75]:
+            - button "Mark as complete" [ref=e76] [cursor=pointer]
+            - generic [ref=e78]:
+              - generic [ref=e79]: Implement sync mechanism
+              - generic [ref=e80]: Modified 6d ago
+            - button "Delete todo" [ref=e81] [cursor=pointer]:
+              - img [ref=e82]
+          - listitem [ref=e85]:
+            - button "Mark as complete" [ref=e86] [cursor=pointer]
+            - generic [ref=e88]:
+              - generic [ref=e89]: Build offline-first todo app
+              - generic [ref=e90]: Modified 5d ago
+            - button "Delete todo" [ref=e91] [cursor=pointer]:
+              - img [ref=e92]
+          - listitem [ref=e95]:
+            - button "Mark as incomplete" [ref=e96] [cursor=pointer]:
+              - img [ref=e98]
+            - generic [ref=e100]:
+              - generic [ref=e101]: Learn Rextive signals
+              - generic [ref=e102]: Modified 3d ago
+            - button "Delete todo" [ref=e103] [cursor=pointer]:
+              - img [ref=e104]
+      - generic [ref=e108]:
+        - heading "🔍 Pokemon Search" [level=3] [ref=e109]
+        - paragraph [ref=e110]: Type a Pokemon name or click an example below. Uses debounce + 1s delay.
+        - generic [ref=e111]:
+          - button "pikachu" [ref=e112] [cursor=pointer]:
+            - generic [ref=e113]: pikachu
+          - button "charizard" [ref=e114] [cursor=pointer]:
+            - generic [ref=e115]: charizard
+          - button "mewtwo" [ref=e116] [cursor=pointer]:
+            - generic [ref=e117]: mewtwo
+          - button "gengar" [ref=e118] [cursor=pointer]:
+            - generic [ref=e119]: gengar
+          - button "eevee" [ref=e120] [cursor=pointer]:
+            - generic [ref=e121]: eevee
+          - button "snorlax" [ref=e122] [cursor=pointer]:
+            - generic [ref=e123]: snorlax
+        - generic [ref=e124]:
+          - textbox "Enter Pokemon name..." [active] [ref=e125]: notarealpokemon123
+          - button "🔄" [ref=e126] [cursor=pointer]
+        - generic [ref=e130]: Searching...
+      - generic [ref=e132]:
+        - heading "🎲 Error Demo" [level=3] [ref=e133]
+        - paragraph [ref=e134]: This signal has a 50% chance of throwing an error. Click refresh to retry.
+        - generic [ref=e135]:
+          - generic [ref=e136]:
+            - generic [ref=e137]: ⚠️
+            - generic [ref=e138]: "Error: Something went wrong"
+          - button "🔄 Refresh" [ref=e139] [cursor=pointer]:
+            - generic [ref=e140]: 🔄 Refresh
+      - generic [ref=e142]:
+        - heading "📊 Signal Counter Demo" [level=3] [ref=e143]
+        - paragraph [ref=e144]: Demonstrates mutable state, derived values, and effect signals with auto-refresh
+        - generic [ref=e145]:
+          - generic [ref=e146]:
+            - generic [ref=e147]: Count
+            - generic [ref=e148]: "0"
+          - generic [ref=e149]:
+            - generic [ref=e150]: Doubled
+            - generic [ref=e151]: "0"
+          - generic [ref=e152]:
+            - generic [ref=e153]: Tripled
+            - generic [ref=e154]: "0"
+        - generic [ref=e155]:
+          - button "−" [ref=e156] [cursor=pointer]:
+            - generic [ref=e157]: −
+          - button "+" [ref=e158] [cursor=pointer]:
+            - generic [ref=e159]: +
+          - button "Reset" [ref=e160] [cursor=pointer]:
+            - generic [ref=e161]: Reset
+        - generic [ref=e163] [cursor=pointer]:
+          - checkbox "Auto-increment every 5s" [ref=e164]
+          - generic [ref=e165]: Auto-increment every 5s
+      - generic [ref=e167]:
+        - generic [ref=e168]:
+          - heading "📝 Complex Form Editor Demo" [level=3] [ref=e169]
+          - paragraph [ref=e170]:
+            - text: Using
+            - code [ref=e171]: focus
+            - text: operator with
+            - code [ref=e172]: provider
+            - text: pattern
+          - generic [ref=e173]:
+            - button "🔄 Soft Reset" [ref=e174] [cursor=pointer]:
+              - generic [ref=e175]: 🔄 Soft Reset
+            - button "💥 Hard Reset" [ref=e176] [cursor=pointer]:
+              - generic [ref=e177]: 💥 Hard Reset
+        - generic [ref=e179]:
+          - generic [ref=e180]:
+            - heading "📋 Basic Information" [level=4] [ref=e181]
+            - generic [ref=e182]:
+              - generic [ref=e183]:
+                - generic [ref=e184]: Title *
+                - textbox "Enter title..." [ref=e185]
+              - generic [ref=e186]:
+                - generic [ref=e187]: Status
+                - combobox [ref=e188]:
+                  - option "📝 Draft" [selected]
+                  - option "✅ Submitted"
+                  - option "📦 Archived"
+          - generic [ref=e189]:
+            - generic [ref=e193] [cursor=pointer]: 📝 Description
+            - generic [ref=e197] [cursor=pointer]: 📅 Effective Date
+            - generic [ref=e201] [cursor=pointer]: 💰 Budget
+          - generic [ref=e202]:
+            - heading "🏷️ Tags" [level=4] [ref=e203]
+            - generic [ref=e204]:
+              - generic [ref=e205]:
+                - textbox "Add a tag..." [ref=e206]
+                - button "+ Add" [ref=e207] [cursor=pointer]:
+                  - generic [ref=e208]: + Add
+              - generic [ref=e210]: No tags added
+          - generic [ref=e211]:
+            - heading "⚙️ Settings" [level=4] [ref=e212]
+            - generic [ref=e213]:
+              - generic [ref=e217] [cursor=pointer]: 🔔 Enable Notifications
+              - generic [ref=e218]:
+                - generic [ref=e219]: Visibility
+                - combobox [ref=e220]:
+                  - option "🔒 Private" [selected]
+                  - option "👥 Team"
+                  - option "🌍 Public"
+          - generic [ref=e221]:
+            - heading "👥 Contacts" [level=4] [ref=e222]
+            - generic [ref=e223]:
+              - button "+ Add Contact" [ref=e224] [cursor=pointer]:
+                - generic [ref=e225]: + Add Contact
+              - paragraph [ref=e226]: No contacts added yet
+      - generic [ref=e228]:
+        - generic [ref=e229]:
+          - heading "🧪 useScope Test" [level=3] [ref=e230]
+          - button "+ Add Instance" [ref=e232] [cursor=pointer]
+        - generic [ref=e233]: Each instance creates 2 signals (count + doubled). Watch DevTools to see signals created/disposed when mounting/unmounting.
+        - generic [ref=e234]: Click "+ Add Instance" to create scoped signals
+      - paragraph [ref=e236]: Built with Rextive signals
+    - button "Back to top" [ref=e237] [cursor=pointer]:
+      - img [ref=e238]
+  - generic [ref=e242] [cursor=pointer]:
+    - heading [level=3] [ref=e243]:
+      - img [ref=e245]
+    - generic [ref=e247]:
+      - button "Move to bottom" [ref=e248]:
+        - img [ref=e249]
+      - button "Expand" [ref=e251]:
+        - img [ref=e252]
+```

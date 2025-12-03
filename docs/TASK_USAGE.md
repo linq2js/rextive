@@ -3,12 +3,12 @@
 This guide demonstrates two approaches for handling async task status in Rextive:
 
 1. **`task.from(signal)`** - Value may be undefined during loading/error
-2. **`signal.to(task(defaultValue))`** - Value is never undefined
+2. **`signal.pipe(task(defaultValue))`** - Value is never undefined
 
 ## Quick Comparison
 
-| Feature | `task.from()` | `signal.to(task())` |
-|---------|---------------|---------------------|
+| Feature | `task.from()` | `signal.pipe(task())` |
+|---------|---------------|----------------------|
 | Value type | `T \| undefined` | `T` (always defined) |
 | Initial state | `undefined` | default value |
 | During loading | `undefined` | previous value (or default) |
@@ -23,8 +23,7 @@ This guide demonstrates two approaches for handling async task status in Rextive
 Use `task.from()` when you need explicit handling of loading/error states and showing skeleton/placeholder during loading is acceptable.
 
 ```tsx
-import { signal, rx } from "rextive/react";
-import { task } from "rextive/op";
+import { signal, rx, task } from "rextive/react";
 
 interface User {
   id: number;
@@ -73,13 +72,12 @@ function UserProfile() {
 
 ---
 
-## Approach 2: `signal.to(task())` - Stale-While-Revalidate
+## Approach 2: `signal.pipe(task())` - Stale-While-Revalidate
 
-Use `signal.to(task(defaultValue))` when you want to show stale data while refreshing, similar to the "stale-while-revalidate" caching strategy.
+Use `signal.pipe(task(defaultValue))` when you want to show stale data while refreshing, similar to the "stale-while-revalidate" caching strategy.
 
 ```tsx
-import { signal, rx } from "rextive/react";
-import { task } from "rextive/op";
+import { signal, rx, task } from "rextive/react";
 
 interface User {
   id: number;
@@ -99,7 +97,7 @@ const userProfileAsync = signal(async () => {
 });
 
 // Convert to task signal with default value
-const userProfileTask = userProfileAsync.to(task(DEFAULT_USER));
+const userProfileTask = userProfileAsync.pipe(task(DEFAULT_USER));
 
 function UserProfile() {
   return rx(() => {
@@ -130,7 +128,7 @@ function UserProfile() {
 }
 ```
 
-### When to Use `signal.to(task())`
+### When to Use `signal.pipe(task())`
 
 - Data refreshing / polling
 - Search results (keep showing previous results while searching)
@@ -182,7 +180,7 @@ function Search() {
 }
 ```
 
-### With `signal.to(task())` - Keep showing previous results
+### With `signal.pipe(task())` - Keep showing previous results
 
 ```tsx
 const searchQuery = signal("");
@@ -198,7 +196,7 @@ const searchResults = signal({ searchQuery }, async ({ deps, abortSignal }) => {
 });
 
 // Convert to task signal - keeps previous results while searching
-const searchResultsTask = searchResults.to(task<Post[]>([]));
+const searchResultsTask = searchResults.pipe(task<Post[]>([]));
 
 function Search() {
   return (
@@ -239,7 +237,7 @@ Sometimes you want different behavior for initial load vs refresh:
 ```tsx
 const DEFAULT_USER: User = { id: 0, username: "anonymous", email: "" };
 
-const userProfileTask = userProfileAsync.to(task(DEFAULT_USER));
+const userProfileTask = userProfileAsync.pipe(task(DEFAULT_USER));
 
 function UserProfile() {
   return rx(() => {
@@ -273,7 +271,6 @@ function UserProfile() {
 Choose your approach based on the UX you want:
 
 - **`task.from()`**: Content is replaced during loading/error → Use for initial loads, auth checks
-- **`signal.to(task())`**: Content persists during loading/error → Use for refreshes, search, dashboards
+- **`signal.pipe(task())`**: Content persists during loading/error → Use for refreshes, search, dashboards
 
 Both approaches provide the same `{ loading, error, value, status }` interface, making it easy to switch between them as your requirements evolve.
-

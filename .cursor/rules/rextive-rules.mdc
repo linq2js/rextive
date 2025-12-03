@@ -1156,6 +1156,50 @@ const throttledPosition = mousePosition.pipe(throttle(100));
 const pacedData = fastData.pipe(pace(1000));
 ```
 
+#### `task()` - Async State with Stale-While-Revalidate ⭐ NEW
+
+Creates a task signal that ensures `value` is always defined (never undefined):
+
+```tsx
+import { task } from "rextive/op";
+
+const userProfile = signal(async () => fetchUser());
+const userTask = userProfile.pipe(task({ name: "Guest" }));
+```
+
+**Stale-while-revalidate pattern:**
+- **First load**: Uses `initial` value while loading
+- **Loading after success**: Shows previous successful value (stale data)
+- **Success**: Shows current value (fresh data)
+
+```tsx
+const DEFAULT_USER = { id: 0, name: "Loading..." };
+
+const userProfileTask = userProfileAsync.pipe(task(DEFAULT_USER));
+
+function UserProfile() {
+  return rx(() => {
+    const { loading, error, value } = userProfileTask();
+    // ✅ value is ALWAYS defined - never undefined!
+    return (
+      <div>
+        {loading && <Spinner />}
+        <h2>{value.name}</h2>
+        {error && <ErrorToast error={error} />}
+      </div>
+    );
+  });
+}
+```
+
+**With options:**
+
+```tsx
+const userTask = userProfile.pipe(
+  task(DEFAULT_USER, { name: "userTask" })
+);
+```
+
 ---
 
 ### 11. Plugins (`rextive/plugins`) ⭐ NEW
@@ -1593,6 +1637,7 @@ function Component() {
 - `debounce(ms)` - Debounce
 - `throttle(ms)` - Throttle
 - `pace(ms)` - Rate limit
+- `task(initial, options?)` - Async state with stale-while-revalidate
 
 ### Plugins (`rextive/plugins`) ⭐
 
