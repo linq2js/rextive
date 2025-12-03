@@ -1,4 +1,4 @@
-import type { Signal, Tag } from "../types";
+import type { Signal, Tag, SignalMap } from "../types";
 import type { SignalErrorWhen } from "../utils/errorTracking";
 
 /**
@@ -51,6 +51,10 @@ export type SignalInfo = {
   kind: "mutable" | "computed";
   /** The signal instance */
   signal: Signal<any>;
+  /** Dependencies (for computed signals) - maps name to signal uid */
+  deps?: SignalMap;
+  /** Dependency signal IDs (computed from deps for easy lookup) */
+  depIds?: string[];
   /** Creation timestamp */
   createdAt: number;
   /** Last update timestamp */

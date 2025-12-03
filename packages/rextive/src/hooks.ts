@@ -6,7 +6,7 @@
  * - DevTools/monitoring (global via setHooks)
  */
 
-import type { AnySignal, Task, Tag } from "./types";
+import type { AnySignal, Task, Tag, SignalMap } from "./types";
 import { getGlobalThisAccessor } from "./utils/globalThisAccessor";
 
 // ============================================
@@ -20,7 +20,7 @@ export interface Hooks {
   onTaskAccess: (task: Task<any>) => void;
 
   // Lifecycle monitoring (typically global via setHooks)
-  onSignalCreate?: (signal: AnySignal<any>) => void;
+  onSignalCreate?: (signal: AnySignal<any>, deps?: SignalMap) => void;
   onSignalChange?: (signal: AnySignal<any>, value: unknown) => void;
   onSignalError?: (signal: AnySignal<any>, error: unknown) => void;
   onSignalDispose?: (signal: AnySignal<any>) => void;
@@ -50,10 +50,13 @@ const hooksAccessor = getGlobalThisAccessor("__REXTIVE_HOOKS__", defaultHooks);
 // Hooks State
 // ============================================
 
+/** Queued signal creation event */
+type QueuedSignal = { signal: AnySignal<any>; deps?: SignalMap };
+
 /** Accessor for global queue (shared across all module instances) */
 const queueAccessor = getGlobalThisAccessor(
   "__REXTIVE_QUEUE__",
-  [] as AnySignal<any>[]
+  [] as QueuedSignal[]
 );
 
 // ============================================
@@ -85,10 +88,10 @@ export function setHooks(
   // Replay queued signal creations now that hooks are set
   const globalQueue = queueAccessor.get();
   if (newHooks.onSignalCreate && globalQueue.length > 0) {
-    const signals = [...globalQueue];
+    const queued = [...globalQueue];
     globalQueue.length = 0; // Clear queue
-    for (const signal of signals) {
-      newHooks.onSignalCreate?.(signal);
+    for (const { signal, deps } of queued) {
+      newHooks.onSignalCreate?.(signal, deps);
     }
   }
 }
@@ -179,17 +182,17 @@ let forgetModeDepth = 0;
 
 /** Emit devtools events */
 export const emit = {
-  signalCreate: (signal: AnySignal<any>) => {
+  signalCreate: (signal: AnySignal<any>, deps?: SignalMap) => {
     const hooks = getHooks();
     const onSignalCreate = hooks.onSignalCreate;
 
     if (!onSignalCreate) {
       // DevTools not enabled yet - queue for later replay in global queue
-      queueAccessor.get().push(signal);
+      queueAccessor.get().push({ signal, deps });
       return;
     }
 
-    onSignalCreate(signal);
+    onSignalCreate(signal, deps);
   },
   signalChange: (signal: AnySignal<any>, value: unknown) => {
     getHooks().onSignalChange?.(signal, value);

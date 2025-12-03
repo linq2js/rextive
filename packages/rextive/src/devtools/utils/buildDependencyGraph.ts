@@ -80,112 +80,72 @@ export function buildDependencyGraph(
     }
   }
 
-  // 3. Extract focus signal relationships (parent → focus)
-  // Focus signals have names like: "#focus(parentName.path)" or "focus(parentName.path)"
+  // 3. Build edges from actual signal dependencies (most reliable!)
+  // This uses the depIds captured at signal creation time
   for (const [id, info] of signals) {
     if (info.disposed) continue;
 
-    const name = info.signal.displayName || info.name;
-
-    // Check if it's a focus signal
-    const focusMatch = name.match(/#?focus\(([^)]+)\)/);
-    if (focusMatch) {
-      const path = focusMatch[1];
-      // Extract parent name (before first dot, or entire path if no dot)
-      const parts = path.split(".");
-      const parentName = parts[0];
-      const focusPath = parts.slice(1).join(".");
-
-      // Find parent signal by name - prefer non-disposed signals
-      let matchedParentId: string | null = null;
-
-      for (const [parentId, parentInfo] of signals) {
-        const parentDisplayName =
-          parentInfo.signal.displayName || parentInfo.name;
-        // Match parent name (could be full name or just the base)
-        if (
-          parentDisplayName === parentName ||
-          parentDisplayName.endsWith(`.${parentName}`) ||
-          parentName === parentDisplayName.split(".")[0]
-        ) {
-          // Prefer non-disposed signals over disposed ones
-          if (!parentInfo.disposed) {
-            matchedParentId = parentId;
-            break; // Found active parent, use it
-          } else if (matchedParentId === null) {
-            // First match is disposed, keep looking but remember it as fallback
-            matchedParentId = parentId;
+    // Use depIds if available (computed signals)
+    if (info.depIds && info.depIds.length > 0) {
+      for (const depId of info.depIds) {
+        if (nodes.has(depId)) {
+          const key = `${depId}→${id}:dependency`;
+          if (!edgeMap.has(key)) {
+            const edge: GraphEdge = {
+              from: depId,
+              to: id,
+              type: "dependency",
+              weight: 1,
+            };
+            edgeMap.set(key, edge);
+            edges.push(edge);
           }
-        }
-      }
-
-      // Create edge if parent found
-      if (matchedParentId) {
-        const key = `${matchedParentId}→${id}:focus`;
-        if (!edgeMap.has(key)) {
-          const edge: GraphEdge = {
-            from: matchedParentId,
-            to: id,
-            type: "focus",
-            label: focusPath || undefined,
-            weight: 1,
-          };
-          edgeMap.set(key, edge);
-          edges.push(edge);
         }
       }
     }
   }
 
-  // 4. Extract pipe relationships (source → transformed)
-  // Pipe operators create signals with names like: "#to(sourceName)" or "#filter(sourceName)"
+  // 4. Parse chain names (source>#op-N) for pipe relationships
+  // This supplements depIds for operators that create new signals
   for (const [id, info] of signals) {
     if (info.disposed) continue;
 
     const name = info.signal.displayName || info.name;
 
-    // Check for pipe operators (to, filter, scan, etc.)
-    const pipeMatch = name.match(
-      /#(to|filter|scan|debounce|throttle)\(([^)]+)\)/
-    );
-    if (pipeMatch) {
-      const operator = pipeMatch[1];
-      const sourceName = pipeMatch[2];
+    // Check for chain format: source>#operator-N or source>focus(path)
+    if (name.includes(">")) {
+      const segments = name.split(">");
 
-      // Find source signal - prefer non-disposed signals
-      let matchedSourceId: string | null = null;
+      // Find the immediate parent (segment before last)
+      if (segments.length >= 2) {
+        const parentName = segments.slice(0, -1).join(">");
+        const operatorPart = segments[segments.length - 1];
 
-      for (const [sourceId, sourceInfo] of signals) {
-        const sourceDisplayName =
-          sourceInfo.signal.displayName || sourceInfo.name;
-        if (
-          sourceDisplayName === sourceName ||
-          sourceDisplayName.includes(sourceName)
-        ) {
-          // Prefer non-disposed signals over disposed ones
-          if (!sourceInfo.disposed) {
-            matchedSourceId = sourceId;
-            break; // Found active source, use it
-          } else if (matchedSourceId === null) {
-            // First match is disposed, keep looking but remember it as fallback
-            matchedSourceId = sourceId;
+        // Find parent signal by matching displayName
+        for (const [parentId, parentInfo] of signals) {
+          if (parentInfo.disposed) continue;
+          const parentDisplayName =
+            parentInfo.signal.displayName || parentInfo.name;
+
+          if (parentDisplayName === parentName) {
+            const key = `${parentId}→${id}:pipe`;
+            if (!edgeMap.has(key)) {
+              // Extract operator name for label
+              const opMatch = operatorPart.match(/^#?(\w+)/);
+              const label = opMatch ? opMatch[1] : undefined;
+
+              const edge: GraphEdge = {
+                from: parentId,
+                to: id,
+                type: "pipe",
+                label,
+                weight: 1,
+              };
+              edgeMap.set(key, edge);
+              edges.push(edge);
+            }
+            break;
           }
-        }
-      }
-
-      // Create edge if source found
-      if (matchedSourceId) {
-        const key = `${matchedSourceId}→${id}:pipe`;
-        if (!edgeMap.has(key)) {
-          const edge: GraphEdge = {
-            from: matchedSourceId,
-            to: id,
-            type: "pipe",
-            label: operator,
-            weight: 1,
-          };
-          edgeMap.set(key, edge);
-          edges.push(edge);
         }
       }
     }

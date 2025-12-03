@@ -491,8 +491,8 @@ export function createComputedSignal(
 
   attacher(instanceRef, onDispose).attach(use);
 
-  // Notify devtools of signal creation
-  emit.signalCreate(instanceRef);
+  // Notify devtools of signal creation (with dependencies for graph building)
+  emit.signalCreate(instanceRef, deps);
 
   if (!lazy) {
     try {

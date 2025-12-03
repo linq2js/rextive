@@ -22,7 +22,7 @@
  * @module devtools
  */
 
-import type { Signal, Tag, DevTools } from "../types";
+import type { Signal, Tag, DevTools, SignalMap } from "../types";
 import { setHooks, resetHooks } from "../hooks";
 import { getErrorTrace } from "../utils/errorTracking";
 import type {
@@ -436,11 +436,12 @@ function addToChain(signalId: string): void {
 // ============================================================================
 
 const devToolsHooks: DevTools = {
-  onSignalCreate(signal: Signal<any>): void {
+  onSignalCreate(signal: Signal<any>, deps?: SignalMap): void {
     if ($config().logToConsole) {
       console.log(
         `[${$config().name}] onSignalCreate called for:`,
-        signal.displayName || "unnamed"
+        signal.displayName || "unnamed",
+        deps ? `with ${Object.keys(deps).length} deps` : ""
       );
     }
     // Use signal's built-in unique ID
@@ -457,11 +458,18 @@ const devToolsHooks: DevTools = {
       }
     }
 
+    // Extract dependency signal IDs for graph building
+    const depIds = deps
+      ? Object.values(deps).map((dep) => dep.uid)
+      : undefined;
+
     const info: SignalInfo = {
       id,
       name, // Display name (may not be unique)
       kind: getSignalKind(signal),
       signal,
+      deps,
+      depIds,
       createdAt: now,
       updatedAt: now,
       changeCount: 0,

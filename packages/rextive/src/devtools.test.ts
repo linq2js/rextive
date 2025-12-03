@@ -31,7 +31,8 @@ describe("DevTools integration", () => {
       const sig = signal(0, { name: "counter" });
 
       expect(devtools.onSignalCreate).toHaveBeenCalledOnce();
-      expect(devtools.onSignalCreate).toHaveBeenCalledWith(sig);
+      // Mutable signals have no deps (undefined)
+      expect(devtools.onSignalCreate).toHaveBeenCalledWith(sig, undefined);
     });
 
     it("should call onSignalDispose when signal is disposed", () => {
@@ -72,14 +73,15 @@ describe("DevTools integration", () => {
   });
 
   describe("computed signal lifecycle", () => {
-    it("should call onSignalCreate for computed signals", () => {
+    it("should call onSignalCreate for computed signals with deps", () => {
       const a = signal(1, { name: "a" });
       const doubled = signal({ a }, ({ deps }) => deps.a * 2, {
         name: "doubled",
       });
 
       expect(devtools.onSignalCreate).toHaveBeenCalledTimes(2);
-      expect(devtools.onSignalCreate).toHaveBeenCalledWith(doubled);
+      // Computed signals include their dependencies
+      expect(devtools.onSignalCreate).toHaveBeenCalledWith(doubled, { a });
     });
 
     it("should call onSignalChange when computed value changes", () => {
