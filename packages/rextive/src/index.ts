@@ -3,41 +3,6 @@
  *
  * Rextive - A reactive state management library with explicit dependencies.
  *
- * Core features:
- * - **signal()** - Create reactive mutable and computed signals
- * - **signal.batch()** - Batch multiple updates into one notification
- * - **signal.tag()** - Group signals for bulk operations
- * - **signal.on()** - Subscribe to multiple signals
- * - **signal.from()** - Combine signals into records or tuples
- * - **disposable()** - Combine disposable resources
- * - **wait()** - Suspense-compatible async utilities
- * - **task.from()** - Manual loading state management
- *
- * @example Basic usage
- * ```ts
- * import { signal, disposable, wait } from 'rextive';
- *
- * // Mutable signal
- * const count = signal(0);
- * count.set(1);
- * count.set(prev => prev + 1);
- *
- * // Computed signal with explicit dependencies
- * const doubled = signal({ count }, ({ deps }) => deps.count * 2);
- *
- * // Async computed
- * const userData = signal({ userId }, async ({ deps, abortSignal }) => {
- *   const res = await fetch(`/users/${deps.userId}`, { signal: abortSignal });
- *   return res.json();
- * });
- *
- * // Batch updates
- * signal.batch(() => {
- *   count.set(10);
- *   name.set("Alice");
- * });
- * ```
- *
  * @see {@link https://jsr.io/@ging/rextive | JSR Documentation}
  */
 
