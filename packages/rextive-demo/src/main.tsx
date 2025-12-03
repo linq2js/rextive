@@ -24,12 +24,11 @@ async function bootstrap() {
 
   // Render DevToolsPanel in a SEPARATE root (only in dev mode)
   // This isolates DevTools from the app's render cycle, preventing warnings
-  if (import.meta.env.DEV) {
-    const devtoolsRoot = document.createElement("div");
-    devtoolsRoot.id = "rextive-devtools-root";
-    document.body.appendChild(devtoolsRoot);
-    createRoot(devtoolsRoot).render(<DevToolsPanel />);
-  }
+  // render devtools in production for showcase
+  const devtoolsRoot = document.createElement("div");
+  devtoolsRoot.id = "rextive-devtools-root";
+  document.body.appendChild(devtoolsRoot);
+  createRoot(devtoolsRoot).render(<DevToolsPanel />);
 }
 
 bootstrap();
