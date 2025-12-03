@@ -3,7 +3,7 @@ import { Button } from "./Button";
 
 // 🎯 One concept for everything
 const count = signal(0, { name: "demo:count" }); // Mutable state
-const doubled = count.to((x) => x * 2); // Derived value
+const doubled = count.to((x) => x * 2, { name: "demo:doubled" }); // Derived value
 const tripled = signal({ count }, ({ deps }) => deps.count * 3, {
   name: "demo:tripled",
 }); // Explicit deps

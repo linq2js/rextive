@@ -226,6 +226,7 @@ export function DevToolsPanel(): React.ReactElement | null {
   const [flashingSignals, setFlashingSignals] = useState<
     Map<string, "change" | "create">
   >(new Map());
+  const [flashingTabs, setFlashingTabs] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [editingSignal, setEditingSignal] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -327,7 +328,27 @@ export function DevToolsPanel(): React.ReactElement | null {
   const eventIdRef = useRef(0);
   const flashTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const autoToggleFlashTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tabFlashTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Flash tab header (only shows animation if not already on that tab)
+  const flashTab = useCallback((tabId: string) => {
+    const existingTimeout = tabFlashTimeoutsRef.current.get(tabId);
+    if (existingTimeout) clearTimeout(existingTimeout);
+
+    setFlashingTabs((prev) => new Set(prev).add(tabId));
+
+    const timeout = setTimeout(() => {
+      setFlashingTabs((prev) => {
+        const next = new Set(prev);
+        next.delete(tabId);
+        return next;
+      });
+      tabFlashTimeoutsRef.current.delete(tabId);
+    }, 1500); // Flash for 1.5s (3 animation cycles of 0.5s)
+
+    tabFlashTimeoutsRef.current.set(tabId, timeout);
+  }, []);
 
   // Mobile mode detection - force bottom position on small screens
   useEffect(() => {
@@ -474,6 +495,7 @@ export function DevToolsPanel(): React.ReactElement | null {
 
       snapshotCounterRef.current++;
       setSnapshots((prev) => [newSnapshot, ...prev]);
+      flashTab("snaps"); // Flash Snaps tab when new snapshot is taken
     },
     [
       signals,
@@ -481,6 +503,7 @@ export function DevToolsPanel(): React.ReactElement | null {
       bookmarkedSignals,
       snapshots,
       snapshotsAreEqual,
+      flashTab,
     ]
   );
 
@@ -529,8 +552,9 @@ export function DevToolsPanel(): React.ReactElement | null {
 
       snapshotCounterRef.current++;
       setSnapshots((prev) => [newSnapshot, ...prev]);
+      flashTab("snaps"); // Flash Snaps tab when new snapshot is taken
     },
-    [signals]
+    [signals, flashTab]
   );
 
   const deleteSnapshot = useCallback(
@@ -923,6 +947,11 @@ export function DevToolsPanel(): React.ReactElement | null {
         return newEvents.slice(0, 100);
       });
 
+      // Flash Events tab on error
+      if (isError) {
+        flashTab("events");
+      }
+
       const flashSignal = (signalId: string, type: "change" | "create") => {
         const existingTimeout = flashTimeoutsRef.current.get(signalId);
         if (existingTimeout) clearTimeout(existingTimeout);
@@ -943,6 +972,7 @@ export function DevToolsPanel(): React.ReactElement | null {
 
       if (event.type === "signal:change" && "signalId" in event) {
         flashSignal(event.signalId, "change");
+        flashTab("signals"); // Flash Signals tab on value change
       } else if (event.type === "signal:create" && "signal" in event) {
         flashSignal(event.signal.id, "create");
 
@@ -968,6 +998,8 @@ export function DevToolsPanel(): React.ReactElement | null {
       unsubscribe();
       flashTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
       flashTimeoutsRef.current.clear();
+      tabFlashTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+      tabFlashTimeoutsRef.current.clear();
     };
   }, [enabled]);
 
@@ -3823,6 +3855,7 @@ export function DevToolsPanel(): React.ReactElement | null {
                 }))}
                 activeTab={activeTab}
                 onTabChange={(tabId) => updateActiveTab(tabId as Tab)}
+                flashingTabs={flashingTabs}
               />
 
               {/* Tab content with search, filters, and main content */}
