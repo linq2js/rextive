@@ -36,10 +36,17 @@
  *
  * ## How it works
  *
- * 1. Creates a Proxy that wraps the input object
- * 2. For **functions**: Returns the same wrapper function reference that delegates to the latest implementation
- * 3. For **objects/arrays**: Returns the cached reference if shallowly equal to the new value
- * 4. For **primitives**: Returns the value directly (no caching needed)
+ * Creates a Proxy that wraps the input object. Property access returns:
+ *
+ * | Type | Behavior |
+ * |------|----------|
+ * | **Functions** | Stable wrapper that delegates to latest implementation |
+ * | **Arrays** | Cached if shallowly equal (same elements) |
+ * | **Objects** | Cached if shallowly equal (same keys/values) |
+ * | **Dates** | Cached if same timestamp |
+ * | **Sets** | Cached if same size and elements |
+ * | **Maps** | Cached if same size and key-value pairs |
+ * | **Primitives** | Returned directly (no caching needed) |
  *
  * ## Full Example
  *
@@ -173,25 +180,54 @@ export class UseStableController<T extends object> {
           return cachedValue;
         }
 
-        // Arrays: Return cached if shallowly equal
-        if (Array.isArray(current)) {
-          if (
-            Array.isArray(cachedValue) &&
-            shallowEquals(current, cachedValue, this.options.equals)
-          ) {
-            return cachedValue;
-          }
-          cache.set(key, current);
-          return current;
-        }
-
         // Objects (including Date)
         if (current && typeof current === "object") {
+          // Arrays: Return cached if shallowly equal
+          if (Array.isArray(current)) {
+            if (
+              Array.isArray(cachedValue) &&
+              shallowEquals(current, cachedValue, this.options.equals)
+            ) {
+              return cachedValue;
+            }
+            cache.set(key, current);
+            return current;
+          }
+
           // Dates: Compare by timestamp
           if (current instanceof Date) {
             if (
               cachedValue instanceof Date &&
               cachedValue.getTime() === current.getTime()
+            ) {
+              return cachedValue;
+            }
+            cache.set(key, current);
+            return current;
+          }
+
+          // Sets: Compare by size and element membership
+          if (current instanceof Set) {
+            if (
+              cachedValue instanceof Set &&
+              current.size === cachedValue.size &&
+              [...current].every((v) => cachedValue.has(v))
+            ) {
+              return cachedValue;
+            }
+            cache.set(key, current);
+            return current;
+          }
+
+          // Maps: Compare by size and key-value pairs
+          if (current instanceof Map) {
+            if (
+              cachedValue instanceof Map &&
+              current.size === cachedValue.size &&
+              [...current].every(
+                ([k, v]) =>
+                  cachedValue.has(k) && Object.is(cachedValue.get(k), v)
+              )
             ) {
               return cachedValue;
             }

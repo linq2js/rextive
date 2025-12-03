@@ -205,6 +205,200 @@ describe("UseStableController", () => {
     });
   });
 
+  describe("sets", () => {
+    it("should return cached Set if same elements", () => {
+      const value1 = { ids: new Set([1, 2, 3]) };
+      const controller = new UseStableController(value1);
+
+      const set1 = controller.proxy.ids;
+
+      // Update with same elements (different reference)
+      const value2 = { ids: new Set([1, 2, 3]) };
+      controller.onRender(value2, {});
+
+      const set2 = controller.proxy.ids;
+
+      // Same reference (cached)
+      expect(set1).toBe(set2);
+    });
+
+    it("should return new Set if different elements", () => {
+      const value1 = { ids: new Set([1, 2, 3]) };
+      const controller = new UseStableController(value1);
+
+      const set1 = controller.proxy.ids;
+
+      // Update with different elements
+      const value2 = { ids: new Set([1, 2, 4]) };
+      controller.onRender(value2, {});
+
+      const set2 = controller.proxy.ids;
+
+      expect(set1).not.toBe(set2);
+      expect(set2).toEqual(new Set([1, 2, 4]));
+    });
+
+    it("should detect Set size changes", () => {
+      const value1 = { ids: new Set([1, 2, 3]) };
+      const controller = new UseStableController(value1);
+
+      const set1 = controller.proxy.ids;
+
+      // Update with different size
+      const value2 = { ids: new Set([1, 2]) };
+      controller.onRender(value2, {});
+
+      const set2 = controller.proxy.ids;
+
+      expect(set1).not.toBe(set2);
+    });
+
+    it("should handle Set with object elements (by reference)", () => {
+      const obj = { id: 1 };
+      const value1 = { items: new Set([obj]) };
+      const controller = new UseStableController(value1);
+
+      const set1 = controller.proxy.items;
+
+      // Same object reference in Set
+      const value2 = { items: new Set([obj]) };
+      controller.onRender(value2, {});
+
+      const set2 = controller.proxy.items;
+
+      // Same reference because Set.has uses reference equality
+      expect(set1).toBe(set2);
+    });
+
+    it("should detect different object references in Set", () => {
+      const value1 = { items: new Set([{ id: 1 }]) };
+      const controller = new UseStableController(value1);
+
+      const set1 = controller.proxy.items;
+
+      // Different object reference (even if equal content)
+      const value2 = { items: new Set([{ id: 1 }]) };
+      controller.onRender(value2, {});
+
+      const set2 = controller.proxy.items;
+
+      // Different because Set.has uses reference equality
+      expect(set1).not.toBe(set2);
+    });
+  });
+
+  describe("maps", () => {
+    it("should return cached Map if same key-value pairs", () => {
+      const value1 = {
+        data: new Map([
+          ["a", 1],
+          ["b", 2],
+        ]),
+      };
+      const controller = new UseStableController(value1);
+
+      const map1 = controller.proxy.data;
+
+      // Update with same key-value pairs (different reference)
+      const value2 = {
+        data: new Map([
+          ["a", 1],
+          ["b", 2],
+        ]),
+      };
+      controller.onRender(value2, {});
+
+      const map2 = controller.proxy.data;
+
+      // Same reference (cached)
+      expect(map1).toBe(map2);
+    });
+
+    it("should return new Map if different values", () => {
+      const value1 = { data: new Map([["a", 1]]) };
+      const controller = new UseStableController(value1);
+
+      const map1 = controller.proxy.data;
+
+      // Update with different value
+      const value2 = { data: new Map([["a", 2]]) };
+      controller.onRender(value2, {});
+
+      const map2 = controller.proxy.data;
+
+      expect(map1).not.toBe(map2);
+      expect(map2.get("a")).toBe(2);
+    });
+
+    it("should return new Map if different keys", () => {
+      const value1 = { data: new Map([["a", 1]]) };
+      const controller = new UseStableController(value1);
+
+      const map1 = controller.proxy.data;
+
+      // Update with different key
+      const value2 = { data: new Map([["b", 1]]) };
+      controller.onRender(value2, {});
+
+      const map2 = controller.proxy.data;
+
+      expect(map1).not.toBe(map2);
+    });
+
+    it("should detect Map size changes", () => {
+      const value1 = {
+        data: new Map([
+          ["a", 1],
+          ["b", 2],
+        ]),
+      };
+      const controller = new UseStableController(value1);
+
+      const map1 = controller.proxy.data;
+
+      // Update with different size
+      const value2 = { data: new Map([["a", 1]]) };
+      controller.onRender(value2, {});
+
+      const map2 = controller.proxy.data;
+
+      expect(map1).not.toBe(map2);
+    });
+
+    it("should handle Map with object keys (by reference)", () => {
+      const key = { id: 1 };
+      const value1 = { data: new Map([[key, "value"]]) };
+      const controller = new UseStableController(value1);
+
+      const map1 = controller.proxy.data;
+
+      // Same object key reference
+      const value2 = { data: new Map([[key, "value"]]) };
+      controller.onRender(value2, {});
+
+      const map2 = controller.proxy.data;
+
+      // Same reference because Map.has uses reference equality for keys
+      expect(map1).toBe(map2);
+    });
+
+    it("should use Object.is for value comparison", () => {
+      const value1 = { data: new Map([["a", NaN]]) };
+      const controller = new UseStableController(value1);
+
+      const map1 = controller.proxy.data;
+
+      // NaN === NaN is false, but Object.is(NaN, NaN) is true
+      const value2 = { data: new Map([["a", NaN]]) };
+      controller.onRender(value2, {});
+
+      const map2 = controller.proxy.data;
+
+      // Same reference because Object.is handles NaN correctly
+      expect(map1).toBe(map2);
+    });
+  });
+
   describe("primitives", () => {
     it("should return primitives directly", () => {
       const value = {
@@ -295,6 +489,7 @@ describe("UseStableController", () => {
 
       expect(Object.keys(controller.proxy)).toEqual(["a"]);
 
+      // @ts-expect-error - b is not in the value
       controller.onRender({ a: 1, b: 2 }, {});
       expect(Object.keys(controller.proxy)).toEqual(["a", "b"]);
     });
@@ -355,4 +550,3 @@ describe("UseStableController", () => {
     });
   });
 });
-
