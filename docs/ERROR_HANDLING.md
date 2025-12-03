@@ -81,9 +81,10 @@ if (safeValue !== undefined) {
 When a signal's value is a Promise, Rextive:
 
 1. **Detects** the Promise
-2. **Attaches** a rejection handler
-3. **Validates** the Promise is still current
-4. **Updates** the error state and notifies subscribers
+2. **Notifies** subscribers when the Promise settles (resolve or reject)
+3. **Ignores** stale Promise results after refresh
+
+Use `task.from()` to access the loading/error/success state:
 
 ```tsx
 const asyncSignal = signal(async () => {
@@ -91,12 +92,15 @@ const asyncSignal = signal(async () => {
   throw new Error("Async error");
 });
 
-// Trigger computation
-asyncSignal.tryGet();
+// Trigger computation - value is a Promise
+const promise = asyncSignal();
 
 // Wait for rejection
 await delay(150);
-console.log(asyncSignal.error()); // Error: Async error
+
+// Access error via task.from()
+const state = task.from(promise);
+console.log(state.error); // Error: Async error
 ```
 
 ### Stale Promise Handling
@@ -109,20 +113,19 @@ const fetchData = signal(async () => {
   throw new Error("Old error");
 });
 
-fetchData.tryGet();
+fetchData(); // Start first computation
 fetchData.refresh(); // New computation starts
 
 // Old Promise rejects but error is ignored
-await delay(1500);
-console.log(fetchData.error()); // undefined
+// because it's no longer the current value
 ```
 
-### With `loadable()` - Full Loading State Control
+### With `task.from()` - Full Loading State Control
 
 ```tsx
 function UserProfile() {
   return rx(() => {
-    const state = loadable(userData());
+    const state = task.from(userData());
 
     switch (state.status) {
       case "loading":
@@ -206,8 +209,10 @@ try {
 ```tsx
 const data = signal(async () => fetchData());
 
-if (data.error()) {
-  data.refresh(); // Clear error and retry
+// Check error via task.from()
+const state = task.from(data());
+if (state.error) {
+  data.refresh(); // Retry with new computation
   // or
   data.reset(); // Reset to initial state
 }

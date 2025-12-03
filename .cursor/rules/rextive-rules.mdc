@@ -487,9 +487,31 @@ userData.stale(); // Will recompute on next access
 
 #### `.error()` / `.tryGet()` - Safe Error Access ⭐ NEW
 
+For **synchronous errors** during signal computation:
+
 ```tsx
-const error = signal.error();    // Get error without throwing
+const error = signal.error();    // Get sync error without throwing
 const value = signal.tryGet();   // Get value or undefined (never throws)
+```
+
+**⚠️ For async signals**: Use `task.from()` to access error states:
+
+```tsx
+// Async signal returns a Promise
+const asyncData = signal(async () => fetchData());
+
+// Access async state via task.from()
+const promise = asyncData();
+const state = task.from(promise);
+// state.loading, state.error, state.value
+
+// In React with rx()
+{rx(() => {
+  const state = task.from(asyncData());
+  if (state.loading) return <Spinner />;
+  if (state.error) return <Error error={state.error} />;
+  return <div>{state.value}</div>;
+})}
 ```
 
 ---
@@ -1017,10 +1039,13 @@ await wait.delay(1000);
 
 ---
 
-### 9. `loadable()` - Manual Loading States
+### 9. `task.from()` - Async State Access
+
+Async signals return Promises. Use `task.from()` to access loading/error/success states:
 
 ```tsx
-const state = loadable(promise);
+const promise = asyncSignal();
+const state = task.from(promise);
 
 state.status;   // "loading" | "success" | "error"
 state.loading;  // boolean
@@ -1032,12 +1057,18 @@ state.error;    // error if rejected
 
 ```tsx
 {rx(() => {
-  const state = loadable(userData());
+  const state = task.from(userData());
   if (state.loading) return <Spinner />;
   if (state.error) return <Error error={state.error} />;
   return <div>{state.value.name}</div>;
 })}
 ```
+
+**Key points:**
+- Async signals return the **Promise itself** as their value
+- Subscribers are **notified when the Promise settles** (resolve or reject)
+- Use `task.from()` to check the Promise's current state
+- The `onError` callback is for **sync errors only** (during computation)
 
 ---
 
@@ -1333,7 +1364,7 @@ function SearchBox() {
     <div>
       <input onChange={(e) => scope.searchInput.set(e.target.value)} />
       {rx(() => {
-        const state = loadable(scope.results());
+        const state = task.from(scope.results());
         if (state.loading) return <div>Searching...</div>;
         return <ul>{state.value.map(item => <li key={item.id}>{item.name}</li>)}</ul>;
       })}
@@ -1537,13 +1568,13 @@ function Component() {
 - `wait.timeout()` - With timeout
 - `wait.delay()` - Simple delay
 
-### Loadable Methods
+### Task Methods
 
-- `loadable()` - Normalize to loadable
-- `loadable.loading()` - Create loading state
-- `loadable.success()` - Create success state
-- `loadable.error()` - Create error state
-- `loadable.is()` - Type guard
+- `task.from(promise)` - Get loading/error/success state from Promise
+- `task.loading()` - Create loading state
+- `task.success(value)` - Create success state
+- `task.error(error)` - Create error state
+- `task.is(value)` - Type guard
 
 ### React Hooks
 
@@ -1666,6 +1697,6 @@ emit.signalError(signalRef, error);
 - Add `dispose()` method for single cleanup, use `disposable()` to combine multiple
 - Use `rx()` for reactive rendering
 - Use `wait()` for Suspense-based async handling
-- Use `loadable()` for manual loading states
+- Use `task.from()` for manual loading states
 - Use `abortSignal` for queries, not mutations
 - Import from `rextive/react` in React apps

@@ -183,7 +183,7 @@ function UserProfile({ userId }: { userId: string }) {
   }, { watch: [userId] });
 
   return rx(() => {
-    const state = loadable(scope.value);
+    const state = task.from(scope.value);
     if (state.loading) return <Loading />;
     if (state.error) return <Error error={state.error} />;
     return <div>{state.value.name}</div>;

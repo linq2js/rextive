@@ -66,11 +66,11 @@ Auto-tracks any signals accessed inside the function.
 })}
 ```
 
-**With manual loading states (`loadable()`):**
+**With manual loading states (`task.from()`):**
 
 ```tsx
 {rx(() => {
-  const state = loadable(userData());
+  const state = task.from(userData());
   if (state.loading) return <Spinner />;
   if (state.error) return <Error error={state.error} />;
   return <div>{state.value.name}</div>;
@@ -312,7 +312,7 @@ function App() {
 // Use useScope for component-scoped signals
 const { signal } = useScope(() => disposable({ signal: signal(0) }));
 
-// Wrap async values with wait() or loadable()
+// Wrap async values with wait() or task.from()
 rx(() => <div>{wait(asyncSignal()).name}</div>)
 ```
 

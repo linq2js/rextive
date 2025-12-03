@@ -525,12 +525,12 @@ Simple delay:
 await wait.delay(1000);
 ```
 
-### `loadable()`
+### `task.from()`
 
-Manual loading states:
+Access loading/error/success state from a Promise:
 
 ```tsx
-const state = loadable(promise);
+const state = task.from(promise);
 
 state.status;   // "loading" | "success" | "error"
 state.loading;  // boolean

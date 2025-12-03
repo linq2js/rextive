@@ -326,7 +326,7 @@ function Dashboard() {
   return (
     <div>
       {rx(() => {
-        const state = loadable(scope.data);
+        const state = task.from(scope.data);
         if (state.loading) return <Spinner />;
         return <DashboardView data={state.value} />;
       })}

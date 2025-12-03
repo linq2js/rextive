@@ -130,7 +130,7 @@ Demonstrates async signals with automatic request cancellation. When the depende
 - Creating async computed signals
 - Using `abortSignal` for automatic cancellation
 - Integrating with React Suspense
-- Manual loading states with `loadable()`
+- Manual loading states with `task.from()`
 
 ### Code (Suspense Mode)
 
@@ -174,12 +174,12 @@ function Profile() {
 ### Code (Manual Loading States)
 
 ```tsx
-import { loadable } from "rextive";
+import { task } from "rextive";
 
 function ProfileManual() {
   return rx(() => {
-    // loadable() normalizes Promise to { loading, error, value } object
-    const state = loadable(user);
+    // task.from() normalizes Promise to { loading, error, value } object
+    const state = task.from(user);
 
     if (state.loading) return <div>Loading user...</div>;
     if (state.error) return <div>Error: {state.error.message}</div>;
@@ -199,7 +199,7 @@ function ProfileManual() {
 | `signal({ deps }, async fn)` | Creates async computed signal with explicit dependencies            |
 | `abortSignal`                | Automatically provided; cancels when deps change or signal disposes |
 | `Suspense`                   | Works out-of-the-box with async signals                             |
-| `loadable()`                 | Converts Promise to `{ loading, error, value }` for manual handling |
+| `task.from()`                 | Converts Promise to `{ loading, error, value }` for manual handling |
 
 ---
 
@@ -385,7 +385,7 @@ Build a reusable query pattern similar to React Query or SWR.
 ### Code
 
 ```tsx
-import { signal, disposable, rx, useScope, loadable } from "rextive/react";
+import { signal, disposable, rx, useScope, task } from "rextive/react";
 
 // Reusable query factory
 function createQuery(endpoint, options = {}) {
@@ -434,7 +434,7 @@ function UserProfile({ userId }) {
       <button onClick={() => userQuery.refetch()}>Refresh</button>
 
       {rx(() => {
-        const state = loadable(userQuery.result);
+        const state = task.from(userQuery.result);
 
         if (state.loading) return <div>Loading...</div>;
         if (state.error) return <div>Error: {state.error.message}</div>;
@@ -478,7 +478,7 @@ import {
   disposable,
   rx,
   useScope,
-  loadable,
+  task,
   wait,
 } from "rextive/react";
 
@@ -525,7 +525,7 @@ function RegistrationForm() {
   const Field = ({ label, field, validation }) =>
     rx(() => {
       const fieldValue = field();
-      const validationState = loadable(validation);
+      const validationState = task.from(validation);
 
       return (
         <div>
@@ -569,7 +569,7 @@ function RegistrationForm() {
 | Sync `.to()`    | Returns computed value immediately                       |
 | Async `.to()`   | Returns Promise, handles cancellation automatically      |
 | `safe(promise)` | Throws if cancelled - use for debounce/delay             |
-| `loadable()`    | Normalizes sync/async validation to `{ loading, value }` |
+| `task.from()`    | Normalizes sync/async validation to `{ loading, value }` |
 
 ---
 
@@ -592,7 +592,7 @@ import {
   rx,
   useScope,
   wait,
-  loadable,
+  task,
 } from "rextive/react";
 
 function SearchBox() {
@@ -631,7 +631,7 @@ function SearchBox() {
       />
 
       {rx(() => {
-        const resultsState = loadable(scope.results);
+        const resultsState = task.from(scope.results);
 
         if (resultsState.loading) return <div>Searching...</div>;
         if (resultsState.error) return <div>Error!</div>;
@@ -863,7 +863,7 @@ Implement automatic data polling using the signal context's `refresh()` method. 
 ### Code
 
 ```tsx
-import { signal, loadable, disposable } from "rextive";
+import { signal, task, disposable } from "rextive";
 import { useScope, rx } from "rextive/react";
 
 // Basic polling - refreshes every 10 seconds
@@ -931,7 +931,7 @@ function StockTicker() {
       </select>
 
       {rx(() => {
-        const state = loadable(scope.price);
+        const state = task.from(scope.price);
 
         if (state.loading) return <span>Loading...</span>;
         if (state.error) return <span>Error: {state.error.message}</span>;
@@ -992,7 +992,7 @@ function Dashboard() {
   return (
     <div>
       {rx(() => {
-        const state = loadable(scope.metrics);
+        const state = task.from(scope.metrics);
         if (state.loading) return <Spinner />;
         return <MetricsView data={state.value} />;
       })}

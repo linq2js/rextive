@@ -210,7 +210,7 @@ const user = signal({ userIdSignal }, async ({ deps, abortSignal }) => {
 
 // In component
 rx(() => {
-  const state = loadable(user());
+  const state = task.from(user());
   if (state.loading) return <Loading />;
   if (state.error) return <Error />;
   return <User data={state.value} />;
