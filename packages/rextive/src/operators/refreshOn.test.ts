@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { signal } from "../signal";
-import { refreshOn } from "./refreshOn";
+import { refreshOn } from "./on";
 
 describe("refreshOn", () => {
   describe("single notifier", () => {
@@ -135,7 +135,9 @@ describe("refreshOn", () => {
       });
 
       // Only refresh when the specific notifier's value > 0
-      const result = source.pipe(refreshOn([trigger1, trigger2], (n) => n() > 0));
+      const result = source.pipe(
+        refreshOn([trigger1, trigger2], (n) => n() > 0)
+      );
 
       // Initial compute
       result();

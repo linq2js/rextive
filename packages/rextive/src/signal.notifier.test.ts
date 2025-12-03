@@ -124,7 +124,7 @@ describe("signal() - Notifier Pattern (Empty Signal)", () => {
 
   describe("integration with operators", () => {
     it("should work with refreshOn operator", async () => {
-      const { refreshOn } = await import("./operators/refreshOn");
+      const { refreshOn } = await import("./operators/on");
 
       const refreshTrigger = signal<void>();
       let computeCount = 0;
@@ -156,7 +156,7 @@ describe("signal() - Notifier Pattern (Empty Signal)", () => {
     });
 
     it("should work with staleOn operator", async () => {
-      const { staleOn } = await import("./operators/staleOn");
+      const { staleOn } = await import("./operators/on");
 
       const invalidate = signal<void>();
       let computeCount = 0;
@@ -292,4 +292,3 @@ describe("signal() - Notifier Pattern (Empty Signal)", () => {
     });
   });
 });
-

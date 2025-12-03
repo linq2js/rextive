@@ -85,6 +85,4 @@ export { distinct } from "./distinct";
 export type { DistinctOptions } from "./distinct";
 
 // Reactive trigger operators
-export { refreshOn } from "./refreshOn";
-export { staleOn } from "./staleOn";
-export type { NotifierFilter } from "./refreshOn";
+export { refreshOn, staleOn, resetOn, type NotifierFilter } from "./on";

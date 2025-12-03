@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { signal } from "../signal";
-import { staleOn } from "./staleOn";
+import { staleOn } from "./on";
+// Import refreshOn for combined test
+import { refreshOn } from "./on";
 
 describe("staleOn", () => {
   describe("single notifier", () => {
@@ -327,6 +329,3 @@ describe("staleOn", () => {
     });
   });
 });
-
-// Import refreshOn for combined test
-import { refreshOn } from "./refreshOn";

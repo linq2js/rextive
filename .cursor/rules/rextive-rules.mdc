@@ -1272,6 +1272,81 @@ function UserProfile() {
 const userTask = userProfile.pipe(task(DEFAULT_USER, { name: "userTask" }));
 ```
 
+#### `refreshOn()` - Trigger Immediate Recomputation
+
+Triggers `.refresh()` on a computed signal when notifier(s) change:
+
+```tsx
+import { refreshOn } from "rextive/op";
+
+const refreshTrigger = signal(0);
+const userData = asyncSignal.pipe(refreshOn(refreshTrigger));
+
+// Click to refresh immediately
+<button onClick={() => refreshTrigger.set(v => v + 1)}>Refresh</button>
+```
+
+**With filter:**
+
+```tsx
+const networkStatus = signal<'online' | 'offline'>('online');
+
+// Only refresh when coming back online
+const data = asyncSignal.pipe(
+  refreshOn(networkStatus, (status) => status() === 'online')
+);
+```
+
+#### `staleOn()` - Mark for Lazy Recomputation
+
+Marks a computed signal as stale when notifier(s) change (recomputes on next access):
+
+```tsx
+import { staleOn } from "rextive/op";
+
+const cacheInvalidate = signal(0);
+const userData = asyncSignal.pipe(staleOn(cacheInvalidate));
+
+// Mark data as stale (won't refetch until accessed)
+cacheInvalidate.set(v => v + 1);
+```
+
+**Use `staleOn` vs `refreshOn`:**
+- `refreshOn` - Immediate recomputation (use for active data)
+- `staleOn` - Lazy recomputation (use for cached/background data)
+
+#### `resetOn()` - Reset Mutable Signal to Initial Value
+
+Triggers `.reset()` on a mutable signal when notifier(s) change:
+
+```tsx
+import { resetOn } from "rextive/op";
+
+const clearTrigger = signal<void>();
+const formData = signal({ name: '', email: '' }).pipe(
+  resetOn(clearTrigger)
+);
+
+// Reset form after submission
+<button onClick={() => {
+  submitForm(formData());
+  clearTrigger.set(undefined as void);
+}}>Submit & Clear</button>
+```
+
+**With filter:**
+
+```tsx
+const routeChange = signal<string>('/home');
+
+// Reset filters when navigating away from /products
+const productFilters = signal({ category: 'all', sort: 'name' }).pipe(
+  resetOn(routeChange, (route) => !route().startsWith('/products'))
+);
+```
+
+**Note:** Only works with **mutable signals** (not computed).
+
 ---
 
 ### 11. Plugins (`rextive/plugins`) ⭐ NEW
@@ -1792,6 +1867,9 @@ function Component() {
 - `throttle(ms)` - Throttle
 - `pace(ms)` - Rate limit
 - `task(initial, options?)` - Async state with stale-while-revalidate
+- `refreshOn(notifier, filter?)` - Trigger immediate recomputation
+- `staleOn(notifier, filter?)` - Mark for lazy recomputation
+- `resetOn(notifier, filter?)` - Reset mutable signal to initial value
 
 ### Plugins (`rextive/plugins`) ⭐
 
