@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { tag } from "./tag";
-import { signal } from "./index";
+import { signal, is } from "./index";
 import type { Signal, Plugin, Tag } from "./types";
 
 describe("tag", () => {
@@ -143,7 +143,7 @@ describe("tag", () => {
       const values: number[] = [];
       myTag.forEach((sig) => {
         values.push(sig());
-        if (signal.is(sig, "mutable")) {
+        if (is(sig, "mutable")) {
           sig.set((v) => v * 2);
         }
       });

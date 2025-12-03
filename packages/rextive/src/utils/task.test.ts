@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { task } from "./task";
+import { is } from "../is";
 import { TASK_TYPE, type Task } from "../types";
 
 describe("task", () => {
@@ -164,36 +165,36 @@ describe("task", () => {
     });
   });
 
-  describe("task.is() - type guard", () => {
+  describe("is(value, 'task') - type guard", () => {
     it("should identify loading task", () => {
       const l = task.loading(Promise.resolve(1));
-      expect(task.is(l)).toBe(true);
+      expect(is(l, "task")).toBe(true);
     });
 
     it("should identify success task", () => {
       const l = task.success(42);
-      expect(task.is(l)).toBe(true);
+      expect(is(l, "task")).toBe(true);
     });
 
     it("should identify error task", () => {
       const l = task.error(new Error());
-      expect(task.is(l)).toBe(true);
+      expect(is(l, "task")).toBe(true);
     });
 
     it("should reject non-task values", () => {
-      expect(task.is(null)).toBe(false);
-      expect(task.is(undefined)).toBe(false);
-      expect(task.is(42)).toBe(false);
-      expect(task.is("string")).toBe(false);
-      expect(task.is({})).toBe(false);
-      expect(task.is([])).toBe(false);
-      expect(task.is({ status: "success", data: 42 })).toBe(false);
+      expect(is(null, "task")).toBe(false);
+      expect(is(undefined, "task")).toBe(false);
+      expect(is(42, "task")).toBe(false);
+      expect(is("string", "task")).toBe(false);
+      expect(is({}, "task")).toBe(false);
+      expect(is([], "task")).toBe(false);
+      expect(is({ status: "success", data: 42 }, "task")).toBe(false);
     });
 
     it("should work with type narrowing", () => {
       const value: unknown = task.success({ id: 1, name: "Alice" });
 
-      if (task.is<{ id: number; name: string }>(value)) {
+      if (is<{ id: number; name: string }>(value, "task")) {
         // TypeScript should know value is Task<{ id: number; name: string }>
         if (value.status === "success") {
           expect(value.value.id).toBe(1);

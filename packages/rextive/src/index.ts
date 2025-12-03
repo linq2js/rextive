@@ -16,7 +16,6 @@ export { TASK_TYPE } from "./types";
 
 // Import signal and utilities, combine them, then export
 import { signal as signalBase } from "./signal";
-import { is } from "./is";
 import { batch as batchImpl } from "./batch";
 import { tag as tagImpl } from "./tag";
 import { signalOn } from "./signal.on";
@@ -26,7 +25,6 @@ import { getErrorTrace } from "./utils/errorTracking";
 
 /** Combined signal API type */
 export type SignalApi = typeof signalBase & {
-  is: typeof is;
   batch: typeof batchImpl;
   tag: typeof tagImpl;
   on: typeof signalOn;
@@ -37,7 +35,6 @@ export type SignalApi = typeof signalBase & {
 
 // Augment signal with utility methods
 export const signal: SignalApi = Object.assign(signalBase, {
-  is: is,
   batch: batchImpl,
   tag: tagImpl,
   on: signalOn,
@@ -65,6 +62,8 @@ export { wait, type Awaitable } from "./wait";
 export { awaited } from "./awaited";
 export { AbortedComputationError } from "./createSignalContext";
 export { FallbackError } from "./common";
+
+export { is } from "./is";
 
 // Disposable utilities
 export {

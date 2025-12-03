@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { signal } from "./index";
+import { signal, is } from "./index";
 
 describe("is", () => {
   it("should identify any signal", () => {
@@ -7,22 +7,22 @@ describe("is", () => {
     const computed = signal({ mutable }, ({ deps }) => deps.mutable * 2);
     const notSignal = { value: 1 };
 
-    expect(signal.is(mutable)).toBe(true);
-    expect(signal.is(computed)).toBe(true);
-    expect(signal.is(notSignal)).toBe(false);
-    expect(signal.is(null)).toBe(false);
-    expect(signal.is(undefined)).toBe(false);
-    expect(signal.is(42)).toBe(false);
+    expect(is(mutable)).toBe(true);
+    expect(is(computed)).toBe(true);
+    expect(is(notSignal)).toBe(false);
+    expect(is(null)).toBe(false);
+    expect(is(undefined)).toBe(false);
+    expect(is(42)).toBe(false);
   });
 
   it("should identify mutable signals", () => {
     const mutable = signal(1);
     const computed = signal({ mutable }, ({ deps }) => deps.mutable * 2);
 
-    expect(signal.is(mutable, "mutable")).toBe(true);
-    expect(signal.is(computed, "mutable")).toBe(false);
+    expect(is(mutable, "mutable")).toBe(true);
+    expect(is(computed, "mutable")).toBe(false);
 
-    if (signal.is(mutable, "mutable")) {
+    if (is(mutable, "mutable")) {
       // TypeScript should know mutable has set method
       mutable.set(5);
       expect(mutable()).toBe(5);
@@ -33,10 +33,10 @@ describe("is", () => {
     const mutable = signal(1);
     const computed = signal({ mutable }, ({ deps }) => deps.mutable * 2);
 
-    expect(signal.is(computed, "computed")).toBe(true);
-    expect(signal.is(mutable, "computed")).toBe(false);
+    expect(is(computed, "computed")).toBe(true);
+    expect(is(mutable, "computed")).toBe(false);
 
-    if (signal.is(computed, "computed")) {
+    if (is(computed, "computed")) {
       // TypeScript should know computed has pause/resume methods
       computed.pause();
       expect(computed.paused()).toBe(true);
@@ -53,9 +53,9 @@ describe("is", () => {
       null,
     ];
 
-    const mutableSignals = signals.filter((s) => signal.is(s, "mutable"));
-    const computedSignals = signals.filter((s) => signal.is(s, "computed"));
-    const anySignals = signals.filter((s) => signal.is(s));
+    const mutableSignals = signals.filter((s) => is(s, "mutable"));
+    const computedSignals = signals.filter((s) => is(s, "computed"));
+    const anySignals = signals.filter((s) => is(s));
 
     expect(mutableSignals).toHaveLength(1);
     expect(computedSignals).toHaveLength(1);
@@ -65,7 +65,7 @@ describe("is", () => {
   it("should provide proper type narrowing", () => {
     const mixed: unknown = signal(42);
 
-    if (signal.is(mixed, "mutable")) {
+    if (is(mixed, "mutable")) {
       // TypeScript knows this has set method
       mixed.set(100);
       expect(mixed()).toBe(100);
@@ -73,7 +73,7 @@ describe("is", () => {
 
     const computed = signal({ a: signal(1) }, ({ deps }) => deps.a * 2);
 
-    if (signal.is(computed, "computed")) {
+    if (is(computed, "computed")) {
       // TypeScript knows this has pause/resume
       computed.pause();
       expect(computed.paused()).toBe(true);
@@ -85,50 +85,50 @@ describe("is", () => {
     const computed = signal({ mutable }, ({ deps }) => deps.mutable * 2);
 
     // Signals are accessors (functions with on method)
-    expect(signal.is(mutable, "accessor")).toBe(true);
-    expect(signal.is(computed, "accessor")).toBe(true);
+    expect(is(mutable, "accessor")).toBe(true);
+    expect(is(computed, "accessor")).toBe(true);
 
     // Regular functions without on method are not accessors
     const regularFn = () => 42;
-    expect(signal.is(regularFn, "accessor")).toBe(false);
+    expect(is(regularFn, "accessor")).toBe(false);
 
     // Objects are not accessors
-    expect(signal.is({ on: () => {} }, "accessor")).toBe(false);
+    expect(is({ on: () => {} }, "accessor")).toBe(false);
   });
 
   it("should identify observables (object with on method)", () => {
     // Object with on method is observable
     const observable = { on: () => {} };
-    expect(signal.is(observable, "observable")).toBe(true);
+    expect(is(observable, "observable")).toBe(true);
 
     // Null is not observable
-    expect(signal.is(null, "observable")).toBe(false);
+    expect(is(null, "observable")).toBe(false);
 
     // Object without on method is not observable
-    expect(signal.is({ value: 1 }, "observable")).toBe(false);
+    expect(is({ value: 1 }, "observable")).toBe(false);
 
     // Functions are not observables (even if they have on)
     const fn = Object.assign(() => {}, { on: () => {} });
-    expect(signal.is(fn, "observable")).toBe(false);
+    expect(is(fn, "observable")).toBe(false);
   });
 
   it("should identify tags", () => {
     const tag = signal.tag<number>();
 
-    expect(signal.is(tag, "tag")).toBe(true);
+    expect(is(tag, "tag")).toBe(true);
 
     // Regular objects are not tags
-    expect(signal.is({}, "tag")).toBe(false);
-    expect(signal.is(null, "tag")).toBe(false);
+    expect(is({}, "tag")).toBe(false);
+    expect(is(null, "tag")).toBe(false);
 
     // Signals are not tags
     const mutable = signal(1);
-    expect(signal.is(mutable, "tag")).toBe(false);
+    expect(is(mutable, "tag")).toBe(false);
   });
 
   it("should return false for unknown type parameter", () => {
     const mutable = signal(1);
     // Use a type assertion to test the edge case
-    expect(signal.is(mutable, "unknown" as any)).toBe(false);
+    expect(is(mutable, "unknown" as any)).toBe(false);
   });
 });

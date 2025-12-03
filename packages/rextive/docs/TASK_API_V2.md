@@ -6,7 +6,7 @@ The `task` API has been completely refactored to use a namespace-based design wi
 
 ## Migration Guide
 
-###  Before (v1)
+### Before (v1)
 
 ```typescript
 import { task, isTask, getTask, setTask, toTask } from "rextive";
@@ -42,8 +42,9 @@ const loading = task.loading(promise);
 const success = task.success(data);
 const error = task.error(err);
 
-// Type guard namespace method
-if (task.is(value)) { ... }
+// Type guard (use `is` from rextive)
+import { is } from "rextive";
+if (is(value, "task")) { ... }
 
 // Cache management namespace methods
 const l = task.get(promise);
@@ -92,7 +93,7 @@ All factory and helper functions are now under the `task` namespace:
 // Create loading task
 task.loading<T>(promise: PromiseLike<T>): LoadingTask<T>
 
-// Create success task  
+// Create success task
 task.success<T>(value: T, promise?: PromiseLike<T>): SuccessTask<T>
 
 // Create error task
@@ -101,12 +102,16 @@ task.error<T>(error: unknown, promise?: PromiseLike<T>): ErrorTask<T>
 
 #### **Type Guard**
 
+Use the standalone `is()` function from rextive:
+
 ```typescript
+import { is } from "rextive";
+
 // Check if value is a task
-task.is<T>(value: unknown): value is Task<T>
+is<T>(value: unknown, "task"): value is Task<T>
 
 // Example
-if (task.is<User>(value)) {
+if (is<User>(value, "task")) {
   console.log(value.status); // Type-safe
 }
 ```
@@ -125,7 +130,7 @@ task.set<T>(promise: PromiseLike<T>, l: Task<T>): Task<T>
 
 The following standalone functions have been **removed**:
 
-- ❌ `isTask()` → Use `task.is()`
+- ❌ `isTask()` → Use `is(value, "task")`
 - ❌ `getTask()` → Use `task.get()`
 - ❌ `setTask()` → Use `task.set()`
 - ❌ `toTask()` → Use `task.from()`
@@ -163,7 +168,8 @@ const l3 = task.error(err);
 if (isTask(value)) { ... }
 
 // After
-if (task.is(value)) { ... }
+import { is } from "rextive";
+if (is(value, "task")) { ... }
 ```
 
 ### Step 4: Update Cache Functions
@@ -202,9 +208,12 @@ task.           // IDE autocomplete shows all methods:
   // - loading()
   // - success()
   // - error()
-  // - is()
   // - get()
   // - set()
+
+// For type checking, use standalone is():
+import { is } from "rextive";
+is(value, "task");  // Check if value is a Task
 ```
 
 ### 2. **Cleaner Imports**
@@ -223,14 +232,15 @@ The main `task.from()` function does what you expect - converts any value to a t
 
 ```typescript
 // Automatic "do what I mean" behavior
-const l1 = task.from(promise);      // Loading
-const l2 = task.from(data);         // Success
-const l3 = task.from(existingL);    // Pass-through
+const l1 = task.from(promise); // Loading
+const l2 = task.from(data); // Success
+const l3 = task.from(existingL); // Pass-through
 ```
 
 ### 4. **Consistent with Modern APIs**
 
 Follows patterns from popular libraries:
+
 - React: `React.useState()`, `React.useEffect()`
 - RxJS: `rx.of()`, `rx.from()`
 - Lodash: `_.map()`, `_.filter()`
@@ -246,16 +256,18 @@ const success = task.success({ id: 1, name: "Alice" });
 const error = task.error(new Error("Failed"));
 
 // Automatic normalization
-const l1 = task.from(Promise.resolve(42));        // LoadingTask<number>
-const l2 = task.from({ id: 1 });                  // SuccessTask<{ id: number }>
-const l3 = task.from(task.success(42));       // SuccessTask<number> (same reference)
+const l1 = task.from(Promise.resolve(42)); // LoadingTask<number>
+const l2 = task.from({ id: 1 }); // SuccessTask<{ id: number }>
+const l3 = task.from(task.success(42)); // SuccessTask<number> (same reference)
 ```
 
 ### Type Guards
 
 ```typescript
+import { is } from "rextive";
+
 function handleValue(value: unknown) {
-  if (task.is<User>(value)) {
+  if (is<User>(value, "task")) {
     switch (value.status) {
       case "loading":
         return <Spinner />;
@@ -274,16 +286,16 @@ function handleValue(value: unknown) {
 ```typescript
 // Fetch with caching
 async function fetchWithCache(url: string) {
-  const promise = fetch(url).then(r => r.json());
-  
+  const promise = fetch(url).then((r) => r.json());
+
   // Get or create task
   const l = task.get(promise);
-  
+
   if (l.status === "loading") {
     const data = await l.promise;
     // Cache is automatically updated
   }
-  
+
   return l;
 }
 ```
@@ -316,8 +328,9 @@ sed -i 's/task("loading",/task.loading(/g' **/*.ts
 sed -i 's/task("success",/task.success(/g' **/*.ts
 sed -i 's/task("error",/task.error(/g' **/*.ts
 
-# Replace type guard
-sed -i 's/isTask(/task.is(/g' **/*.ts
+# Replace type guard (use `is` from rextive)
+sed -i 's/isTask(/is(/g' **/*.ts
+# Note: You'll also need to add `import { is } from "rextive";` and use `is(value, "task")`
 
 # Replace cache functions
 sed -i 's/getTask(/task.get(/g' **/*.ts
@@ -335,7 +348,7 @@ The underlying types (`Task<T>`, `LoadingTask<T>`, `SuccessTask<T>`, `ErrorTask<
 ## Questions?
 
 If you have questions about the migration, please refer to:
+
 - API Reference: `docs/api-reference.md`
 - Examples: `examples/`
 - Tests: `src/utils/task.test.ts`
-

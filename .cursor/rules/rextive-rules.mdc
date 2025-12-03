@@ -61,11 +61,11 @@ const user = signal<User>();
 
 Empty signals act as **notifiers** - they trigger subscribers on every `.set()` call, even with the same value:
 
-| Property | Value |
-|----------|-------|
-| Initial value | `undefined` |
-| Equality | Always different (`NOT_EQUALS`) |
-| Name | Auto-generated `#notifier-xxx` |
+| Property      | Value                           |
+| ------------- | ------------------------------- |
+| Initial value | `undefined`                     |
+| Equality      | Always different (`NOT_EQUALS`) |
+| Name          | Auto-generated `#notifier-xxx`  |
 
 ```tsx
 const notifier = signal<"action1" | "action2">();
@@ -372,10 +372,11 @@ const doubled = signal({ count }, ({ deps }) => deps.count * 2);
 console.log(doubled.uid); // "sig-2"
 
 // Use as React key
-signals.map(s => <div key={s.uid}>{s.displayName}</div>)
+signals.map((s) => <div key={s.uid}>{s.displayName}</div>);
 ```
 
 **Key characteristics:**
+
 - Auto-generated on signal creation
 - Immutable - never changes for the lifetime of the signal
 - Unique across all signals in the application
@@ -411,6 +412,7 @@ const value = count.peek();
 ```
 
 **When to use:**
+
 - In event handlers where you don't want to create dependencies
 - Logging/debugging without affecting reactivity
 - Internal reads in computed signals that shouldn't trigger updates
@@ -423,7 +425,7 @@ const value = count.peek();
 rx(() => {
   // This WILL create a dependency (triggers re-render when count changes)
   console.log("Count:", count());
-  
+
   // This WON'T create a dependency (no re-render when user changes)
   console.log("User (peeked):", user.peek());
 });
@@ -443,6 +445,7 @@ const operator = (source) => {
 ```
 
 **Key differences from `.get()`:**
+
 - `.get()` / `signal()` - triggers `onSignalAccess` in render hooks (creates dependencies)
 - `.peek()` - never triggers tracking (safe for internal use)
 
@@ -543,8 +546,8 @@ userData.stale(); // Will recompute on next access
 For **synchronous errors** during signal computation:
 
 ```tsx
-const error = signal.error();    // Get sync error without throwing
-const value = signal.tryGet();   // Get value or undefined (never throws)
+const error = signal.error(); // Get sync error without throwing
+const value = signal.tryGet(); // Get value or undefined (never throws)
 ```
 
 **⚠️ For async signals**: Use `task.from()` to access error states:
@@ -559,12 +562,14 @@ const state = task.from(promise);
 // state.loading, state.error, state.value
 
 // In React with rx()
-{rx(() => {
-  const state = task.from(asyncData());
-  if (state.loading) return <Spinner />;
-  if (state.error) return <Error error={state.error} />;
-  return <div>{state.value}</div>;
-})}
+{
+  rx(() => {
+    const state = task.from(asyncData());
+    if (state.loading) return <Spinner />;
+    if (state.error) return <Error error={state.error} />;
+    return <div>{state.value}</div>;
+  });
+}
 ```
 
 ---
@@ -628,7 +633,9 @@ counter.when(increment, (self, notifier) => self() + notifier());
 
 ```tsx
 const refreshTrigger = signal(0);
-const fetchedData = signal({ userId }, async ({ deps }) => fetchUser(deps.userId));
+const fetchedData = signal({ userId }, async ({ deps }) =>
+  fetchUser(deps.userId)
+);
 
 // Refresh (immediate recompute)
 fetchedData.when(refreshTrigger, "refresh");
@@ -658,9 +665,7 @@ userData.when([trigger1, trigger2], "refresh", (self, notifier) => {
 
 ```tsx
 // .when() returns this for chaining
-userData
-  .when(refreshTrigger, "refresh")
-  .when(resetTrigger, "reset");
+userData.when(refreshTrigger, "refresh").when(resetTrigger, "reset");
 ```
 
 **Cleanup:**
@@ -718,8 +723,8 @@ For computed signals, the compute function receives a context object:
 
 ```tsx
 signal({ userId, filter }, (context) => {
-  context.deps        // Dependency values
-  context.abortSignal // AbortSignal for cancellation
+  context.deps; // Dependency values
+  context.abortSignal; // AbortSignal for cancellation
 });
 ```
 
@@ -729,22 +734,22 @@ signal({ userId, filter }, (context) => {
 signal(async (context) => {
   // Safe execution (throws if aborted)
   const data = context.safe(() => processData());
-  
+
   // Safe promise (never resolves if aborted)
   await context.safe(wait.delay(300));
-  
+
   // Register cleanup
   context.onCleanup(() => cleanup());
-  
+
   // Check if aborted
   if (context.aborted()) return null;
-  
+
   // Reuse logic with context
   const result = await context.use(fetchUser, options);
-  
+
   // Trigger recomputation (polling)
   setTimeout(() => context.refresh(), 1000);
-  
+
   // Mark stale (TTL cache)
   setTimeout(() => context.stale(), 5 * 60 * 1000);
 });
@@ -774,8 +779,8 @@ const control = signal.on([count, name], (trigger) => {
   console.log("Changed:", trigger());
 });
 
-control.pause();   // Pause
-control.resume();  // Resume
+control.pause(); // Pause
+control.resume(); // Resume
 control.dispose(); // Cleanup
 ```
 
@@ -790,8 +795,8 @@ const name = signal("", { use: [formTag] });
 const email = signal("", { use: [formTag] });
 
 formTag.forEach((s) => s.reset()); // Reset all
-formTag.map((s) => s.get());       // Collect values
-formTag.size;                       // Count
+formTag.map((s) => s.get()); // Collect values
+formTag.size; // Count
 ```
 
 ---
@@ -818,20 +823,10 @@ try {
 } catch (error) {
   const traces = signal.trace(error);
   // [{ signal: "db", when: "compute:initial", async: true }, ...]
-  
+
   const errorPath = traces.map((t) => t.signal).join(" → ");
   console.log("Error path:", errorPath);
 }
-```
-
----
-
-#### `signal.is(value, kind?)` - Check Signal Type ⭐ NEW
-
-```tsx
-signal.is(maybeSignal);           // Is any signal?
-signal.is(sig, "mutable");        // Is mutable?
-signal.is(sig, "computed");       // Is computed?
 ```
 
 ---
@@ -844,7 +839,9 @@ The `rx()` function has **4 overloads** for reactive rendering in React.
 
 ```tsx
 const count = signal(42);
-{rx(count)} // Renders: 42
+{
+  rx(count);
+} // Renders: 42
 ```
 
 ---
@@ -855,10 +852,14 @@ const count = signal(42);
 const user = signal({ name: "Alice", age: 30 });
 
 // Property access
-{rx(user, "name")} // Renders: "Alice"
+{
+  rx(user, "name");
+} // Renders: "Alice"
 
 // Selector function
-{rx(user, (u) => u.age + 5)} // Renders: 35
+{
+  rx(user, (u) => u.age + 5);
+} // Renders: 35
 ```
 
 ---
@@ -866,7 +867,9 @@ const user = signal({ name: "Alice", age: 30 });
 #### Overload 3: Reactive Function (Auto-Tracking)
 
 ```tsx
-{rx(() => <div>Count: {count()}</div>)}
+{
+  rx(() => <div>Count: {count()}</div>);
+}
 ```
 
 **How it works:**
@@ -879,8 +882,12 @@ const user = signal({ name: "Alice", age: 30 });
 #### Overload 4: Component with Reactive Props
 
 ```tsx
-{rx(Component, { prop1: signal1, prop2: "static" })}
-{rx("div", { children: count, className: "counter" })}
+{
+  rx(Component, { prop1: signal1, prop2: "static" });
+}
+{
+  rx("div", { children: count, className: "counter" });
+}
 ```
 
 ---
@@ -899,10 +906,14 @@ const user = signal({ name: "Alice", age: 30 });
 
 ```tsx
 // Option 1: Wrap entire element with rx(fn)
-{rx(() => <input value={signal()} />)}
+{
+  rx(() => <input value={signal()} />);
+}
 
 // Option 2: Use component form rx(Component, props)
-{rx("input", { value: signal })}
+{
+  rx("input", { value: signal });
+}
 ```
 
 ---
@@ -939,11 +950,11 @@ function TodoList() {
   const scope = useScope(() => {
     const todos = signal([]);
     const filter = signal("all");
-    
+
     return {
       todos,
       filter,
-      addTodo: (text) => todos.set(prev => [...prev, text]),
+      addTodo: (text) => todos.set((prev) => [...prev, text]),
     };
   });
 
@@ -958,7 +969,7 @@ function TodoList() {
 const scope = useScope(() => {
   const todos = signal([]);
   const subscription = someExternalService.subscribe();
-  
+
   return {
     todos,
     dispose: () => subscription.unsubscribe(),
@@ -971,7 +982,7 @@ const scope = useScope(() => {
   const sub1 = service1.subscribe();
   const sub2 = service2.subscribe();
   const timer = setInterval(() => {}, 1000);
-  
+
   return disposable({
     todos,
     dispose: [sub1, sub2, () => clearInterval(timer)],
@@ -1100,24 +1111,27 @@ Async signals return Promises. Use `task.from()` to access loading/error/success
 const promise = asyncSignal();
 const state = task.from(promise);
 
-state.status;   // "loading" | "success" | "error"
-state.loading;  // boolean
-state.value;    // resolved value
-state.error;    // error if rejected
+state.status; // "loading" | "success" | "error"
+state.loading; // boolean
+state.value; // resolved value
+state.error; // error if rejected
 ```
 
 **React usage:**
 
 ```tsx
-{rx(() => {
-  const state = task.from(userData());
-  if (state.loading) return <Spinner />;
-  if (state.error) return <Error error={state.error} />;
-  return <div>{state.value.name}</div>;
-})}
+{
+  rx(() => {
+    const state = task.from(userData());
+    if (state.loading) return <Spinner />;
+    if (state.error) return <Error error={state.error} />;
+    return <div>{state.value.name}</div>;
+  });
+}
 ```
 
 **Key points:**
+
 - Async signals return the **Promise itself** as their value
 - Subscribers are **notified when the Promise settles** (resolve or reject)
 - Use `task.from()` to check the Promise's current state
@@ -1158,7 +1172,7 @@ Create a bidirectional mutable signal for a nested property path:
 const form = signal({ user: { name: "Alice" } });
 const userName = form.pipe(focus("user.name"));
 console.log(userName()); // "Alice"
-userName.set("Bob");     // Updates source immutably
+userName.set("Bob"); // Updates source immutably
 
 // With fallback (for optional properties)
 type User = { name: string; nickname?: string };
@@ -1172,21 +1186,27 @@ const nicknameDefault = user.pipe(focus("nickname", () => "Guest"));
 console.log(nicknameDefault()); // "Guest"
 
 // With options
-const price = form.pipe(focus("price", {
-  get: (v) => v * 1.1,     // Transform on read
-  set: (v) => v / 1.1,     // Transform on write
-  equals: "shallow",
-}));
+const price = form.pipe(
+  focus("price", {
+    get: (v) => v * 1.1, // Transform on read
+    set: (v) => v / 1.1, // Transform on write
+    equals: "shallow",
+  })
+);
 
 // Fallback + options
-const theme = user.pipe(focus("settings.theme", () => "light", { name: "userTheme" }));
+const theme = user.pipe(
+  focus("settings.theme", () => "light", { name: "userTheme" })
+);
 ```
 
 **Overloads:**
+
 - `focus(path, options?)` → `Mutable<PathValue<T, P>>` (may include undefined)
 - `focus(path, fallback, options?)` → `Mutable<F>` (F = fallback return type, non-nullable)
 
 **Fallback behaviors:**
+
 - Called only for `null` or `undefined` values
 - **Memoized** - factory called only once
 - `0`, `""`, `false` are NOT nullish (no fallback used)
@@ -1221,6 +1241,7 @@ const userTask = userProfile.pipe(task({ name: "Guest" }));
 ```
 
 **Stale-while-revalidate pattern:**
+
 - **First load**: Uses `initial` value while loading
 - **Loading after success**: Shows previous successful value (stale data)
 - **Success**: Shows current value (fresh data)
@@ -1248,9 +1269,7 @@ function UserProfile() {
 **With options:**
 
 ```tsx
-const userTask = userProfile.pipe(
-  task(DEFAULT_USER, { name: "userTask" })
-);
+const userTask = userProfile.pipe(task(DEFAULT_USER, { name: "userTask" }));
 ```
 
 ---
@@ -1266,7 +1285,10 @@ const persist = persistor<{ theme: string; fontSize: number }>({
   load: () => JSON.parse(localStorage.getItem("settings") || "{}"),
   save: (args) => {
     const existing = JSON.parse(localStorage.getItem("settings") || "{}");
-    localStorage.setItem("settings", JSON.stringify({ ...existing, ...args.values }));
+    localStorage.setItem(
+      "settings",
+      JSON.stringify({ ...existing, ...args.values })
+    );
   },
 });
 
@@ -1283,10 +1305,12 @@ import { produce } from "rextive/immer";
 const state = signal({ count: 0, user: { name: "John" } });
 
 // Write "mutations" that are actually immutable
-state.set(produce((draft) => {
-  draft.count++;
-  draft.user.name = "Jane";
-}));
+state.set(
+  produce((draft) => {
+    draft.count++;
+    draft.user.name = "Jane";
+  })
+);
 ```
 
 ---
@@ -1309,10 +1333,10 @@ const user = await value;
 unref();
 
 // Cache methods
-getUser.stale("123");   // Mark stale
+getUser.stale("123"); // Mark stale
 getUser.refresh("123"); // Force re-fetch
-getUser.delete("123");  // Remove
-getUser.clear();        // Clear all
+getUser.delete("123"); // Remove
+getUser.clear(); // Clear all
 ```
 
 ---
@@ -1345,7 +1369,7 @@ function App() {
 ```tsx
 const scope = disposable({
   count: signal(0),
-  doubled: count.to(x => x * 2),
+  doubled: count.to((x) => x * 2),
 });
 // Automatically adds dispose array
 ```
@@ -1355,8 +1379,8 @@ const scope = disposable({
 ```tsx
 const titles = todoList.to(
   awaited(
-    (todos) => todos.filter(t => !t.done),
-    (todos) => todos.map(t => t.title)
+    (todos) => todos.filter((t) => !t.done),
+    (todos) => todos.map((t) => t.title)
   )
 );
 ```
@@ -1449,7 +1473,9 @@ function SearchBox() {
         // Debounce: wait 300ms
         await safe(wait.delay(300));
 
-        const res = await fetch(`/api/search?q=${query}`, { signal: abortSignal });
+        const res = await fetch(`/api/search?q=${query}`, {
+          signal: abortSignal,
+        });
         return res.json();
       }
     );
@@ -1463,7 +1489,13 @@ function SearchBox() {
       {rx(() => {
         const state = task.from(scope.results());
         if (state.loading) return <div>Searching...</div>;
-        return <ul>{state.value.map(item => <li key={item.id}>{item.name}</li>)}</ul>;
+        return (
+          <ul>
+            {state.value.map((item) => (
+              <li key={item.id}>{item.name}</li>
+            ))}
+          </ul>
+        );
       })}
     </div>
   );
@@ -1555,8 +1587,8 @@ const refreshTrigger = signal<void>();
 const invalidateCache = signal<void>();
 
 const userData = asyncSignal.pipe(
-  refreshOn(refreshTrigger),  // Manual refresh
-  staleOn(invalidateCache)    // Cache invalidation
+  refreshOn(refreshTrigger), // Manual refresh
+  staleOn(invalidateCache) // Cache invalidation
 );
 
 // Trigger refresh
@@ -1594,7 +1626,7 @@ signal({ searchTerm }, async ({ deps, abortSignal }) => {
 // ✅ GOOD - Signals auto-dispose on unmount (no wrapper needed!)
 useScope(() => {
   const count = signal(0);
-  const doubled = count.to(x => x * 2);
+  const doubled = count.to((x) => x * 2);
   return { count, doubled };
 });
 
@@ -1609,17 +1641,19 @@ useScope(() => {
 });
 
 // ✅ Use disposable() to combine multiple cleanup logic
-useScope(() => disposable({
-  count: signal(0),
-  dispose: [sub1, sub2, () => clearInterval(timer)],
-}));
+useScope(() =>
+  disposable({
+    count: signal(0),
+    dispose: [sub1, sub2, () => clearInterval(timer)],
+  })
+);
 ```
 
 4. **Use `.to()` for single-signal transforms**
 
 ```tsx
 // ✅ GOOD - cleaner
-const doubled = count.to(x => x * 2);
+const doubled = count.to((x) => x * 2);
 
 // ✅ Also valid but verbose
 const doubled = signal({ count }, ({ deps }) => deps.count * 2);
@@ -1677,8 +1711,12 @@ function Component() {
 <input value={rx(signal)} />;
 
 // ✅ Good
-{rx(() => <input value={signal()} />)}
-{rx("input", { value: signal })}
+{
+  rx(() => <input value={signal()} />);
+}
+{
+  rx("input", { value: signal });
+}
 ```
 
 ---
@@ -1719,7 +1757,6 @@ function Component() {
 - `signal.tag()` - Create tag for grouping
 - `signal.from(signals)` - Combine signals
 - `signal.trace(error)` - Error tracing ⭐
-- `signal.is(value, kind?)` - Type checking ⭐
 
 ### Wait Methods
 
@@ -1736,7 +1773,6 @@ function Component() {
 - `task.loading()` - Create loading state
 - `task.success(value)` - Create success state
 - `task.error(error)` - Create error state
-- `task.is(value)` - Type guard
 
 ### React Hooks
 
@@ -1761,6 +1797,16 @@ function Component() {
 
 - `persistor(options)` - Auto-persistence
 
+### Type Guards
+
+- `is(value)` - Check if value is any Signal
+- `is(value, "mutable")` - Check if mutable signal
+- `is(value, "computed")` - Check if computed signal
+- `is(value, "task")` - Check if Task
+- `is(value, "tag")` - Check if Tag
+- `is(value, "accessor")` - Check if Accessor (function with on)
+- `is(value, "observable")` - Check if Observable (object with on)
+
 ### Utilities
 
 - `disposable(obj)` - Create disposable ⭐
@@ -1783,18 +1829,21 @@ import { RenderHooks, getRenderHooks, withRenderHooks } from "./hooks";
 // RenderHooks interface
 interface RenderHooks {
   onSignalAccess: (signal: AnySignal<any>) => void;
-  onLoadableAccess: (loadable: Loadable<any>) => void;
+  onTaskAccess: (task: Task<any>) => void;
 }
 
 // Get current render hooks
 const hooks = getRenderHooks();
 
 // Execute with custom render hooks (used by rx())
-withRenderHooks({
-  onSignalAccess: (signal) => accessedSignals.add(signal),
-}, () => {
-  return renderFn();
-});
+withRenderHooks(
+  {
+    onSignalAccess: (signal) => accessedSignals.add(signal),
+  },
+  () => {
+    return renderFn();
+  }
+);
 ```
 
 #### DevTools Hooks (for monitoring)
@@ -1816,8 +1865,12 @@ interface DevToolsHooks {
 
 // Register devtools hooks (called by enableDevTools)
 setDevToolsHooks({
-  onSignalCreate: (signal) => { /* track */ },
-  onSignalChange: (signal, value) => { /* log */ },
+  onSignalCreate: (signal) => {
+    /* track */
+  },
+  onSignalChange: (signal, value) => {
+    /* log */
+  },
 });
 
 // Emit events from core code
@@ -1828,14 +1881,14 @@ emit.signalError(signalRef, error);
 
 #### Migration from `contextDispatcher.ts`
 
-| Old (Removed) | New |
-|---------------|-----|
-| `contextDispatcher.ts` | `hooks.ts` |
-| `ContextDispatcher` | `RenderHooks` |
-| `getCurrent()` | `getRenderHooks()` |
-| `withDispatcher()` | `withRenderHooks()` |
-| `trackSignal()` | `onSignalAccess()` |
-| `trackLoadable()` | `onLoadableAccess()` |
+| Old (Removed)                     | New                           |
+| --------------------------------- | ----------------------------- |
+| `contextDispatcher.ts`            | `hooks.ts`                    |
+| `ContextDispatcher`               | `RenderHooks`                 |
+| `getCurrent()`                    | `getRenderHooks()`            |
+| `withDispatcher()`                | `withRenderHooks()`           |
+| `trackSignal()`                   | `onSignalAccess()`            |
+| `trackTask()`                     | `onTaskAccess()`              |
 | `globalThis.__REXTIVE_DEVTOOLS__` | `setDevToolsHooks()` + `emit` |
 
 ---

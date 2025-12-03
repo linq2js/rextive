@@ -16,6 +16,7 @@ import { rx } from "./react/rx";
 import { signal } from "./signal";
 import { tag } from "./tag";
 import { task } from "./utils/task";
+import { is } from "./is";
 import { wait, type Awaitable, type AwaitedFromAwaitable } from "./wait";
 import { awaited } from "./awaited";
 import { compose } from "./utils/compose";
@@ -580,16 +581,16 @@ function taskTests() {
   expectType<PromiseLike<number>>(errorWithPromise.promise);
 
   // -----------------------------------------------------------------------------
-  // task.is() type guard
+  // is(value, "task") type guard
   // -----------------------------------------------------------------------------
 
-  if (task.is(unknownValue)) {
+  if (is(unknownValue, "task")) {
     expectType<Task<unknown>>(unknownValue);
     expectType<"loading" | "success" | "error">(unknownValue.status);
   }
 
   // With type parameter
-  if (task.is<number>(unknownValue)) {
+  if (is<number>(unknownValue, "task")) {
     expectType<Task<number>>(unknownValue);
 
     if (unknownValue.status === "success") {
@@ -598,7 +599,7 @@ function taskTests() {
   }
 
   // Narrowing within task
-  if (task.is<string>(maybeTask)) {
+  if (is<string>(maybeTask, "task")) {
     if (maybeTask.status === "success") {
       expectType<string>(maybeTask.value);
     }

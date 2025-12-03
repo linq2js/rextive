@@ -8,6 +8,8 @@ import {
   type SignalKind,
   SIGNAL_TYPE,
   TAG_TYPE,
+  Task,
+  TASK_TYPE,
 } from "./types";
 
 /**
@@ -55,6 +57,7 @@ import {
  * ```
  */
 export function is<T = any>(value: unknown): value is Signal<T>;
+export function is<T = any>(value: unknown, type: "task"): value is Task<T>;
 export function is<T = any>(
   value: unknown,
   type: "observable"
@@ -77,13 +80,18 @@ export function is<T = any>(
 ): value is Computed<T>;
 export function is<T = any>(
   value: unknown,
-  type?: "mutable" | "computed" | "observable" | "accessor" | "tag"
+  type?: "mutable" | "computed" | "observable" | "accessor" | "tag" | "task"
 ): value is Signal<T> | Mutable<T> | Computed<T> {
   if (type === "observable") {
     return typeof value === "object" && value !== null && "on" in value;
   }
+
   if (type === "accessor") {
     return typeof value === "function" && "on" in value;
+  }
+
+  if (type === "task") {
+    return typeof value === "object" && value !== null && TASK_TYPE in value;
   }
 
   if (type === "tag") {

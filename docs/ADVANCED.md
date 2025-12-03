@@ -173,14 +173,16 @@ function logChanges<T>(s: AnySignal<T>, label: string) {
   return s.on(() => console.log(`[${label}]`, s()));
 }
 
-// Type narrowing with signal.is()
+// Type narrowing with is()
+import { is } from "rextive";
+
 function maybeReset<T>(s: AnySignal<T>) {
-  // signal.is() narrows the type so TypeScript knows .reset() is available
-  if (signal.is(s, "mutable")) {
+  // is() narrows the type so TypeScript knows .reset() is available
+  if (is(s, "mutable")) {
     s.reset(); // ✅ TypeScript knows this is a Mutable signal
   }
   // For computed signals, you might use .refresh() instead
-  if (signal.is(s, "computed")) {
+  if (is(s, "computed")) {
     s.refresh(); // ✅ TypeScript knows this is a Computed signal
   }
 }
@@ -636,7 +638,7 @@ import { RenderHooks, getRenderHooks, withRenderHooks } from "./hooks";
 // RenderHooks interface - called when signals are read
 interface RenderHooks {
   onSignalAccess: (signal: AnySignal<any>) => void;
-  onLoadableAccess: (loadable: Loadable<any>) => void;
+  onTaskAccess: (task: Task<any>) => void;
 }
 
 // How rx() works internally:

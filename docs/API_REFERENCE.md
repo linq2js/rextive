@@ -355,14 +355,20 @@ try {
 }
 ```
 
-### `signal.is(value, kind?)`
+### `is(value, kind?)`
 
-Check signal type:
+Unified type guard for signals, tasks, tags, accessors, and observables:
 
 ```tsx
-signal.is(maybeSignal);           // Is any signal?
-signal.is(sig, "mutable");        // Is mutable?
-signal.is(sig, "computed");       // Is computed?
+import { is } from "rextive";
+
+is(maybeSignal);           // Is any signal?
+is(sig, "mutable");        // Is mutable signal?
+is(sig, "computed");       // Is computed signal?
+is(value, "task");         // Is a Task?
+is(value, "tag");          // Is a Tag?
+is(value, "accessor");     // Is an Accessor (function with on)?
+is(value, "observable");   // Is an Observable (object with on)?
 ```
 
 ---

@@ -176,8 +176,10 @@ logChanges(doubled, "Doubled");
 ### Type Narrowing
 
 ```tsx
+import { is } from "rextive";
+
 function maybeSet<T>(s: AnySignal<T>, value: T) {
-  if (signal.is(s, "mutable")) {
+  if (is(s, "mutable")) {
     s.set(value); // ✅ TypeScript knows it's mutable
   }
 }

@@ -11,7 +11,7 @@ import {
   Computed,
 } from "../types";
 import { getHooks } from "../hooks";
-import { is as signalIs } from "../is";
+import { is } from "../is";
 import { autoPrefix } from "./nameGenerator";
 
 /**
@@ -192,28 +192,6 @@ export namespace task {
   }
 
   /**
-   * Type guard to check if a value is a Task.
-   *
-   * @param value - The value to check
-   * @returns True if value is a Task
-   *
-   * @example
-   * ```typescript
-   * if (task.is(value)) {
-   *   console.log(value.status);
-   * }
-   * ```
-   */
-  export function is<T = unknown>(value: unknown): value is Task<T> {
-    return (
-      typeof value === "object" &&
-      value !== null &&
-      TASK_TYPE in value &&
-      (value as any)[TASK_TYPE] === true
-    );
-  }
-
-  /**
    * Associates a task with a promise in the cache.
    *
    * @param promise - The promise to cache
@@ -299,7 +277,7 @@ export namespace task {
     : TValue extends PromiseLike<infer T>
     ? Task<T>
     : Task<TValue> {
-    if (signalIs(value)) {
+    if (is(value)) {
       if (value.error()) {
         return task.error(value.error()) as any;
       }
@@ -353,7 +331,7 @@ function getStaticTaskCache(): WeakMap<object, Task<unknown>> {
  * Internal implementation for normalizing a value to a Task.
  */
 function toTaskImpl<T>(value: unknown): Task<T> {
-  if (task.is<T>(value)) {
+  if (is<T>(value, "task")) {
     return value;
   }
 

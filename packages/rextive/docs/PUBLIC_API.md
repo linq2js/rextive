@@ -217,16 +217,6 @@ Create error state.
 const l = task.error(new Error("Failed"));
 ```
 
-#### `task.is(value)`
-
-Type guard for task.
-
-```ts
-if (task.is(value)) {
-  console.log(value.status); // 'loading' | 'success' | 'error'
-}
-```
-
 #### `task.get(promise)` / `task.set(promise, task)`
 
 Get/set task state for a promise.
@@ -516,8 +506,8 @@ import type {
 - Signal: `signal` / `$`, `.set`, `.reset`, `.on`, `.dispose`, `.map`, `.scan`
 - Batch: `batch`, `signal.batch`
 - Async: `wait.all`, `wait.any`, `wait.race`, `wait.settled`, `wait.delay`, `wait.timeout`
-- Task: `task`, `task.loading`, `task.success`, `task.error`, `task.is`, `task.get`, `task.set`
-- Guards: `is`, `isSignal`
+- Task: `task`, `task.loading`, `task.success`, `task.error`, `task.get`, `task.set`
+- Guards: `is` (unified type guard for signal, task, tag, accessor, observable)
 - Utils: `emitter`, `tryDispose`, `resolveEquals`
 - Dev: `dev`, `dev(fn)`, `dev.log`, `dev.warn`, `dev.error`, `dev.assert`
 

@@ -335,26 +335,6 @@ const withPromise = task.error<User>(err, userPromise);
 
 ---
 
-#### `task.is(value)` - Type guard
-
-```ts
-function is<T = unknown>(value: unknown): value is Task<T>
-```
-
-**Example:**
-```ts
-if (task.is(value)) {
-  // value is Task<unknown>
-  switch (value.status) {
-    case "loading": /* ... */
-    case "success": /* ... */
-    case "error": /* ... */
-  }
-}
-```
-
----
-
 #### `task.get(promise)` - Get or create from promise
 
 ```ts
