@@ -63,11 +63,8 @@ export function refreshOn<TSource extends Signal<any>, TNotifier>(
 ): (source: TSource) => TSource {
   return (source: TSource): TSource => {
     const notifiers = Array.isArray(notifier) ? notifier : [notifier];
-    const unsubscribeAll = emitter();
-
-    // Subscribe to each notifier
-    notifiers.forEach((n) =>
-      unsubscribeAll.on(
+    const unsubscribeAll = emitter(
+      notifiers.map((n) =>
         n.on(() => {
           if (filter && !filter(n)) {
             return;
