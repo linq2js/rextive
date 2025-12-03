@@ -2,14 +2,14 @@
  * Formatting utilities for DevTools
  */
 
-import { signal } from "@/index";
+import { is as isSignal } from "../../is";
 
 export function formatValue(value: unknown, maxLength = 40): string {
   if (value === undefined) return "undefined";
   if (value === null) return "null";
   if (typeof value === "function") {
     // Check if it's a signal
-    if (signal.is(value)) {
+    if (isSignal(value)) {
       try {
         const nestedValue = (value as any).tryGet?.();
         if (nestedValue !== undefined) {
@@ -36,7 +36,7 @@ export function formatValueFull(value: unknown): string {
   if (value === null) return "null";
   if (typeof value === "function") {
     // Check if it's a signal
-    if (signal.is(value)) {
+    if (isSignal(value)) {
       try {
         const nestedError = (value as any).error?.();
         if (nestedError) {

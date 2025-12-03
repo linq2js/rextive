@@ -4,12 +4,12 @@
  */
 
 import React, { useState } from "react";
-import type { TagInfo, SignalInfo } from "@/devtools/types";
+import type { TagInfo, SignalInfo } from "../../devtools/types";
 import type { PanelPosition } from "../styles";
 import * as styles from "../styles";
 import { formatValue } from "../utils/formatUtils";
-import { task } from "@/utils/task";
-import { isPromiseLike } from "@/utils/isPromiseLike";
+import { task } from "../../utils/task";
+import { isPromiseLike } from "../../utils/isPromiseLike";
 import { IconCamera } from "../icons";
 
 interface TagsTabProps {

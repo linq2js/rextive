@@ -5,9 +5,9 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import type { DependencyGraph, GraphNode, GraphEdge } from "@/devtools/utils/buildDependencyGraph";
+import type { DependencyGraph, GraphNode, GraphEdge } from "../../devtools/utils/buildDependencyGraph";
 import * as styles from "../styles";
-import { getDependencies, getDependents } from "@/devtools/utils/buildDependencyGraph";
+import { getDependencies, getDependents } from "../../devtools/utils/buildDependencyGraph";
 
 interface DependencyGraphViewProps {
   graph: DependencyGraph;

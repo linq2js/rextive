@@ -2,7 +2,7 @@ import { useMemo, useRef } from "react";
 import { dev } from "../utils/dev";
 import { disposable, tryDispose } from "../disposable";
 import { emit, withHooks } from "../hooks";
-import { Emitter, emitter } from "@/utils/emitter";
+import { Emitter, emitter } from "../utils/emitter";
 
 export interface SafeFactoryController<T> {
   /** The created object */

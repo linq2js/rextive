@@ -14,11 +14,6 @@ export default defineConfig({
       insertTypesEntry: true,
     }),
   ],
-  resolve: {
-    alias: {
-      "@": resolve(__dirname, "src"),
-    },
-  },
   // Don't define __DEV__ at library build time - let the consuming application
   // define it based on their build mode. This ensures proper tree-shaking
   // in the consumer's production build, not the library's build.

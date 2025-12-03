@@ -4,10 +4,10 @@
  */
 
 import React, { useState } from "react";
-import type { ChainReaction, SignalInfo } from "@/devtools/types";
+import type { ChainReaction, SignalInfo } from "../../devtools/types";
 import * as styles from "../styles";
 import { IconClose } from "../icons";
-import { deleteChain } from "@/devtools";
+import { deleteChain } from "../../devtools";
 
 interface ChainsTabProps {
   chains: ChainReaction[];

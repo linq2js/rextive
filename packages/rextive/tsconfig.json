@@ -19,17 +19,7 @@
     "declarationMap": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"],
-      "@/cache/*": ["./src/cache/*"],
-      "@/devtools/*": ["./src/devtools/*"],
-      "@/immer/*": ["./src/immer/*"],
-      "@/operators/*": ["./src/operators/*"],
-      "@/plugins/*": ["./src/plugins/*"],
-      "@/react/*": ["./src/react/*"],
-      "@/utils/*": ["./src/utils/*"]
-    }
+    "baseUrl": "."
   },
   "include": ["src"],
   "exclude": [

@@ -11,13 +11,13 @@ import {
   onDevToolsEvent,
   enableChainTracking,
   disableChainTracking,
-} from "@/devtools";
+} from "../../devtools";
 import type {
   SignalInfo,
   TagInfo,
   DevToolsEvent,
   ChainReaction,
-} from "@/devtools/types";
+} from "../../devtools/types";
 
 const BOOKMARKS_STORAGE_KEY = "rextive-devtools-bookmarks";
 

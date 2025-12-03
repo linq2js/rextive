@@ -9,7 +9,7 @@ import type {
   DependencyGraph,
   GraphNode,
   GraphEdge,
-} from "@/devtools/utils/buildDependencyGraph";
+} from "../../devtools/utils/buildDependencyGraph";
 import * as styles from "../styles";
 
 // Status colors - consistent with Signals tab

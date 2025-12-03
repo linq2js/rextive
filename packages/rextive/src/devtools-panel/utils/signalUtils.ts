@@ -2,10 +2,10 @@
  * Signal value extraction utilities
  */
 
-import { task } from "@/utils/task";
-import { isPromiseLike } from "@/utils/isPromiseLike";
-import { signal } from "@/index";
-import type { SignalInfo } from "@/devtools/types";
+import { task } from "../../utils/task";
+import { isPromiseLike } from "../../utils/isPromiseLike";
+import { is as isSignal } from "../../is";
+import type { SignalInfo } from "../../devtools/types";
 
 /**
  * Extract current value from a signal, handling errors and async states
@@ -35,7 +35,7 @@ export function extractSignalValue(info: SignalInfo): {
       currentValue = info.signal.tryGet();
 
       // Handle nested signals - if the value is itself a signal, extract its value
-      if (signal.is(currentValue)) {
+      if (isSignal(currentValue)) {
         try {
           const nestedError = (currentValue as any).error?.();
           if (nestedError) {
@@ -44,7 +44,7 @@ export function extractSignalValue(info: SignalInfo): {
             const nestedValue = (currentValue as any).tryGet?.();
             if (nestedValue !== undefined) {
               // Recursively handle nested signals
-              currentValue = signal.is(nestedValue)
+              currentValue = isSignal(nestedValue)
                 ? `[Signal: ${(nestedValue as any).displayName || "nested"}]`
                 : nestedValue;
             } else {
