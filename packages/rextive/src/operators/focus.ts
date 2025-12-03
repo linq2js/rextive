@@ -18,7 +18,6 @@ import type {
 } from "../types";
 import { signal } from "../signal";
 import { is } from "../is";
-import { autoPrefix } from "../utils/nameGenerator";
 
 /**
  * Context passed to focus callbacks (set, validate, onError)
@@ -293,8 +292,8 @@ export function focus<T extends object, P extends Path<T>>(
     const initialValue = readFromSource();
     const inner = signal<V>(initialValue, {
       equals,
-      name:
-        name ?? autoPrefix(`focus(${source.displayName}.${path as string})`),
+      // Chain name format: source>focus(path)
+      name: name ?? `${source.displayName}>focus(${path as string})`,
     });
 
     // Store original methods BEFORE creating subscriptions

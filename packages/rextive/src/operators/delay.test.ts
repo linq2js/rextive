@@ -15,7 +15,8 @@ describe("delay operator", () => {
     const source = signal("test");
     const delayed = delay(300, { name: "customDelay" })(source);
 
-    expect(delayed.displayName).toMatch(/^#customDelay-\d+$/);
+    // Custom name is used as-is
+    expect(delayed.displayName).toBe("customDelay");
   });
 
   describe("delayScheduler", () => {

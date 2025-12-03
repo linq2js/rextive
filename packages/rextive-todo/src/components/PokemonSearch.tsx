@@ -78,7 +78,7 @@ function createPokemonSearch() {
       refreshOn(notifier),
       // Transform to task for loading/error/success states
       // Pass DEFAULT_PROFILE as the initial value before first computation
-      task(DEFAULT_PROFILE, { name: "pokemonProfileTask" })
+      task(DEFAULT_PROFILE, { name: "pokemonProfile" })
     );
 
   return {

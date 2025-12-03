@@ -1,7 +1,7 @@
 import { signal } from "../signal";
 import type { Signal, Computed } from "../types";
 import type { Scheduler, Operator, OperatorNameOptions } from "./types";
-import { autoPrefix } from "../utils/nameGenerator";
+import { operatorId, chainName } from "../utils/nameGenerator";
 import { wrapDispose } from "../disposable";
 
 /**
@@ -36,25 +36,26 @@ export interface PaceOptions extends OperatorNameOptions {}
  *     timeoutId = setTimeout(notify, ms);
  *   };
  * };
- * const debounced = pace(debounceScheduler(300), { name: "debounce" })(source);
+ * const debounced = pace(debounceScheduler(300), { name: "myDebounce" })(source);
  */
 export function pace<T>(
   scheduler: Scheduler,
   options: PaceOptions = {}
 ): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
-    // If custom name provided, use it directly; otherwise include source name
-    const baseName = options.name ?? `pace(${source.displayName})`;
+    // If custom name provided, use it; otherwise build chain name
+    const opId = operatorId("pace");
+    const resultName = options.name ?? chainName(source.displayName, opId);
 
-    // Internal mutable signal holds the paced value (hidden from devtools by default)
+    // Internal signal uses result name + ".i" suffix
     // Use peek() to avoid triggering render tracking
     const internal = signal(source.peek(), {
-      name: autoPrefix(`${baseName}_internal`),
+      name: `${resultName}.i`,
     });
 
-    // Computed signal exposes it as read-only (hidden from devtools by default)
+    // Result signal uses the chain name
     const result = signal({ internal }, ({ deps }) => deps.internal, {
-      name: autoPrefix(baseName),
+      name: resultName,
     });
 
     // Track if disposed to prevent updates after disposal

@@ -165,8 +165,8 @@ describe("pipeSignals", () => {
       // Create a signal with auto-generated name
       const computed = to((x: number) => x * 2)(source);
 
-      // Verify the computed signal has auto-generated name
-      expect(computed.displayName).toMatch(/^#to\(testSource\)-\d+$/);
+      // Verify the computed signal has chain name format: source>#to-N
+      expect(computed.displayName).toMatch(/^testSource>#to-\d+$/);
       expect(is(computed)).toBe(true);
 
       // Now pipe it
@@ -175,7 +175,7 @@ describe("pipeSignals", () => {
       // The rename should trigger because:
       // 1. result !== source (true)
       // 2. is(result) (true - it's a computed signal)
-      // 3. displayName starts with # (depends on implementation)
+      // 3. displayName contains > chain separator
       expect(is(result)).toBe(true);
     });
   });

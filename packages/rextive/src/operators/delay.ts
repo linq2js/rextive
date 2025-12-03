@@ -1,6 +1,7 @@
 import type { Signal, Computed, SignalOptions } from "../types";
 import type { Scheduler, Operator } from "./types";
 import { pace } from "./pace";
+import { operatorId, chainName } from "../utils/nameGenerator";
 
 /**
  * Creates a scheduler that delays notifications by a fixed duration or until a specific time.
@@ -54,9 +55,10 @@ export function delay<T>(
   options: SignalOptions<T> = {}
 ): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
-    const baseName = options?.name ?? `delay(${source.displayName})`;
-    return pace<T>(delayScheduler(due), {
-      name: baseName,
-    })(source);
+    // Use custom name if provided, otherwise build chain name
+    const opId = operatorId("delay");
+    const name = options?.name ?? chainName(source.displayName, opId);
+
+    return pace<T>(delayScheduler(due), { name })(source);
   };
 }

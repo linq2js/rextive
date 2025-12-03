@@ -1,6 +1,7 @@
 import type { Signal, Computed, SignalOptions } from "../types";
 import type { Scheduler, Operator } from "./types";
 import { pace } from "./pace";
+import { operatorId, chainName } from "../utils/nameGenerator";
 
 /**
  * Creates a scheduler that debounces notifications.
@@ -56,9 +57,10 @@ export function debounce<T>(
   options: SignalOptions<T> = {}
 ): Operator<T> {
   return (source: Signal<T>): Computed<T> => {
-    const baseName = options?.name ?? `debounce(${source.displayName})`;
-    return pace<T>(debounceScheduler(ms), {
-      name: baseName,
-    })(source);
+    // Use custom name if provided, otherwise generate chain name
+    const opId = operatorId("debounce");
+    const name = options?.name ?? chainName(source.displayName, opId);
+
+    return pace<T>(debounceScheduler(ms), { name })(source);
   };
 }

@@ -11,7 +11,7 @@ import {
   resolveSelectorsRequired,
   type SelectorOptions,
 } from "./resolveSelectors";
-import { autoPrefix } from "../utils/nameGenerator";
+import { operatorId, chainName } from "../utils/nameGenerator";
 
 /**
  * Options for to operator
@@ -197,9 +197,13 @@ export function to(
   const [selector, options] = resolveSelectorsRequired([first, ...rest]);
 
   return (source: Signal<any>) => {
+    // Use custom name if provided, otherwise build chain name
+    const opId = operatorId("to");
+    const name = options.name ?? chainName(source.displayName, opId);
+
     const signalOptions: SignalOptions<any> = {
       ...options,
-      name: options.name ?? autoPrefix(`to(${source.displayName})`),
+      name,
     };
 
     return signal(

@@ -16,7 +16,16 @@ describe("debounce operator", () => {
     const source = signal("test");
     const debounced = debounce(300, { name: "customDebounce" })(source);
 
-    expect(debounced.displayName).toMatch(/^#customDebounce-\d+$/);
+    // Custom name is used as-is (no auto-prefix)
+    expect(debounced.displayName).toBe("customDebounce");
+  });
+
+  it("should generate chain name when no custom name", () => {
+    const source = signal("test", { name: "mySource" });
+    const debounced = debounce(300)(source);
+
+    // Chain name format: source>#debounce-N
+    expect(debounced.displayName).toMatch(/^mySource>#debounce-\d+$/);
   });
 
   it("should create a debounced signal with initial value", () => {

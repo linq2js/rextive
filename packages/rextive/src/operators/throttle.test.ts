@@ -15,7 +15,8 @@ describe("throttle operator", () => {
     const source = signal("test");
     const throttled = throttle(300, { name: "customThrottle" })(source);
 
-    expect(throttled.displayName).toMatch(/^#customThrottle-\d+$/);
+    // Custom name is used as-is
+    expect(throttled.displayName).toBe("customThrottle");
   });
 
   it("should create a throttled signal with initial value", () => {

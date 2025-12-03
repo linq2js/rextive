@@ -219,7 +219,8 @@ describe("operators", () => {
       const count = signal(1);
       const filtered = count.pipe(filter((x) => x > 0, { name: "customFilter" }));
 
-      expect(filtered.displayName).toMatch(/^#customFilter-\d+$/);
+      // Custom name is used as-is
+      expect(filtered.displayName).toBe("customFilter");
     });
 
     it("should filter values based on predicate", () => {

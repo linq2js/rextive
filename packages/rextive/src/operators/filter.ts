@@ -9,7 +9,7 @@ import type {
   PredefinedEquals,
 } from "../types";
 import { signal } from "../signal";
-import { autoPrefix } from "../utils/nameGenerator";
+import { operatorId, chainName } from "../utils/nameGenerator";
 
 /**
  * Filter signal values based on a predicate
@@ -66,7 +66,9 @@ export function filter<T>(
         ? { equals: equalsOrOptions }
         : equalsOrOptions;
 
-    const baseName = options?.name ?? `filter(${source.displayName})`;
+    // Use custom name if provided, otherwise build chain name
+    const opId = operatorId("filter");
+    const name = options?.name ?? chainName(source.displayName, opId);
 
     return signal(
       { source: source as any },
@@ -90,7 +92,7 @@ export function filter<T>(
       },
       {
         ...options,
-        name: autoPrefix(baseName),
+        name,
       }
     );
   };
