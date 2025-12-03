@@ -14,6 +14,7 @@ import { EqualsStrategy } from "./utils/resolveEquals";
 import { signalOn } from "./signal.on";
 import { signalFrom } from "./signal.from";
 import { getErrorTrace } from "./utils/errorTracking";
+import { autoPrefix } from "./utils/nameGenerator";
 
 // Re-export signal.on types
 export type { SignalOnControl } from "./signal.on";
@@ -37,6 +38,8 @@ function isDependenciesObject(obj: any): boolean {
   return true;
 }
 
+const NOT_EQUALS = () => false;
+
 /**
  * Implementation: signal() - creates MutableSignal<undefined>
  */
@@ -44,7 +47,7 @@ function createEmptySignal(): Mutable<unknown, undefined> {
   return createMutableSignal(
     {},
     () => undefined,
-    undefined,
+    { equals: NOT_EQUALS, name: autoPrefix("notifier") },
     { value: undefined },
     createSignalContext
   );

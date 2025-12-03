@@ -1,5 +1,5 @@
 import { signal, wait, task, rx, useScope } from "rextive/react";
-import { debounce, to } from "rextive/op";
+import { debounce, refreshOn, to } from "rextive/op";
 import { Button } from "./Button";
 
 /**
@@ -36,8 +36,8 @@ interface PokemonData {
 function createPokemonSearch() {
   // Input signal for pokemon name
   const pokemonName = signal("", { name: "pokemonName" });
-
-  const pokemonProfileApi = pokemonName
+  const notifier = signal<"refresh">();
+  const pokemonProfile = pokemonName
     // Debounce the input
     .pipe(
       debounce(300),
@@ -74,19 +74,17 @@ function createPokemonSearch() {
 
         const data: PokemonData = await res.json();
         return { name: data.name, data };
-      })
+      }),
+      refreshOn(notifier),
+      // Transform to task for loading/error/success states
+      // Pass DEFAULT_PROFILE as the initial value before first computation
+      task(DEFAULT_PROFILE, { name: "pokemonProfileTask" })
     );
 
-  // Transform to task for loading/error/success states
-  // Pass DEFAULT_PROFILE as the initial value before first computation
-  const pokemonProfileTask = pokemonProfileApi.pipe(
-    task(DEFAULT_PROFILE, { name: "pokemonProfileTask" })
-  );
-
   return {
+    notifier,
     pokemonName,
-    pokemonProfile: pokemonProfileApi,
-    pokemonProfileTask,
+    pokemonProfile,
   };
 }
 
@@ -100,7 +98,7 @@ function createPokemonSearch() {
  * - Async signal with abortSignal for cancellation
  */
 export function PokemonSearch() {
-  const { pokemonName, pokemonProfile, pokemonProfileTask } =
+  const { pokemonName, notifier, pokemonProfile } =
     useScope(createPokemonSearch);
 
   return (
@@ -137,7 +135,7 @@ export function PokemonSearch() {
         ))}
         <button
           className="pokemon-refresh-btn"
-          onClick={() => pokemonProfile.refresh()}
+          onClick={() => notifier.set("refresh")}
           title="Refresh search"
         >
           🔄
@@ -145,7 +143,7 @@ export function PokemonSearch() {
       </div>
 
       {rx(() => {
-        const { status, loading, error, value } = pokemonProfileTask();
+        const { status, loading, error, value } = pokemonProfile();
         const name = pokemonName().trim();
 
         // Only show loading if we have a name to search

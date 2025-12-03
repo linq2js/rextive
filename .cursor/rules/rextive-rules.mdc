@@ -38,7 +38,7 @@ rextive/devtools  DevTools panel
 
 The `signal()` function has **6 overloads** - 3 for mutable signals, 3 for computed signals.
 
-#### Overload 1: Empty Signal
+#### Overload 1: Empty Signal (Notifier Pattern)
 
 ```tsx
 const user = signal<User>();
@@ -49,6 +49,7 @@ const user = signal<User>();
 - Optional values that start undefined
 - Lazy initialization patterns
 - Signals that receive values later
+- **Action/event dispatching** (notifier pattern)
 
 **Type behavior:**
 
@@ -56,7 +57,59 @@ const user = signal<User>();
 - `user.set()` requires `User` (not undefined)
 - `user.set(undefined)` is a **type error**
 
-**Example:**
+**⭐ Notifier Behavior:**
+
+Empty signals act as **notifiers** - they trigger subscribers on every `.set()` call, even with the same value:
+
+| Property | Value |
+|----------|-------|
+| Initial value | `undefined` |
+| Equality | Always different (`NOT_EQUALS`) |
+| Name | Auto-generated `#notifier-xxx` |
+
+```tsx
+const notifier = signal<"action1" | "action2">();
+
+notifier.on(() => {
+  console.log("triggered:", notifier());
+});
+
+notifier.set("action1"); // ✅ Triggers (1st time)
+notifier.set("action1"); // ✅ Triggers again (same value!)
+```
+
+**Example - Action Dispatching:**
+
+```tsx
+type Action =
+  | { type: "login"; username: string; password: string }
+  | { type: "logout" };
+
+const action = signal<Action>();
+
+action.on(() => {
+  const a = action();
+  if (a?.type === "login") handleLogin(a.username, a.password);
+  if (a?.type === "logout") handleLogout();
+});
+
+action.set({ type: "login", username: "admin", password: "secret" });
+action.set({ type: "logout" });
+```
+
+**Example - Event Bus:**
+
+```tsx
+const onClick = signal<MouseEvent>();
+const onKeyPress = signal<KeyboardEvent>();
+
+onClick.on(() => console.log("clicked!", onClick()));
+
+// Works great with refreshOn/staleOn operators
+const data = asyncSignal.pipe(refreshOn(onClick));
+```
+
+**Example - Optional/Lazy Value:**
 
 ```tsx
 const selectedUser = signal<User>();
@@ -1443,6 +1496,71 @@ const message = signal("", { use: [formTag] });
 
 // Reset all form fields at once
 formTag.forEach((s) => s.reset());
+```
+
+---
+
+### Pattern 8: Notifier / Action Dispatcher
+
+Use `signal<T>()` (empty signal) as an action dispatcher or event bus:
+
+```tsx
+// Action dispatcher pattern
+type Action =
+  | { type: "login"; username: string; password: string }
+  | { type: "logout" }
+  | { type: "refresh" };
+
+const action = signal<Action>();
+
+// Subscribe to actions
+action.on(() => {
+  const a = action();
+  switch (a?.type) {
+    case "login":
+      handleLogin(a.username, a.password);
+      break;
+    case "logout":
+      handleLogout();
+      break;
+    case "refresh":
+      refreshData();
+      break;
+  }
+});
+
+// Dispatch actions - triggers even with same value!
+action.set({ type: "refresh" });
+action.set({ type: "refresh" }); // Triggers again!
+```
+
+**Key difference from regular signals:**
+
+```tsx
+// Regular signal - same value = NO trigger
+const count = signal(0);
+count.set(1); // triggers
+count.set(1); // NO trigger (same value)
+
+// Empty signal (notifier) - always triggers
+const notifier = signal<number>();
+notifier.set(1); // triggers
+notifier.set(1); // triggers again!
+```
+
+**Works great with `refreshOn`/`staleOn`:**
+
+```tsx
+const refreshTrigger = signal<void>();
+const invalidateCache = signal<void>();
+
+const userData = asyncSignal.pipe(
+  refreshOn(refreshTrigger),  // Manual refresh
+  staleOn(invalidateCache)    // Cache invalidation
+);
+
+// Trigger refresh
+refreshTrigger.set(undefined as void);
 ```
 
 ---
