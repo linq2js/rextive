@@ -13,6 +13,8 @@ describe("SortSelect", () => {
     const instance = {
       sortBy: signal<"title" | "price" | "rating">("title"),
       sortOrder: signal<"asc" | "desc">("asc"),
+      category: signal<string | null>(null),
+      search: signal(""),
       setSort: vi.fn(),
       ...overrides,
     };
@@ -68,5 +70,32 @@ describe("SortSelect", () => {
 
     const select = screen.getByRole("combobox");
     expect(select).toHaveValue("price-desc");
+  });
+
+  it("should be disabled when category is selected", () => {
+    setupProductsLogic({ category: signal("furniture") });
+
+    render(<SortSelect />);
+
+    const select = screen.getByRole("combobox");
+    expect(select).toBeDisabled();
+  });
+
+  it("should be disabled when search is active", () => {
+    setupProductsLogic({ search: signal("phone") });
+
+    render(<SortSelect />);
+
+    const select = screen.getByRole("combobox");
+    expect(select).toBeDisabled();
+  });
+
+  it("should be enabled when no category or search", () => {
+    setupProductsLogic({ category: signal(null), search: signal("") });
+
+    render(<SortSelect />);
+
+    const select = screen.getByRole("combobox");
+    expect(select).not.toBeDisabled();
   });
 });

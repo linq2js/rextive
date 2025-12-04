@@ -110,6 +110,18 @@ This document captures all requirements for the DevTools panel. **All new featur
 - [x] Value block is scrollable with max-height 150px
 - [x] Error values shown in red color
 
+### REQ-021b: Signal Details - Dependencies Section ✨ NEW
+
+- [x] Show "Dependencies" section for computed signals (signals this signal depends on)
+- [x] Show "Dependents" section for any signal (signals that depend on this signal)
+- [x] Each dependency/dependent shows:
+  - Badge (M/C/✕) with appropriate colors
+  - Signal name (clickable)
+  - Current value preview
+- [x] Click on signal navigates to and highlights that signal
+- [x] Empty state message when no dependencies/dependents
+- [x] Section collapsed by default, shows count in header
+
 ### REQ-022: Signal Actions
 
 - [x] Copy button (📋) - copy JSON value to clipboard
@@ -375,6 +387,14 @@ interface ChainReaction {
 ---
 
 ## Change Log
+
+### 2024-XX-XX - Signal Dependencies Section ✨ NEW
+
+- Added: REQ-021b - Dependencies section in signal details
+- Show dependencies for computed signals (what this signal depends on)
+- Show dependents for any signal (what depends on this signal)
+- Clickable signal names to navigate to dependency/dependent
+- Section collapsed by default with count in header
 
 ### 2024-XX-XX - Signal Bookmarks & History Actions ✨ NEW
 

@@ -7,12 +7,14 @@ import { DEFAULT_SHIPPING_INFO, type ShippingInfo } from "./types";
  */
 export const shippingLogic = logic("checkout.shippingLogic", () => {
   // Form data
+  /** Shipping address form data (firstName, lastName, email, address, etc.) */
   const info = signal<ShippingInfo>(DEFAULT_SHIPPING_INFO, {
     name: "shipping.info",
     equals: "shallow",
   });
 
   // Validation
+  /** Whether all required shipping fields are filled and valid */
   const isValid = info.to(
     (info) =>
       info.firstName.trim() !== "" &&
@@ -26,10 +28,12 @@ export const shippingLogic = logic("checkout.shippingLogic", () => {
   );
 
   // Actions
+  /** Update shipping info with partial data */
   const update = (updates: Partial<ShippingInfo>) => {
     info.set((prev) => ({ ...prev, ...updates }));
   };
 
+  /** Pre-fill shipping form from logged-in user profile */
   const prefillFromUser = () => {
     const $auth = authLogic();
     const user = $auth.user();
@@ -43,6 +47,7 @@ export const shippingLogic = logic("checkout.shippingLogic", () => {
     }
   };
 
+  /** Reset shipping form to defaults */
   const reset = () => {
     info.set(DEFAULT_SHIPPING_INFO);
   };

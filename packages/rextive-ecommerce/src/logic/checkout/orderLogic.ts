@@ -11,20 +11,25 @@ export const orderLogic = logic("checkout.orderLogic", () => {
   const $cart = cartLogic();
 
   // Processing state
+  /** Whether an order is currently being processed */
   const isProcessing = signal(false, { name: "order.isProcessing" });
 
   // Order result
+  /** Order summary after successful placement (null before order) */
   const summary = signal<OrderSummary | null>(null, {
     name: "order.summary",
   });
 
   // Computed totals
+  /** Fixed shipping cost */
   const shippingCost = signal(SHIPPING_COST, { name: "order.shippingCost" });
 
+  /** Calculated tax amount (8% of subtotal) */
   const tax = $cart.subtotal.to((subtotal) => subtotal * TAX_RATE, {
     name: "order.tax",
   });
 
+  /** Total order amount (subtotal + shipping + tax) */
   const total = signal(
     { subtotal: $cart.subtotal, shippingCost, tax },
     ({ deps }) => deps.subtotal + deps.shippingCost + deps.tax,
@@ -32,6 +37,7 @@ export const orderLogic = logic("checkout.orderLogic", () => {
   );
 
   // Actions
+  /** Submit order to API and clear cart on success */
   const placeOrder = async () => {
     const $shipping = shippingLogic();
     const $payment = paymentLogic();
@@ -65,6 +71,7 @@ export const orderLogic = logic("checkout.orderLogic", () => {
     return orderSummary;
   };
 
+  /** Reset order state (summary and processing flag) */
   const reset = () => {
     summary.set(null);
     isProcessing.set(false);

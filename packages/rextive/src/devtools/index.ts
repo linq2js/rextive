@@ -1119,7 +1119,11 @@ export function deleteChain(id: string): boolean {
  * console.log("Edges:", graph.edges.length);
  * ```
  */
-export { buildDependencyGraph } from "./utils/buildDependencyGraph";
+export {
+  buildDependencyGraph,
+  getDependencies,
+  getDependents,
+} from "./utils/buildDependencyGraph";
 export type {
   DependencyGraph,
   GraphNode,

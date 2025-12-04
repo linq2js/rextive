@@ -19,12 +19,15 @@ export const checkoutLogic = logic("checkoutLogic", () => {
   const $order = orderLogic();
 
   // Flow state
+  /** Whether the checkout modal is open */
   const isOpen = signal(false, { name: "checkout.isOpen" });
+  /** Current step in checkout flow: "shipping" | "payment" | "review" | "complete" */
   const currentStep = signal<CheckoutStep>("shipping", {
     name: "checkout.currentStep",
   });
 
   // Actions
+  /** Open checkout modal and prefill shipping from logged-in user */
   const open = () => {
     $shipping.prefillFromUser();
     isOpen.set(true);
@@ -32,14 +35,17 @@ export const checkoutLogic = logic("checkoutLogic", () => {
     $order.reset();
   };
 
+  /** Close checkout modal */
   const close = () => {
     isOpen.set(false);
   };
 
+  /** Navigate to a specific step */
   const goToStep = (step: CheckoutStep) => {
     currentStep.set(step);
   };
 
+  /** Move to the next step (validates current step first) */
   const nextStep = () => {
     const step = currentStep();
     if (step === "shipping" && $shipping.isValid()) {
@@ -49,6 +55,7 @@ export const checkoutLogic = logic("checkoutLogic", () => {
     }
   };
 
+  /** Move to the previous step */
   const prevStep = () => {
     const step = currentStep();
     if (step === "payment") {
@@ -58,11 +65,13 @@ export const checkoutLogic = logic("checkoutLogic", () => {
     }
   };
 
+  /** Submit the order and move to completion step */
   const placeOrder = async () => {
     await $order.placeOrder();
     currentStep.set("complete");
   };
 
+  /** Reset all checkout state (shipping, payment, order) */
   const reset = () => {
     currentStep.set("shipping");
     $shipping.reset();
@@ -75,28 +84,19 @@ export const checkoutLogic = logic("checkoutLogic", () => {
     // SIGNALS (for UI reactivity and computed signals)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /** Whether the checkout modal is open */
     isOpen,
-    /** Current step in checkout flow: "shipping" | "payment" | "review" | "complete" */
     currentStep,
 
     // ═══════════════════════════════════════════════════════════════════════════
     // ACTIONS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /** Open checkout modal and prefill shipping from logged-in user */
     open,
-    /** Close checkout modal */
     close,
-    /** Navigate to a specific step */
     goToStep,
-    /** Move to the next step (validates current step first) */
     nextStep,
-    /** Move to the previous step */
     prevStep,
-    /** Submit the order and move to completion step */
     placeOrder,
-    /** Reset all checkout state (shipping, payment, order) */
     reset,
   };
 });
