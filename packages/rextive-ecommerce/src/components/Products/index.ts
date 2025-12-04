@@ -1,5 +1,6 @@
 export { ProductGrid } from "./ProductGrid";
 export { ProductCard } from "./ProductCard";
+export { ProductDetails } from "./ProductDetails";
 export { ProductFilters } from "./ProductFilters";
 export { ProductsContent } from "./ProductsContent";
 export { ProductsLoading } from "./ProductsLoading";

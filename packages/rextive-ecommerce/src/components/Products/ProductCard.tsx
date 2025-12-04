@@ -1,4 +1,5 @@
 import { cartLogic } from "@/logic/cartLogic";
+import { routerLogic } from "@/logic/routerLogic";
 import type { Product } from "@/api/types";
 
 interface ProductCardProps {
@@ -9,20 +10,28 @@ interface ProductCardProps {
 export function ProductCard({ product, index }: ProductCardProps) {
   // Get singleton cart logic
   const cart = cartLogic();
+  const router = routerLogic();
 
   const discountedPrice =
     product.price * (1 - product.discountPercentage / 100);
   const hasDiscount = product.discountPercentage > 0;
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     cart.addItem(product);
     cart.openDrawer();
   };
 
+  const handleClick = () => {
+    router.goToProduct(product.id);
+  };
+
   return (
     <article
-      className="card group overflow-hidden animate-slide-up"
+      className="card group overflow-hidden animate-slide-up cursor-pointer"
       style={{ animationDelay: `${index * 0.05}s`, animationFillMode: "both" }}
+      onClick={handleClick}
     >
       {/* Image */}
       <div className="relative aspect-square overflow-hidden bg-warm-100">
@@ -48,7 +57,7 @@ export function ProductCard({ product, index }: ProductCardProps) {
         )}
 
         {/* Quick add overlay */}
-        <div className="absolute inset-0 bg-warm-900/0 group-hover:bg-warm-900/40 transition-colors duration-300 flex items-center justify-center">
+        <div className="absolute inset-0 bg-warm-900/0 group-hover:bg-warm-900/40 transition-colors duration-300 flex items-center justify-center gap-3">
           <button
             onClick={handleAddToCart}
             className="btn-primary opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300"

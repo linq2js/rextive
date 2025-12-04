@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { logic } from "rextive";
+import { logic, signal } from "rextive";
 import { cartLogic } from "./cartLogic";
+import { authLogic } from "./authLogic";
 import type { Product } from "@/api/types";
 
 // Mock localStorage
@@ -11,6 +12,17 @@ const localStorageMock = {
   clear: vi.fn(),
 };
 Object.defineProperty(global, "localStorage", { value: localStorageMock });
+
+// Helper to setup auth mock (authenticated by default)
+const setupAuthMock = (isAuthenticated = true) => {
+  const instance = {
+    user: signal(isAuthenticated ? { id: 1, username: "test" } : null),
+    isAuthenticated: signal(isAuthenticated).to((v) => v),
+    openLoginModal: vi.fn(),
+  };
+  logic.provide(authLogic as any, () => instance as any);
+  return instance;
+};
 
 // Mock product
 const mockProduct: Product = {
@@ -50,6 +62,7 @@ describe("cartLogic", () => {
   });
 
   it("should start with empty cart", () => {
+    setupAuthMock(true);
     const cart = cartLogic.create();
 
     expect(cart.items()).toEqual([]);
@@ -57,7 +70,8 @@ describe("cartLogic", () => {
     expect(cart.subtotal()).toBe(0);
   });
 
-  it("should add item to cart", () => {
+  it("should add item to cart when authenticated", () => {
+    setupAuthMock(true);
     const cart = cartLogic.create();
 
     cart.addItem(mockProduct, 2);
@@ -68,7 +82,18 @@ describe("cartLogic", () => {
     expect(cart.itemCount()).toBe(2);
   });
 
+  it("should show login modal when adding item while not authenticated", () => {
+    const authMock = setupAuthMock(false);
+    const cart = cartLogic.create();
+
+    cart.addItem(mockProduct, 2);
+
+    expect(authMock.openLoginModal).toHaveBeenCalled();
+    expect(cart.items()).toHaveLength(0);
+  });
+
   it("should increase quantity when adding existing item", () => {
+    setupAuthMock(true);
     const cart = cartLogic.create();
 
     cart.addItem(mockProduct, 1);
@@ -80,6 +105,7 @@ describe("cartLogic", () => {
   });
 
   it("should remove item from cart", () => {
+    setupAuthMock(true);
     const cart = cartLogic.create();
 
     cart.addItem(mockProduct, 1);
@@ -90,6 +116,7 @@ describe("cartLogic", () => {
   });
 
   it("should update item quantity", () => {
+    setupAuthMock(true);
     const cart = cartLogic.create();
 
     cart.addItem(mockProduct, 1);
@@ -100,6 +127,7 @@ describe("cartLogic", () => {
   });
 
   it("should remove item when quantity set to 0", () => {
+    setupAuthMock(true);
     const cart = cartLogic.create();
 
     cart.addItem(mockProduct, 2);
@@ -109,6 +137,7 @@ describe("cartLogic", () => {
   });
 
   it("should calculate subtotal with discount", () => {
+    setupAuthMock(true);
     const cart = cartLogic.create();
 
     // Product: $100 with 10% discount = $90 per item
@@ -119,6 +148,7 @@ describe("cartLogic", () => {
   });
 
   it("should calculate total discount", () => {
+    setupAuthMock(true);
     const cart = cartLogic.create();
 
     // Product: $100 with 10% discount = $10 discount per item
@@ -129,6 +159,7 @@ describe("cartLogic", () => {
   });
 
   it("should clear all items", () => {
+    setupAuthMock(true);
     const cart = cartLogic.create();
 
     cart.addItem(mockProduct, 3);
@@ -140,6 +171,7 @@ describe("cartLogic", () => {
   });
 
   it("should open and close drawer", () => {
+    setupAuthMock(true);
     const cart = cartLogic.create();
 
     expect(cart.drawerOpen()).toBe(false);

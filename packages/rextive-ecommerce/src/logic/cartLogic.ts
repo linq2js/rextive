@@ -1,6 +1,7 @@
 import { signal, logic } from "rextive";
 import { persistor } from "rextive/plugins";
 import type { Product, LocalCartItem } from "@/api/types";
+import { authLogic } from "./authLogic";
 
 // Persistor for cart items
 const persist = persistor<{ items: LocalCartItem[] }>({
@@ -21,6 +22,7 @@ const persist = persistor<{ items: LocalCartItem[] }>({
 
 /**
  * Cart logic - manages shopping cart state with persistence.
+ * Requires authentication for cart operations.
  *
  * Uses `logic()` for:
  * - Automatic signal disposal
@@ -28,6 +30,17 @@ const persist = persistor<{ items: LocalCartItem[] }>({
  * - Testability via logic.provide() and logic.clear()
  */
 export const cartLogic = logic("cartLogic", () => {
+  // Get auth logic for checking authentication
+  const $auth = authLogic();
+
+  // Helper to require auth - returns true if authenticated, false if showing login modal
+  const requireAuth = (): boolean => {
+    if ($auth.isAuthenticated()) {
+      return true;
+    }
+    $auth.openLoginModal();
+    return false;
+  };
   // Core state (signals)
   const items = signal<LocalCartItem[]>([], {
     name: "cart.items",
@@ -62,8 +75,10 @@ export const cartLogic = logic("cartLogic", () => {
     { name: "cart.totalDiscount" }
   );
 
-  // Actions
+  // Actions (require authentication)
   const addItem = (product: Product, quantity = 1) => {
+    if (!requireAuth()) return;
+
     items.set((current) => {
       const existing = current.find((item) => item.productId === product.id);
 
@@ -80,12 +95,16 @@ export const cartLogic = logic("cartLogic", () => {
   };
 
   const removeItem = (productId: number) => {
+    if (!requireAuth()) return;
+
     items.set((current) =>
       current.filter((item) => item.productId !== productId)
     );
   };
 
   const updateQuantity = (productId: number, quantity: number) => {
+    if (!requireAuth()) return;
+
     if (quantity <= 0) {
       removeItem(productId);
       return;
@@ -99,6 +118,8 @@ export const cartLogic = logic("cartLogic", () => {
   };
 
   const clearCart = () => {
+    if (!requireAuth()) return;
+
     items.set([]);
   };
 
