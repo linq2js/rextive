@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from "@/test/utils";
 import { logic, signal } from "rextive";
 import { CartDrawer } from "./CartDrawer";
 import { cartLogic } from "@/logic/cart";
-import type { TestInstance } from "rextive";
 
 describe("CartDrawer", () => {
   afterEach(() => {
@@ -11,7 +10,7 @@ describe("CartDrawer", () => {
   });
 
   const setupCartLogic = (overrides = {}) => {
-    const instance: TestInstance<typeof cartLogic> = {
+    const instance = {
       drawerOpen: signal(false),
       closeDrawer: vi.fn(),
       items: signal([]),
@@ -19,13 +18,10 @@ describe("CartDrawer", () => {
       subtotal: signal(0),
       totalDiscount: signal(0),
       clearCart: vi.fn(),
-      addItem: vi.fn(),
-      removeItem: vi.fn(),
-      updateQuantity: vi.fn(),
-      openDrawer: vi.fn(),
       ...overrides,
     };
-    logic.provide(cartLogic, () => instance);
+    // Use type assertion for partial mock
+    logic.provide(cartLogic as any, () => instance);
     return instance;
   };
 

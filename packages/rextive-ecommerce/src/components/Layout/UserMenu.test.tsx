@@ -30,7 +30,8 @@ describe("UserMenu", () => {
       openLoginModal: vi.fn(),
       ...overrides,
     };
-    logic.provide(authLogic, () => instance);
+    // Use type assertion for partial mock
+    logic.provide(authLogic as any, () => instance);
     return instance;
   };
 

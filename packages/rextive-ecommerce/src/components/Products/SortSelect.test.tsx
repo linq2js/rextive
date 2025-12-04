@@ -16,7 +16,8 @@ describe("SortSelect", () => {
       setSort: vi.fn(),
       ...overrides,
     };
-    logic.provide(productsLogic, () => instance);
+    // Use type assertion for partial mock
+    logic.provide(productsLogic as any, () => instance);
     return instance;
   };
 

@@ -20,13 +20,14 @@ describe("CategoryFilter", () => {
       category: signal<string | null>(null),
       categoriesTask: signal({
         loading: false,
-        error: null,
+        error: undefined,
         value: mockCategories,
       }),
       setCategory: vi.fn(),
       ...overrides,
     };
-    logic.provide(productsLogic, () => instance);
+    // Use type assertion for partial mock
+    logic.provide(productsLogic as any, () => instance);
     return instance;
   };
 
@@ -76,7 +77,7 @@ describe("CategoryFilter", () => {
       category: signal(null),
       categoriesTask: signal({
         loading: true,
-        error: null,
+        error: undefined,
         value: [],
       }),
     });

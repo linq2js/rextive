@@ -1,16 +1,8 @@
 import { signal, logic, task } from "rextive";
 import { productsApi } from "@/api/client";
-import type { Product, Category } from "@/api/types";
+import type { Product } from "@/api/types";
 
 const PRODUCTS_PER_PAGE = 12;
-
-// Type for products response
-type ProductsResponse = {
-  products: Product[];
-  total: number;
-  skip: number;
-  limit: number;
-};
 
 /**
  * Products logic - manages product listing, search, filtering, and pagination.

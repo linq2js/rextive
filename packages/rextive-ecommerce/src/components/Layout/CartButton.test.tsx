@@ -15,7 +15,8 @@ describe("CartButton", () => {
       itemCount: signal(0),
       ...overrides,
     };
-    logic.provide(cartLogic, () => instance);
+    // Use type assertion for partial mock
+    logic.provide(cartLogic as any, () => instance);
     return instance;
   };
 
