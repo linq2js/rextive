@@ -78,3 +78,7 @@ export type {
   WrapDisposeWhen,
 } from "./disposable";
 export { validate } from "./validate";
+
+// Logic module
+export { logic, NotImplementedError, LogicCreateError } from "./logic";
+export type { Logic, AbstractLogic, Instance } from "./types";

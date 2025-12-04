@@ -5,7 +5,8 @@
   "scripts": {
     "build": "pnpm --filter rextive build",
     "test": "pnpm --filter rextive test",
-    "dev:demo": "concurrently -k -n rextive,demo -c cyan,green \"pnpm --filter rextive watch\" \"pnpm --filter rextive-demo dev\""
+    "dev:demo": "concurrently -k -n rextive,demo -c cyan,green \"pnpm --filter rextive watch\" \"pnpm --filter rextive-demo dev\"",
+    "dev:ecom": "concurrently -k -n rextive,ecommerce -c cyan,magenta \"pnpm --filter rextive watch\" \"pnpm --filter rextive-ecommerce dev\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

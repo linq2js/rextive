@@ -337,8 +337,8 @@ describe("logic", () => {
     });
   });
 
-  describe("singleton semantics with override", () => {
-    it("regular logic with override should return same instance", () => {
+  describe("override semantics", () => {
+    it("regular logic with override should return consistent values", () => {
       const counter = logic("counter", () => ({
         value: Math.random(), // Different each creation
       }));
@@ -348,27 +348,9 @@ describe("logic", () => {
       const a = counter();
       const b = counter();
 
-      // Should be same instance (singleton semantics)
-      expect(a).toBe(b);
+      // Values should be consistent (resolver is called each time but returns same value)
       expect(a.value).toBe(42);
-    });
-
-    it("should use original singleton in override", () => {
-      const counter = logic("counter", () => ({
-        base: 10,
-      }));
-
-      // Access singleton first
-      const original = counter();
-      expect(original.base).toBe(10);
-
-      // Override using original
-      logic.provide(counter, (getOriginal) => ({
-        base: getOriginal().base + 5,
-      }));
-
-      const overridden = counter();
-      expect(overridden.base).toBe(15);
+      expect(b.value).toBe(42);
     });
   });
 
@@ -457,13 +439,13 @@ describe("logic", () => {
         theme: "light",
       }));
 
-      const instance = logic.create(counter);
+      const instance = counter.create();
 
       expect(instance.count()).toBe(100);
       expect(instance.theme).toBe("light");
     });
 
-    it("should be chainable", () => {
+    it("should support multiple provides", () => {
       const dep1 = logic("dep1", () => ({ a: 1 }));
       const dep2 = logic("dep2", () => ({ b: 2 }));
       const main = logic("main", () => {
@@ -472,13 +454,10 @@ describe("logic", () => {
         return { a, b };
       });
 
-      const result = logic
-        .provide(dep1, () => ({ a: 10 }))
-        .provide(dep2, () => ({ b: 20 }));
+      logic.provide(dep1, () => ({ a: 10 }));
+      logic.provide(dep2, () => ({ b: 20 }));
 
-      expect(result).toBe(logic); // Returns logic for chaining
-
-      const instance = logic.create(main);
+      const instance = main.create();
       expect(instance.a).toBe(10);
       expect(instance.b).toBe(20);
     });
@@ -499,11 +478,11 @@ describe("logic", () => {
       expect(singleton.initialValue).toBe(1);
 
       // New instances use override
-      const newInstance = logic.create(counter);
+      const newInstance = counter.create();
       expect(newInstance.initialValue).toBe(999);
     });
 
-    it("should support partial override with original", () => {
+    it("should support full override", () => {
       const config = logic("config", () => ({
         host: "localhost",
         port: 3000,
@@ -514,14 +493,15 @@ describe("logic", () => {
         return { url: `http://${cfg.host}:${cfg.port}` };
       });
 
-      // Partial override - only change port
-      logic.provide(config, (original) => ({
-        ...original(),
+      // Full override - must provide all used properties
+      logic.provide(config, () => ({
+        host: "testhost",
         port: 8080,
+        timeout: 1000,
       }));
 
-      const instance = logic.create(consumer);
-      expect(instance.url).toBe("http://localhost:8080");
+      const instance = consumer.create();
+      expect(instance.url).toBe("http://testhost:8080");
     });
 
     it("should work with nested dependencies", () => {
@@ -538,7 +518,7 @@ describe("logic", () => {
       // Global override on base affects all
       logic.provide(base, () => ({ value: 50 }));
 
-      const instance = logic.create(top);
+      const instance = top.create();
       expect(instance.result).toBe(110); // (50 * 2) + 10
     });
   });
@@ -601,9 +581,9 @@ describe("logic", () => {
         return { count };
       });
 
-      // Create tracked instances via logic.create()
-      const instance1 = logic.create(counter);
-      const instance2 = logic.create(counter);
+      // Instances are auto-tracked in dev mode
+      const instance1 = counter.create();
+      const instance2 = counter.create();
 
       instance1.count.set(10);
       instance2.count.set(20);
@@ -619,29 +599,24 @@ describe("logic", () => {
       expect(() => instance2.count.set(1)).toThrow();
     });
 
-    it("should not track instances created via myLogic.create()", () => {
+    it("should track all instances in dev mode", () => {
       const counter = logic("counter", () => {
         const count = signal(0);
         return { count };
       });
 
-      // Create untracked instance via myLogic.create()
-      const untracked = counter.create();
+      // All instances are auto-tracked in dev mode
+      const instance1 = counter.create();
+      const instance2 = counter.create();
 
-      // Create tracked instance via logic.create()
-      const tracked = logic.create(counter);
+      instance1.count.set(10);
+      instance2.count.set(20);
 
       logic.clear();
 
-      // Tracked should be disposed
-      expect(() => tracked.count.set(1)).toThrow();
-
-      // Untracked should still work
-      untracked.count.set(5);
-      expect(untracked.count()).toBe(5);
-
-      // Manual cleanup
-      untracked.dispose();
+      // Both should be disposed after logic.clear()
+      expect(() => instance1.count.set(1)).toThrow();
+      expect(() => instance2.count.set(1)).toThrow();
     });
 
     it("should remove from tracking when manually disposed", () => {
@@ -650,7 +625,7 @@ describe("logic", () => {
         return { count };
       });
 
-      const instance = logic.create(counter);
+      const instance = counter.create();
       instance.count.set(10);
 
       // Manually dispose
@@ -790,8 +765,383 @@ describe("logic", () => {
     });
   });
 
+  describe("signal ownership and disposal", () => {
+    it("should NOT dispose global signals when child logic is disposed", () => {
+      // Global signal - exists outside any logic
+      const globalSignal = signal(100, { name: "globalSignal" });
+
+      const childLogic = logic("child", () => {
+        const ownSignal = signal(0, { name: "ownSignal" });
+
+        return {
+          globalSignal, // Reference to global - should NOT be disposed
+          ownSignal, // Created inside - should be disposed
+        };
+      });
+
+      const child = childLogic.create();
+
+      // Both signals work before dispose
+      expect(globalSignal()).toBe(100);
+      expect(child.ownSignal()).toBe(0);
+
+      // Dispose the child logic
+      child.dispose();
+
+      // CRITICAL: Global signal should NOT be disposed!
+      expect(globalSignal.disposed()).toBe(false);
+      expect(globalSignal()).toBe(100);
+
+      // Child's own signal should be disposed
+      expect(child.ownSignal.disposed()).toBe(true);
+    });
+
+    it("should NOT dispose parent logic signals when child logic is disposed", () => {
+      const parentLogic = logic("parent", () => {
+        const s1 = signal(42, { name: "parentSignal" });
+        return { s1 };
+      });
+
+      const childLogic = logic("child", () => {
+        const { s1 } = parentLogic(); // Access parent singleton
+        const s2 = signal(0, { name: "childSignal" });
+
+        return {
+          s1, // From parent - should NOT be disposed
+          s2, // Created in child - should be disposed
+        };
+      });
+
+      const child = childLogic.create();
+
+      // Both signals work before dispose
+      expect(child.s1()).toBe(42);
+      expect(child.s2()).toBe(0);
+
+      // Dispose the child logic
+      child.dispose();
+
+      // CRITICAL: Parent's signal should NOT be disposed!
+      const parent = parentLogic();
+      expect(parent.s1.disposed()).toBe(false);
+      expect(parent.s1()).toBe(42);
+
+      // Child's own signal should be disposed
+      expect(child.s2.disposed()).toBe(true);
+    });
+
+    it("should only dispose signals created within the logic, not external references", () => {
+      const childSignals = new Set<ReturnType<typeof signal<number>>>();
+      const globalSignal = signal(0, { name: "global" });
+
+      const parentLogic = logic("parent", () => {
+        const s1 = signal(0, { name: "parent.s1" });
+        return { s1 };
+      });
+
+      const childLogic = logic("child", () => {
+        const { s1 } = parentLogic();
+        const s2 = signal(0, { name: "child.s2" });
+        childSignals.add(s2);
+
+        return {
+          globalSignal,
+          s1,
+          s2,
+        };
+      });
+
+      const child = childLogic.create();
+
+      // Verify all signals work
+      expect(child.globalSignal()).toBe(0);
+      expect(child.s1()).toBe(0);
+      expect(child.s2()).toBe(0);
+
+      // Dispose child logic
+      child.dispose();
+
+      // globalSignal should NOT be disposed
+      expect(globalSignal.disposed()).toBe(false);
+      globalSignal.set(999); // Should still work
+      expect(globalSignal()).toBe(999);
+
+      // Parent's s1 should NOT be disposed
+      const parent = parentLogic();
+      expect(parent.s1.disposed()).toBe(false);
+      parent.s1.set(888);
+      expect(parent.s1()).toBe(888);
+
+      // Child's s2 should be disposed
+      for (const s of childSignals) {
+        expect(s.disposed()).toBe(true);
+      }
+    });
+
+    it("should handle multiple nested logic levels correctly", () => {
+      const level1 = logic("level1", () => {
+        const a = signal("a", { name: "level1.a" });
+        return { a };
+      });
+
+      const level2 = logic("level2", () => {
+        const { a } = level1();
+        const b = signal("b", { name: "level2.b" });
+        return { a, b };
+      });
+
+      const level3 = logic("level3", () => {
+        const { a, b } = level2();
+        const c = signal("c", { name: "level3.c" });
+        return { a, b, c };
+      });
+
+      const instance3 = level3.create();
+
+      expect(instance3.a()).toBe("a");
+      expect(instance3.b()).toBe("b");
+      expect(instance3.c()).toBe("c");
+
+      // Dispose level3
+      instance3.dispose();
+
+      // Level1 and Level2 signals should still work (they're singletons)
+      const instance1 = level1();
+      const instance2 = level2();
+
+      expect(instance1.a.disposed()).toBe(false);
+      expect(instance2.b.disposed()).toBe(false);
+      expect(instance1.a()).toBe("a");
+      expect(instance2.b()).toBe("b");
+
+      // Only level3's own signal should be disposed
+      expect(instance3.c.disposed()).toBe(true);
+    });
+
+    it("should dispose computed signals that depend on external signals, but not the external signals", () => {
+      const externalSignal = signal(10, { name: "external" });
+
+      const myLogic = logic("myLogic", () => {
+        // This computed signal is created inside logic
+        const doubled = signal(
+          { externalSignal },
+          ({ deps }) => deps.externalSignal * 2,
+          { name: "doubled" }
+        );
+
+        return { externalSignal, doubled };
+      });
+
+      const instance = myLogic.create();
+
+      expect(instance.doubled()).toBe(20);
+
+      // Dispose the logic
+      instance.dispose();
+
+      // External signal should NOT be disposed
+      expect(externalSignal.disposed()).toBe(false);
+      externalSignal.set(50);
+      expect(externalSignal()).toBe(50);
+
+      // The computed signal created inside should be disposed
+      expect(instance.doubled.disposed()).toBe(true);
+    });
+  });
+
+  describe("logic.provide() - testing patterns", () => {
+    it("should provide full override", () => {
+      const auth = logic("auth", () => ({
+        getUser: () => "original-user",
+        getToken: () => "original-token",
+        logout: () => {},
+      }));
+
+      logic.provide(auth, () => ({
+        getUser: () => "mock-user",
+        getToken: () => "mock-token",
+        logout: () => {},
+      }));
+
+      const instance = auth();
+      expect(instance.getUser()).toBe("mock-user");
+      expect(instance.getToken()).toBe("mock-token");
+    });
+
+    it("should work with vi.fn() mocks", () => {
+      const api = logic("api", () => ({
+        fetchUser: (id: number) => ({ id, name: "Real User" }),
+        updateUser: (id: number, data: unknown) => ({ success: true }),
+      }));
+
+      const mockFetchUser = vi.fn().mockReturnValue({ id: 1, name: "Mock User" });
+      const mockUpdateUser = vi.fn().mockReturnValue({ success: false });
+
+      logic.provide(api, () => ({
+        fetchUser: mockFetchUser,
+        updateUser: mockUpdateUser,
+      }));
+
+      const instance = api();
+      
+      expect(instance.fetchUser(1)).toEqual({ id: 1, name: "Mock User" });
+      expect(mockFetchUser).toHaveBeenCalledWith(1);
+      
+      expect(instance.updateUser(1, { name: "New" })).toEqual({ success: false });
+      expect(mockUpdateUser).toHaveBeenCalledWith(1, { name: "New" });
+    });
+
+    it("should call factory fresh each time (no caching)", () => {
+      const config = logic("config", () => ({
+        value: "original",
+      }));
+
+      let callCount = 0;
+      logic.provide(config, () => {
+        callCount++;
+        return { value: `call-${callCount}` };
+      });
+
+      // Each call to config() calls the factory
+      expect(config().value).toBe("call-1");
+      expect(config().value).toBe("call-2");
+      expect(config().value).toBe("call-3");
+      expect(callCount).toBe(3);
+    });
+
+    it("should work with mockReturnValueOnce for sequential calls", () => {
+      const api = logic("api", () => ({
+        getData: () => "real-data",
+      }));
+
+      const mockGetData = vi
+        .fn()
+        .mockReturnValueOnce("first-call")
+        .mockReturnValueOnce("second-call")
+        .mockReturnValue("default");
+
+      logic.provide(api, () => ({
+        getData: mockGetData,
+      }));
+
+      expect(api().getData()).toBe("first-call");
+      expect(api().getData()).toBe("second-call");
+      expect(api().getData()).toBe("default");
+      expect(api().getData()).toBe("default");
+    });
+
+    it("should work with abstract logic", () => {
+      type AuthApi = {
+        getToken: () => string;
+        refresh: () => void;
+      };
+
+      const authApi = logic.abstract<AuthApi>("authApi");
+
+      logic.provide(authApi, () => ({
+        getToken: () => "test-token",
+        refresh: () => {},
+      }));
+
+      const instance = authApi();
+      expect(instance.getToken()).toBe("test-token");
+    });
+
+    it("should work with multiple provides", () => {
+      const auth = logic("auth", () => ({ user: "original" }));
+      const config = logic("config", () => ({ env: "prod" }));
+
+      logic.provide(auth, () => ({ user: "mock-user" }));
+      logic.provide(config, () => ({ env: "test" }));
+
+      expect(auth().user).toBe("mock-user");
+      expect(config().env).toBe("test");
+    });
+
+    it("setup pattern - return writable instance for test manipulation", () => {
+      type User = { id: number; name: string };
+      
+      const authLogic = logic("auth", () => {
+        const user = signal<User | null>(null);
+        return {
+          user,
+          getUser: () => user(),
+          login: (u: User) => user.set(u),
+          logout: () => user.set(null),
+        };
+      });
+
+      // Setup helper returns writable instance
+      const setupAuth = (initial: { user?: User | null } = {}) => {
+        const instance = {
+          user: signal<User | null>(initial.user ?? null),
+          getUser: () => instance.user(),
+          login: vi.fn((u: User) => instance.user.set(u)),
+          logout: vi.fn(() => instance.user.set(null)),
+        };
+        logic.provide(authLogic, () => instance);
+        return instance;
+      };
+
+      // Test 1: Start logged out
+      const auth = setupAuth();
+      expect(auth.getUser()).toBe(null);
+
+      // Test 2: Manipulate state during test
+      auth.user.set({ id: 1, name: "Alice" });
+      expect(auth.getUser()).toEqual({ id: 1, name: "Alice" });
+
+      // Test 3: Re-setup with different initial state
+      const auth2 = setupAuth({ user: { id: 2, name: "Bob" } });
+      expect(auth2.getUser()).toEqual({ id: 2, name: "Bob" });
+
+      // Test 4: Verify mock function calls
+      auth2.login({ id: 3, name: "Charlie" });
+      expect(auth2.login).toHaveBeenCalledWith({ id: 3, name: "Charlie" });
+    });
+
+    it("setup pattern - manipulate state between assertions", () => {
+      const counterLogic = logic("counter", () => {
+        const count = signal(0);
+        return {
+          count,
+          getCount: () => count(),
+          increment: () => count.set((x) => x + 1),
+        };
+      });
+
+      const setupCounter = (initial = 0) => {
+        const instance = {
+          count: signal(initial),
+          getCount: () => instance.count(),
+          increment: vi.fn(() => instance.count.set((x) => x + 1)),
+        };
+        logic.provide(counterLogic, () => instance);
+        return instance;
+      };
+
+      const counter = setupCounter(10);
+      
+      // Assert initial state
+      expect(counter.getCount()).toBe(10);
+
+      // Manipulate state
+      counter.count.set(50);
+      expect(counter.getCount()).toBe(50);
+
+      // Call action
+      counter.increment();
+      expect(counter.increment).toHaveBeenCalled();
+      expect(counter.getCount()).toBe(51);
+
+      // Direct manipulation again
+      counter.count.set(100);
+      expect(counter.getCount()).toBe(100);
+    });
+  });
+
   describe("test isolation patterns", () => {
-    it("test 1: using logic.create() for tracked isolation", () => {
+    it("test 1: instances are automatically isolated", () => {
       const settings = logic("settings", () => ({
         apiUrl: "https://api.example.com",
       }));
@@ -803,7 +1153,7 @@ describe("logic", () => {
         };
       });
 
-      const instance = logic.create(api);
+      const instance = api.create();
       expect(instance.fetch()).toBe("Fetching from https://api.example.com");
     });
 
@@ -821,7 +1171,7 @@ describe("logic", () => {
 
       logic.provide(settings, () => ({ apiUrl: "http://localhost:3000" }));
 
-      const instance = logic.create(api);
+      const instance = api.create();
       expect(instance.fetch()).toBe("Fetching from http://localhost:3000");
     });
 
@@ -838,7 +1188,7 @@ describe("logic", () => {
       });
 
       // No override - afterEach cleared it
-      const instance = logic.create(api);
+      const instance = api.create();
       expect(instance.fetch()).toBe("Fetching from https://api.example.com");
     });
   });
@@ -857,7 +1207,7 @@ describe("logic", () => {
         };
       });
 
-      const instance = logic.create(counter);
+      const instance = counter.create();
 
       expect(instance.count()).toBe(0);
       expect(instance.doubled()).toBe(0);
@@ -883,7 +1233,7 @@ describe("logic", () => {
         return { count, doubled };
       });
 
-      const instance = logic.create(counter);
+      const instance = counter.create();
       const countRef = instance.count;
       const doubledRef = instance.doubled;
 
@@ -898,7 +1248,7 @@ describe("logic", () => {
   describe("edge cases", () => {
     it("should handle empty object return", () => {
       const empty = logic("empty", () => ({}));
-      const instance = logic.create(empty);
+      const instance = empty.create();
 
       expect(instance).toEqual(expect.objectContaining({}));
       expect(typeof instance.dispose).toBe("function");
@@ -910,7 +1260,7 @@ describe("logic", () => {
         compute: (x: number) => x * 2,
       }));
 
-      const instance = logic.create(standalone);
+      const instance = standalone.create();
       expect(instance.value).toBe(42);
       expect(instance.compute(5)).toBe(10);
     });
@@ -930,7 +1280,7 @@ describe("logic", () => {
         return { data, loading, fetchData };
       });
 
-      const instance = logic.create(asyncLogic);
+      const instance = asyncLogic.create();
 
       expect(instance.data()).toBe(null);
       expect(instance.loading()).toBe(false);

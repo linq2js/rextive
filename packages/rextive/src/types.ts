@@ -1852,6 +1852,43 @@ export const LOGIC_TYPE = Symbol("LOGIC_TYPE");
 export type Instance<T> = T & { dispose(): void };
 
 /**
+ * Utility type for creating mock instances in tests.
+ *
+ * Extracts the instance type from a Logic, preserving Signal types
+ * so you can create mock instances with real signals for testing.
+ *
+ * @example
+ * ```ts
+ * const setupCartLogic = (overrides: Partial<TestInstance<typeof cartLogic>> = {}) => {
+ *   const instance: TestInstance<typeof cartLogic> = {
+ *     items: signal([]),
+ *     itemCount: signal(0),
+ *     addItem: vi.fn(),
+ *     removeItem: vi.fn(),
+ *     ...overrides,
+ *   };
+ *   logic.provide(cartLogic, () => instance);
+ *   return instance;
+ * };
+ *
+ * it('test', () => {
+ *   const cart = setupCartLogic({ itemCount: signal(5) });
+ *   // Manipulate state during test
+ *   cart.items.set([mockItem]);
+ * });
+ * ```
+ */
+export type TestInstance<TLogic extends Logic<any>> = TLogic extends Logic<
+  infer T
+>
+  ? {
+      [key in keyof T]: T[key] extends Signal<infer TValue, infer TInit>
+        ? Signal<TValue, TInit>
+        : T[key];
+    }
+  : never;
+
+/**
  * Infer the instance type from a logic.
  */
 export type InferInstance<TLogic extends Logic<any>> = ReturnType<TLogic> & {

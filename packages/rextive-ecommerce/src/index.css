@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-warm-50 text-warm-900 font-sans antialiased;
+    background-image: 
+      radial-gradient(ellipse at top, rgba(207, 127, 91, 0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(102, 120, 86, 0.05) 0%, transparent 50%);
+    min-height: 100vh;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-warm-100;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-warm-300 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-warm-400;
+  }
+}
+
+@layer components {
+  /* Button variants */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium
+           transition-all duration-200 ease-out
+           focus:outline-none focus:ring-2 focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-primary {
+    @apply btn bg-brand-600 text-white 
+           hover:bg-brand-700 active:bg-brand-800
+           focus:ring-brand-500;
+  }
+  
+  .btn-secondary {
+    @apply btn bg-warm-200 text-warm-800
+           hover:bg-warm-300 active:bg-warm-400
+           focus:ring-warm-400;
+  }
+  
+  .btn-ghost {
+    @apply btn bg-transparent text-warm-600
+           hover:bg-warm-100 active:bg-warm-200
+           focus:ring-warm-300;
+  }
+
+  .btn-sage {
+    @apply btn bg-sage-600 text-white
+           hover:bg-sage-700 active:bg-sage-800
+           focus:ring-sage-500;
+  }
+
+  /* Card styles */
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-warm-200/50
+           transition-shadow duration-200
+           hover:shadow-md;
+  }
+
+  /* Input styles */
+  .input {
+    @apply w-full px-4 py-2.5 rounded-lg border border-warm-300
+           bg-white text-warm-900 placeholder:text-warm-400
+           transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500;
+  }
+
+  /* Badge styles */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .badge-brand {
+    @apply badge bg-brand-100 text-brand-700;
+  }
+  
+  .badge-sage {
+    @apply badge bg-sage-100 text-sage-700;
+  }
+
+  /* Skeleton loading */
+  .skeleton {
+    @apply bg-warm-200 rounded animate-pulse;
+  }
+  
+  .skeleton-shimmer {
+    @apply bg-gradient-to-r from-warm-200 via-warm-100 to-warm-200
+           bg-[length:200%_100%] animate-shimmer rounded;
+  }
+}
+
+@layer utilities {
+  /* Text gradient */
+  .text-gradient {
+    @apply bg-gradient-to-r from-brand-600 to-sage-600 bg-clip-text text-transparent;
+  }
+
+  /* Glass effect */
+  .glass {
+    @apply bg-white/70 backdrop-blur-md;
+  }
+
+  /* Stagger animation delays */
+  .stagger-1 { animation-delay: 0.1s; }
+  .stagger-2 { animation-delay: 0.2s; }
+  .stagger-3 { animation-delay: 0.3s; }
+  .stagger-4 { animation-delay: 0.4s; }
+  .stagger-5 { animation-delay: 0.5s; }
+}
+

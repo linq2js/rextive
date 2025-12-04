@@ -1,6 +1,7 @@
-import { disposable, tryDispose } from "./disposable";
+import { noop, once } from "lodash/fp";
+import { tryDispose } from "./disposable";
 import { withHooks } from "./hooks";
-import { emitter } from "./react";
+import { dev, emitter } from "./react";
 import { AbstractLogic, Instance, Logic, LOGIC_TYPE } from "./types";
 
 // ============================================================================
@@ -39,10 +40,7 @@ export class LogicCreateError extends Error {
  * WeakMap storing dependency overrides for testing/DI.
  * Key: Logic to override, Value: Factory function returning override value
  */
-type Resolvers = WeakMap<
-  Logic<any> | AbstractLogic<any>,
-  (original: () => any) => any
->;
+type Resolvers = WeakMap<Logic<any> | AbstractLogic<any>, () => any>;
 
 /**
  * Global resolvers - set via logic.with(), cleared via logic.clear().
@@ -50,7 +48,7 @@ type Resolvers = WeakMap<
 let globalResolvers: Resolvers = new WeakMap();
 
 /**
- * Tracked instances - created via logic.create(), disposed via logic.clear().
+ * Tracked instances - automatically tracked in dev mode, disposed via logic.clear().
  */
 let trackedInstances: Set<Instance<any>> = new Set();
 
@@ -60,12 +58,17 @@ let trackedInstances: Set<Instance<any>> = new Set();
  */
 let initializingLogics: Set<Logic<any>> | undefined;
 
+let singletonDev = new WeakMap<Logic<any>, Instance<any>>();
+
 // ============================================================================
 // Main Implementation
 // ============================================================================
 
 /**
  * Create a logic unit - a factory for bundles of signals and methods.
+ *
+ * In dev mode, all instances are automatically tracked and disposed when
+ * `logic.clear()` is called. This provides test isolation without manual cleanup.
  *
  * @param name - Display name for debugging and error messages (required)
  * @param fn - Factory function that creates the logic's content
@@ -85,23 +88,25 @@ let initializingLogics: Set<Logic<any>> | undefined;
  *   );
  *
  *   return {
- *     todos,
- *     filter,
- *     filtered,
+ *     getTodos: () => todos(),
+ *     getFilter: () => filter(),
+ *     getFiltered: () => filtered(),
  *     addTodo: (text: string) => todos.set(prev => [...prev, { text, done: false }]),
  *   };
  * });
  *
- * // Production: Use singleton or create fresh instances
+ * // Usage
  * const { addTodo } = todoStore();      // Singleton (persists)
  * const instance = todoStore.create();  // Fresh instance
  *
- * // Testing: Use logic.create() for auto-cleanup
+ * // Testing - instances are automatically disposed on logic.clear()
  * afterEach(() => logic.clear());
- * const store = logic.create(todoStore); // Tracked, auto-disposed
  *
- * // For abstract dependencies, use logic.abstract<T>():
- * const authProvider = logic.abstract<{ getToken: () => string }>("authProvider");
+ * it('test', () => {
+ *   const store = todoStore.create(); // Auto-disposed on logic.clear()
+ *   store.addTodo('test');
+ *   expect(store.getTodos()).toHaveLength(1);
+ * });
  * ```
  */
 function logicImpl<T extends object>(name: string, fn: () => T): Logic<T> {
@@ -112,9 +117,8 @@ function logicImpl<T extends object>(name: string, fn: () => T): Logic<T> {
   const displayName = name;
 
   /**
-   * Create a new instance of this logic (untracked).
-   * In production: use for fresh instances when needed.
-   * In tests: prefer logic.create(myLogic) for auto-cleanup.
+   * Create a new instance of this logic.
+   * In dev mode, instances are automatically tracked and disposed on logic.clear().
    */
   const create = (): Instance<T> => {
     // Circular dependency check
@@ -138,7 +142,7 @@ function logicImpl<T extends object>(name: string, fn: () => T): Logic<T> {
       initializingLogics.add(lg);
 
       // Run the factory function
-      const instance = withHooks(
+      const originalInstance = withHooks(
         (prevHooks) => ({
           onSignalCreate(signal, deps, disposalHandled) {
             if (!disposalHandled) {
@@ -150,18 +154,22 @@ function logicImpl<T extends object>(name: string, fn: () => T): Logic<T> {
         }),
         fn
       );
-      const originalDispose = (instance as any).dispose;
+      const originalDispose = (originalInstance as any).dispose;
 
       // Wrap with disposable for automatic cleanup
-      return {
-        ...instance,
-        dispose() {
+      const instance: Instance<T> = {
+        ...originalInstance,
+        dispose: once(() => {
           onCleanup.emitAndClear();
           if (originalDispose) {
             tryDispose({ dispose: originalDispose });
           }
-        },
+        }),
       };
+
+      dev() && trackedInstances.add(instance);
+
+      return instance;
     } catch (error) {
       onCleanup.emitAndClear();
       // Wrap non-LogicCreateError errors
@@ -175,18 +183,26 @@ function logicImpl<T extends object>(name: string, fn: () => T): Logic<T> {
     }
   };
 
-  /**
-   * Get or create singleton instance.
-   */
-  const getSingleton = (): Instance<T> => {
+  const getSingletonPro = () => {
     if (!singleton) {
       singleton = create();
     }
     return singleton;
   };
 
-  /** Cached override result (separate from singleton) */
-  let overrideInstance: Instance<T> | undefined;
+  const getSingletonDev = () => {
+    singleton = singletonDev.get(lg);
+    if (!singleton) {
+      singleton = create();
+      singletonDev.set(lg, singleton);
+    }
+    return singleton;
+  };
+
+  /**
+   * Get or create singleton instance.
+   */
+  const getSingleton = dev() ? getSingletonDev : getSingletonPro;
 
   /**
    * The logic object - callable as function for singleton access.
@@ -197,19 +213,14 @@ function logicImpl<T extends object>(name: string, fn: () => T): Logic<T> {
       // Check global override
       const resolver = globalResolvers.get(lg);
       if (resolver) {
-        // Cache override result for singleton semantics
-        if (!overrideInstance) {
-          const result = resolver(getSingleton);
-          const instance =
-            typeof result?.dispose === "function" ? result : disposable(result);
-          overrideInstance = instance;
-          return instance;
+        const result = resolver();
+
+        if (result && !result.dispose) {
+          result.dispose = noop;
         }
-        return overrideInstance;
+        return result;
       }
 
-      // No override - clear any cached override and return singleton
-      overrideInstance = undefined;
       return getSingleton();
     },
     {
@@ -224,76 +235,78 @@ function logicImpl<T extends object>(name: string, fn: () => T): Logic<T> {
 
 export const logic = Object.assign(logicImpl, {
   /**
-   * Provide an implementation for a logic (override).
-   * Applies to ALL logics that depend on the specified logic.
+   * Provide a mock implementation for a logic (override).
+   * Useful for testing - replace logic with controlled test instances.
    *
-   * @param l - The logic to provide implementation for
-   * @param impl - Factory function receiving original and returning implementation
-   * @returns logic (for chaining)
+   * **Important**: Always provide a complete mock instance. Partial overrides
+   * don't work correctly because methods have closure references to original signals.
+   *
+   * @param logic - The logic to provide implementation for
+   * @param factory - Factory function returning the mock instance
+   * @returns The logic (for chaining)
    *
    * @example
    * ```ts
-   * // Provide implementation for abstract logic
-   * logic.provide(authProvider, () => ({
-   *   getToken: () => localStorage.getItem('token'),
-   * }));
+   * // Setup pattern - return instance for test manipulation
+   * const setupAuth = (initial: { user?: User }) => {
+   *   const instance = {
+   *     user: signal(initial.user ?? null),
+   *     isRestoring: signal(false),
+   *     getUser: () => instance.user(),
+   *     getIsRestoring: () => instance.isRestoring(),
+   *     logout: vi.fn(),
+   *     openLoginModal: vi.fn(),
+   *   };
+   *   logic.provide(authLogic, () => instance);
+   *   return instance;
+   * };
    *
-   * // Chain multiple providers
-   * logic
-   *   .provide(settings, () => ({ apiUrl: 'http://test' }))
-   *   .provide(auth, () => ({ token: 'test-token' }));
+   * it('shows user name when logged in', () => {
+   *   const auth = setupAuth({ user: { name: 'Alice' } });
+   *   // ... test with initial state ...
    *
-   * // Partial override with original
-   * logic.provide(settings, (original) => ({
-   *   ...original(),
-   *   apiUrl: 'http://test',
+   *   // Manipulate state during test
+   *   auth.user.set(null);
+   *   // ... test logged out state ...
+   * });
+   *
+   * // Simple mock pattern
+   * logic.provide(authLogic, () => ({
+   *   getUser: vi.fn().mockReturnValue(mockUser),
+   *   getIsRestoring: vi.fn().mockReturnValue(false),
+   *   logout: vi.fn(),
+   *   openLoginModal: vi.fn(),
    * }));
    * ```
    */
-  provide: <TOther extends object>(
-    l: Logic<TOther> | AbstractLogic<TOther>,
-    impl: (original: () => TOther) => TOther
+  provide: <
+    TInstance extends object,
+    TLogic extends Logic<TInstance> | AbstractLogic<TInstance>
+  >(
+    logic: TLogic,
+    factory: () => TInstance
   ) => {
-    globalResolvers.set(l, impl);
+    globalResolvers.set(logic, factory);
     return logic;
   },
 
   /**
-   * Create a tracked instance of a logic (for testing).
-   * Instance will be disposed when logic.clear() is called.
-   *
-   * @param l - The logic to create an instance of
-   * @returns A tracked instance
-   *
-   * @example
-   * ```ts
-   * afterEach(() => {
-   *   logic.clear(); // Disposes all tracked instances + clears overrides
-   * });
-   *
-   * it('test', () => {
-   *   const store = logic.create(userStore); // Tracked!
-   *   // ... test ...
-   *   // No manual dispose needed!
-   * });
-   * ```
-   */
-  create: <T extends object>(l: Logic<T>): Instance<T> => {
-    const instance = l.create();
-
-    trackedInstances.add(instance);
-
-    return instance;
-  },
-
-  /**
    * Clear all global overrides and dispose all tracked instances.
+   * In dev mode, all instances created via `myLogic()` or `myLogic.create()`
+   * are automatically tracked and disposed when this is called.
+   *
    * Call in afterEach() for test isolation.
    *
    * @example
    * ```ts
    * afterEach(() => {
-   *   logic.clear(); // Clears overrides + disposes tracked instances
+   *   logic.clear(); // Clears overrides + disposes all tracked instances
+   * });
+   *
+   * it('test', () => {
+   *   const store = todoStore.create(); // Auto-tracked in dev mode
+   *   // ... test ...
+   *   // No manual dispose needed - logic.clear() handles it
    * });
    * ```
    */
@@ -306,7 +319,7 @@ export const logic = Object.assign(logicImpl, {
         // Ignore disposal errors during cleanup
       }
     }
-    trackedInstances = new Set();
+    trackedInstances.clear();
 
     // Clear global overrides
     globalResolvers = new WeakMap();
@@ -356,8 +369,17 @@ export const logic = Object.assign(logicImpl, {
      * This allows changing the override to take effect immediately.
      */
     const createProxy = (): Instance<T> => {
-      // Storage for dispose wrapper (set by logic.create())
+      // Storage for dispose wrapper
       let disposeWrapper: (() => void) | undefined;
+
+      const getOverride = () => {
+        // Check override on EACH property access (no caching)
+        const resolver = globalResolvers.get(lg as unknown as Logic<T>);
+        if (resolver) {
+          return resolver() as any;
+        }
+        return undefined;
+      };
 
       return new Proxy({} as Instance<T>, {
         get(_, prop) {
@@ -371,32 +393,26 @@ export const logic = Object.assign(logicImpl, {
           }
 
           // Check override on EACH property access (no caching)
-          const resolver = globalResolvers.get(lg as unknown as Logic<T>);
-          if (resolver) {
+          const override = getOverride();
+          if (override) {
             // Get the real implementation and access the property
-            const impl = resolver(() => {
-              throw new NotImplementedError(name, "original");
-            });
-            return (impl as any)[prop];
+            return override[prop];
           }
 
           // No override - throw
           throw new NotImplementedError(name, String(prop));
         },
         set(_, prop, value) {
-          // Allow setting dispose (for logic.create() wrapper)
+          // Allow setting dispose
           if (prop === "dispose" && typeof value === "function") {
             disposeWrapper = value;
             return true;
           }
 
           // Check override for set operations
-          const resolver = globalResolvers.get(lg as unknown as Logic<T>);
-          if (resolver) {
-            const impl = resolver(() => {
-              throw new NotImplementedError(name, "original");
-            });
-            (impl as any)[prop] = value;
+          const override = getOverride();
+          if (override) {
+            override[prop] = value;
             return true;
           }
 
@@ -404,10 +420,9 @@ export const logic = Object.assign(logicImpl, {
         },
         has(_, prop) {
           // Check override
-          const resolver = globalResolvers.get(lg as unknown as Logic<T>);
-          if (resolver) {
-            const impl = resolver(() => ({}));
-            return prop in impl;
+          const override = getOverride();
+          if (override) {
+            return prop in override;
           }
           return true; // Pretend all properties exist for type compatibility
         },

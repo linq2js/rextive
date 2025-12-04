@@ -251,7 +251,12 @@ export function SimpleTreeView({
     }
   };
 
-  const renderNode = (node: GraphNode, level: number, hasChildren: boolean, hasVisibleChildren: boolean) => {
+  const renderNode = (
+    node: GraphNode,
+    level: number,
+    _hasChildren: boolean,
+    hasVisibleChildren: boolean
+  ) => {
     const isExpanded = expandedNodes.has(node.id);
     const isSelected = node.id === selectedNodeId;
     const isRecentlyUpdated = recentlyUpdatedNodes.has(node.id);
@@ -326,12 +331,22 @@ export function SimpleTreeView({
             transition: "all 0.25s ease",
           }}
           onMouseEnter={(e) => {
-            if (!isSelected && !isRecentlyUpdated && !isMatch && !node.hasError) {
+            if (
+              !isSelected &&
+              !isRecentlyUpdated &&
+              !isMatch &&
+              !node.hasError
+            ) {
               e.currentTarget.style.backgroundColor = styles.colors.bgHover;
             }
           }}
           onMouseLeave={(e) => {
-            if (!isSelected && !isRecentlyUpdated && !isMatch && !node.hasError) {
+            if (
+              !isSelected &&
+              !isRecentlyUpdated &&
+              !isMatch &&
+              !node.hasError
+            ) {
               e.currentTarget.style.backgroundColor = getBgColor();
             }
           }}
@@ -509,8 +524,16 @@ export function SimpleTreeView({
     for (const item of tree) {
       if (!expandVisibleNodes.has(item.node.id)) continue;
 
-      const hasVisibleChildren = hasVisibleChildrenMap.get(item.node.id) || false;
-      result.push(renderNode(item.node, item.level, item.children.length > 0, hasVisibleChildren));
+      const hasVisibleChildren =
+        hasVisibleChildrenMap.get(item.node.id) || false;
+      result.push(
+        renderNode(
+          item.node,
+          item.level,
+          item.children.length > 0,
+          hasVisibleChildren
+        )
+      );
     }
 
     return result;
@@ -523,9 +546,7 @@ export function SimpleTreeView({
 
   if (visibleNodeIds !== null && visibleNodeIds.size === 0) {
     return (
-      <div style={styles.emptyStateStyles}>
-        No nodes match "{searchQuery}"
-      </div>
+      <div style={styles.emptyStateStyles}>No nodes match "{searchQuery}"</div>
     );
   }
 

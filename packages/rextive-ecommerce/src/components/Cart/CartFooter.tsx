@@ -1,0 +1,20 @@
+import { rx } from "rextive/react";
+import { cartLogic } from "@/logic/cart";
+import { CartSummary } from "./CartSummary";
+
+export function CartFooter() {
+  const { items, subtotal, totalDiscount, clearCart } = cartLogic();
+
+  return rx(() => {
+    const cartItems = items();
+    if (cartItems.length === 0) return null;
+
+    return (
+      <CartSummary
+        subtotal={subtotal()}
+        discount={totalDiscount()}
+        onClear={clearCart}
+      />
+    );
+  });
+}
