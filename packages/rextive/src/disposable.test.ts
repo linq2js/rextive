@@ -1,4 +1,9 @@
-import { disposable, DisposalAggregateError, wrapDispose, noop } from "./disposable";
+import {
+  disposable,
+  DisposalAggregateError,
+  wrapDispose,
+  noop,
+} from "./disposable";
 import { describe, it, expect, vi } from "vitest";
 
 describe("disposable", () => {
@@ -227,30 +232,6 @@ describe("disposable", () => {
 
       expect(service1.dispose).toHaveBeenCalled();
       expect(service2.dispose).toHaveBeenCalled(); // Should still be called
-    });
-
-    it("should warn if dispose is called multiple times", () => {
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {});
-
-      const service = {
-        dispose: vi.fn(),
-      };
-
-      const combined = disposable([service]);
-
-      combined.dispose();
-      combined.dispose(); // Second call
-
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Already disposed")
-      );
-
-      // Should only dispose once
-      expect(service.dispose).toHaveBeenCalledTimes(1);
-
-      consoleWarnSpy.mockRestore();
     });
   });
 

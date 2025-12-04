@@ -6,10 +6,12 @@ import {
   type Observable,
   type Tag,
   type SignalKind,
+  type Logic,
   SIGNAL_TYPE,
   TAG_TYPE,
   Task,
   TASK_TYPE,
+  LOGIC_TYPE,
 } from "./types";
 
 /**
@@ -74,13 +76,24 @@ export function is<T = any>(
   value: unknown,
   type: "mutable"
 ): value is Mutable<T>;
+export function is<T extends object>(
+  value: unknown,
+  type: "logic"
+): value is Logic<T>;
 export function is<T = any>(
   value: unknown,
   type: "computed"
 ): value is Computed<T>;
 export function is<T = any>(
   value: unknown,
-  type?: "mutable" | "computed" | "observable" | "accessor" | "tag" | "task"
+  type?:
+    | "mutable"
+    | "computed"
+    | "observable"
+    | "accessor"
+    | "tag"
+    | "task"
+    | "logic"
 ): value is Signal<T> | Mutable<T> | Computed<T> {
   if (type === "observable") {
     return typeof value === "object" && value !== null && "on" in value;
@@ -110,6 +123,10 @@ export function is<T = any>(
 
   if (!isAnySignal) {
     return false;
+  }
+
+  if (type === "logic") {
+    return typeof value === "object" && value !== null && LOGIC_TYPE in value;
   }
 
   if (!type) {

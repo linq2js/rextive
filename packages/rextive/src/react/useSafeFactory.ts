@@ -1,6 +1,7 @@
 import { useMemo, useRef } from "react";
 import { dev } from "../utils/dev";
 import { disposable, tryDispose } from "../disposable";
+import { is } from "../is";
 import { emit, withHooks } from "../hooks";
 import { Emitter, emitter } from "../utils/emitter";
 
@@ -48,14 +49,22 @@ export function useSafeFactory<T>(
     // dispose last result
     disposeRef.current?.();
     try {
-      let result = withHooks((prevHooks) => {
-        return {
-          onSignalCreate(signal) {
-            prevHooks.onSignalCreate?.(signal);
-            onDispose?.on(signal.dispose);
-          },
-        };
-      }, factory);
+      let result = withHooks(
+        (prevHooks) => {
+          return {
+            onSignalCreate(signal) {
+              prevHooks.onSignalCreate?.(signal);
+              onDispose?.on(signal.dispose);
+            },
+          };
+        },
+        () => {
+          if (is(factory, "logic")) {
+            return factory.create() as T;
+          }
+          return factory();
+        }
+      );
 
       if (!onDispose.size) {
         onDispose = undefined;

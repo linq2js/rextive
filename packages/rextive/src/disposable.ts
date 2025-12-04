@@ -1,3 +1,4 @@
+import { once } from "lodash/fp";
 import { Disposable, ExDisposable, UnionToIntersection } from "./types";
 
 /**
@@ -113,9 +114,6 @@ export function disposable<
 >(disposables: T, options?: CombineDisposablesOptions): any {
   const { merge = "overwrite", onBefore, onAfter } = options || {};
 
-  // Track disposal state
-  let disposed = false;
-
   // Detect if input is array or object
   const isArray = Array.isArray(disposables);
   const serviceEntries: Array<[string | number, any]> = isArray
@@ -159,14 +157,7 @@ export function disposable<
   }
 
   // Create unified dispose method
-  combined.dispose = () => {
-    if (disposed) {
-      console.warn("disposable: Already disposed, ignoring");
-      return;
-    }
-
-    disposed = true;
-
+  combined.dispose = once(() => {
     if (respectDispose) {
       // Handle dispose being a function, array, or object with dispose
       if (typeof respectDispose === "function") {
@@ -221,7 +212,7 @@ export function disposable<
         `Failed to dispose ${errors.length} service(s)`
       );
     }
-  };
+  });
 
   return combined;
 }
@@ -279,7 +270,7 @@ export function wrapDispose<T extends { dispose?: VoidFunction }>(
   target: T,
   customDispose:
     | ((originalDispose: VoidFunction) => void)
-    | readonly (VoidFunction | Disposable)[],
+    | readonly (VoidFunction | Disposable | ExDisposable)[],
   when?: WrapDisposeWhen
 ): () => boolean {
   let disposed = false;

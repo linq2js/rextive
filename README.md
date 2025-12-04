@@ -84,6 +84,7 @@ const Counter = <h1 onClick={increment}>{rx(count)}</h1>;
 | **[Operators](./docs/OPERATORS.md)**             | debounce, throttle, filter, etc.           |
 | **[Integrations](./docs/INTEGRATIONS.md)**       | Immer, Cache, DevTools                     |
 | **[Comparison](./docs/COMPARISON.md)**           | vs Zustand, React Query, Jotai, Redux      |
+| **[Logic & Testing](./docs/LOGIC.md)**           | Testable services, DI, mocking, isolation  |
 | **[Advanced Topics](./docs/ADVANCED.md)**        | Services, custom operators, internal hooks |
 
 ---
@@ -93,6 +94,7 @@ const Counter = <h1 onClick={increment}>{rx(count)}</h1>;
 | Feature              | Description                                      |
 | -------------------- | ------------------------------------------------ |
 | **`signal()`**       | Unified primitive for state, computed, and async |
+| **`logic()`**        | Testable service pattern with DI and mocking     |
 | **`rx()`**           | React integration — makes components reactive    |
 | **`.to()`**          | Transform values with chained selectors          |
 | **`.pipe()`**        | Compose operators for complex data flows         |

@@ -1844,6 +1844,133 @@ export type ResolvedValueMap<
     : never;
 };
 
+export const LOGIC_TYPE = Symbol("LOGIC_TYPE");
+
+/**
+ * An instance returned by logic, automatically wrapped with dispose() method.
+ */
+export type Instance<T> = T & { dispose(): void };
+
+/**
+ * Infer the instance type from a logic.
+ */
+export type InferInstance<TLogic extends Logic<any>> = ReturnType<TLogic> & {
+  dispose(): void;
+};
+
+/**
+ * A logic unit - a factory for creating bundles of signals and methods.
+ *
+ * Supports:
+ * - Singleton pattern: `myLogic()` returns cached instance
+ * - Instance creation: `myLogic.create()` creates new instance
+ * - Dependency injection: `myLogic.with(dep, mock)` overrides dependencies
+ * - Test isolation: `myLogic.reset()` clears singleton and mocks
+ *
+ * @example
+ * ```ts
+ * const settings = logic(() => ({
+ *   theme: 'dark',
+ *   fontSize: 14,
+ * }));
+ *
+ * const counter = logic(() => {
+ *   const { fontSize } = settings(); // Dependency - auto-resolved
+ *   const count = signal(0);
+ *   return {
+ *     count,
+ *     increment: () => count.set(x => x + 1),
+ *   };
+ * });
+ *
+ * // Usage
+ * const { count, increment } = counter(); // Singleton
+ * const instance = counter.create();       // New instance
+ *
+ * // Testing
+ * counter.with(settings, () => ({ theme: 'light', fontSize: 16 }));
+ * counter.reset(); // Clear for next test
+ * ```
+ */
+export interface Logic<T extends object> {
+  /** Type brand for detection (e.g., in useScope) */
+  [LOGIC_TYPE]: true;
+
+  /**
+   * Get or create the singleton instance.
+   * Singleton persists for the app lifetime.
+   * If a global override is set via logic.with(), returns the override instead.
+   */
+  (): Instance<T>;
+
+  /** Debug name for devtools and error messages */
+  readonly displayName: string;
+
+  /**
+   * Create a new instance (not singleton).
+   * Each call returns a fresh instance with its own state.
+   * The instance is auto-wrapped with disposable().
+   *
+   * Use this in tests for isolation:
+   * @example
+   * ```ts
+   * it('should increment', () => {
+   *   const instance = counter.create();
+   *   instance.increment();
+   *   expect(instance.count()).toBe(1);
+   *   instance.dispose(); // Clean up
+   * });
+   * ```
+   */
+  create(): Instance<T>;
+}
+
+/**
+ * An abstract logic that must be overridden before use.
+ * Unlike regular Logic, AbstractLogic:
+ * - Has no `create()` method (only singleton access)
+ * - Returns a Proxy that throws NotImplementedError on property access
+ * - Can be safely passed around; error only occurs when properties are accessed
+ *
+ * @example
+ * ```ts
+ * // Define abstract logic with just a type
+ * const authProvider = logic.abstract<{
+ *   getToken: () => Promise<string>;
+ *   logout: () => void;
+ * }>("authProvider");
+ *
+ * // Can pass around without error
+ * const auth = authProvider(); // ✅ No error yet
+ *
+ * // Error only when property is accessed
+ * auth.getToken(); // ❌ NotImplementedError
+ *
+ * // Consumer must override
+ * logic.with(authProvider, () => ({
+ *   getToken: async () => localStorage.getItem("token") ?? "",
+ *   logout: () => localStorage.removeItem("token"),
+ * }));
+ *
+ * authProvider().getToken(); // ✅ Works now
+ * ```
+ */
+export interface AbstractLogic<T extends object> {
+  /** Type brand for detection */
+  [LOGIC_TYPE]: true;
+
+  /**
+   * Get the singleton instance.
+   * Returns a Proxy if not overridden - accessing any property throws NotImplementedError.
+   */
+  (): Instance<T>;
+
+  /** Debug name for devtools and error messages */
+  readonly displayName: string;
+
+  // Note: No create() method - abstract logics only have singleton access
+}
+
 /**
  * Internal symbol used to identify task objects at runtime.
  * This allows for reliable type checking without relying on duck typing.
@@ -1974,10 +2101,7 @@ export type ErrorTask<TValue> = {
  * }
  * ```
  */
-export type Task<T> =
-  | LoadingTask<T>
-  | SuccessTask<T>
-  | ErrorTask<T>;
+export type Task<T> = LoadingTask<T> | SuccessTask<T> | ErrorTask<T>;
 
 /**
  * A lazy factory that produces and manages a single instance at a time.
