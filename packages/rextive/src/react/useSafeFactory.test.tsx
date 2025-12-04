@@ -30,9 +30,9 @@ describe.each(testModes)(
         wrapper,
       });
 
-      // Result is wrapped with disposable() which adds dispose method
-      expect(result.current.result).toMatchObject({ value: 42 });
-      expect((result.current.result as any).dispose).toBeInstanceOf(Function);
+      // Result is returned as-is (not wrapped with disposable())
+      // This prevents accidental disposal of global signals passed as props
+      expect(result.current.result).toEqual({ value: 42 });
     });
 
     it("should handle committed objects correctly", async () => {
@@ -592,6 +592,114 @@ describe.each(testModes)(
         // In StrictMode, first signal (orphan) should be disposed
         // The committed signal should still work (not disposed)
         expect(lastSignal!.disposed()).toBe(false);
+      });
+
+      it("should NOT dispose global signals passed as props to scope", async () => {
+        // This is a critical test! Global signals must NOT be disposed when component unmounts.
+        // We only dispose:
+        // 1. Signals created INSIDE the factory (auto-tracked)
+        // 2. Scope's explicit dispose method (user's custom cleanup)
+        const globalSignal = signal(100, { name: "globalSignal" });
+
+        let localSignal: ReturnType<typeof signal<number>> | null = null;
+
+        const { unmount } = renderHook(
+          () => {
+            const controller = useSafeFactory(() => {
+              // This signal is created inside factory - should be auto-disposed
+              localSignal = signal(0, { name: "localSignal" });
+
+              // Return scope that references global signal
+              return {
+                globalSignal, // Reference to global - should NOT be disposed
+                localSignal, // Reference to local - will be disposed via auto-tracking
+                getValue: () => globalSignal() + localSignal!(),
+              };
+            }, []);
+
+            React.useEffect(() => {
+              controller.commit();
+              return () => controller.scheduleDispose();
+            }, [controller]);
+
+            return controller;
+          },
+          { wrapper }
+        );
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // Both signals should work before unmount
+        expect(globalSignal()).toBe(100);
+        expect(localSignal!()).toBe(0);
+        expect(globalSignal.disposed()).toBe(false);
+        expect(localSignal!.disposed()).toBe(false);
+
+        // Unmount the component
+        unmount();
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // CRITICAL: Global signal should NOT be disposed!
+        expect(globalSignal.disposed()).toBe(false);
+        expect(globalSignal()).toBe(100); // Should still be readable
+
+        // Local signal (created inside factory) should be disposed
+        expect(localSignal!.disposed()).toBe(true);
+      });
+
+      it("should call scope's explicit dispose method for user cleanup", async () => {
+        const customCleanup = vi.fn();
+        const timerCleanup = vi.fn();
+
+        const { unmount } = renderHook(
+          () => {
+            const controller = useSafeFactory(() => {
+              const count = signal(0);
+
+              // User provides explicit dispose for custom side effects
+              return {
+                count,
+                dispose: () => {
+                  customCleanup();
+                  timerCleanup();
+                },
+              };
+            }, []);
+
+            React.useEffect(() => {
+              controller.commit();
+              return () => controller.scheduleDispose();
+            }, [controller]);
+
+            return controller;
+          },
+          { wrapper }
+        );
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // Clear any StrictMode orphan calls
+        customCleanup.mockClear();
+        timerCleanup.mockClear();
+
+        expect(customCleanup).not.toHaveBeenCalled();
+
+        unmount();
+
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // User's explicit dispose should be called
+        expect(customCleanup).toHaveBeenCalledTimes(1);
+        expect(timerCleanup).toHaveBeenCalledTimes(1);
       });
     });
   }

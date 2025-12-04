@@ -1,5 +1,4 @@
 import { useLayoutEffect, useRef } from "react";
-import { ExDisposable } from "../types";
 
 import {
   useLifecycle,
@@ -183,7 +182,7 @@ export function useScope<TTarget>(
 ): () => LifecyclePhase;
 
 // Overload 3: Factory mode (create scoped services)
-// TScope can be any object - auto-wrapped with disposable() if no dispose prop
+// TScope is returned as-is. Disposal handles: signals created inside factory + scope's dispose method
 export function useScope<TScope extends Record<string, any>>(
   create: () => TScope,
   options?: UseScopeOptions<TScope>
@@ -244,7 +243,7 @@ export function useScope<TScope extends Record<string, any>>(
     const scope = isArgsMode ? create(...(args || [])) : create();
 
     init?.(scope);
-    return scope as ExDisposable & TScope;
+    return scope as TScope;
   }, watchDeps);
 
   const { result: scope } = controller;

@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { dev } from "../utils/dev";
-import { disposable, tryDispose } from "../disposable";
+import { tryDispose } from "../disposable";
 import { is } from "../is";
 import { emit, withHooks } from "../hooks";
 import { Emitter, emitter } from "../utils/emitter";
@@ -68,11 +68,6 @@ export function useSafeFactory<T>(
 
       if (!onDispose.size) {
         onDispose = undefined;
-      }
-
-      if (typeof result === "object" && result && !("dispose" in result)) {
-        // keep it as it is
-        result = disposable(result as any) as T;
       }
 
       const dispose = () => {

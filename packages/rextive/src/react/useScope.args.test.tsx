@@ -104,7 +104,8 @@ describe("useScope with args overload", () => {
 
       render(<TestComponent userId={1} />);
 
-      // Scope is auto-wrapped with disposable(), so it includes dispose
+      // Scope is returned as-is (not wrapped with disposable())
+      // Disposal handles: signals created inside factory + scope's dispose method
       expect(init).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.any(Function) })
       );
