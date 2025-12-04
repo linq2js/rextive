@@ -123,6 +123,8 @@ export interface SimpleTreeViewProps {
   onExpandedNodesChange?: (nodes: Set<string>) => void;
   /** Set of node IDs that were recently updated (for flash effect) */
   recentlyUpdatedNodes?: Set<string>;
+  /** Search query to highlight and scroll to matching nodes */
+  searchQuery?: string;
 }
 
 export function SimpleTreeView({
@@ -132,6 +134,7 @@ export function SimpleTreeView({
   expandedNodes: controlledExpandedNodes,
   onExpandedNodesChange,
   recentlyUpdatedNodes = new Set(),
+  searchQuery = "",
 }: SimpleTreeViewProps): React.ReactElement {
   const [internalExpandedNodes, setInternalExpandedNodes] = useState<
     Set<string>
@@ -142,6 +145,58 @@ export function SimpleTreeView({
   );
 
   const tree = useMemo(() => buildTree(graph.nodes, graph.edges), [graph]);
+
+  // Find matching nodes and their ancestors (for filtering)
+  const { matchingNodeIds, visibleNodeIds } = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return {
+        matchingNodeIds: new Set<string>(),
+        visibleNodeIds: null, // null = show all
+      };
+    }
+
+    const query = searchQuery.toLowerCase();
+    const matches = new Set<string>();
+    const visible = new Set<string>();
+
+    // Find all matching nodes
+    for (const [id, node] of graph.nodes) {
+      if (node.name.toLowerCase().includes(query)) {
+        matches.add(id);
+      }
+    }
+
+    // Build parent map (child -> parent)
+    const parentMap = new Map<string, string>();
+    for (const edge of graph.edges) {
+      parentMap.set(edge.to, edge.from);
+    }
+
+    // Build children map (parent -> children)
+    const childrenMap = new Map<string, string[]>();
+    for (const edge of graph.edges) {
+      if (!childrenMap.has(edge.from)) {
+        childrenMap.set(edge.from, []);
+      }
+      childrenMap.get(edge.from)!.push(edge.to);
+    }
+
+    // Add matching nodes and all their ancestors to visible set
+    for (const matchId of matches) {
+      visible.add(matchId);
+      // Walk up the parent chain
+      let current = matchId;
+      const visited = new Set<string>();
+      while (parentMap.has(current) && !visited.has(current)) {
+        visited.add(current);
+        const parent = parentMap.get(current)!;
+        visible.add(parent);
+        current = parent;
+      }
+    }
+
+    return { matchingNodeIds: matches, visibleNodeIds: visible };
+  }, [searchQuery, graph.nodes, graph.edges]);
 
   // Use controlled or internal state
   const expandedNodes = controlledExpandedNodes ?? internalExpandedNodes;
@@ -196,13 +251,16 @@ export function SimpleTreeView({
     }
   };
 
-  const renderNode = (node: GraphNode, level: number, hasChildren: boolean) => {
+  const renderNode = (node: GraphNode, level: number, hasChildren: boolean, hasVisibleChildren: boolean) => {
     const isExpanded = expandedNodes.has(node.id);
     const isSelected = node.id === selectedNodeId;
     const isRecentlyUpdated = recentlyUpdatedNodes.has(node.id);
+    const isMatch = matchingNodeIds.has(node.id);
     const dependents = dependentsCount.get(node.id) || 0;
     const nodeColor =
       node.kind === "mutable" ? styles.colors.mutable : styles.colors.computed;
+    // When filtering, show expand arrow only if has visible children
+    const showExpandArrow = hasVisibleChildren;
 
     // Determine status color based on state (consistent with Signals tab)
     const getStatusColor = () => {
@@ -216,6 +274,7 @@ export function SimpleTreeView({
     const getBgColor = () => {
       if (node.hasError) return styles.colors.errorBg;
       if (isRecentlyUpdated) return STATUS_COLORS.active + "33"; // 20% opacity
+      if (isMatch) return styles.colors.accent + "33"; // Highlight matching nodes
       if (isSelected) return styles.colors.bgHover;
       return "transparent";
     };
@@ -224,6 +283,7 @@ export function SimpleTreeView({
     const getBorderColor = () => {
       if (node.hasError) return styles.colors.error;
       if (isRecentlyUpdated) return STATUS_COLORS.active;
+      if (isMatch) return styles.colors.accent;
       return "transparent";
     };
 
@@ -231,6 +291,7 @@ export function SimpleTreeView({
     const getBoxShadow = () => {
       if (node.hasError) return `0 0 8px ${styles.colors.error}44`;
       if (isRecentlyUpdated) return `0 0 8px ${STATUS_COLORS.active}44`;
+      if (isMatch) return `0 0 8px ${styles.colors.accent}44`;
       return "none";
     };
 
@@ -265,17 +326,17 @@ export function SimpleTreeView({
             transition: "all 0.25s ease",
           }}
           onMouseEnter={(e) => {
-            if (!isSelected && !isRecentlyUpdated && !node.hasError) {
+            if (!isSelected && !isRecentlyUpdated && !isMatch && !node.hasError) {
               e.currentTarget.style.backgroundColor = styles.colors.bgHover;
             }
           }}
           onMouseLeave={(e) => {
-            if (!isSelected && !isRecentlyUpdated && !node.hasError) {
-              e.currentTarget.style.backgroundColor = "transparent";
+            if (!isSelected && !isRecentlyUpdated && !isMatch && !node.hasError) {
+              e.currentTarget.style.backgroundColor = getBgColor();
             }
           }}
         >
-          {hasChildren && (
+          {showExpandArrow && (
             <button
               onClick={(e) => toggleExpand(node.id, e)}
               style={{
@@ -295,7 +356,7 @@ export function SimpleTreeView({
               {isExpanded ? "▼" : "▶"}
             </button>
           )}
-          {!hasChildren && (
+          {!showExpandArrow && (
             <span style={{ width: "12px", marginRight: "4px" }} />
           )}
           {/* Status indicator dot */}
@@ -396,7 +457,7 @@ export function SimpleTreeView({
 
   const renderTree = () => {
     const result: React.ReactElement[] = [];
-    const visibleNodes = new Set<string>();
+    const expandVisibleNodes = new Set<string>();
     const parentMap = new Map<string, string>(); // child -> parent
 
     // Build parent map
@@ -404,17 +465,21 @@ export function SimpleTreeView({
       parentMap.set(edge.to, edge.from);
     }
 
-    // Determine visible nodes (expanded path from root)
+    // Determine visible nodes based on expansion state
     // Use visited set to prevent infinite recursion from circular dependencies
-    function markVisible(nodeId: string, visited = new Set<string>()) {
+    function markExpandVisible(nodeId: string, visited = new Set<string>()) {
       if (visited.has(nodeId)) return; // Prevent infinite recursion
       visited.add(nodeId);
-      visibleNodes.add(nodeId);
+
+      // If filtering, only process nodes that pass the filter
+      if (visibleNodeIds !== null && !visibleNodeIds.has(nodeId)) return;
+
+      expandVisibleNodes.add(nodeId);
 
       const item = tree.find((t) => t.node.id === nodeId);
       if (item && expandedNodes.has(nodeId)) {
         for (const childId of item.children) {
-          markVisible(childId, visited);
+          markExpandVisible(childId, visited);
         }
       }
     }
@@ -422,22 +487,46 @@ export function SimpleTreeView({
     // Start from root nodes (level 0)
     for (const item of tree) {
       if (item.level === 0) {
-        markVisible(item.node.id);
+        markExpandVisible(item.node.id);
       }
+    }
+
+    // Count visible children for each node (for showing expand arrow)
+    const hasVisibleChildrenMap = new Map<string, boolean>();
+    for (const item of tree) {
+      if (!expandVisibleNodes.has(item.node.id)) continue;
+      const visibleChildren = item.children.filter((childId) => {
+        // When filtering, check if child passes filter
+        if (visibleNodeIds !== null) {
+          return visibleNodeIds.has(childId);
+        }
+        return true;
+      });
+      hasVisibleChildrenMap.set(item.node.id, visibleChildren.length > 0);
     }
 
     // Render visible nodes
     for (const item of tree) {
-      if (!visibleNodes.has(item.node.id)) continue;
+      if (!expandVisibleNodes.has(item.node.id)) continue;
 
-      result.push(renderNode(item.node, item.level, item.children.length > 0));
+      const hasVisibleChildren = hasVisibleChildrenMap.get(item.node.id) || false;
+      result.push(renderNode(item.node, item.level, item.children.length > 0, hasVisibleChildren));
     }
 
     return result;
   };
 
+  // Show empty state when filtering returns no results
   if (tree.length === 0) {
     return <div style={styles.emptyStateStyles}>No signals to display</div>;
+  }
+
+  if (visibleNodeIds !== null && visibleNodeIds.size === 0) {
+    return (
+      <div style={styles.emptyStateStyles}>
+        No nodes match "{searchQuery}"
+      </div>
+    );
   }
 
   return (

@@ -228,6 +228,7 @@ export function DevToolsPanel(): React.ReactElement | null {
   >(new Map());
   const [flashingTabs, setFlashingTabs] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [graphSearchQuery, setGraphSearchQuery] = useState("");
   const [editingSignal, setEditingSignal] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
@@ -296,9 +297,9 @@ export function DevToolsPanel(): React.ReactElement | null {
   const snapshotInitDoneRef = useRef(false);
   const snapshotIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Ref to store latest takeSnapshot function for interval (avoids restarting interval on every change)
-  const takeSnapshotRef = useRef<(options?: { skipIfNoDiff?: boolean }) => void>(
-    () => {}
-  );
+  const takeSnapshotRef = useRef<
+    (options?: { skipIfNoDiff?: boolean }) => void
+  >(() => {});
 
   // Config modal state
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -2915,6 +2916,7 @@ export function DevToolsPanel(): React.ReactElement | null {
           expandedNodes={graphExpandedNodes}
           onExpandedNodesChange={setGraphExpandedNodes}
           recentlyUpdatedNodes={recentlyUpdatedNodes}
+          searchQuery={graphSearchQuery}
         />
       </div>
     );
@@ -3867,7 +3869,13 @@ export function DevToolsPanel(): React.ReactElement | null {
               <TabContent
                 searchBox={
                   activeTab === "graph"
-                    ? undefined
+                    ? {
+                        value: graphSearchQuery,
+                        onChange: setGraphSearchQuery,
+                        placeholder: "Search nodes...",
+                        showHelp: false,
+                        leftActions: undefined,
+                      }
                     : activeTab === "chains"
                     ? {
                         value: chainFilter,
