@@ -1,0 +1,43 @@
+# Netlify configuration for rextive-demo
+# Deploy from monorepo root with: pnpm --filter rextive-demo... run build
+
+[build]
+  # Build command - builds rextive first, then demo
+  command = "cd ../.. && pnpm install && pnpm --filter rextive-demo... run build"
+  # Output directory (relative to package root)
+  publish = "dist"
+
+# SPA redirect - all routes go to index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Environment variables
+[build.environment]
+  NODE_VERSION = "20"
+  PNPM_VERSION = "9"
+
+# Development settings for netlify dev
+[dev]
+  command = "pnpm dev"
+  port = 4000
+  targetPort = 4000
+  autoLaunch = false
+
+# Headers for caching static assets
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
