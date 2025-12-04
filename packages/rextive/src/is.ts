@@ -12,6 +12,7 @@ import {
   Task,
   TASK_TYPE,
   LOGIC_TYPE,
+  AbstractLogic,
 } from "./types";
 
 /**
@@ -79,7 +80,7 @@ export function is<T = any>(
 export function is<T extends object>(
   value: unknown,
   type: "logic"
-): value is Logic<T>;
+): value is Logic<T> | AbstractLogic<T>;
 export function is<T = any>(
   value: unknown,
   type: "computed"

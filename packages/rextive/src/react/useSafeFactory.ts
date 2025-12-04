@@ -49,22 +49,26 @@ export function useSafeFactory<T>(
     // dispose last result
     disposeRef.current?.();
     try {
-      let result = withHooks(
-        (prevHooks) => {
+      let result: T;
+      if (is(factory, "logic")) {
+        if ("create" in factory) {
+          result = factory.create() as T;
+        } else {
+          throw new Error("Cannot create instance from abstract logic");
+        }
+      } else {
+        result = withHooks((prevHooks) => {
           return {
-            onSignalCreate(signal) {
-              prevHooks.onSignalCreate?.(signal);
-              onDispose?.on(signal.dispose);
+            onSignalCreate(signal, deps, disposalHandled) {
+              if (!disposalHandled) {
+                disposalHandled = true;
+                onDispose?.on(signal.dispose);
+              }
+              prevHooks.onSignalCreate?.(signal, deps, disposalHandled);
             },
           };
-        },
-        () => {
-          if (is(factory, "logic")) {
-            return factory.create() as T;
-          }
-          return factory();
-        }
-      );
+        }, factory);
+      }
 
       if (!onDispose.size) {
         onDispose = undefined;

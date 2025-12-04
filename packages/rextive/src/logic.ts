@@ -1,4 +1,6 @@
-import { disposable } from "./disposable";
+import { disposable, tryDispose } from "./disposable";
+import { withHooks } from "./hooks";
+import { emitter } from "./react";
 import { AbstractLogic, Instance, Logic, LOGIC_TYPE } from "./types";
 
 // ============================================================================
@@ -128,17 +130,40 @@ function logicImpl<T extends object>(name: string, fn: () => T): Logic<T> {
     // Save previous context (for nested logic creation)
     const prevInitializing = initializingLogics;
 
+    const onCleanup = emitter();
+
     try {
       // Track this logic as initializing (copy set to allow nesting)
       initializingLogics = new Set(initializingLogics);
       initializingLogics.add(lg);
 
       // Run the factory function
-      const instance = fn();
+      const instance = withHooks(
+        (prevHooks) => ({
+          onSignalCreate(signal, deps, disposalHandled) {
+            if (!disposalHandled) {
+              disposalHandled = true;
+              onCleanup.on(signal.dispose);
+            }
+            prevHooks.onSignalCreate?.(signal, deps, disposalHandled);
+          },
+        }),
+        fn
+      );
+      const originalDispose = (instance as any).dispose;
 
       // Wrap with disposable for automatic cleanup
-      return disposable(instance);
+      return {
+        ...instance,
+        dispose() {
+          onCleanup.emitAndClear();
+          if (originalDispose) {
+            tryDispose({ dispose: originalDispose });
+          }
+        },
+      };
     } catch (error) {
+      onCleanup.emitAndClear();
       // Wrap non-LogicCreateError errors
       if (error instanceof LogicCreateError) {
         throw error;
@@ -253,45 +278,10 @@ export const logic = Object.assign(logicImpl, {
    * });
    * ```
    */
-  create: <T extends object>(l: Logic<T> | AbstractLogic<T>): Instance<T> => {
-    // Check for global override
-    const resolver = globalResolvers.get(l);
-    let instance: Instance<T>;
-
-    if (resolver) {
-      // Pass original getter (temporarily bypass override)
-      const getOriginal = (): Instance<T> => {
-        // Temporarily remove override to get original
-        globalResolvers.delete(l);
-        try {
-          return l();
-        } finally {
-          // Restore override
-          globalResolvers.set(l, resolver);
-        }
-      };
-
-      const result = resolver(getOriginal);
-      instance =
-        typeof result?.dispose === "function"
-          ? result
-          : (disposable(result) as Instance<T>);
-    } else if ("create" in l) {
-      // Regular logic - create fresh instance
-      instance = l.create();
-    } else {
-      // Abstract logic without override - return proxy (will throw on access)
-      instance = l();
-    }
+  create: <T extends object>(l: Logic<T>): Instance<T> => {
+    const instance = l.create();
 
     trackedInstances.add(instance);
-
-    // Remove from tracking when disposed manually
-    const originalDispose = instance.dispose;
-    instance.dispose = () => {
-      trackedInstances.delete(instance);
-      originalDispose();
-    };
 
     return instance;
   },

@@ -13,24 +13,125 @@ import { getGlobalThisAccessor } from "./utils/globalThisAccessor";
 // Types
 // ============================================
 
-/** Unified hooks interface for all signal lifecycle events */
+/**
+ * Unified hooks interface for all signal lifecycle events.
+ *
+ * Two categories of hooks:
+ * 1. **Render-time tracking** - Used by `rx()` to track signal access during render.
+ *    Typically scoped via `withHooks()` for component-level tracking.
+ * 2. **Lifecycle monitoring** - Used by DevTools to monitor signal lifecycle.
+ *    Typically set globally via `setHooks()`.
+ */
 export interface Hooks {
-  // Render-time tracking (typically scoped via withHooks)
+  // ─────────────────────────────────────────────────────────────────
+  // Render-time tracking (scoped via withHooks)
+  // ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Called when a signal is accessed (read) during render.
+   * Used by `rx()` to track dependencies for reactive re-rendering.
+   * @param signal - The signal being accessed
+   */
   onSignalAccess: (signal: AnySignal<any>) => void;
+
+  /**
+   * Called when a task (async state) is accessed during render.
+   * Used by `rx()` to track async dependencies.
+   * @param task - The task being accessed
+   */
   onTaskAccess: (task: Task<any>) => void;
 
-  // Lifecycle monitoring (typically global via setHooks)
-  onSignalCreate?: (signal: AnySignal<any>, deps?: SignalMap) => void;
+  // ─────────────────────────────────────────────────────────────────
+  // Lifecycle monitoring (global via setHooks)
+  // ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Called when a new signal is created.
+   * Used by DevTools to track all signals and by useScope/logic to track
+   * signals for automatic disposal.
+   *
+   * @param signal - The newly created signal
+   * @param deps - Dependencies map (for computed signals)
+   * @param disposalHandled - If true, the caller (useScope/logic) will handle
+   *                          disposal automatically. DevTools can use this to
+   *                          show disposal status in the UI.
+   */
+  onSignalCreate?: (
+    signal: AnySignal<any>,
+    deps?: SignalMap,
+    disposalHandled?: boolean
+  ) => void;
+
+  /**
+   * Called when a signal's value changes.
+   * Used by DevTools to show value history and change notifications.
+   * @param signal - The signal that changed
+   * @param value - The new value
+   */
   onSignalChange?: (signal: AnySignal<any>, value: unknown) => void;
+
+  /**
+   * Called when a signal encounters an error (sync errors during computation).
+   * Used by DevTools to show error states.
+   * @param signal - The signal that errored
+   * @param error - The error that occurred
+   */
   onSignalError?: (signal: AnySignal<any>, error: unknown) => void;
+
+  /**
+   * Called when a signal is disposed.
+   * Used by DevTools to mark signals as disposed in the UI.
+   * @param signal - The signal being disposed
+   */
   onSignalDispose?: (signal: AnySignal<any>) => void;
+
+  /**
+   * Called when a signal is renamed (displayName changed).
+   * Used by DevTools to update the signal's display name.
+   * @param signal - The signal that was renamed
+   */
   onSignalRename?: (signal: AnySignal<any>) => void;
+
+  /**
+   * Called to completely remove signals from DevTools (not just mark as disposed).
+   * Used for orphaned signals from React StrictMode double-invoke that should
+   * never appear in DevTools history.
+   * @param signals - Array of signals to forget
+   */
   onForgetSignals?: (signals: AnySignal<any>[]) => void;
+
+  /**
+   * Called when a new tag is created.
+   * Used by DevTools to track tag groups.
+   * @param tag - The newly created tag
+   */
   onTagCreate?: (tag: Tag<any, any>) => void;
+
+  /**
+   * Called when a signal is added to a tag.
+   * Used by DevTools to show tag membership.
+   * @param tag - The tag
+   * @param signal - The signal being added
+   */
   onTagAdd?: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
+
+  /**
+   * Called when a signal is removed from a tag.
+   * Used by DevTools to update tag membership.
+   * @param tag - The tag
+   * @param signal - The signal being removed
+   */
   onTagRemove?: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
 
-  /** Check if devtools-level monitoring is enabled */
+  // ─────────────────────────────────────────────────────────────────
+  // Utility
+  // ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Check if devtools-level monitoring is enabled.
+   * Used to conditionally enable expensive debugging features.
+   * @returns true if DevTools hooks are active
+   */
   hasDevTools: () => boolean;
 }
 

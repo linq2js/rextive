@@ -370,22 +370,6 @@ describe("logic", () => {
       const overridden = counter();
       expect(overridden.base).toBe(15);
     });
-
-    it("logic.create() should work with AbstractLogic", () => {
-      type Api = { fetch: () => string };
-      const api = logic.abstract<Api>("api");
-
-      // Without override - returns proxy
-      const proxy = logic.create(api);
-      expect(() => proxy.fetch()).toThrow(NotImplementedError);
-
-      logic.clear();
-
-      // With override - returns implementation
-      logic.provide(api, () => ({ fetch: () => "data" }));
-      const instance = logic.create(api);
-      expect(instance.fetch()).toBe("data");
-    });
   });
 
   describe("LogicCreateError - error wrapping", () => {
