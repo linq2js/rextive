@@ -1,20 +1,21 @@
 import { rx } from "rextive/react";
+import { shippingLogic } from "@/logic/checkout";
 import { checkoutLogic } from "@/logic/checkout";
 
 export function ShippingForm() {
-  const { shippingInfo, updateShippingInfo, nextStep, isShippingValid } =
-    checkoutLogic();
+  const $shipping = shippingLogic();
+  const { nextStep } = checkoutLogic();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isShippingValid()) {
+    if ($shipping.isValid()) {
       nextStep();
     }
   };
 
   return rx(() => {
-    const info = shippingInfo();
-    const isValid = isShippingValid();
+    const info = $shipping.info();
+    const isValid = $shipping.isValid();
 
     return (
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -30,7 +31,7 @@ export function ShippingForm() {
             <input
               type="text"
               value={info.firstName}
-              onChange={(e) => updateShippingInfo({ firstName: e.target.value })}
+              onChange={(e) => $shipping.update({ firstName: e.target.value })}
               className="input w-full"
               required
             />
@@ -42,7 +43,7 @@ export function ShippingForm() {
             <input
               type="text"
               value={info.lastName}
-              onChange={(e) => updateShippingInfo({ lastName: e.target.value })}
+              onChange={(e) => $shipping.update({ lastName: e.target.value })}
               className="input w-full"
               required
             />
@@ -56,7 +57,7 @@ export function ShippingForm() {
           <input
             type="email"
             value={info.email}
-            onChange={(e) => updateShippingInfo({ email: e.target.value })}
+            onChange={(e) => $shipping.update({ email: e.target.value })}
             className="input w-full"
             required
           />
@@ -69,7 +70,7 @@ export function ShippingForm() {
           <input
             type="text"
             value={info.address}
-            onChange={(e) => updateShippingInfo({ address: e.target.value })}
+            onChange={(e) => $shipping.update({ address: e.target.value })}
             className="input w-full"
             placeholder="Street address"
             required
@@ -84,7 +85,7 @@ export function ShippingForm() {
             <input
               type="text"
               value={info.city}
-              onChange={(e) => updateShippingInfo({ city: e.target.value })}
+              onChange={(e) => $shipping.update({ city: e.target.value })}
               className="input w-full"
               required
             />
@@ -96,7 +97,7 @@ export function ShippingForm() {
             <input
               type="text"
               value={info.postalCode}
-              onChange={(e) => updateShippingInfo({ postalCode: e.target.value })}
+              onChange={(e) => $shipping.update({ postalCode: e.target.value })}
               className="input w-full"
               required
             />
@@ -109,7 +110,7 @@ export function ShippingForm() {
           </label>
           <select
             value={info.country}
-            onChange={(e) => updateShippingInfo({ country: e.target.value })}
+            onChange={(e) => $shipping.update({ country: e.target.value })}
             className="input w-full"
           >
             <option>United States</option>
@@ -145,4 +146,3 @@ export function ShippingForm() {
     );
   });
 }
-

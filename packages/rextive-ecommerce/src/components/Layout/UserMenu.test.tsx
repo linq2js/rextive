@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@/test/utils";
 import { logic, signal } from "rextive";
 import { UserMenu } from "./UserMenu";
-import { authLogic } from "@/logic/auth";
+import { authLogic } from "@/logic/authLogic";
 
 // Mock user data
 const mockUser = {

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@/test/utils";
 import { logic, signal } from "rextive";
 import { CategoryFilter } from "./CategoryFilter";
-import { productsLogic } from "@/logic/products";
+import { productsLogic } from "@/logic/productsLogic";
 
 const mockCategories = [
   { slug: "smartphones", name: "Smartphones", url: "/category/smartphones" },

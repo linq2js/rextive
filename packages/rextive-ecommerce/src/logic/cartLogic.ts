@@ -27,7 +27,7 @@ const persist = persistor<{ items: LocalCartItem[] }>({
  * - Singleton management
  * - Testability via logic.provide() and logic.clear()
  */
-export const cartLogic = logic("cart", () => {
+export const cartLogic = logic("cartLogic", () => {
   // Core state (signals)
   const items = signal<LocalCartItem[]>([], {
     name: "cart.items",
@@ -111,19 +111,36 @@ export const cartLogic = logic("cart", () => {
   };
 
   return {
-    // Signals
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SIGNALS (for UI reactivity and computed signals)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /** List of cart items with product details and quantities */
     items,
+    /** Whether the cart drawer is currently visible */
     drawerOpen,
+    /** Computed: total number of items in cart */
     itemCount,
+    /** Computed: cart subtotal after item discounts */
     subtotal,
+    /** Computed: total discount amount across all items */
     totalDiscount,
 
-    // Actions
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ACTIONS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /** Add a product to cart (or increase quantity if exists) */
     addItem,
+    /** Remove a product from cart entirely */
     removeItem,
+    /** Update quantity of a specific item (removes if quantity <= 0) */
     updateQuantity,
+    /** Remove all items from cart */
     clearCart,
+    /** Show the cart drawer */
     openDrawer,
+    /** Hide the cart drawer */
     closeDrawer,
   };
 });

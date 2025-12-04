@@ -1,4 +1,4 @@
-import { cartLogic } from "@/logic/cart";
+import { cartLogic } from "@/logic/cartLogic";
 import type { Product } from "@/api/types";
 
 interface ProductCardProps {

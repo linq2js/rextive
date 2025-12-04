@@ -1,5 +1,5 @@
 import { rx } from "rextive/react";
-import { checkoutLogic } from "@/logic/checkout";
+import { checkoutLogic, orderLogic } from "@/logic/checkout";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-US", {
@@ -8,12 +8,13 @@ const formatCurrency = (amount: number) =>
   }).format(amount);
 
 export function OrderComplete() {
-  const checkout = checkoutLogic();
+  const $checkout = checkoutLogic();
+  const $order = orderLogic();
 
   return rx(() => {
-    const order = checkout.orderSummary();
+    const summary = $order.summary();
 
-    if (!order) return null;
+    if (!summary) return null;
 
     return (
       <div className="text-center py-8">
@@ -45,7 +46,7 @@ export function OrderComplete() {
         <div className="bg-warm-50 rounded-xl p-4 mb-6 inline-block">
           <p className="text-sm text-warm-500">Order ID</p>
           <p className="text-lg font-mono font-bold text-brand-600">
-            {order.orderId}
+            {summary.orderId}
           </p>
         </div>
 
@@ -53,7 +54,7 @@ export function OrderComplete() {
         <div className="bg-warm-50 rounded-xl p-4 text-left mb-6">
           <h4 className="font-medium text-warm-900 mb-3">Order Summary</h4>
           <div className="space-y-2 text-sm">
-            {order.items.map((item, index) => (
+            {summary.items.map((item, index) => (
               <div key={index} className="flex justify-between">
                 <span className="text-warm-600">
                   {item.name} × {item.quantity}
@@ -66,20 +67,20 @@ export function OrderComplete() {
             <div className="border-t border-warm-200 pt-2 mt-2">
               <div className="flex justify-between">
                 <span className="text-warm-600">Subtotal</span>
-                <span>{formatCurrency(order.subtotal)}</span>
+                <span>{formatCurrency(summary.subtotal)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-warm-600">Shipping</span>
-                <span>{formatCurrency(order.shipping)}</span>
+                <span>{formatCurrency(summary.shipping)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-warm-600">Tax</span>
-                <span>{formatCurrency(order.tax)}</span>
+                <span>{formatCurrency(summary.tax)}</span>
               </div>
               <div className="flex justify-between font-semibold text-base pt-2 border-t border-warm-200 mt-2">
                 <span>Total</span>
                 <span className="text-brand-600">
-                  {formatCurrency(order.total)}
+                  {formatCurrency(summary.total)}
                 </span>
               </div>
             </div>
@@ -91,13 +92,13 @@ export function OrderComplete() {
           <h4 className="font-medium text-warm-900 mb-2">Shipping to</h4>
           <div className="text-sm text-warm-600">
             <p>
-              {order.shippingInfo.firstName} {order.shippingInfo.lastName}
+              {summary.shippingInfo.firstName} {summary.shippingInfo.lastName}
             </p>
-            <p>{order.shippingInfo.address}</p>
+            <p>{summary.shippingInfo.address}</p>
             <p>
-              {order.shippingInfo.city}, {order.shippingInfo.postalCode}
+              {summary.shippingInfo.city}, {summary.shippingInfo.postalCode}
             </p>
-            <p>{order.shippingInfo.country}</p>
+            <p>{summary.shippingInfo.country}</p>
           </div>
         </div>
 
@@ -105,15 +106,15 @@ export function OrderComplete() {
         <p className="text-sm text-warm-500 mb-6">
           A confirmation email has been sent to{" "}
           <span className="font-medium text-warm-700">
-            {order.shippingInfo.email}
+            {summary.shippingInfo.email}
           </span>
         </p>
 
         {/* Continue Shopping */}
         <button
           onClick={() => {
-            checkout.reset();
-            checkout.close();
+            $checkout.reset();
+            $checkout.close();
           }}
           className="btn-primary py-3 px-8"
         >
@@ -136,4 +137,3 @@ export function OrderComplete() {
     );
   });
 }
-

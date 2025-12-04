@@ -1471,6 +1471,244 @@ events.dispose();
 
 ---
 
+### 16. `logic()` - Reusable Logic Units
+
+Create reusable, testable logic units that encapsulate signals and actions:
+
+```tsx
+import { logic, signal } from "rextive";
+
+export const counterLogic = logic("counterLogic", () => {
+  const count = signal(0, { name: "counter.count" });
+  const doubled = count.to((x) => x * 2, { name: "counter.doubled" });
+
+  const increment = () => count.set((x) => x + 1);
+  const decrement = () => count.set((x) => x - 1);
+  const reset = () => count.reset();
+
+  return {
+    count,
+    doubled,
+    increment,
+    decrement,
+    reset,
+  };
+});
+```
+
+#### Naming Conventions
+
+**✅ Logic Name (first parameter):**
+
+Always use `Logic` postfix in the logic name string:
+
+```tsx
+// ✅ GOOD
+logic("authLogic", () => { ... });
+logic("cartLogic", () => { ... });
+logic("checkout.shippingLogic", () => { ... });
+
+// ❌ BAD
+logic("auth", () => { ... });
+logic("cart", () => { ... });
+```
+
+**✅ Variable/Export Name:**
+
+Always use `Logic` postfix:
+
+```tsx
+// ✅ GOOD
+export const authLogic = logic("authLogic", () => { ... });
+export const cartLogic = logic("cartLogic", () => { ... });
+
+// ❌ BAD
+export const auth = logic("authLogic", () => { ... });
+```
+
+**✅ File Name:**
+
+Use `Logic` postfix in file names:
+
+```
+✅ GOOD
+src/logic/authLogic.ts
+src/logic/cartLogic.ts
+src/logic/checkout/shippingLogic.ts
+
+❌ BAD
+src/logic/auth.ts
+src/logic/cart.ts
+```
+
+#### Consumer Convention: `$` Prefix
+
+When consuming logic instances, use `$` prefix to distinguish logic instances from local variables:
+
+```tsx
+// ✅ GOOD - Clear distinction
+export function UserMenu() {
+  const $auth = authLogic();
+  const $cart = cartLogic();
+
+  return rx(() => {
+    const user = $auth.user();
+    const itemCount = $cart.itemCount();
+    return <div>{user?.name} ({itemCount})</div>;
+  });
+}
+
+// ❌ BAD - Ambiguous naming
+export function UserMenu() {
+  const auth = authLogic();  // Easy to confuse with local 'auth' object
+  const cart = cartLogic();
+
+  return rx(() => {
+    const user = auth.user();
+    return <div>{user?.name}</div>;
+  });
+}
+```
+
+**When to use `$` prefix:**
+
+- ✅ When storing the full logic instance: `const $auth = authLogic();`
+- ❌ NOT when destructuring: `const { user, logout } = authLogic();` (destructured values are not logic instances)
+
+**Mixed usage:**
+
+```tsx
+// ✅ GOOD - $prefix for full instance, no prefix for destructured
+export function OrderReview() {
+  const $shipping = shippingLogic();
+  const $payment = paymentLogic();
+  const $order = orderLogic();
+  const { goToStep, prevStep } = checkoutLogic(); // Destructured actions
+
+  return rx(() => {
+    const info = $shipping.info();
+    const method = $payment.method();
+    const total = $order.total();
+    // ...
+  });
+}
+```
+
+#### Logic Within Logic
+
+When consuming logic from another logic, use the same `$` prefix convention:
+
+```tsx
+export const checkoutLogic = logic("checkoutLogic", () => {
+  // Get child logics with $ prefix
+  const $shipping = shippingLogic();
+  const $payment = paymentLogic();
+  const $order = orderLogic();
+
+  const open = () => {
+    $shipping.prefillFromUser();
+    $order.reset();
+    // ...
+  };
+
+  const placeOrder = async () => {
+    await $order.placeOrder();
+    // ...
+  };
+
+  return {
+    open,
+    placeOrder,
+    // ...
+  };
+});
+```
+
+#### Splitting Logic by Concern
+
+For complex features, split logic into focused units:
+
+```
+src/logic/checkout/
+├── types.ts           # Shared types and constants
+├── shippingLogic.ts   # Shipping form state & validation
+├── paymentLogic.ts    # Payment method selection
+├── orderLogic.ts      # Order totals & placement
+├── checkoutLogic.ts   # Flow coordinator
+└── index.ts           # Barrel exports
+```
+
+**Coordinator pattern:**
+
+```tsx
+// checkoutLogic.ts - coordinates child logics
+export const checkoutLogic = logic("checkoutLogic", () => {
+  const $shipping = shippingLogic();
+  const $payment = paymentLogic();
+  const $order = orderLogic();
+
+  // Only exposes flow control, not child state
+  return {
+    isOpen,
+    currentStep,
+    open,
+    close,
+    nextStep,
+    prevStep,
+    placeOrder,
+    reset,
+  };
+});
+```
+
+**Components access step logics directly:**
+
+```tsx
+// ShippingForm.tsx - uses shippingLogic directly
+export function ShippingForm() {
+  const $shipping = shippingLogic();
+  const { nextStep } = checkoutLogic(); // Only navigation from coordinator
+
+  return rx(() => {
+    const info = $shipping.info();
+    const isValid = $shipping.isValid();
+    // ...
+  });
+}
+```
+
+#### Testing Logic
+
+Use `logic.provide()` to override logic for testing:
+
+```tsx
+import { logic, signal } from "rextive";
+import { vi } from "vitest";
+
+const setupAuthLogic = (overrides = {}) => {
+  const instance = {
+    user: signal(null),
+    isRestoring: signal(false),
+    logout: vi.fn(),
+    openLoginModal: vi.fn(),
+    ...overrides,
+  };
+  logic.provide(authLogic, () => instance as any);
+  return instance;
+};
+
+it("should show user name when logged in", () => {
+  const $auth = setupAuthLogic({
+    user: signal({ id: 1, firstName: "John" }),
+  });
+
+  render(<UserMenu />);
+  expect(screen.getByText("John")).toBeInTheDocument();
+});
+```
+
+---
+
 ## 🎨 Advanced Patterns
 
 ### Pattern 1: Single Dependency - Transform with `.to()`
@@ -1734,6 +1972,28 @@ const doubled = count.to((x) => x * 2);
 const doubled = signal({ count }, ({ deps }) => deps.count * 2);
 ```
 
+5. **Use `Logic` postfix for logic names**
+
+```tsx
+// ✅ GOOD
+export const authLogic = logic("authLogic", () => { ... });
+
+// ❌ BAD
+export const auth = logic("auth", () => { ... });
+```
+
+6. **Use `$` prefix for logic instances**
+
+```tsx
+// ✅ GOOD
+const $auth = authLogic();
+const $cart = cartLogic();
+
+// ❌ BAD
+const auth = authLogic();
+const cart = cartLogic();
+```
+
 ### ❌ Never Do These
 
 1. **Never try auto-tracking**
@@ -1994,3 +2254,11 @@ emit.signalError(signalRef, error);
 - Use `task.from()` for manual loading states
 - Use `abortSignal` for queries, not mutations
 - Import from `rextive/react` in React apps
+
+**Logic Conventions:**
+
+- Always use `Logic` postfix: `authLogic`, `cartLogic`, `checkoutLogic`
+- Logic file names: `authLogic.ts`, `cartLogic.ts`
+- Use `$` prefix when consuming: `const $auth = authLogic()`
+- No `$` prefix when destructuring: `const { user, logout } = authLogic()`
+- Split complex logic by concern (e.g., `checkout/shippingLogic.ts`, `checkout/paymentLogic.ts`)

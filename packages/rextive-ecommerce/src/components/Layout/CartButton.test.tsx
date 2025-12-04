@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@/test/utils";
 import { logic, signal } from "rextive";
 import { CartButton } from "./CartButton";
-import { cartLogic } from "@/logic/cart";
+import { cartLogic } from "@/logic/cartLogic";
 
 describe("CartButton", () => {
   afterEach(() => {

@@ -32,7 +32,7 @@ const tokenStorage = {
  * - Singleton management
  * - Testability via logic.provide() and logic.clear()
  */
-export const authLogic = logic("auth", () => {
+export const authLogic = logic("authLogic", () => {
   // Load initial token from storage
   const initialToken = tokenStorage.get();
 
@@ -111,19 +111,36 @@ export const authLogic = logic("auth", () => {
   }
 
   return {
-    // Signals
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SIGNALS (for UI reactivity and computed signals)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /** Current logged-in user data (null if not authenticated) */
     user,
+    /** JWT access token (auto-persisted to localStorage) */
     token,
+    /** Whether login modal is currently shown */
     loginModalOpen,
+    /** Error message from last login attempt (null on success) */
     loginError,
+    /** Whether a login request is in progress */
     isLoggingIn,
+    /** Whether session restoration from token is in progress */
     isRestoring,
+    /** Computed: true when user is authenticated */
     isAuthenticated,
 
-    // Actions
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ACTIONS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /** Authenticate with username/password credentials */
     login,
+    /** Clear user session and token */
     logout,
+    /** Show the login modal */
     openLoginModal,
+    /** Hide the login modal */
     closeLoginModal,
   };
 });

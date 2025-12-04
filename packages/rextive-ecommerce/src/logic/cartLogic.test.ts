@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { logic } from "rextive";
-import { cartLogic } from "./cart";
+import { cartLogic } from "./cartLogic";
 import type { Product } from "@/api/types";
 
 // Mock localStorage

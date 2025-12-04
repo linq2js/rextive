@@ -1,6 +1,7 @@
 import { rx } from "rextive/react";
+import { shippingLogic, paymentLogic, orderLogic } from "@/logic/checkout";
 import { checkoutLogic } from "@/logic/checkout";
-import { cartLogic } from "@/logic/cart";
+import { cartLogic } from "@/logic/cartLogic";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-US", {
@@ -9,23 +10,26 @@ const formatCurrency = (amount: number) =>
   }).format(amount);
 
 export function OrderReview() {
-  const checkout = checkoutLogic();
-  const cart = cartLogic();
+  const $shipping = shippingLogic();
+  const $payment = paymentLogic();
+  const $order = orderLogic();
+  const $checkout = checkoutLogic();
+  const $cart = cartLogic();
 
   return rx(() => {
-    const items = cart.items();
-    const info = checkout.shippingInfo();
-    const payment = checkout.paymentMethod();
-    const subtotal = cart.subtotal();
-    const shippingCost = checkout.shipping();
-    const taxAmount = checkout.tax();
-    const totalAmount = checkout.total();
-    const isProcessing = checkout.isProcessing();
+    const items = $cart.items();
+    const info = $shipping.info();
+    const paymentMethod = $payment.method();
+    const subtotal = $cart.subtotal();
+    const shippingCost = $order.shippingCost();
+    const taxAmount = $order.tax();
+    const totalAmount = $order.total();
+    const isProcessing = $order.isProcessing();
 
     const paymentLabel =
-      payment === "card"
+      paymentMethod === "card"
         ? "Credit Card"
-        : payment === "paypal"
+        : paymentMethod === "paypal"
         ? "PayPal"
         : "Cash on Delivery";
 
@@ -67,7 +71,7 @@ export function OrderReview() {
           <div className="flex justify-between items-start mb-2">
             <h4 className="font-medium text-warm-900">Shipping Address</h4>
             <button
-              onClick={() => checkout.goToStep("shipping")}
+              onClick={() => $checkout.goToStep("shipping")}
               className="text-sm text-brand-600 hover:text-brand-700"
             >
               Edit
@@ -91,7 +95,7 @@ export function OrderReview() {
           <div className="flex justify-between items-start mb-2">
             <h4 className="font-medium text-warm-900">Payment Method</h4>
             <button
-              onClick={() => checkout.goToStep("payment")}
+              onClick={() => $checkout.goToStep("payment")}
               className="text-sm text-brand-600 hover:text-brand-700"
             >
               Edit
@@ -123,7 +127,7 @@ export function OrderReview() {
         {/* Actions */}
         <div className="flex gap-3">
           <button
-            onClick={() => checkout.prevStep()}
+            onClick={() => $checkout.prevStep()}
             disabled={isProcessing}
             className="btn-secondary flex-1 py-3 disabled:opacity-50"
           >
@@ -143,7 +147,7 @@ export function OrderReview() {
             Back
           </button>
           <button
-            onClick={() => checkout.placeOrder()}
+            onClick={() => $checkout.placeOrder()}
             disabled={isProcessing}
             className="btn-primary flex-1 py-3 disabled:opacity-50"
           >
@@ -194,4 +198,3 @@ export function OrderReview() {
     );
   });
 }
-

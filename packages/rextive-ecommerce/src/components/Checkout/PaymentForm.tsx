@@ -1,5 +1,6 @@
 import { rx } from "rextive/react";
-import { checkoutLogic, type PaymentMethod } from "@/logic/checkout";
+import { paymentLogic, type PaymentMethod } from "@/logic/checkout";
+import { checkoutLogic } from "@/logic/checkout";
 
 const paymentOptions: { id: PaymentMethod; label: string; icon: string }[] = [
   { id: "card", label: "Credit / Debit Card", icon: "💳" },
@@ -8,11 +9,11 @@ const paymentOptions: { id: PaymentMethod; label: string; icon: string }[] = [
 ];
 
 export function PaymentForm() {
-  const { paymentMethod, setPaymentMethod, nextStep, prevStep } =
-    checkoutLogic();
+  const $payment = paymentLogic();
+  const { nextStep, prevStep } = checkoutLogic();
 
   return rx(() => {
-    const selected = paymentMethod();
+    const selected = $payment.method();
 
     return (
       <div className="space-y-4">
@@ -35,7 +36,7 @@ export function PaymentForm() {
                 name="payment"
                 value={option.id}
                 checked={selected === option.id}
-                onChange={() => setPaymentMethod(option.id)}
+                onChange={() => $payment.setMethod(option.id)}
                 className="sr-only"
               />
               <span className="text-2xl mr-3">{option.icon}</span>
@@ -144,4 +145,3 @@ export function PaymentForm() {
     );
   });
 }
-

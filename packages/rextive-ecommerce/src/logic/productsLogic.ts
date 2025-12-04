@@ -12,7 +12,7 @@ const PRODUCTS_PER_PAGE = 12;
  * - Singleton management
  * - Testability via logic.provide() and logic.clear()
  */
-export const productsLogic = logic("products", () => {
+export const productsLogic = logic("productsLogic", () => {
   // Filter state (signals)
   const search = signal("", { name: "products.search" });
   const category = signal<string | null>(null, { name: "products.category" });
@@ -134,23 +134,44 @@ export const productsLogic = logic("products", () => {
   };
 
   return {
-    // Signals (for UI reactivity and computed signals)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SIGNALS (for UI reactivity and computed signals)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /** Current search query string */
     search,
+    /** Selected category slug (null for all products) */
     category,
+    /** Sort field: "title" | "price" | "rating" */
     sortBy,
+    /** Sort direction: "asc" | "desc" */
     sortOrder,
+    /** Current page number (1-based) */
     page,
+    /** Computed: total number of pages based on product count */
     totalPages,
+    /** Products list with loading/error state (stale-while-revalidate) */
     productsTask,
+    /** Categories list with loading/error state */
     categoriesTask,
 
-    // Actions
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ACTIONS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /** Update search query and reset to page 1 */
     setSearch,
+    /** Select category and clear search */
     setCategory,
+    /** Update sort field and direction */
     setSort,
+    /** Navigate to specific page */
     setPage,
+    /** Go to next page (if available) */
     nextPage,
+    /** Go to previous page (if available) */
     prevPage,
+    /** Force refresh products list */
     refresh,
   };
 });

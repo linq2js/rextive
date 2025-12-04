@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { rx } from "rextive/react";
-import { authLogic } from "@/logic/auth";
+import { authLogic } from "@/logic/authLogic";
 
 export function LoginModal() {
   const { loginModalOpen, closeLoginModal, login, loginError, isLoggingIn } =

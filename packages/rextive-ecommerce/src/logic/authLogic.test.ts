@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { logic } from "rextive";
-import { authLogic } from "./auth";
+import { authLogic } from "./authLogic";
 
 // Mock localStorage
 const localStorageMock = {

@@ -1,5 +1,5 @@
 import { rx } from "rextive/react";
-import { productsLogic } from "@/logic/products";
+import { productsLogic } from "@/logic/productsLogic";
 
 export function CategoryFilter() {
   // Get singleton products logic

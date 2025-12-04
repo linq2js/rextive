@@ -1,5 +1,5 @@
 import { rx } from "rextive/react";
-import { authLogic } from "@/logic/auth";
+import { authLogic } from "@/logic/authLogic";
 
 export function UserMenu() {
   const { user, isRestoring, logout, openLoginModal } = authLogic();

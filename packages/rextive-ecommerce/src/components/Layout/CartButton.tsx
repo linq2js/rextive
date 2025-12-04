@@ -1,5 +1,5 @@
 import { rx } from "rextive/react";
-import { cartLogic } from "@/logic/cart";
+import { cartLogic } from "@/logic/cartLogic";
 
 export function CartButton() {
   const { openDrawer, itemCount } = cartLogic();

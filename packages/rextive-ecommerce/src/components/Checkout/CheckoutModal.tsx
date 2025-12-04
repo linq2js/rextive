@@ -1,5 +1,5 @@
 import { rx } from "rextive/react";
-import { checkoutLogic } from "@/logic/checkout";
+import { checkoutLogic, orderLogic } from "@/logic/checkout";
 import { CheckoutSteps } from "./CheckoutSteps";
 import { ShippingForm } from "./ShippingForm";
 import { PaymentForm } from "./PaymentForm";
@@ -7,12 +7,13 @@ import { OrderReview } from "./OrderReview";
 import { OrderComplete } from "./OrderComplete";
 
 export function CheckoutModal() {
-  const { isOpen, currentStep, close, isProcessing } = checkoutLogic();
+  const $checkout = checkoutLogic();
+  const $order = orderLogic();
 
   return rx(() => {
-    const open = isOpen();
-    const step = currentStep();
-    const processing = isProcessing();
+    const open = $checkout.isOpen();
+    const step = $checkout.currentStep();
+    const processing = $order.isProcessing();
 
     return (
       <>
@@ -21,7 +22,7 @@ export function CheckoutModal() {
           className={`fixed inset-0 bg-warm-900/50 backdrop-blur-sm z-50 transition-opacity duration-300 ${
             open ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
-          onClick={() => !processing && close()}
+          onClick={() => !processing && $checkout.close()}
           aria-hidden="true"
         />
 
@@ -44,7 +45,7 @@ export function CheckoutModal() {
               </h2>
               {step !== "complete" && !processing && (
                 <button
-                  onClick={() => close()}
+                  onClick={() => $checkout.close()}
                   className="btn-ghost p-2"
                   aria-label="Close"
                 >
@@ -80,4 +81,3 @@ export function CheckoutModal() {
     );
   });
 }
-

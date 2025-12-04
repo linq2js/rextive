@@ -1,7 +1,7 @@
 import { signal } from "rextive";
 import { rx, useScope } from "rextive/react";
 import { debounce } from "rextive/op";
-import { productsLogic } from "@/logic/products";
+import { productsLogic } from "@/logic/productsLogic";
 
 export function SearchBar() {
   // Get singleton products logic
