@@ -1,11 +1,31 @@
-import { signal, logic } from "rextive";
+import { signal, logic, wait } from "rextive";
 import { cartLogic } from "../cartLogic";
 import { shippingLogic } from "./shippingLogic";
 import { paymentLogic } from "./paymentLogic";
 import { SHIPPING_COST, TAX_RATE, type OrderSummary } from "./types";
 
+/** Order request - triggers order processing when set */
+type OrderRequest = {
+  cartItems: Array<{
+    product: {
+      id: number;
+      title: string;
+      price: number;
+      discountPercentage: number;
+    };
+    quantity: number;
+  }>;
+  subtotal: number;
+  shipping: number;
+  tax: number;
+  total: number;
+  shippingInfo: ReturnType<ReturnType<typeof shippingLogic>["info"]>;
+  paymentMethod: ReturnType<ReturnType<typeof paymentLogic>["method"]>;
+};
+
 /**
  * Order logic - manages order totals and order placement.
+ * Uses reactive pattern: setting orderRequest triggers async processing.
  */
 export const orderLogic = logic("checkout.orderLogic", () => {
   // Get dependencies at factory level (not inside actions!)
@@ -13,17 +33,10 @@ export const orderLogic = logic("checkout.orderLogic", () => {
   const $shipping = shippingLogic();
   const $payment = paymentLogic();
 
-  // Processing state
-  /** Whether an order is currently being processed */
-  const isProcessing = signal(false, { name: "order.isProcessing" });
+  // ═══════════════════════════════════════════════════════════════════════════
+  // COMPUTED TOTALS
+  // ═══════════════════════════════════════════════════════════════════════════
 
-  // Order result
-  /** Order summary after successful placement (null before order) */
-  const summary = signal<OrderSummary | null>(null, {
-    name: "order.summary",
-  });
-
-  // Computed totals
   /** Fixed shipping cost */
   const shippingCost = signal(SHIPPING_COST, { name: "order.shippingCost" });
 
@@ -39,56 +52,88 @@ export const orderLogic = logic("checkout.orderLogic", () => {
     { name: "order.total" }
   );
 
-  // Actions
-  /** Submit order to API and clear cart on success */
-  const placeOrder = async () => {
-    isProcessing.set(true);
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REACTIVE ORDER PROCESSING
+  // ═══════════════════════════════════════════════════════════════════════════
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+  /** Order request - set this to trigger order processing */
+  const orderRequest = signal<OrderRequest | null>(null, {
+    name: "order.request",
+  });
 
-    const cartItems = $cart.items();
-    const orderSummary: OrderSummary = {
-      orderId: `ORD-${Date.now().toString(36).toUpperCase()}`,
-      items: cartItems.map((item) => ({
-        name: item.product.title,
-        quantity: item.quantity,
-        price: item.product.price * (1 - item.product.discountPercentage / 100),
-      })),
+  /**
+   * Async order processing - reactive signal that returns Promise<OrderSummary | null>.
+   * Use with wait() in components for Suspense integration.
+   */
+  const orderAsync = signal(
+    { orderRequest },
+    async ({ deps, safe }): Promise<OrderSummary | null> => {
+      const request = deps.orderRequest;
+      if (!request) return null;
+
+      // Simulate API call (2 second delay)
+      await safe(wait.delay(2000));
+
+      // Simulate random API error (30% chance)
+      if (Math.random() < 0.3) {
+        throw new Error("Payment processing failed. Please try again.");
+      }
+
+      // Build order summary
+      const orderSummary: OrderSummary = {
+        orderId: `ORD-${Date.now().toString(36).toUpperCase()}`,
+        items: request.cartItems.map((item) => ({
+          name: item.product.title,
+          quantity: item.quantity,
+          price:
+            item.product.price * (1 - item.product.discountPercentage / 100),
+        })),
+        subtotal: request.subtotal,
+        shipping: request.shipping,
+        tax: request.tax,
+        total: request.total,
+        shippingInfo: request.shippingInfo,
+        paymentMethod: request.paymentMethod,
+      };
+
+      // Clear cart after successful order
+      $cart._clearAfterOrder();
+
+      return orderSummary;
+    },
+    { name: "order.async" }
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ACTIONS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Submit order - triggers reactive processing pipeline.
+   * Returns the promise so caller can await completion.
+   */
+  const placeOrder = () => {
+    orderRequest.set({
+      cartItems: $cart.items(),
       subtotal: $cart.subtotal(),
       shipping: shippingCost(),
       tax: tax(),
       total: total(),
       shippingInfo: $shipping.info(),
       paymentMethod: $payment.method(),
-    };
-
-    summary.set(orderSummary);
-    // Clear cart after successful order (uses internal method)
-    $cart._clearAfterOrder();
-    isProcessing.set(false);
-
-    return orderSummary;
+    });
+    // Return the promise for caller to await
+    return orderAsync();
   };
 
-  /** Reset order state (summary and processing flag) */
+  /** Reset order state */
   const reset = () => {
-    summary.set(null);
-    isProcessing.set(false);
+    orderRequest.set(null);
   };
 
   return {
     // ═══════════════════════════════════════════════════════════════════════════
-    // SIGNALS (for UI reactivity and computed signals)
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /** Whether an order is currently being processed */
-    isProcessing,
-    /** Order summary after successful placement (null before order) */
-    summary,
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // COMPUTED SIGNALS
+    // COMPUTED SIGNALS (Totals)
     // ═══════════════════════════════════════════════════════════════════════════
 
     /** Fixed shipping cost */
@@ -99,12 +144,22 @@ export const orderLogic = logic("checkout.orderLogic", () => {
     total,
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // ORDER ASYNC (Use with wait() for Suspense)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Async order signal - returns Promise<OrderSummary | null>.
+     * Use wait(orderAsync()) in components for Suspense integration.
+     */
+    orderAsync,
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // ACTIONS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /** Submit order to API and clear cart on success */
+    /** Submit order - returns promise for completion */
     placeOrder,
-    /** Reset order state (summary and processing flag) */
+    /** Reset order state */
     reset,
   };
 });

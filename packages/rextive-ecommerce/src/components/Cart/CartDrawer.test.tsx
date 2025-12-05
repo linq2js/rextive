@@ -1,16 +1,19 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@/test/utils";
-import { logic, signal } from "rextive";
+import { signal } from "rextive";
+import { mockLogic } from "rextive/test";
 import { CartDrawer } from "./CartDrawer";
 import { cartLogic } from "@/logic/cartLogic";
 
 describe("CartDrawer", () => {
+  const $cart = mockLogic(cartLogic);
+
   afterEach(() => {
-    logic.clear();
+    $cart.clear();
   });
 
-  const setupCartLogic = (overrides = {}) => {
-    const instance = {
+  beforeEach(() => {
+    $cart.default({
       drawerOpen: signal(false),
       closeDrawer: vi.fn(),
       items: signal([]),
@@ -18,15 +21,11 @@ describe("CartDrawer", () => {
       subtotal: signal(0),
       totalDiscount: signal(0),
       clearCart: vi.fn(),
-      ...overrides,
-    };
-    // Use type assertion for partial mock
-    logic.provide(cartLogic as any, () => instance);
-    return instance;
-  };
+    });
+  });
 
   it("should be hidden when drawer is closed", () => {
-    setupCartLogic({ drawerOpen: signal(false) });
+    $cart.provide({ drawerOpen: signal(false) });
 
     render(<CartDrawer />);
 
@@ -35,7 +34,7 @@ describe("CartDrawer", () => {
   });
 
   it("should be visible when drawer is open", () => {
-    setupCartLogic({ drawerOpen: signal(true) });
+    $cart.provide({ drawerOpen: signal(true) });
 
     render(<CartDrawer />);
 
@@ -44,7 +43,7 @@ describe("CartDrawer", () => {
   });
 
   it("should show Your Cart title", () => {
-    setupCartLogic({ drawerOpen: signal(true) });
+    $cart.provide({ drawerOpen: signal(true) });
 
     render(<CartDrawer />);
 
@@ -52,7 +51,10 @@ describe("CartDrawer", () => {
   });
 
   it("should call closeDrawer when backdrop is clicked", () => {
-    const cart = setupCartLogic({ drawerOpen: signal(true) });
+    const mock = $cart.provide({
+      drawerOpen: signal(true),
+      closeDrawer: vi.fn(),
+    });
 
     render(<CartDrawer />);
 
@@ -61,11 +63,11 @@ describe("CartDrawer", () => {
       fireEvent.click(backdrop);
     }
 
-    expect(cart.closeDrawer).toHaveBeenCalled();
+    expect(mock.closeDrawer).toHaveBeenCalled();
   });
 
   it("should show empty cart message when cart is empty", () => {
-    setupCartLogic({ drawerOpen: signal(true), items: signal([]) });
+    $cart.provide({ drawerOpen: signal(true), items: signal([]) });
 
     render(<CartDrawer />);
 
@@ -73,7 +75,7 @@ describe("CartDrawer", () => {
   });
 
   it("should show item count in header", () => {
-    setupCartLogic({ drawerOpen: signal(true), itemCount: signal(3) });
+    $cart.provide({ drawerOpen: signal(true), itemCount: signal(3) });
 
     render(<CartDrawer />);
 
@@ -81,7 +83,7 @@ describe("CartDrawer", () => {
   });
 
   it("should show singular item text for 1 item", () => {
-    setupCartLogic({ drawerOpen: signal(true), itemCount: signal(1) });
+    $cart.provide({ drawerOpen: signal(true), itemCount: signal(1) });
 
     render(<CartDrawer />);
 

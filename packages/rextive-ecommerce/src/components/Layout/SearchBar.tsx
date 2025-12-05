@@ -1,32 +1,34 @@
-import { signal } from "rextive";
-import { rx, useScope } from "rextive/react";
-import { debounce } from "rextive/op";
+import { signal, logic } from "rextive";
+import { rx } from "rextive/react";
+import { debounce, to } from "rextive/op";
 import { productsLogic } from "@/logic/productsLogic";
 
-export function SearchBar() {
-  // Get singleton products logic
-  const products = productsLogic();
+/**
+ * Local logic for SearchBar - manages input debouncing.
+ * Not exported, only used by this component.
+ */
+export const searchBarLogic = logic("searchBarLogic", () => {
+  const $products = productsLogic();
 
-  // Local scope for input debouncing
-  const scope = useScope(() => {
-    const inputValue = signal("");
-    const debouncedValue = inputValue.pipe(debounce(300));
+  const input = signal("", { name: "searchBar.input" });
+  // Update products search when debounced value changes
+  input.pipe(debounce(300), to($products.setSearch));
 
-    // Update products search when debounced value changes
-    debouncedValue.on(() => {
-      products.setSearch(debouncedValue());
-    });
-
-    return { inputValue };
-  });
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    scope.inputValue.set(e.target.value);
+  const clear = () => {
+    input.set("");
   };
 
-  const handleClear = () => {
-    scope.inputValue.set("");
-    products.setSearch("");
+  return {
+    input,
+    clear,
+  };
+});
+
+export function SearchBar() {
+  const $search = searchBarLogic();
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    $search.input.set(e.target.value);
   };
 
   return (
@@ -51,7 +53,7 @@ export function SearchBar() {
         <input
           type="text"
           placeholder="Search products..."
-          value={scope.inputValue()}
+          value={$search.input()}
           onChange={handleChange}
           className="input pl-10 pr-10 py-2"
         />
@@ -59,11 +61,11 @@ export function SearchBar() {
 
       {/* Clear button */}
       {rx(() => {
-        if (!scope.inputValue()) return null;
+        if (!$search.input()) return null;
 
         return (
           <button
-            onClick={handleClear}
+            onClick={() => $search.clear()}
             className="absolute inset-y-0 right-0 pr-3 flex items-center text-warm-400 hover:text-warm-600 transition-colors"
           >
             <svg

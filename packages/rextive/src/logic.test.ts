@@ -1058,20 +1058,25 @@ describe("logic", () => {
         updateUser: (id: number, data: unknown) => ({ success: true }),
       }));
 
-      const mockFetchUser = vi.fn().mockReturnValue({ id: 1, name: "Mock User" });
+      const mockFetchUser = vi
+        .fn()
+        .mockReturnValue({ id: 1, name: "Mock User" });
       const mockUpdateUser = vi.fn().mockReturnValue({ success: false });
 
+      // @ts-expect-error - mock types are not compatible with api types
       logic.provide(api, () => ({
         fetchUser: mockFetchUser,
         updateUser: mockUpdateUser,
       }));
 
       const instance = api();
-      
+
       expect(instance.fetchUser(1)).toEqual({ id: 1, name: "Mock User" });
       expect(mockFetchUser).toHaveBeenCalledWith(1);
-      
-      expect(instance.updateUser(1, { name: "New" })).toEqual({ success: false });
+
+      expect(instance.updateUser(1, { name: "New" })).toEqual({
+        success: false,
+      });
       expect(mockUpdateUser).toHaveBeenCalledWith(1, { name: "New" });
     });
 
@@ -1104,6 +1109,7 @@ describe("logic", () => {
         .mockReturnValueOnce("second-call")
         .mockReturnValue("default");
 
+      // @ts-expect-error - mock types are not compatible with api types
       logic.provide(api, () => ({
         getData: mockGetData,
       }));
@@ -1144,7 +1150,7 @@ describe("logic", () => {
 
     it("setup pattern - return writable instance for test manipulation", () => {
       type User = { id: number; name: string };
-      
+
       const authLogic = logic("auth", () => {
         const user = signal<User | null>(null);
         return {
@@ -1205,7 +1211,7 @@ describe("logic", () => {
       };
 
       const counter = setupCounter(10);
-      
+
       // Assert initial state
       expect(counter.getCount()).toBe(10);
 

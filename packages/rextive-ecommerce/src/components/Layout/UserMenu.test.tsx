@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@/test/utils";
-import { logic, signal } from "rextive";
+import { signal } from "rextive";
+import { mockLogic } from "rextive/test";
 import { UserMenu } from "./UserMenu";
 import { authLogic } from "@/logic/authLogic";
 
@@ -18,25 +19,23 @@ const mockUser = {
 };
 
 describe("UserMenu", () => {
-  afterEach(() => {
-    logic.clear();
-  });
+  const $auth = mockLogic(authLogic);
 
-  const setupAuthLogic = (overrides = {}) => {
-    const instance = {
+  beforeEach(() => {
+    $auth.default({
       user: signal(null),
       isRestoring: signal(false),
       logout: vi.fn(),
       openLoginModal: vi.fn(),
-      ...overrides,
-    };
-    // Use type assertion for partial mock
-    logic.provide(authLogic as any, () => instance);
-    return instance;
-  };
+    });
+  });
+
+  afterEach(() => {
+    $auth.clear();
+  });
 
   it("should show Sign In button when not authenticated", () => {
-    setupAuthLogic({ user: signal(null), isRestoring: signal(false) });
+    $auth.provide({ user: signal(null), isRestoring: signal(false) });
 
     render(<UserMenu />);
 
@@ -44,7 +43,7 @@ describe("UserMenu", () => {
   });
 
   it("should show loading state while restoring session", () => {
-    setupAuthLogic({ user: signal(null), isRestoring: signal(true) });
+    $auth.provide({ user: signal(null), isRestoring: signal(true) });
 
     render(<UserMenu />);
 
@@ -52,7 +51,7 @@ describe("UserMenu", () => {
   });
 
   it("should show user name when authenticated", () => {
-    setupAuthLogic({ user: signal(mockUser), isRestoring: signal(false) });
+    $auth.provide({ user: signal(mockUser), isRestoring: signal(false) });
 
     render(<UserMenu />);
 
@@ -61,22 +60,24 @@ describe("UserMenu", () => {
   });
 
   it("should call openLoginModal when Sign In is clicked", () => {
-    const auth = setupAuthLogic({
+    const mock = $auth.provide({
       user: signal(null),
       isRestoring: signal(false),
+      openLoginModal: vi.fn(),
     });
 
     render(<UserMenu />);
 
     fireEvent.click(screen.getByText("Sign In"));
 
-    expect(auth.openLoginModal).toHaveBeenCalledTimes(1);
+    expect(mock.openLoginModal).toHaveBeenCalledTimes(1);
   });
 
   it("should call logout when logout button is clicked", () => {
-    const auth = setupAuthLogic({
+    const mock = $auth.provide({
       user: signal(mockUser),
       isRestoring: signal(false),
+      logout: vi.fn(),
     });
 
     render(<UserMenu />);
@@ -85,6 +86,6 @@ describe("UserMenu", () => {
     const logoutButton = screen.getByTitle("Logout");
     fireEvent.click(logoutButton);
 
-    expect(auth.logout).toHaveBeenCalledTimes(1);
+    expect(mock.logout).toHaveBeenCalledTimes(1);
   });
 });

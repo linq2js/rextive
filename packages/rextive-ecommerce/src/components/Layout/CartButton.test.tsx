@@ -1,27 +1,26 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@/test/utils";
-import { logic, signal } from "rextive";
+import { signal } from "rextive";
+import { mockLogic } from "rextive/test";
 import { CartButton } from "./CartButton";
 import { cartLogic } from "@/logic/cartLogic";
 
 describe("CartButton", () => {
-  afterEach(() => {
-    logic.clear();
-  });
+  const $cart = mockLogic(cartLogic);
 
-  const setupCartLogic = (overrides = {}) => {
-    const instance = {
+  beforeEach(() => {
+    $cart.default({
       openDrawer: vi.fn(),
       itemCount: signal(0),
-      ...overrides,
-    };
-    // Use type assertion for partial mock
-    logic.provide(cartLogic as any, () => instance);
-    return instance;
-  };
+    });
+  });
+
+  afterEach(() => {
+    $cart.clear();
+  });
 
   it("should not show badge when cart is empty", () => {
-    setupCartLogic({ itemCount: signal(0) });
+    $cart.provide({ itemCount: signal(0) });
 
     render(<CartButton />);
 
@@ -30,7 +29,7 @@ describe("CartButton", () => {
   });
 
   it("should show badge with item count", () => {
-    setupCartLogic({ itemCount: signal(5) });
+    $cart.provide({ itemCount: signal(5) });
 
     render(<CartButton />);
 
@@ -38,7 +37,7 @@ describe("CartButton", () => {
   });
 
   it("should show 99+ when count exceeds 99", () => {
-    setupCartLogic({ itemCount: signal(150) });
+    $cart.provide({ itemCount: signal(150) });
 
     render(<CartButton />);
 
@@ -46,12 +45,15 @@ describe("CartButton", () => {
   });
 
   it("should call openDrawer when clicked", () => {
-    const cart = setupCartLogic({ itemCount: signal(3) });
+    const mock = $cart.provide({
+      itemCount: signal(3),
+      openDrawer: vi.fn(),
+    });
 
     render(<CartButton />);
 
     fireEvent.click(screen.getByRole("button", { name: /shopping cart/i }));
 
-    expect(cart.openDrawer).toHaveBeenCalledTimes(1);
+    expect(mock.openDrawer).toHaveBeenCalledTimes(1);
   });
 });

@@ -12,6 +12,8 @@ export default defineConfig({
     react(),
     dts({
       insertTypesEntry: true,
+      include: ["src/**/*.ts", "src/**/*.tsx"],
+      exclude: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     }),
   ],
   // Don't define __DEV__ at library build time - let the consuming application
@@ -32,6 +34,7 @@ export default defineConfig({
         ),
         "operators/index": resolve(__dirname, "src/operators/index.ts"),
         op: resolve(__dirname, "src/op.ts"),
+        "test/index": resolve(__dirname, "src/test/index.ts"),
       },
       formats: ["es"],
     },

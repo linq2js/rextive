@@ -1,30 +1,29 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@/test/utils";
-import { logic, signal } from "rextive";
+import { signal } from "rextive";
+import { mockLogic } from "rextive/test";
 import { SortSelect } from "./SortSelect";
 import { productsLogic } from "@/logic/productsLogic";
 
 describe("SortSelect", () => {
-  afterEach(() => {
-    logic.clear();
-  });
+  const $products = mockLogic(productsLogic);
 
-  const setupProductsLogic = (overrides = {}) => {
-    const instance = {
+  beforeEach(() => {
+    $products.default({
       sortBy: signal<"title" | "price" | "rating">("title"),
       sortOrder: signal<"asc" | "desc">("asc"),
       category: signal<string | null>(null),
       search: signal(""),
       setSort: vi.fn(),
-      ...overrides,
-    };
-    // Use type assertion for partial mock
-    logic.provide(productsLogic as any, () => instance);
-    return instance;
-  };
+    });
+  });
+
+  afterEach(() => {
+    $products.clear();
+  });
 
   it("should show sort label", () => {
-    setupProductsLogic();
+    $products.provide({});
 
     render(<SortSelect />);
 
@@ -32,7 +31,7 @@ describe("SortSelect", () => {
   });
 
   it("should show default selection", () => {
-    setupProductsLogic({ sortBy: signal("title"), sortOrder: signal("asc") });
+    $products.provide({ sortBy: signal("title"), sortOrder: signal("asc") });
 
     render(<SortSelect />);
 
@@ -41,18 +40,18 @@ describe("SortSelect", () => {
   });
 
   it("should call setSort when selection changes", () => {
-    const products = setupProductsLogic();
+    const mock = $products.provide({ setSort: vi.fn() });
 
     render(<SortSelect />);
 
     const select = screen.getByRole("combobox");
     fireEvent.change(select, { target: { value: "price-desc" } });
 
-    expect(products.setSort).toHaveBeenCalledWith("price", "desc");
+    expect(mock.setSort).toHaveBeenCalledWith("price", "desc");
   });
 
   it("should show all sort options", () => {
-    setupProductsLogic();
+    $products.provide({});
 
     render(<SortSelect />);
 
@@ -64,7 +63,7 @@ describe("SortSelect", () => {
   });
 
   it("should reflect current sort state", () => {
-    setupProductsLogic({ sortBy: signal("price"), sortOrder: signal("desc") });
+    $products.provide({ sortBy: signal("price"), sortOrder: signal("desc") });
 
     render(<SortSelect />);
 
@@ -73,7 +72,7 @@ describe("SortSelect", () => {
   });
 
   it("should be disabled when category is selected", () => {
-    setupProductsLogic({ category: signal("furniture") });
+    $products.provide({ category: signal("furniture") });
 
     render(<SortSelect />);
 
@@ -82,7 +81,7 @@ describe("SortSelect", () => {
   });
 
   it("should be disabled when search is active", () => {
-    setupProductsLogic({ search: signal("phone") });
+    $products.provide({ search: signal("phone") });
 
     render(<SortSelect />);
 
@@ -91,7 +90,7 @@ describe("SortSelect", () => {
   });
 
   it("should be enabled when no category or search", () => {
-    setupProductsLogic({ category: signal(null), search: signal("") });
+    $products.provide({ category: signal(null), search: signal("") });
 
     render(<SortSelect />);
 

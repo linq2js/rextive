@@ -24,7 +24,6 @@ export function OrderReview() {
     const shippingCost = $order.shippingCost();
     const taxAmount = $order.tax();
     const totalAmount = $order.total();
-    const isProcessing = $order.isProcessing();
 
     const paymentLabel =
       paymentMethod === "card"
@@ -35,7 +34,9 @@ export function OrderReview() {
 
     return (
       <div className="space-y-6">
-        <h3 className="text-lg font-semibold text-warm-900">Review Your Order</h3>
+        <h3 className="text-lg font-semibold text-warm-900">
+          Review Your Order
+        </h3>
 
         {/* Items */}
         <div className="bg-warm-50 rounded-xl p-4">
@@ -112,7 +113,9 @@ export function OrderReview() {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-warm-600">Shipping</span>
-            <span className="text-warm-900">{formatCurrency(shippingCost)}</span>
+            <span className="text-warm-900">
+              {formatCurrency(shippingCost)}
+            </span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-warm-600">Tax (8%)</span>
@@ -120,7 +123,9 @@ export function OrderReview() {
           </div>
           <div className="flex justify-between text-lg font-semibold pt-2 border-t border-warm-200">
             <span className="text-warm-900">Total</span>
-            <span className="text-brand-600">{formatCurrency(totalAmount)}</span>
+            <span className="text-brand-600">
+              {formatCurrency(totalAmount)}
+            </span>
           </div>
         </div>
 
@@ -128,8 +133,7 @@ export function OrderReview() {
         <div className="flex gap-3">
           <button
             onClick={() => $checkout.prevStep()}
-            disabled={isProcessing}
-            className="btn-secondary flex-1 py-3 disabled:opacity-50"
+            className="btn-secondary flex-1 py-3"
           >
             <svg
               className="w-5 h-5"
@@ -148,50 +152,22 @@ export function OrderReview() {
           </button>
           <button
             onClick={() => $checkout.placeOrder()}
-            disabled={isProcessing}
-            className="btn-primary flex-1 py-3 disabled:opacity-50"
+            className="btn-primary flex-1 py-3"
           >
-            {isProcessing ? (
-              <>
-                <svg
-                  className="animate-spin w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Processing...
-              </>
-            ) : (
-              <>
-                Place Order
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </>
-            )}
+            Place Order
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
           </button>
         </div>
       </div>

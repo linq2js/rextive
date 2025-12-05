@@ -1,19 +1,21 @@
+import { Suspense } from "react";
 import { rx } from "rextive/react";
-import { checkoutLogic, orderLogic } from "@/logic/checkout";
+import { checkoutLogic } from "@/logic/checkout";
 import { CheckoutSteps } from "./CheckoutSteps";
 import { ShippingForm } from "./ShippingForm";
 import { PaymentForm } from "./PaymentForm";
 import { OrderReview } from "./OrderReview";
 import { OrderComplete } from "./OrderComplete";
+import { OrderLoading } from "./OrderLoading";
+import { OrderErrorBoundary } from "./OrderErrorBoundary";
 
 export function CheckoutModal() {
   const $checkout = checkoutLogic();
-  const $order = orderLogic();
 
   return rx(() => {
     const open = $checkout.isOpen();
     const step = $checkout.currentStep();
-    const processing = $order.isProcessing();
+    const isComplete = step === "complete";
 
     return (
       <>
@@ -22,7 +24,7 @@ export function CheckoutModal() {
           className={`fixed inset-0 bg-warm-900/50 backdrop-blur-sm z-50 transition-opacity duration-300 ${
             open ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
-          onClick={() => !processing && $checkout.close()}
+          onClick={() => !isComplete && $checkout.close()}
           aria-hidden="true"
         />
 
@@ -41,9 +43,9 @@ export function CheckoutModal() {
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-warm-200">
               <h2 className="text-xl font-semibold text-warm-900">
-                {step === "complete" ? "Order Confirmed" : "Checkout"}
+                {isComplete ? "Order Confirmed" : "Checkout"}
               </h2>
-              {step !== "complete" && !processing && (
+              {!isComplete && (
                 <button
                   onClick={() => $checkout.close()}
                   className="btn-ghost p-2"
@@ -73,7 +75,13 @@ export function CheckoutModal() {
               {step === "shipping" && <ShippingForm />}
               {step === "payment" && <PaymentForm />}
               {step === "review" && <OrderReview />}
-              {step === "complete" && <OrderComplete />}
+              {step === "complete" && (
+                <ErrorBoundary>
+                  <Suspense fallback={<OrderLoading />}>
+                    <OrderComplete />
+                  </Suspense>
+                </ErrorBoundary>
+              )}
             </div>
           </div>
         </div>
@@ -81,3 +89,6 @@ export function CheckoutModal() {
     );
   });
 }
+
+// Use OrderErrorBoundary as ErrorBoundary
+const ErrorBoundary = OrderErrorBoundary;

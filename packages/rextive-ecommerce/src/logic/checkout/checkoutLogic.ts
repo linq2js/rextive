@@ -65,10 +65,10 @@ export const checkoutLogic = logic("checkoutLogic", () => {
     }
   };
 
-  /** Submit the order and move to completion step */
-  const placeOrder = async () => {
-    await $order.placeOrder();
-    currentStep.set("complete");
+  /** Submit the order - navigates to complete, Suspense handles loading */
+  const placeOrder = () => {
+    $order.placeOrder();
+    currentStep.set("complete"); // Navigate immediately, Suspense shows loading
   };
 
   /** Reset all checkout state (shipping, payment, order) */

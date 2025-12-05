@@ -42,6 +42,10 @@
     "./operators": {
       "types": "./dist/operators/index.d.ts",
       "default": "./dist/operators/index.js"
+    },
+    "./test": {
+      "types": "./dist/test/index.d.ts",
+      "default": "./dist/test/index.js"
     }
   },
   "files": [

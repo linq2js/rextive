@@ -60,6 +60,163 @@ it("test 2", () => {
 
 ---
 
+## Logic Structure
+
+A well-organized logic follows this structure:
+
+```ts
+import { logic, signal } from "rextive";
+
+export const myLogic = logic("myLogic", () => {
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 1. DEPENDENCIES - Import other logics (at factory level!)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const $auth = authLogic();       // Shared singleton
+  const $config = configLogic();   // Shared singleton
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 2. STATE - Signals and computed values
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const items = signal<Item[]>([], { name: "myLogic.items" });
+  const filter = signal("all", { name: "myLogic.filter" });
+  
+  // Computed signals
+  const filtered = signal(
+    { items, filter },
+    ({ deps }) => deps.items.filter(/* ... */),
+    { name: "myLogic.filtered" }
+  );
+  const count = items.to((list) => list.length, { name: "myLogic.count" });
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 3. SIDE EFFECTS - Subscriptions, timers, external resources
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const socket = new WebSocket($config.wsUrl);
+  const interval = setInterval(() => refresh(), 60000);
+  
+  // Signal subscriptions
+  $auth.user.on(() => {
+    if (!$auth.user()) items.reset();
+  });
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 4. METHODS - Actions and business logic
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const add = (item: Item) => {
+    items.set((prev) => [...prev, item]);
+  };
+
+  const remove = (id: string) => {
+    items.set((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  const refresh = async () => {
+    const data = await fetch("/api/items");
+    items.set(await data.json());
+  };
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 5. RETURN - Public API + cleanup
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  return {
+    // State (read-only or mutable as needed)
+    items,
+    filter,
+    filtered,
+    count,
+
+    // Methods
+    add,
+    remove,
+    refresh,
+
+    // Cleanup (optional - for external resources)
+    dispose: () => {
+      socket.close();
+      clearInterval(interval);
+      // Note: Signals are auto-disposed, no need to dispose them manually
+    },
+  };
+});
+```
+
+### Section Breakdown
+
+| Section | Purpose | Guidelines |
+|---------|---------|------------|
+| **Dependencies** | Import other logics | Always at factory level, not inside methods |
+| **State** | Signals & computed | Name signals for debugging: `{ name: "logic.signal" }` |
+| **Side Effects** | External resources | WebSockets, timers, event listeners, subscriptions |
+| **Methods** | Business logic | Keep pure when possible, use signals for state |
+| **Return** | Public API + cleanup | Include `dispose()` if you have side effects |
+
+### ⚠️ Common Mistakes
+
+```ts
+// ❌ BAD: Getting logic inside a method (stale reference risk)
+const myLogic = logic("myLogic", () => {
+  const doSomething = () => {
+    const $auth = authLogic(); // ❌ Called on every invocation
+    return $auth.user();
+  };
+  return { doSomething };
+});
+
+// ✅ GOOD: Get logic at factory level
+const myLogic = logic("myLogic", () => {
+  const $auth = authLogic(); // ✅ Called once during initialization
+  
+  const doSomething = () => {
+    return $auth.user(); // Uses captured reference
+  };
+  return { doSomething };
+});
+```
+
+```ts
+// ❌ BAD: Forgetting to clean up external resources
+const myLogic = logic("myLogic", () => {
+  const socket = new WebSocket("wss://...");
+  // No dispose! Memory leak when instance is disposed
+  return { /* ... */ };
+});
+
+// ✅ GOOD: Clean up external resources
+const myLogic = logic("myLogic", () => {
+  const socket = new WebSocket("wss://...");
+  return {
+    /* ... */
+    dispose: () => socket.close(),
+  };
+});
+```
+
+```ts
+// ❌ BAD: Disposing shared logics
+const myLogic = logic("myLogic", () => {
+  const $auth = authLogic(); // Singleton - shared!
+  return {
+    dispose: () => {
+      $auth.dispose(); // ❌ Don't dispose shared logics!
+    },
+  };
+});
+
+// ✅ GOOD: Only dispose what you own
+const myLogic = logic("myLogic", () => {
+  const $auth = authLogic();           // Shared - DON'T dispose
+  const tabs = [tabLogic.create()];    // Owned - MUST dispose
+  
+  return {
+    dispose: () => {
+      tabs.forEach(t => t.dispose()); // ✅ Dispose owned only
+    },
+  };
+});
+```
+
+---
+
 ## Basic Usage
 
 ### Creating a Logic Unit
@@ -2093,6 +2250,196 @@ it("with override", () => {
   // No manual dispose needed - logic.clear() handles it
 });
 ```
+
+---
+
+## Testing React Components with `mockLogic`
+
+For React component testing, `rextive/test` provides a `mockLogic` utility that simplifies mocking logics with cleaner syntax.
+
+### Installation
+
+```ts
+import { mockLogic } from "rextive/test";
+```
+
+### Basic Usage
+
+```tsx
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { signal } from "rextive";
+import { mockLogic } from "rextive/test";
+import { UserMenu } from "./UserMenu";
+import { authLogic } from "@/logic/authLogic";
+
+describe("UserMenu", () => {
+  // Create mock for authLogic
+  const $auth = mockLogic(authLogic);
+
+  beforeEach(() => {
+    // Set default mock values (merged with overrides in provide())
+    $auth.default({
+      user: signal(null),
+      isRestoring: signal(false),
+      logout: vi.fn(),
+      openLoginModal: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    // Clear mocks and logic registry
+    $auth.clear();
+  });
+
+  it("should show Sign In button when not authenticated", () => {
+    $auth.provide({ user: signal(null) });
+
+    render(<UserMenu />);
+
+    expect(screen.getByText("Sign In")).toBeInTheDocument();
+  });
+
+  it("should call logout when clicked", () => {
+    const mock = $auth.provide({
+      user: signal({ id: 1, name: "John" }),
+      logout: vi.fn(),
+    });
+
+    render(<UserMenu />);
+    fireEvent.click(screen.getByTitle("Logout"));
+
+    expect(mock.logout).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+### API Reference
+
+#### `mockLogic(logic)`
+
+Creates a mock controller for a logic.
+
+```ts
+const $auth = mockLogic(authLogic);
+```
+
+**Returns:** `LogicMock<T>` with methods:
+
+| Method | Description |
+|--------|-------------|
+| `.default(partial)` | Set default mock values (merged with overrides) |
+| `.provide(partial?)` | Apply mock to logic registry, returns the merged mock |
+| `.clear()` | Clear defaults, overrides, and logic registry |
+
+### Comparison: `logic.provide()` vs `mockLogic`
+
+**Manual with `logic.provide()`:**
+
+```ts
+const setupAuthLogic = (overrides = {}) => {
+  const instance = {
+    user: signal(null),
+    isRestoring: signal(false),
+    logout: vi.fn(),
+    openLoginModal: vi.fn(),
+    ...overrides,
+  };
+  logic.provide(authLogic as any, () => instance); // Type assertion needed
+  return instance;
+};
+
+afterEach(() => logic.clear());
+
+it("test", () => {
+  const auth = setupAuthLogic({ user: signal(mockUser) });
+  // ...
+});
+```
+
+**With `mockLogic`:**
+
+```ts
+const $auth = mockLogic(authLogic);
+
+beforeEach(() => {
+  $auth.default({
+    user: signal(null),
+    isRestoring: signal(false),
+    logout: vi.fn(),
+    openLoginModal: vi.fn(),
+  });
+});
+
+afterEach(() => $auth.clear());
+
+it("test", () => {
+  const auth = $auth.provide({ user: signal(mockUser) });
+  // ...
+});
+```
+
+**Benefits of `mockLogic`:**
+- ✅ No type assertions needed
+- ✅ Cleaner `$` prefix convention
+- ✅ Reusable across test files
+- ✅ Consistent API
+- ✅ Defaults + overrides pattern
+
+### Pattern: Testing Multiple Logics
+
+```tsx
+describe("CheckoutPage", () => {
+  const $cart = mockLogic(cartLogic);
+  const $auth = mockLogic(authLogic);
+  const $checkout = mockLogic(checkoutLogic);
+
+  beforeEach(() => {
+    $cart.default({
+      items: signal([]),
+      itemCount: signal(0),
+      subtotal: signal(0),
+    });
+
+    $auth.default({
+      user: signal(null),
+      isAuthenticated: signal(false),
+    });
+
+    $checkout.default({
+      isOpen: signal(false),
+      currentStep: signal("shipping"),
+    });
+  });
+
+  afterEach(() => {
+    $cart.clear();
+    $auth.clear();
+    $checkout.clear();
+  });
+
+  it("should show login modal when cart action without auth", () => {
+    $auth.provide({ isAuthenticated: signal(false) });
+    $cart.provide({
+      items: signal([{ id: 1, name: "Widget", quantity: 1 }]),
+    });
+
+    render(<CheckoutPage />);
+    fireEvent.click(screen.getByText("Checkout"));
+
+    expect(screen.getByText("Please sign in")).toBeInTheDocument();
+  });
+});
+```
+
+### When to Use Each Approach
+
+| Scenario | Recommended |
+|----------|-------------|
+| Testing logic units directly | `logic.provide()` + `logic.create()` |
+| Testing React components | `mockLogic()` |
+| Library/SDK testing | `logic.provide()` with partial override |
+| Simple one-off mock | `logic.provide()` inline |
 
 ---
 

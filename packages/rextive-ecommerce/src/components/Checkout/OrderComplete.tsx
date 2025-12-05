@@ -1,3 +1,4 @@
+import { wait } from "rextive";
 import { rx } from "rextive/react";
 import { checkoutLogic, orderLogic } from "@/logic/checkout";
 
@@ -12,7 +13,8 @@ export function OrderComplete() {
   const $order = orderLogic();
 
   return rx(() => {
-    const summary = $order.summary();
+    // Use wait() for Suspense integration - parent handles loading/error
+    const summary = wait($order.orderAsync());
 
     if (!summary) return null;
 

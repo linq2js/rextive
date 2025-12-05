@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@/test/utils";
-import { logic, signal } from "rextive";
+import { signal } from "rextive";
+import { mockLogic } from "rextive/test";
 import { CategoryFilter } from "./CategoryFilter";
 import { productsLogic } from "@/logic/productsLogic";
 
@@ -11,12 +12,10 @@ const mockCategories = [
 ];
 
 describe("CategoryFilter", () => {
-  afterEach(() => {
-    logic.clear();
-  });
+  const $products = mockLogic(productsLogic);
 
-  const setupProductsLogic = (overrides = {}) => {
-    const instance = {
+  beforeEach(() => {
+    $products.default({
       category: signal<string | null>(null),
       categoriesTask: signal({
         loading: false,
@@ -24,15 +23,15 @@ describe("CategoryFilter", () => {
         value: mockCategories,
       }),
       setCategory: vi.fn(),
-      ...overrides,
-    };
-    // Use type assertion for partial mock
-    logic.provide(productsLogic as any, () => instance);
-    return instance;
-  };
+    });
+  });
+
+  afterEach(() => {
+    $products.clear();
+  });
 
   it("should show All button selected by default", () => {
-    setupProductsLogic({ category: signal(null) });
+    $products.provide({ category: signal(null) });
 
     render(<CategoryFilter />);
 
@@ -43,7 +42,7 @@ describe("CategoryFilter", () => {
   });
 
   it("should show category buttons", () => {
-    setupProductsLogic({ category: signal(null) });
+    $products.provide({ category: signal(null) });
 
     render(<CategoryFilter />);
 
@@ -53,27 +52,33 @@ describe("CategoryFilter", () => {
   });
 
   it("should call setCategory when category is clicked", () => {
-    const products = setupProductsLogic({ category: signal(null) });
+    const mock = $products.provide({
+      category: signal(null),
+      setCategory: vi.fn(),
+    });
 
     render(<CategoryFilter />);
 
     fireEvent.click(screen.getByText("Laptops"));
 
-    expect(products.setCategory).toHaveBeenCalledWith("laptops");
+    expect(mock.setCategory).toHaveBeenCalledWith("laptops");
   });
 
   it("should call setCategory(null) when All is clicked", () => {
-    const products = setupProductsLogic({ category: signal("smartphones") });
+    const mock = $products.provide({
+      category: signal("smartphones"),
+      setCategory: vi.fn(),
+    });
 
     render(<CategoryFilter />);
 
     fireEvent.click(screen.getByText("All"));
 
-    expect(products.setCategory).toHaveBeenCalledWith(null);
+    expect(mock.setCategory).toHaveBeenCalledWith(null);
   });
 
   it("should show loading skeletons when loading", () => {
-    setupProductsLogic({
+    $products.provide({
       category: signal(null),
       categoriesTask: signal({
         loading: true,
@@ -90,7 +95,7 @@ describe("CategoryFilter", () => {
   });
 
   it("should highlight selected category", () => {
-    setupProductsLogic({ category: signal("laptops") });
+    $products.provide({ category: signal("laptops") });
 
     render(<CategoryFilter />);
 
