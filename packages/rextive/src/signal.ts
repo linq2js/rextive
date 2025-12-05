@@ -168,6 +168,17 @@ export function signal<TValue>(
     NoInfer<SignalExtraOptions<TValue, "mutable" | "any">>
 ): Mutable<TValue>;
 
+export function signal<TValue, TInit>(
+  value: TInit,
+  equals: "strict" | "shallow" | "deep"
+): Mutable<TValue, TInit>;
+
+export function signal<TValue, TInit>(
+  value: TInit,
+  options?: SignalOptions<TValue> &
+    NoInfer<SignalExtraOptions<TValue, "mutable" | "any">>
+): Mutable<TValue, TInit>;
+
 /**
  * Create computed signal from dependencies with equality string shortcut
  * @param dependencies - Map of signals to depend on

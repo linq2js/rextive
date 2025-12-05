@@ -1,27 +1,50 @@
-import { useState } from "react";
+import { signal, logic } from "rextive";
 import { rx } from "rextive/react";
 import { authLogic } from "@/logic/authLogic";
 
-export function LoginModal() {
-  const { loginModalOpen, closeLoginModal, login, loginError, isLoggingIn } =
-    authLogic();
+/**
+ * Local logic for LoginModal - manages form state.
+ * Using singleton pattern - form state persists across modal open/close.
+ */
+const loginFormLogic = logic("loginFormLogic", () => {
+  const username = signal("emilys", { name: "loginForm.username" });
+  const password = signal("emilyspass", { name: "loginForm.password" });
 
-  const [username, setUsername] = useState("emilys");
-  const [password, setPassword] = useState("emilyspass");
+  const reset = () => {
+    username.set("emilys");
+    password.set("emilyspass");
+  };
+
+  return {
+    username,
+    password,
+    reset,
+  };
+});
+
+export function LoginModal() {
+  const $auth = authLogic();
+  // Use singleton - form state persists. No useScope needed.
+  const $form = loginFormLogic();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login({ username, password });
+      await $auth.login({
+        username: $form.username(),
+        password: $form.password(),
+      });
     } catch {
       // Error is handled in authLogic
     }
   };
 
   return rx(() => {
-    const isOpen = loginModalOpen();
-    const error = loginError();
-    const loading = isLoggingIn();
+    const isOpen = $auth.loginModalOpen();
+    const error = $auth.loginError();
+    const loading = $auth.isLoggingIn();
+    const username = $form.username();
+    const password = $form.password();
 
     return (
       <>
@@ -30,7 +53,7 @@ export function LoginModal() {
           className={`fixed inset-0 bg-warm-900/50 backdrop-blur-sm z-50 transition-opacity duration-300 ${
             isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
-          onClick={() => closeLoginModal()}
+          onClick={() => $auth.closeLoginModal()}
           aria-hidden="true"
         />
 
@@ -50,7 +73,7 @@ export function LoginModal() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-warm-200">
               <h2 className="text-xl font-semibold text-warm-900">Sign In</h2>
               <button
-                onClick={() => closeLoginModal()}
+                onClick={() => $auth.closeLoginModal()}
                 className="btn-ghost p-2"
                 aria-label="Close"
               >
@@ -99,7 +122,7 @@ export function LoginModal() {
                   id="username"
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => $form.username.set(e.target.value)}
                   className="input w-full"
                   placeholder="Enter username"
                   required
@@ -118,7 +141,7 @@ export function LoginModal() {
                   id="password"
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => $form.password.set(e.target.value)}
                   className="input w-full"
                   placeholder="Enter password"
                   required

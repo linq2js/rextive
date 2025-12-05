@@ -685,8 +685,8 @@ export function createMutableSignal(
    */
   const when = (
     notifier: any,
-    actionOrReducer: "reset" | "refresh" | ((self: any, notifier: any) => any),
-    filter?: (self: any, notifier: any) => boolean
+    actionOrReducer: "reset" | "refresh" | ((notifier: any, self: any) => any),
+    filter?: (notifier: any, self: any) => boolean
   ) => {
     // Ensure instance is created (when is called after instance creation via Object.assign)
     const self = instanceRef!;
@@ -705,9 +705,9 @@ export function createMutableSignal(
           const action = actionOrReducer as "reset" | "refresh";
 
           try {
-            // Run filter if provided - receives (self, notifier) signals
+            // Run filter if provided - receives (notifier, self) signals
             if (filter) {
-              const shouldProceed = filter(self, n);
+              const shouldProceed = filter(n, self);
               if (!shouldProceed) return;
             }
 
@@ -722,9 +722,9 @@ export function createMutableSignal(
             throwError(error, "when:filter", false);
           }
         } else {
-          // Reducer overload: apply reducer - receives (self, notifier) signals
-          const reducer = actionOrReducer as (self: any, notifier: any) => any;
-          self.set(() => reducer(self, n));
+          // Reducer overload: apply reducer - receives (notifier, self) signals
+          const reducer = actionOrReducer as (notifier: any, self: any) => any;
+          self.set(() => reducer(n, self));
         }
       });
 

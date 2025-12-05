@@ -117,6 +117,10 @@ export function is<T = any>(
     );
   }
 
+  if (type === "logic") {
+    return typeof value === "function" && value !== null && LOGIC_TYPE in value;
+  }
+
   const isAnySignal =
     typeof value === "function" &&
     value !== null &&
@@ -124,10 +128,6 @@ export function is<T = any>(
 
   if (!isAnySignal) {
     return false;
-  }
-
-  if (type === "logic") {
-    return typeof value === "object" && value !== null && LOGIC_TYPE in value;
   }
 
   if (!type) {

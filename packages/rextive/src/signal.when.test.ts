@@ -63,7 +63,7 @@ describe("signal.when() instance method", () => {
         const count = signal(10).when(
           notifier,
           "reset",
-          (self, notifierSig) => notifierSig() > 5
+          (notifierSig, self) => notifierSig() > 5
         );
 
         count.set(50);
@@ -78,7 +78,7 @@ describe("signal.when() instance method", () => {
 
       it("should pass self signal to filter", () => {
         const notifier = signal(0);
-        const filterFn = vi.fn((self: Mutable<number>, notifierSig) => {
+        const filterFn = vi.fn((notifierSig, self: Mutable<number>) => {
           return self() > 20; // Call self to get current value
         });
 
@@ -86,12 +86,12 @@ describe("signal.when() instance method", () => {
 
         count.set(15);
         notifier.set(1);
-        expect(filterFn).toHaveBeenLastCalledWith(count, notifier);
+        expect(filterFn).toHaveBeenLastCalledWith(notifier, count);
         expect(count()).toBe(15); // Not reset because filter returned false
 
         count.set(25);
         notifier.set(2);
-        expect(filterFn).toHaveBeenLastCalledWith(count, notifier);
+        expect(filterFn).toHaveBeenLastCalledWith(notifier, count);
         expect(count()).toBe(10); // Reset because filter returned true
       });
 
@@ -147,10 +147,10 @@ describe("signal.when() instance method", () => {
         );
 
         notifier1.set(1);
-        expect(filterFn).toHaveBeenLastCalledWith(count, notifier1);
+        expect(filterFn).toHaveBeenLastCalledWith(notifier1, count);
 
         notifier2.set("b");
-        expect(filterFn).toHaveBeenLastCalledWith(count, notifier2);
+        expect(filterFn).toHaveBeenLastCalledWith(notifier2, count);
       });
     });
   });
@@ -158,7 +158,7 @@ describe("signal.when() instance method", () => {
   describe("mutable signals - reducer overload", () => {
     it("should apply reducer when notifier changes", () => {
       const addAmount = signal(0);
-      const total = signal(0).when(addAmount, (self, notifier) => {
+      const total = signal(0).when(addAmount, (notifier, self) => {
         return self() + notifier();
       });
 
@@ -173,7 +173,7 @@ describe("signal.when() instance method", () => {
 
     it("should pass self and notifier as signals to reducer", () => {
       const notifier = signal({ value: 10 });
-      const reducerFn = vi.fn((self, notifierSig) => {
+      const reducerFn = vi.fn((notifierSig, self) => {
         // Both are signals, not values
         expect(typeof self).toBe("function");
         expect(typeof notifierSig).toBe("function");
@@ -183,7 +183,7 @@ describe("signal.when() instance method", () => {
       const total = signal(0).when(notifier, reducerFn);
 
       notifier.set({ value: 5 });
-      expect(reducerFn).toHaveBeenCalledWith(total, notifier);
+      expect(reducerFn).toHaveBeenCalledWith(notifier, total);
       expect(total()).toBe(5);
     });
 
@@ -221,7 +221,7 @@ describe("signal.when() instance method", () => {
       const add = signal(0);
       const multiply = signal(1);
 
-      const total = signal(10).when([add, multiply], (self, notifier) => {
+      const total = signal(10).when([add, multiply], (notifier, self) => {
         if (notifier === add) {
           return self() + notifier();
         }
@@ -295,7 +295,7 @@ describe("signal.when() instance method", () => {
         const computed = signal({ source }, ({ deps }) => {
           computeCount++;
           return deps.source * 2;
-        }).when(notifier, "stale", (self, notifierSig) => notifierSig() > 5);
+        }).when(notifier, "stale", (notifierSig, self) => notifierSig() > 5);
 
         expect(computed()).toBe(20);
         expect(computeCount).toBe(1);
@@ -346,7 +346,7 @@ describe("signal.when() instance method", () => {
 
       const count = signal(10)
         .when(notifier1, "reset")
-        .when(notifier2, (self, n) => self() + n());
+        .when(notifier2, (n, self) => self() + n());
 
       count.on(listener);
 

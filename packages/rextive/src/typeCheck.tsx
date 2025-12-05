@@ -460,6 +460,91 @@ function signalTests() {
   expectType<Computed<number>>(b);
   expectType<Computed<number>>(c);
   expectType<number>(c());
+
+  // -----------------------------------------------------------------------------
+  // Overload: signal<TValue, TInit>(value, equals) - Custom TValue and TInit types
+  // -----------------------------------------------------------------------------
+
+  // Use case: TValue is wider than TInit (e.g., nullable value with non-null initial)
+  const nullableUser = signal<User<number> | null, User<number>>(
+    { id: 1, name: "Alice" },
+    "shallow"
+  );
+  expectType<Mutable<User<number> | null, User<number>>>(nullableUser);
+  expectType<User<number> | null>(nullableUser()); // get() returns TValue
+  nullableUser.set(null); // can set to null
+  nullableUser.set({ id: 2, name: "Bob" }); // can set to User
+  nullableUser.reset(); // resets to initial value (non-null)
+
+  // TValue includes undefined
+  const undefinedableCount = signal<number | undefined, number>(0, "strict");
+  expectType<Mutable<number | undefined, number>>(undefinedableCount);
+  expectType<number | undefined>(undefinedableCount());
+  undefinedableCount.set(undefined); // can set to undefined
+  undefinedableCount.set(42); // can set to number
+
+  // TInit is a literal type
+  const statusSignal = signal<"idle" | "loading" | "done", "idle">(
+    "idle",
+    "strict"
+  );
+  expectType<Mutable<"idle" | "loading" | "done", "idle">>(statusSignal);
+  statusSignal.set("loading");
+  statusSignal.set("done");
+  statusSignal.reset(); // resets to "idle"
+
+  // -----------------------------------------------------------------------------
+  // Overload: signal<TValue, TInit>(value, options) - Custom types with options
+  // -----------------------------------------------------------------------------
+
+  // TValue is wider than TInit with full options
+  const optionalData = signal<string | null, string>("initial", {
+    name: "optionalData",
+    equals: "strict",
+    onChange: (value) => {
+      expectType<string | null>(value);
+    },
+  });
+  expectType<Mutable<string | null, string>>(optionalData);
+  expectType<string | null>(optionalData());
+  optionalData.set(null);
+  optionalData.set("new value");
+
+  // Complex object with nullable TValue
+  interface Config {
+    theme: "light" | "dark";
+    fontSize: number;
+  }
+  const configSignal = signal<Config | undefined, Config>(
+    { theme: "light", fontSize: 14 },
+    {
+      name: "config",
+      equals: "deep",
+      fallback: (): Config => ({ theme: "dark", fontSize: 12 }),
+    }
+  );
+  expectType<Mutable<Config | undefined, Config>>(configSignal);
+  configSignal.set(undefined);
+  configSignal.set({ theme: "dark", fontSize: 16 });
+
+  // Array with nullable TValue
+  const itemsSignal = signal<number[] | null, number[]>([], {
+    equals: "shallow",
+    name: "items",
+  });
+  expectType<Mutable<number[] | null, number[]>>(itemsSignal);
+  itemsSignal.set(null);
+  itemsSignal.set([1, 2, 3]);
+  itemsSignal.reset(); // resets to []
+
+  // Union TValue with specific TInit
+  const modeSignal = signal<"auto" | "manual" | "off", "auto">("auto", {
+    name: "mode",
+  });
+  expectType<Mutable<"auto" | "manual" | "off", "auto">>(modeSignal);
+  modeSignal.set("manual");
+  modeSignal.set("off");
+  modeSignal.reset(); // resets to "auto"
 }
 
 // =============================================================================
@@ -501,8 +586,7 @@ function taskTests() {
   const norm4 = task.from({ id: 1, name: "Alice" });
   const norm5 = task.from(null);
   const norm6 = task.from(undefined);
-  const testTask: Task<number> =
-    successNumber as unknown as Task<number>;
+  const testTask: Task<number> = successNumber as unknown as Task<number>;
 
   // -----------------------------------------------------------------------------
   // task.loading(promise) - LoadingTask
@@ -756,10 +840,7 @@ function taskTests() {
     expectType<PromiseLike<Task<number>>>(asyncResult);
 
     // Helper function to map task values
-    function mapTask<T, U>(
-      t: Task<T>,
-      fn: (value: T) => U
-    ): Task<U> {
+    function mapTask<T, U>(t: Task<T>, fn: (value: T) => U): Task<U> {
       if (t.status === "success") {
         return task.success(fn(t.value));
       }
@@ -786,10 +867,7 @@ function taskTests() {
     expectType<Task<string>>(chain2);
 
     // Error recovery
-    function recoverFromError<T>(
-      t: Task<T>,
-      recovery: T
-    ): SuccessTask<T> {
+    function recoverFromError<T>(t: Task<T>, recovery: T): SuccessTask<T> {
       if (t.status === "error") {
         return task.success(recovery);
       }
@@ -3030,15 +3108,15 @@ function signalWhenTests() {
   // Test 3: Mutable signal with action and filter
   // -----------------------------------------------------------------------------
 
-  // Filter function receives (self, notifier)
+  // Filter function receives (notifier, self)
   const withFilter = mutableCount.when(
     notifier,
     "reset",
-    (self, notifierSig) => {
-      // self should be Mutable<number>
-      expectType<Mutable<number>>(self);
+    (notifierSig, self) => {
       // notifier should match the notifier type
       expectType<Mutable<number>>(notifierSig);
+      // self should be Mutable<number>
+      expectType<Mutable<number>>(self);
       // Can access values
       return self() > 5 && notifierSig() > 0;
     }
@@ -3049,9 +3127,9 @@ function signalWhenTests() {
   const withStringFilter = mutableCount.when(
     stringNotifier,
     "refresh",
-    (self, notifierSig) => {
-      expectType<Mutable<number>>(self);
+    (notifierSig, self) => {
       expectType<Mutable<string>>(notifierSig);
+      expectType<Mutable<number>>(self);
       return notifierSig().length > 0;
     }
   );
@@ -3061,10 +3139,10 @@ function signalWhenTests() {
   const withArrayFilter = mutableCount.when(
     [notifier, notifier2],
     "reset",
-    (self, notifierSig) => {
-      expectType<Mutable<number>>(self);
+    (notifierSig, self) => {
       // notifier is one of the array elements
       expectType<Mutable<number>>(notifierSig);
+      expectType<Mutable<number>>(self);
       return notifierSig() > 5;
     }
   );
@@ -3075,17 +3153,17 @@ function signalWhenTests() {
   // -----------------------------------------------------------------------------
 
   // Basic accumulator pattern
-  const total = signal(0).when(notifier, (self, notifierSig) => {
-    expectType<Mutable<number>>(self);
+  const total = signal(0).when(notifier, (notifierSig, self) => {
     expectType<Mutable<number>>(notifierSig);
+    expectType<Mutable<number>>(self);
     return self() + notifierSig();
   });
   expectType<Mutable<number>>(total);
 
   // Reducer with different notifier type
-  const strLength = signal(0).when(stringNotifier, (self, notifierSig) => {
-    expectType<Mutable<number>>(self);
+  const strLength = signal(0).when(stringNotifier, (notifierSig, self) => {
     expectType<Mutable<string>>(notifierSig);
+    expectType<Mutable<number>>(self);
     return self() + notifierSig().length;
   });
   expectType<Mutable<number>>(strLength);
@@ -3148,11 +3226,11 @@ function signalWhenTests() {
   const computedWithFilter = computed.when(
     notifier,
     "refresh",
-    (self, notifierSig) => {
-      // self should be Computed<number>
-      expectType<Computed<number>>(self);
+    (notifierSig, self) => {
       // notifier should match the notifier type
       expectType<Mutable<number>>(notifierSig);
+      // self should be Computed<number>
+      expectType<Computed<number>>(self);
       return notifierSig() > 5;
     }
   );
@@ -3162,9 +3240,9 @@ function signalWhenTests() {
   const computedStringFilter = computed.when(
     stringNotifier,
     "stale",
-    (self, notifierSig) => {
-      expectType<Computed<number>>(self);
+    (notifierSig, self) => {
       expectType<Mutable<string>>(notifierSig);
+      expectType<Computed<number>>(self);
       return notifierSig().length > 0;
     }
   );
@@ -3232,7 +3310,7 @@ function signalWhenTests() {
 
   // Reducer with complex type
   const updateUser = signal<Partial<User>>({});
-  const userWithReducer = userSignal.when(updateUser, (self, n) => {
+  const userWithReducer = userSignal.when(updateUser, (n, self) => {
     expectType<Mutable<User | null>>(self);
     expectType<Mutable<Partial<User>>>(n);
     const current = self();
@@ -3270,9 +3348,9 @@ function signalWhenTests() {
   type Event = { type: "START" | "COMPLETE" | "FAIL" };
 
   const events = signal<Event | null>(null);
-  const state = signal<State>("idle").when(events, (self, notifierSig) => {
-    expectType<Mutable<State>>(self);
+  const state = signal<State>("idle").when(events, (notifierSig, self) => {
     expectType<Mutable<Event | null>>(notifierSig);
+    expectType<Mutable<State>>(self);
 
     const event = notifierSig();
     if (!event) return self();

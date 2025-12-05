@@ -1,9 +1,9 @@
 import { useMemo, useRef } from "react";
 import { dev } from "../utils/dev";
 import { tryDispose } from "../disposable";
-import { is } from "../is";
 import { emit, withHooks } from "../hooks";
 import { Emitter, emitter } from "../utils/emitter";
+import { resolveLogicFactory } from "./resolveLogicFactory";
 
 export interface SafeFactoryController<T> {
   /** The created object */
@@ -37,11 +37,15 @@ export interface SafeFactoryController<T> {
  * @returns Controller with result, commit, and scheduleDispose methods
  */
 export function useSafeFactory<T>(
-  factory: () => T,
+  factory: (() => T) | Parameters<typeof resolveLogicFactory<T>>[0],
   deps: unknown[]
 ): SafeFactoryController<T> {
   // store last dispose function
   const disposeRef = useRef<VoidFunction>();
+
+  // Resolve logic to factory if needed
+  const resolvedFactory = resolveLogicFactory(factory);
+
   return useMemo(() => {
     let committed = false;
     let disposed = false;
@@ -49,26 +53,17 @@ export function useSafeFactory<T>(
     // dispose last result
     disposeRef.current?.();
     try {
-      let result: T;
-      if (is(factory, "logic")) {
-        if ("create" in factory) {
-          result = factory.create() as T;
-        } else {
-          throw new Error("Cannot create instance from abstract logic");
-        }
-      } else {
-        result = withHooks((prevHooks) => {
-          return {
-            onSignalCreate(signal, deps, disposalHandled) {
-              if (!disposalHandled) {
-                disposalHandled = true;
-                onDispose?.on(signal.dispose);
-              }
-              prevHooks.onSignalCreate?.(signal, deps, disposalHandled);
-            },
-          };
-        }, factory);
-      }
+      const result = withHooks((prevHooks) => {
+        return {
+          onSignalCreate(signal, deps, disposalHandled) {
+            if (!disposalHandled) {
+              disposalHandled = true;
+              onDispose?.on(signal.dispose);
+            }
+            prevHooks.onSignalCreate?.(signal, deps, disposalHandled);
+          },
+        };
+      }, resolvedFactory);
 
       if (!onDispose.size) {
         onDispose = undefined;

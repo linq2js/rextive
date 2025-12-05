@@ -6,7 +6,7 @@ import {
   LifecyclePhase,
 } from "./useLifecycle";
 import { useSafeFactory } from "./useSafeFactory";
-
+import { resolveLogicFactory } from "./resolveLogicFactory";
 /**
  * Options for useScope hook (factory mode only)
  */
@@ -216,7 +216,10 @@ export function useScope<TScope extends Record<string, any>>(
   // Detect if second arg is args array or options object
   const isArgsMode = Array.isArray(argsOrOptions);
 
-  const create = createOrCallbacks as (...args: any[]) => TScope;
+  // Resolve logic to factory if needed
+  const create = resolveLogicFactory(createOrCallbacks as any) as (
+    ...args: any[]
+  ) => TScope;
   const args = isArgsMode ? argsOrOptions : undefined;
   const options = isArgsMode
     ? optionsIfArgs

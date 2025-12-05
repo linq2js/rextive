@@ -406,7 +406,7 @@ export function createComputedSignal(
   const when = (
     notifier: any | readonly any[],
     action: "refresh" | "stale",
-    filter?: (self: Computed<any>, notifier: any) => boolean
+    filter?: (notifier: any, self: Computed<any>) => boolean
   ) => {
     // Ensure instance is created
     const self = instanceRef!;
@@ -424,9 +424,9 @@ export function createComputedSignal(
     for (const n of notifiers) {
       const unsubscribe = n.on(() => {
         try {
-          // Run filter if provided - receives (self, notifier) signals
+          // Run filter if provided - receives (notifier, self) signals
           if (filter) {
-            const shouldProceed = filter(self, n);
+            const shouldProceed = filter(n, self);
             if (!shouldProceed) return;
           }
 

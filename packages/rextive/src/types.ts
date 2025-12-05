@@ -195,25 +195,25 @@ export type HydrateStatus = "success" | "skipped";
  * // Type: ComputedSignal<string>
  * ```
  */
-export type Pipe<TKind extends SignalKind, TValue, TInit> = {
-  <T1>(op1: Operator<SignalOf<TValue, TKind, TInit>, T1>): TryInjectDispose<T1>;
+export type Pipe<TKind extends SignalKind, TValue> = {
+  <T1>(op1: Operator<SignalOf<TValue, TKind>, T1>): TryInjectDispose<T1>;
 
   // 2 operators
   <T1, T2>(
-    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op1: Operator<SignalOf<TValue, TKind>, T1>,
     op2: Operator<T1, T2>
   ): TryInjectDispose<T2>;
 
   // 3 operators
   <T1, T2, T3>(
-    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op1: Operator<SignalOf<TValue, TKind>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>
   ): TryInjectDispose<T3>;
 
   // 4 operators
   <T1, T2, T3, T4>(
-    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op1: Operator<SignalOf<TValue, TKind>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>
@@ -221,7 +221,7 @@ export type Pipe<TKind extends SignalKind, TValue, TInit> = {
 
   // 5 operators
   <T1, T2, T3, T4, T5>(
-    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op1: Operator<SignalOf<TValue, TKind>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>,
@@ -230,7 +230,7 @@ export type Pipe<TKind extends SignalKind, TValue, TInit> = {
 
   // 6 operators
   <T1, T2, T3, T4, T5, T6>(
-    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op1: Operator<SignalOf<TValue, TKind>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>,
@@ -240,7 +240,7 @@ export type Pipe<TKind extends SignalKind, TValue, TInit> = {
 
   // 7 operators
   <T1, T2, T3, T4, T5, T6, T7>(
-    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op1: Operator<SignalOf<TValue, TKind>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>,
@@ -251,7 +251,7 @@ export type Pipe<TKind extends SignalKind, TValue, TInit> = {
 
   // 8 operators
   <T1, T2, T3, T4, T5, T6, T7, T8>(
-    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op1: Operator<SignalOf<TValue, TKind>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>,
@@ -263,7 +263,7 @@ export type Pipe<TKind extends SignalKind, TValue, TInit> = {
 
   // 9 operators
   <T1, T2, T3, T4, T5, T6, T7, T8, T9>(
-    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op1: Operator<SignalOf<TValue, TKind>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>,
@@ -276,7 +276,7 @@ export type Pipe<TKind extends SignalKind, TValue, TInit> = {
 
   // 10 operators
   <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(
-    op1: Operator<SignalOf<TValue, TKind, TInit>, T1>,
+    op1: Operator<SignalOf<TValue, TKind>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>,
@@ -919,14 +919,14 @@ export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    * const data = signal(fetchData).when(
    *   refreshTrigger,
    *   "refresh",
-   *   (self, notifier) => notifier() > 5 // Only refresh if trigger value > 5
+   *   (notifier, self) => notifier() > 5 // Only refresh if trigger value > 5
    * );
    * ```
    */
   when<N extends AnySignal<any>>(
     notifier: N | readonly N[],
     action: MutableWhenAction,
-    filter?: (self: Mutable<TValue, TInit>, notifier: N) => boolean
+    filter?: (notifier: N, self: Mutable<TValue, TInit>) => boolean
   ): Mutable<TValue, TInit>;
 
   /**
@@ -946,7 +946,7 @@ export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    * @example Accumulator pattern
    * ```ts
    * const addAmount = signal(0);
-   * const total = signal(0).when(addAmount, (self, notifier) => {
+   * const total = signal(0).when(addAmount, (notifier, self) => {
    *   return self() + notifier(); // Add notifier's value to current
    * });
    *
@@ -957,7 +957,7 @@ export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    * @example State machine
    * ```ts
    * const events = signal<Event | null>(null);
-   * const state = signal<"idle" | "loading" | "done">("idle").when(events, (self, notifier) => {
+   * const state = signal<"idle" | "loading" | "done">("idle").when(events, (notifier, self) => {
    *   const event = notifier();
    *   if (event?.type === "START") return "loading";
    *   if (event?.type === "COMPLETE") return "done";
@@ -967,10 +967,10 @@ export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    */
   when<N extends AnySignal<any>>(
     notifier: N | readonly N[],
-    reducer: (self: Mutable<TValue, TInit>, notifier: N) => TValue
+    reducer: (notifier: N, self: Mutable<TValue, TInit>) => TValue
   ): Mutable<TValue, TInit>;
 
-  pipe: Pipe<"mutable", TValue, TInit>;
+  pipe: Pipe<"mutable", TValue>;
 };
 
 /**
@@ -1030,7 +1030,7 @@ export type Computed<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    * ```ts
    * const invalidateTrigger = signal(0);
    * const expensive = signal({ data }, ({ deps }) => heavyComputation(deps.data))
-   *   .when(invalidateTrigger, "stale", (self, notifier) => notifier() > 0);
+   *   .when(invalidateTrigger, "stale", (notifier, self) => notifier() > 0);
    *
    * invalidateTrigger.set(1); // Won't recompute until accessed
    * expensive(); // Now recomputes
@@ -1039,10 +1039,10 @@ export type Computed<TValue, TInit = TValue> = Signal<TValue, TInit> & {
   when<N extends AnySignal<any>>(
     notifier: N | readonly N[],
     action: ComputedWhenAction,
-    filter?: (self: Computed<TValue, TInit>, notifier: N) => boolean
+    filter?: (notifier: N, self: Computed<TValue, TInit>) => boolean
   ): Computed<TValue, TInit>;
 
-  pipe: Pipe<"computed", TValue, TInit>;
+  pipe: Pipe<"computed", TValue>;
 };
 
 /**
@@ -1105,17 +1105,13 @@ export type SignalKind = "mutable" | "computed" | "any";
 /**
  * Helper type to get the signal type based on kind
  */
-export type SignalOf<
-  TValue,
-  K extends SignalKind,
-  TInit = TValue
-> = K extends "any"
-  ? AnySignal<TValue, TInit>
+export type SignalOf<TValue, K extends SignalKind> = K extends "any"
+  ? AnySignal<TValue>
   : K extends "mutable"
-  ? Mutable<TValue, TInit>
+  ? Mutable<TValue>
   : K extends "computed"
-  ? Computed<TValue, TInit>
-  : Signal<TValue, TInit>;
+  ? Computed<TValue>
+  : Signal<TValue>;
 
 /**
  * Plugin function type for extending signal behavior.

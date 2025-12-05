@@ -819,14 +819,14 @@ const todos = signal(async () => fetchTodos());
 todos.when([filter, sort], "refresh");
 
 // With filter - only trigger when condition is met
-todos.when(refreshTrigger, "refresh", (self, notifier) => notifier() > 0);
+todos.when(refreshTrigger, "refresh", (notifier, self) => notifier() > 0);
 
 // Custom reducer - update value based on notifier
 const counter = signal(0);
 const increment = signal(0);
 
 // When increment changes, add its value to counter
-counter.when(increment, (self, notifier) => self() + notifier());
+counter.when(increment, (notifier, self) => self() + notifier());
 ```
 
 ### Available Actions
@@ -836,7 +836,7 @@ counter.when(increment, (self, notifier) => self() + notifier());
 | `"refresh"`                    | Computed     | Force immediate recomputation        |
 | `"stale"`                      | Computed     | Mark stale, recompute on next access |
 | `"reset"`                      | Mutable only | Reset to initial value               |
-| `(self, notifier) => newValue` | Mutable only | Custom reducer                       |
+| `(notifier, self) => newValue` | Mutable only | Custom reducer                       |
 
 ### Key Points
 
