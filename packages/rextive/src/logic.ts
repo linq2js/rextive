@@ -207,9 +207,6 @@ let singletonDev = new WeakMap<Logic<any>, Instance<any>>();
  * ```
  */
 export function logic<T extends object>(name: string, fn: () => T): Logic<T> {
-  /** Cached singleton instance (persists for app lifetime) */
-  let singleton: Instance<T> | undefined;
-
   /** Display name for debugging */
   const displayName = name;
 
@@ -280,15 +277,10 @@ export function logic<T extends object>(name: string, fn: () => T): Logic<T> {
     }
   };
 
-  const getSingletonPro = () => {
-    if (!singleton) {
-      singleton = create();
-    }
-    return singleton;
-  };
+  const getSingletonPro = once(create);
 
   const getSingletonDev = () => {
-    singleton = singletonDev.get(lg);
+    let singleton = singletonDev.get(lg);
     if (!singleton) {
       singleton = create();
       singletonDev.set(lg, singleton);
@@ -571,9 +563,6 @@ export namespace logic {
    * ```
    */
   export function abstract<T extends object>(name: string): AbstractLogic<T> {
-    /** Cached proxy singleton */
-    let proxyInstance: AbstractLogicInstance<T> | undefined;
-
     /** Cache for stub functions (created once per property) */
     const stubCache = new Map<string | symbol, (...args: any[]) => any>();
 
@@ -722,18 +711,13 @@ export namespace logic {
     /**
      * Get proxy singleton (creates if not exists).
      */
-    const getProxy = (): AbstractLogicInstance<T> => {
-      if (!proxyInstance) {
-        proxyInstance = createProxy();
-      }
-      return proxyInstance;
-    };
+    const getProxy = once(createProxy);
 
     /**
      * The abstract logic object - callable for singleton access.
      * Always returns the same readonly proxy instance.
      */
-    const lg = Object.assign((): AbstractLogicInstance<T> => getProxy(), {
+    const lg = Object.assign(getProxy, {
       [LOGIC_TYPE]: true as const,
       displayName: name,
       // Note: No create() method for abstract logics
