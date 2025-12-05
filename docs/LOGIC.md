@@ -209,6 +209,113 @@ logic.provide(authHeaders, () => ({
 | Default behavior  | Works immediately        | Throws on property access |
 | Use case          | Concrete implementations | Contracts/interfaces      |
 
+### Multi-Platform (Web vs React Native)
+
+Abstract logics are perfect for cross-platform code:
+
+```ts
+// shared/storageProvider.ts - Define contract
+const storageProvider = logic.abstract<{
+  get: (key: string) => Promise<string | null>;
+  set: (key: string, value: string) => Promise<void>;
+  remove: (key: string) => Promise<void>;
+}>("storageProvider");
+
+// web/setup.ts - Web implementation
+logic.provide(storageProvider, () => ({
+  get: async (key) => localStorage.getItem(key),
+  set: async (key, value) => localStorage.setItem(key, value),
+  remove: async (key) => localStorage.removeItem(key),
+}));
+
+// native/setup.ts - React Native implementation
+import AsyncStorage from '@react-native-async-storage/async-storage';
+logic.provide(storageProvider, () => ({
+  get: (key) => AsyncStorage.getItem(key),
+  set: (key, value) => AsyncStorage.setItem(key, value),
+  remove: (key) => AsyncStorage.removeItem(key),
+}));
+
+// shared/authLogic.ts - Platform-agnostic usage
+const authLogic = logic("authLogic", () => {
+  const storage = storageProvider(); // Works on both platforms!
+  return {
+    getToken: () => storage.get("auth_token"),
+    saveToken: (token: string) => storage.set("auth_token", token),
+  };
+});
+```
+
+### Environment-Based (Dev vs Prod)
+
+Switch implementations based on environment:
+
+```ts
+// Define analytics contract
+const analyticsProvider = logic.abstract<{
+  track: (event: string, data?: Record<string, any>) => void;
+  identify: (userId: string) => void;
+}>("analyticsProvider");
+
+// Production: Real analytics
+if (process.env.NODE_ENV === "production") {
+  logic.provide(analyticsProvider, () => ({
+    track: (event, data) => mixpanel.track(event, data),
+    identify: (userId) => mixpanel.identify(userId),
+  }));
+}
+// Development: Console logging
+else {
+  logic.provide(analyticsProvider, () => ({
+    track: (event, data) => console.log("[Analytics]", event, data),
+    identify: (userId) => console.log("[Analytics] identify:", userId),
+  }));
+}
+```
+
+### Dynamic Runtime Switching
+
+Switch implementations at runtime without restart:
+
+```ts
+// Define payment processor contract
+const paymentProcessor = logic.abstract<{
+  charge: (amount: number) => Promise<{ success: boolean }>;
+  refund: (transactionId: string) => Promise<void>;
+}>("paymentProcessor");
+
+// Implementation factories
+const stripeImpl = () => ({
+  charge: async (amount) => stripe.charges.create({ amount }),
+  refund: async (id) => stripe.refunds.create({ charge: id }),
+});
+
+const paypalImpl = () => ({
+  charge: async (amount) => paypal.payment.create({ amount }),
+  refund: async (id) => paypal.payment.refund(id),
+});
+
+// Switch at runtime based on user preference or feature flag
+function setPaymentProvider(provider: "stripe" | "paypal") {
+  logic.provide(paymentProcessor, provider === "stripe" ? stripeImpl : paypalImpl);
+}
+
+// Usage - automatically uses current provider
+const checkout = logic("checkoutLogic", () => ({
+  processPayment: async (amount: number) => {
+    const processor = paymentProcessor(); // Gets current implementation
+    return processor.charge(amount);
+  },
+}));
+
+// Switch provider dynamically
+setPaymentProvider("stripe");
+checkout().processPayment(100); // Uses Stripe
+
+setPaymentProvider("paypal");
+checkout().processPayment(100); // Uses PayPal (no restart needed!)
+```
+
 ---
 
 ## Error Handling
@@ -325,6 +432,65 @@ const b = logic("b", () => {
 
 a(); // LogicCreateError: Circular dependency detected: "a" is already initializing
 ```
+
+### Shared vs Owned Logics
+
+When a logic depends on other logics, it's important to distinguish between **shared** (singleton) and **owned** (created) instances:
+
+```ts
+// Shared logics - use singleton, DON'T dispose (not owned)
+const authLogic = logic("authLogic", () => { /* ... */ });
+const configLogic = logic("configLogic", () => { /* ... */ });
+
+// Child logic - created fresh, SHOULD dispose (owned)
+const tabLogic = logic("tabLogic", () => { /* ... */ });
+
+const dashboardLogic = logic("dashboardLogic", () => {
+  // ✅ Shared logics - use singleton (get at factory level, not inside actions!)
+  const $auth = authLogic();   // Singleton - NOT owned
+  const $config = configLogic(); // Singleton - NOT owned
+
+  // ✅ Owned logics - create fresh instances
+  const tabs: Instance<typeof tabLogic>[] = [];
+
+  const addTab = () => {
+    const tab = tabLogic.create(); // Fresh instance - OWNED
+    tabs.push(tab);
+    return tab;
+  };
+
+  const removeTab = (tab: Instance<typeof tabLogic>) => {
+    const index = tabs.indexOf(tab);
+    if (index >= 0) {
+      tabs.splice(index, 1);
+      tab.dispose(); // ✅ Dispose owned instance
+    }
+  };
+
+  return {
+    // Expose shared logic state (read-only access)
+    user: $auth.user,
+    theme: $config.theme,
+
+    // Tab management
+    getTabs: () => tabs,
+    addTab,
+    removeTab,
+
+    // ✅ Only dispose OWNED logics
+    dispose: () => {
+      tabs.forEach(tab => tab.dispose());
+      tabs.length = 0;
+      // DON'T dispose $auth or $config - they're shared!
+    },
+  };
+});
+```
+
+| Type | Access | Dispose? |
+|------|--------|----------|
+| **Shared** | `myLogic()` singleton | ❌ Don't dispose |
+| **Owned** | `myLogic.create()` fresh | ✅ Must dispose |
 
 ---
 
@@ -1494,7 +1660,7 @@ instance.count.set(1); // ❌ Throws!
 
 ### Custom Cleanup
 
-Add cleanup logic with `dispose` property or methods ending in `Cleanup`:
+Add cleanup logic with `dispose` property:
 
 ```ts
 const timerLogic = logic("timerLogic", () => {
@@ -1505,17 +1671,49 @@ const timerLogic = logic("timerLogic", () => {
 
   return {
     elapsed,
-    // Option 1: dispose property (array or function)
     dispose: () => clearInterval(interval),
-
-    // Option 2: method ending in 'Cleanup'
-    timerCleanup: () => clearInterval(interval),
   };
 });
 
 const instance = timerLogic.create();
 // Timer is running...
 instance.dispose(); // Timer is cleared!
+```
+
+### Example: WebSocket with Cleanup
+
+```ts
+// Signals inside logic are auto-disposed.
+// For external resources, return an object with dispose() method.
+
+const websocketLogic = logic("websocketLogic", () => {
+  const messages = signal<Message[]>([]);
+  const connected = signal(false);
+
+  // External resource - needs manual cleanup
+  const socket = new WebSocket("wss://api.example.com");
+  socket.onopen = () => connected.set(true);
+  socket.onclose = () => connected.set(false);
+  socket.onmessage = (e) => messages.set(prev => [...prev, JSON.parse(e.data)]);
+
+  return {
+    messages,
+    connected,
+    send: (msg: string) => socket.send(msg),
+    // Custom cleanup - called when instance.dispose() is invoked
+    dispose: () => {
+      socket.close();
+      console.log("WebSocket closed");
+    },
+  };
+});
+
+// Usage
+const ws = websocketLogic.create();
+ws.send("hello");
+
+// Later - cleanup
+ws.dispose(); // Closes WebSocket + disposes signals
 ```
 
 ### Singleton Behavior

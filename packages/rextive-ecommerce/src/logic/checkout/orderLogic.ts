@@ -53,8 +53,7 @@ export const orderLogic = logic("checkout.orderLogic", () => {
       items: cartItems.map((item) => ({
         name: item.product.title,
         quantity: item.quantity,
-        price:
-          item.product.price * (1 - item.product.discountPercentage / 100),
+        price: item.product.price * (1 - item.product.discountPercentage / 100),
       })),
       subtotal: $cart.subtotal(),
       shipping: shippingCost(),

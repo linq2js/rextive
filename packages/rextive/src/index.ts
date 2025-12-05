@@ -81,4 +81,4 @@ export { validate } from "./validate";
 
 // Logic module
 export { logic, NotImplementedError, LogicCreateError } from "./logic";
-export type { Logic, AbstractLogic, Instance } from "./types";
+export type { Logic, AbstractLogic, AbstractLogicInstance, Instance } from "./types";

@@ -2,7 +2,13 @@ import { noop, once } from "lodash/fp";
 import { tryDispose } from "./disposable";
 import { withHooks } from "./hooks";
 import { dev, emitter } from "./react";
-import { AbstractLogic, Instance, Logic, LOGIC_TYPE } from "./types";
+import {
+  AbstractLogic,
+  AbstractLogicInstance,
+  Instance,
+  Logic,
+  LOGIC_TYPE,
+} from "./types";
 
 // ============================================================================
 // Error Types
@@ -74,7 +80,7 @@ let singletonDev = new WeakMap<Logic<any>, Instance<any>>();
  * @param fn - Factory function that creates the logic's content
  * @returns A Logic object with singleton access and create method
  *
- * @example
+ * @example Basic Usage
  * ```ts
  * // Define a logic unit
  * const todoStore = logic("todoStore", () => {
@@ -95,11 +101,102 @@ let singletonDev = new WeakMap<Logic<any>, Instance<any>>();
  *   };
  * });
  *
- * // Usage
- * const { addTodo } = todoStore();      // Singleton (persists)
- * const instance = todoStore.create();  // Fresh instance
+ * // Singleton access
+ * const { addTodo } = todoStore();
  *
- * // Testing - instances are automatically disposed on logic.clear()
+ * // Fresh instance
+ * const instance = todoStore.create();
+ * ```
+ *
+ * @example Custom Cleanup with dispose()
+ * ```ts
+ * // Signals inside logic are auto-disposed.
+ * // For external resources, return an object with dispose() method.
+ *
+ * const websocketLogic = logic("websocketLogic", () => {
+ *   const messages = signal<Message[]>([]);
+ *   const connected = signal(false);
+ *
+ *   // External resource - needs manual cleanup
+ *   const socket = new WebSocket("wss://api.example.com");
+ *   socket.onopen = () => connected.set(true);
+ *   socket.onclose = () => connected.set(false);
+ *   socket.onmessage = (e) => messages.set(prev => [...prev, JSON.parse(e.data)]);
+ *
+ *   return {
+ *     messages,
+ *     connected,
+ *     send: (msg: string) => socket.send(msg),
+ *     // Custom cleanup - called when instance.dispose() is invoked
+ *     dispose: () => {
+ *       socket.close();
+ *       console.log("WebSocket closed");
+ *     },
+ *   };
+ * });
+ *
+ * // Usage
+ * const ws = websocketLogic.create();
+ * ws.send("hello");
+ *
+ * // Later - cleanup
+ * ws.dispose(); // Closes WebSocket + disposes signals
+ * ```
+ *
+ * @example Consuming Other Logics (Shared vs Owned)
+ * ```ts
+ * // Shared logics - use singleton, DON'T dispose (not owned)
+ * const authLogic = logic("authLogic", () => { ... });
+ * const configLogic = logic("configLogic", () => { ... });
+ *
+ * // Child logic - created fresh, SHOULD dispose (owned)
+ * const tabLogic = logic("tabLogic", () => { ... });
+ *
+ * const dashboardLogic = logic("dashboardLogic", () => {
+ *   // ✅ Shared logics - use singleton (get at factory level, not inside actions!)
+ *   const $auth = authLogic();   // Singleton - NOT owned
+ *   const $config = configLogic(); // Singleton - NOT owned
+ *
+ *   // ✅ Owned logics - create fresh instances
+ *   const tabs: Instance<typeof tabLogic>[] = [];
+ *
+ *   const addTab = () => {
+ *     const tab = tabLogic.create(); // Fresh instance - OWNED
+ *     tabs.push(tab);
+ *     return tab;
+ *   };
+ *
+ *   const removeTab = (tab: Instance<typeof tabLogic>) => {
+ *     const index = tabs.indexOf(tab);
+ *     if (index >= 0) {
+ *       tabs.splice(index, 1);
+ *       tab.dispose(); // ✅ Dispose owned instance
+ *     }
+ *   };
+ *
+ *   return {
+ *     // Expose shared logic state (read-only access)
+ *     user: $auth.user,
+ *     theme: $config.theme,
+ *
+ *     // Tab management
+ *     getTabs: () => tabs,
+ *     addTab,
+ *     removeTab,
+ *
+ *     // ✅ Only dispose OWNED logics
+ *     dispose: () => {
+ *       tabs.forEach(tab => tab.dispose());
+ *       tabs.length = 0;
+ *       // DON'T dispose $auth or $config - they're shared!
+ *     },
+ *   };
+ * });
+ * ```
+ *
+ * @example Testing
+ * ```ts
+ * // Instances are automatically disposed on logic.clear()
  * afterEach(() => logic.clear());
  *
  * it('test', () => {
@@ -109,7 +206,7 @@ let singletonDev = new WeakMap<Logic<any>, Instance<any>>();
  * });
  * ```
  */
-function logicImpl<T extends object>(name: string, fn: () => T): Logic<T> {
+export function logic<T extends object>(name: string, fn: () => T): Logic<T> {
   /** Cached singleton instance (persists for app lifetime) */
   let singleton: Instance<T> | undefined;
 
@@ -233,7 +330,8 @@ function logicImpl<T extends object>(name: string, fn: () => T): Logic<T> {
   return lg;
 }
 
-export const logic = Object.assign(logicImpl, {
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace logic {
   /**
    * Provide a mock implementation for a logic (override).
    * Useful for testing - replace logic with controlled test instances.
@@ -241,7 +339,7 @@ export const logic = Object.assign(logicImpl, {
    * **Important**: Always provide a complete mock instance. Partial overrides
    * don't work correctly because methods have closure references to original signals.
    *
-   * @param logic - The logic to provide implementation for
+   * @param targetLogic - The logic to provide implementation for
    * @param factory - Factory function returning the mock instance
    * @returns The logic (for chaining)
    *
@@ -279,16 +377,13 @@ export const logic = Object.assign(logicImpl, {
    * }));
    * ```
    */
-  provide: <
+  export function provide<
     TInstance extends object,
     TLogic extends Logic<TInstance> | AbstractLogic<TInstance>
-  >(
-    logic: TLogic,
-    factory: () => TInstance
-  ) => {
-    globalResolvers.set(logic, factory);
-    return logic;
-  },
+  >(targetLogic: TLogic, factory: () => TInstance): TLogic {
+    globalResolvers.set(targetLogic, factory);
+    return targetLogic;
+  }
 
   /**
    * Clear all global overrides and dispose all tracked instances.
@@ -310,7 +405,7 @@ export const logic = Object.assign(logicImpl, {
    * });
    * ```
    */
-  clear: () => {
+  export function clear(): void {
     // Dispose all tracked instances
     for (const instance of trackedInstances) {
       try {
@@ -323,108 +418,303 @@ export const logic = Object.assign(logicImpl, {
 
     // Clear global overrides
     globalResolvers = new WeakMap();
-  },
+  }
 
   /**
    * Create an abstract logic that must be overridden before use.
-   * Returns a Proxy - accessing any property throws NotImplementedError.
+   * Returns a readonly Proxy with cached function stubs.
    *
    * Unlike regular `logic()`:
    * - No factory function needed, just define the type
    * - No `create()` method (only singleton access)
-   * - Can be passed around safely; error only on property access
+   * - Output only includes function properties (non-functions are excluded)
+   * - Output is readonly (set operations throw TypeError)
+   * - Function stubs are cached and throw NotImplementedError when invoked
    *
    * @param name - Display name for debugging and error messages
-   * @returns An AbstractLogic that must be overridden via logic.with()
+   * @returns An AbstractLogic that must be overridden via logic.provide()
    *
-   * @example
+   * @example Basic Usage
    * ```ts
    * // Define abstract logic with type
    * const authProvider = logic.abstract<{
    *   getToken: () => Promise<string>;
    *   logout: () => void;
+   *   config: { timeout: number }; // Non-function excluded from output
    * }>("authProvider");
    *
    * // Can pass around without error
-   * const auth = authProvider(); // ✅ OK
+   * const auth = authProvider(); // ✅ OK - returns readonly proxy
    *
-   * // Error when property is accessed
+   * // Error when function is INVOKED (not accessed)
    * auth.getToken(); // ❌ NotImplementedError
    *
    * // Consumer provides implementation
-   * logic.with(authProvider, () => ({
+   * logic.provide(authProvider, () => ({
    *   getToken: async () => localStorage.getItem("token") ?? "",
    *   logout: () => localStorage.removeItem("token"),
    * }));
    *
    * authProvider().getToken(); // ✅ Works
    * ```
+   *
+   * @example Multi-Platform (Web vs React Native)
+   * ```ts
+   * // shared/storageProvider.ts - Define contract
+   * const storageProvider = logic.abstract<{
+   *   get: (key: string) => Promise<string | null>;
+   *   set: (key: string, value: string) => Promise<void>;
+   *   remove: (key: string) => Promise<void>;
+   * }>("storageProvider");
+   *
+   * // web/setup.ts - Web implementation
+   * logic.provide(storageProvider, () => ({
+   *   get: async (key) => localStorage.getItem(key),
+   *   set: async (key, value) => localStorage.setItem(key, value),
+   *   remove: async (key) => localStorage.removeItem(key),
+   * }));
+   *
+   * // native/setup.ts - React Native implementation
+   * import AsyncStorage from '@react-native-async-storage/async-storage';
+   * logic.provide(storageProvider, () => ({
+   *   get: (key) => AsyncStorage.getItem(key),
+   *   set: (key, value) => AsyncStorage.setItem(key, value),
+   *   remove: (key) => AsyncStorage.removeItem(key),
+   * }));
+   *
+   * // shared/authLogic.ts - Platform-agnostic usage
+   * const authLogic = logic("authLogic", () => {
+   *   const storage = storageProvider(); // Works on both platforms!
+   *   return {
+   *     getToken: () => storage.get("auth_token"),
+   *     saveToken: (token: string) => storage.set("auth_token", token),
+   *   };
+   * });
+   * ```
+   *
+   * @example Environment-Based (Dev vs Prod)
+   * ```ts
+   * // Define analytics contract
+   * const analyticsProvider = logic.abstract<{
+   *   track: (event: string, data?: Record<string, any>) => void;
+   *   identify: (userId: string) => void;
+   * }>("analyticsProvider");
+   *
+   * // Production: Real analytics
+   * if (process.env.NODE_ENV === "production") {
+   *   logic.provide(analyticsProvider, () => ({
+   *     track: (event, data) => mixpanel.track(event, data),
+   *     identify: (userId) => mixpanel.identify(userId),
+   *   }));
+   * }
+   * // Development: Console logging
+   * else {
+   *   logic.provide(analyticsProvider, () => ({
+   *     track: (event, data) => console.log("[Analytics]", event, data),
+   *     identify: (userId) => console.log("[Analytics] identify:", userId),
+   *   }));
+   * }
+   * ```
+   *
+   * @example Dynamic Runtime Switching
+   * ```ts
+   * // Define payment processor contract
+   * const paymentProcessor = logic.abstract<{
+   *   charge: (amount: number) => Promise<{ success: boolean }>;
+   *   refund: (transactionId: string) => Promise<void>;
+   * }>("paymentProcessor");
+   *
+   * // Feature flag or A/B test driven switching
+   * const stripeImpl = () => ({
+   *   charge: async (amount) => stripe.charges.create({ amount }),
+   *   refund: async (id) => stripe.refunds.create({ charge: id }),
+   * });
+   *
+   * const paypalImpl = () => ({
+   *   charge: async (amount) => paypal.payment.create({ amount }),
+   *   refund: async (id) => paypal.payment.refund(id),
+   * });
+   *
+   * // Switch at runtime based on user preference or feature flag
+   * function setPaymentProvider(provider: "stripe" | "paypal") {
+   *   logic.provide(paymentProcessor, provider === "stripe" ? stripeImpl : paypalImpl);
+   * }
+   *
+   * // Usage - automatically uses current provider
+   * const checkout = logic("checkoutLogic", () => ({
+   *   processPayment: async (amount: number) => {
+   *     const processor = paymentProcessor(); // Gets current implementation
+   *     return processor.charge(amount);
+   *   },
+   * }));
+   *
+   * // Switch provider dynamically
+   * setPaymentProvider("stripe");
+   * checkout().processPayment(100); // Uses Stripe
+   *
+   * setPaymentProvider("paypal");
+   * checkout().processPayment(100); // Uses PayPal (no restart needed!)
+   * ```
+   *
+   * @example Testing with Mocks
+   * ```ts
+   * // In tests - override with mocks
+   * beforeEach(() => {
+   *   logic.provide(storageProvider, () => ({
+   *     get: vi.fn().mockResolvedValue("mock-token"),
+   *     set: vi.fn().mockResolvedValue(undefined),
+   *     remove: vi.fn().mockResolvedValue(undefined),
+   *   }));
+   * });
+   *
+   * afterEach(() => logic.clear()); // Reset all overrides
+   * ```
    */
-  abstract: <T extends object>(name: string): AbstractLogic<T> => {
+  export function abstract<T extends object>(name: string): AbstractLogic<T> {
     /** Cached proxy singleton */
-    let proxyInstance: Instance<T> | undefined;
+    let proxyInstance: AbstractLogicInstance<T> | undefined;
+
+    /** Cache for stub functions (created once per property) */
+    const stubCache = new Map<string | symbol, (...args: any[]) => any>();
 
     /**
-     * Create a proxy that evaluates override on each property access.
-     * This allows changing the override to take effect immediately.
+     * Internal utility: Try to use override, otherwise use fallback or throw.
+     * @param context - Error context (e.g., property name)
+     * @param fn - Function to call with override if available
+     * @param fallback - Optional fallback if no override (if omitted, throws NotImplementedError)
      */
-    const createProxy = (): Instance<T> => {
-      // Storage for dispose wrapper
-      let disposeWrapper: (() => void) | undefined;
+    const withOverride = <R>(
+      context: string,
+      fn: (override: T) => R,
+      fallback?: () => R
+    ): R => {
+      const resolver = globalResolvers.get(lg as unknown as Logic<T>);
+      if (resolver) {
+        return fn(resolver() as T);
+      }
+      if (fallback) {
+        return fallback();
+      }
+      throw new NotImplementedError(name, context);
+    };
 
-      const getOverride = () => {
-        // Check override on EACH property access (no caching)
-        const resolver = globalResolvers.get(lg as unknown as Logic<T>);
-        if (resolver) {
-          return resolver() as any;
-        }
-        return undefined;
-      };
+    /**
+     * Create a cached stub function that throws NotImplementedError when invoked.
+     * The function either calls the override (if available) or throws.
+     */
+    const getStub = (prop: string | symbol): ((...args: any[]) => any) => {
+      if (!stubCache.has(prop)) {
+        const stub = (...args: any[]): any =>
+          withOverride(
+            String(prop),
+            (override) => {
+              const method = (override as any)[prop];
+              if (typeof method === "function") {
+                return method(...args);
+              }
+              throw new NotImplementedError(name, String(prop));
+            }
+            // No fallback - throws NotImplementedError
+          );
+        stubCache.set(prop, stub);
+      }
+      return stubCache.get(prop)!;
+    };
 
-      return new Proxy({} as Instance<T>, {
+    /**
+     * Create a readonly proxy with cached function stubs.
+     * - Only function properties are exposed
+     * - Stubs throw NotImplementedError when invoked (before override)
+     * - Set operations always throw TypeError
+     */
+    const createProxy = (): AbstractLogicInstance<T> => {
+      return new Proxy({} as AbstractLogicInstance<T>, {
         get(_, prop) {
-          // Allow dispose() to be called
-          if (prop === "dispose") {
-            return disposeWrapper ?? (() => {});
-          }
           // Allow symbol access for type checks
           if (typeof prop === "symbol") {
             return undefined;
           }
 
-          // Check override on EACH property access (no caching)
-          const override = getOverride();
-          if (override) {
-            // Get the real implementation and access the property
-            return override[prop];
-          }
-
-          // No override - throw
-          throw new NotImplementedError(name, String(prop));
+          return withOverride(
+            String(prop),
+            (override) => {
+              const value = (override as any)[prop];
+              // Only return function properties (matches AbstractLogicInstance type)
+              return typeof value === "function" ? value : undefined;
+            },
+            () => getStub(prop) // Fallback: return cached stub
+          );
         },
-        set(_, prop, value) {
-          // Allow setting dispose
-          if (prop === "dispose" && typeof value === "function") {
-            disposeWrapper = value;
-            return true;
-          }
 
-          // Check override for set operations
-          const override = getOverride();
-          if (override) {
-            override[prop] = value;
-            return true;
-          }
-
-          throw new NotImplementedError(name, String(prop));
+        set(_, prop) {
+          // Always throw - abstract logic is readonly
+          throw new TypeError(
+            `Cannot set property "${String(
+              prop
+            )}" on abstract logic "${name}". ` +
+              `Abstract logics are readonly. Use logic.provide() to provide an implementation.`
+          );
         },
+
+        deleteProperty(_, prop) {
+          throw new TypeError(
+            `Cannot delete property "${String(
+              prop
+            )}" on abstract logic "${name}".`
+          );
+        },
+
+        defineProperty(_, prop) {
+          throw new TypeError(
+            `Cannot define property "${String(
+              prop
+            )}" on abstract logic "${name}".`
+          );
+        },
+
         has(_, prop) {
-          // Check override
-          const override = getOverride();
-          if (override) {
-            return prop in override;
-          }
-          return true; // Pretend all properties exist for type compatibility
+          return withOverride(
+            String(prop),
+            (override) => typeof (override as any)[prop] === "function",
+            () => typeof prop === "string" // Fallback: pretend functions exist
+          );
+        },
+
+        ownKeys() {
+          return withOverride(
+            "ownKeys",
+            (override) =>
+              Object.keys(override).filter(
+                (key) => typeof (override as any)[key] === "function"
+              ),
+            () => [] // Fallback: empty array
+          );
+        },
+
+        getOwnPropertyDescriptor(_, prop) {
+          return withOverride(
+            String(prop),
+            (override) => {
+              if (typeof (override as any)[prop] === "function") {
+                return {
+                  configurable: true,
+                  enumerable: true,
+                  value: (override as any)[prop],
+                  writable: false,
+                };
+              }
+              return undefined;
+            },
+            () =>
+              typeof prop === "string"
+                ? {
+                    configurable: true,
+                    enumerable: true,
+                    value: getStub(prop),
+                    writable: false,
+                  }
+                : undefined
+          );
         },
       });
     };
@@ -432,7 +722,7 @@ export const logic = Object.assign(logicImpl, {
     /**
      * Get proxy singleton (creates if not exists).
      */
-    const getProxy = (): Instance<T> => {
+    const getProxy = (): AbstractLogicInstance<T> => {
       if (!proxyInstance) {
         proxyInstance = createProxy();
       }
@@ -441,14 +731,14 @@ export const logic = Object.assign(logicImpl, {
 
     /**
      * The abstract logic object - callable for singleton access.
-     * Always returns the same proxy instance.
+     * Always returns the same readonly proxy instance.
      */
-    const lg = Object.assign((): Instance<T> => getProxy(), {
+    const lg = Object.assign((): AbstractLogicInstance<T> => getProxy(), {
       [LOGIC_TYPE]: true as const,
       displayName: name,
       // Note: No create() method for abstract logics
     });
 
     return lg as AbstractLogic<T>;
-  },
-});
+  }
+}

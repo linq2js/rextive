@@ -148,7 +148,7 @@ describe("logic", () => {
   });
 
   describe("logic.abstract() - abstract logics", () => {
-    it("should create abstract logic that throws on property access", () => {
+    it("should create abstract logic that throws on function invocation", () => {
       type AuthProvider = {
         getToken: () => Promise<string>;
         logout: () => void;
@@ -159,7 +159,10 @@ describe("logic", () => {
       // Can get instance without error
       const instance = authProvider();
 
-      // Error only on property access
+      // Can access function property without error (returns cached stub)
+      expect(typeof instance.getToken).toBe("function");
+
+      // Error only when function is INVOKED
       expect(() => instance.getToken()).toThrow(NotImplementedError);
       expect(() => instance.getToken()).toThrow(
         '"authProvider.getToken" is not implemented'
@@ -203,7 +206,7 @@ describe("logic", () => {
     });
 
     it("should not have create() method", () => {
-      type Config = { value: number };
+      type Config = { getValue: () => number };
       const config = logic.abstract<Config>("config");
 
       // AbstractLogic doesn't have create method
@@ -211,25 +214,17 @@ describe("logic", () => {
     });
 
     it("should have LOGIC_TYPE brand", () => {
-      const config = logic.abstract<{ value: number }>("config");
+      const config = logic.abstract<{ getValue: () => number }>("config");
       expect(config[LOGIC_TYPE]).toBe(true);
     });
 
     it("should have displayName", () => {
-      const config = logic.abstract<{ value: number }>("myConfig");
+      const config = logic.abstract<{ getValue: () => number }>("myConfig");
       expect(config.displayName).toBe("myConfig");
     });
 
-    it("should allow dispose() without error", () => {
-      const config = logic.abstract<{ value: number }>("config");
-      const instance = config();
-
-      // dispose() should not throw
-      expect(() => instance.dispose()).not.toThrow();
-    });
-
     it("should return same proxy instance (singleton)", () => {
-      type Auth = { token: string };
+      type Auth = { getToken: () => string };
       const auth = logic.abstract<Auth>("auth");
 
       const instance1 = auth();
@@ -239,35 +234,51 @@ describe("logic", () => {
       expect(instance1).toBe(instance2);
     });
 
-    it("should evaluate override on each property access (no caching)", () => {
-      type Auth = { token: string };
+    it("should cache stub functions", () => {
+      type Auth = { getToken: () => string };
+      const auth = logic.abstract<Auth>("auth");
+      const proxy = auth();
+
+      // Access same property multiple times
+      const stub1 = proxy.getToken;
+      const stub2 = proxy.getToken;
+
+      // Should return same cached stub function
+      expect(stub1).toBe(stub2);
+    });
+
+    it("should evaluate override on function invocation (not on access)", () => {
+      type Auth = { getToken: () => string };
       const auth = logic.abstract<Auth>("auth");
 
       // Get proxy first
       const proxy = auth();
+      const stub = proxy.getToken; // Access stub
 
-      // Set first override
-      logic.provide(auth, () => ({ token: "value-1" }));
-      expect(proxy.token).toBe("value-1");
+      // Set override
+      logic.provide(auth, () => ({ getToken: () => "token-1" }));
 
-      // Change override - takes effect immediately on same instance!
-      logic.provide(auth, () => ({ token: "value-2" }));
-      expect(proxy.token).toBe("value-2");
+      // Stub invocation should use override
+      expect(stub()).toBe("token-1");
+
+      // Change override - takes effect on invocation
+      logic.provide(auth, () => ({ getToken: () => "token-2" }));
+      expect(stub()).toBe("token-2");
     });
 
     it("should work when override is set AFTER first access", () => {
-      type Auth = { token: string };
+      type Auth = { getToken: () => string };
       const auth = logic.abstract<Auth>("auth");
 
       // Access first (returns proxy)
       const proxy = auth();
-      expect(() => proxy.token).toThrow(NotImplementedError);
+      expect(() => proxy.getToken()).toThrow(NotImplementedError);
 
       // Then set override
-      logic.provide(auth, () => ({ token: "later-token" }));
+      logic.provide(auth, () => ({ getToken: () => "later-token" }));
 
-      // Same proxy now returns overridden value
-      expect(proxy.token).toBe("later-token");
+      // Same stub now calls overridden function
+      expect(proxy.getToken()).toBe("later-token");
     });
 
     it("should call methods on overridden implementation", () => {
@@ -289,17 +300,17 @@ describe("logic", () => {
     });
 
     it("should support dynamic overrides (different impl per call)", () => {
-      type Config = { env: string };
+      type Config = { getEnv: () => string };
       const config = logic.abstract<Config>("config");
       const proxy = config();
 
       let currentEnv = "dev";
-      logic.provide(config, () => ({ env: currentEnv }));
+      logic.provide(config, () => ({ getEnv: () => currentEnv }));
 
-      expect(proxy.env).toBe("dev");
+      expect(proxy.getEnv()).toBe("dev");
 
       currentEnv = "prod";
-      expect(proxy.env).toBe("prod"); // Dynamic!
+      expect(proxy.getEnv()).toBe("prod"); // Dynamic!
     });
 
     it("should revert to throwing after logic.clear()", () => {
@@ -334,6 +345,79 @@ describe("logic", () => {
       expect(proxy.count()).toBe(0);
       proxy.count.set(42);
       expect(proxy.count()).toBe(42);
+    });
+
+    it("should be readonly (throw on set)", () => {
+      type Auth = { getToken: () => string };
+      const auth = logic.abstract<Auth>("auth");
+      const proxy = auth();
+
+      expect(() => {
+        (proxy as any).getToken = () => "hacked";
+      }).toThrow(TypeError);
+      expect(() => {
+        (proxy as any).getToken = () => "hacked";
+      }).toThrow('Cannot set property "getToken" on abstract logic "auth"');
+    });
+
+    it("should throw on delete property", () => {
+      type Auth = { getToken: () => string };
+      const auth = logic.abstract<Auth>("auth");
+      const proxy = auth();
+
+      expect(() => {
+        delete (proxy as any).getToken;
+      }).toThrow(TypeError);
+    });
+
+    it("should throw on define property", () => {
+      type Auth = { getToken: () => string };
+      const auth = logic.abstract<Auth>("auth");
+      const proxy = auth();
+
+      expect(() => {
+        Object.defineProperty(proxy, "newProp", { value: 42 });
+      }).toThrow(TypeError);
+    });
+
+    it("should only expose function properties from override", () => {
+      type Mixed = {
+        getValue: () => number;
+        name: string; // Non-function, should be excluded
+      };
+
+      const mixed = logic.abstract<Mixed>("mixed");
+      const proxy = mixed();
+
+      logic.provide(mixed, () => ({
+        getValue: () => 42,
+        name: "test",
+      }));
+
+      // Function property works
+      expect(proxy.getValue()).toBe(42);
+
+      // Non-function property returns undefined (excluded from proxy)
+      expect((proxy as any).name).toBeUndefined();
+    });
+
+    it("should return function keys only from ownKeys", () => {
+      type Mixed = {
+        getValue: () => number;
+        name: string; // Non-function, should be excluded
+      };
+
+      const mixed = logic.abstract<Mixed>("mixed");
+      const proxy = mixed();
+
+      logic.provide(mixed, () => ({
+        getValue: () => 42,
+        name: "test",
+      }));
+
+      const keys = Object.keys(proxy);
+      expect(keys).toContain("getValue");
+      expect(keys).not.toContain("name");
     });
   });
 

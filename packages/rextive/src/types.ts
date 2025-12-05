@@ -1963,11 +1963,35 @@ export interface Logic<T extends object> {
 }
 
 /**
+ * Extract only function properties from T and make them readonly.
+ * Used by AbstractLogic to ensure only methods are exposed.
+ *
+ * @example
+ * ```ts
+ * type Input = {
+ *   name: string;           // ❌ Excluded (not a function)
+ *   count: number;          // ❌ Excluded (not a function)
+ *   getName: () => string;  // ✅ Included
+ *   setCount: (n: number) => void; // ✅ Included
+ * };
+ *
+ * type Output = AbstractLogicInstance<Input>;
+ * // = { readonly getName: () => string; readonly setCount: (n: number) => void }
+ * ```
+ */
+export type AbstractLogicInstance<T> = {
+  readonly [K in keyof T as T[K] extends (...args: any[]) => any
+    ? K
+    : never]: T[K];
+};
+
+/**
  * An abstract logic that must be overridden before use.
  * Unlike regular Logic, AbstractLogic:
  * - Has no `create()` method (only singleton access)
- * - Returns a Proxy that throws NotImplementedError on property access
- * - Can be safely passed around; error only occurs when properties are accessed
+ * - Returns a readonly Proxy with only function properties
+ * - Function stubs are cached and throw NotImplementedError when invoked
+ * - Cannot be modified (set operations always throw)
  *
  * @example
  * ```ts
@@ -1975,16 +1999,20 @@ export interface Logic<T extends object> {
  * const authProvider = logic.abstract<{
  *   getToken: () => Promise<string>;
  *   logout: () => void;
+ *   config: { timeout: number }; // ❌ Non-function props excluded from output
  * }>("authProvider");
  *
  * // Can pass around without error
- * const auth = authProvider(); // ✅ No error yet
+ * const auth = authProvider(); // ✅ OK - returns readonly proxy
  *
- * // Error only when property is accessed
+ * // Error when function is invoked without override
  * auth.getToken(); // ❌ NotImplementedError
  *
- * // Consumer must override
- * logic.with(authProvider, () => ({
+ * // Cannot set properties
+ * (auth as any).getToken = () => {}; // ❌ TypeError: Cannot set on abstract logic
+ *
+ * // Consumer must provide implementation
+ * logic.provide(authProvider, () => ({
  *   getToken: async () => localStorage.getItem("token") ?? "",
  *   logout: () => localStorage.removeItem("token"),
  * }));
@@ -1998,9 +2026,12 @@ export interface AbstractLogic<T extends object> {
 
   /**
    * Get the singleton instance.
-   * Returns a Proxy if not overridden - accessing any property throws NotImplementedError.
+   * Returns a readonly Proxy with cached function stubs.
+   * - Only function properties are exposed
+   * - Function stubs throw NotImplementedError when invoked (before override)
+   * - Set operations always throw TypeError
    */
-  (): Instance<T>;
+  (): AbstractLogicInstance<T>;
 
   /** Debug name for devtools and error messages */
   readonly displayName: string;
