@@ -123,6 +123,11 @@ export const cartLogic = logic("cartLogic", () => {
     items.set([]);
   };
 
+  // Internal: Clear cart after successful order (no auth check needed)
+  const _clearAfterOrder = () => {
+    items.set([]);
+  };
+
   const openDrawer = () => {
     drawerOpen.set(true);
   };
@@ -163,5 +168,9 @@ export const cartLogic = logic("cartLogic", () => {
     openDrawer,
     /** Hide the cart drawer */
     closeDrawer,
+
+    // Internal methods (prefixed with _) for use by other logics
+    /** @internal Clear cart after successful order (bypasses auth) */
+    _clearAfterOrder,
   };
 });

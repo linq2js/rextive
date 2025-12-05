@@ -1,4 +1,4 @@
-import { signal, logic } from "rextive";
+import { signal, logic, disposable } from "rextive";
 
 export type Route =
   | { page: "home" }
@@ -36,6 +36,11 @@ export const routerLogic = logic("routerLogic", () => {
   };
   window.addEventListener("hashchange", handleHashChange);
 
+  // Cleanup function to remove event listener
+  const cleanup = () => {
+    window.removeEventListener("hashchange", handleHashChange);
+  };
+
   // Navigation helpers
   const navigate = (newRoute: Route) => {
     let hash = "#/";
@@ -57,7 +62,7 @@ export const routerLogic = logic("routerLogic", () => {
     }
   };
 
-  return {
+  return disposable({
     /** Current route */
     route,
     /** Navigate to a route */
@@ -68,6 +73,8 @@ export const routerLogic = logic("routerLogic", () => {
     goToProduct,
     /** Go back in history */
     goBack,
-  };
+    // Cleanup event listener on dispose
+    dispose: cleanup,
+  });
 });
 

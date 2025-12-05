@@ -6,6 +6,9 @@ import { DEFAULT_SHIPPING_INFO, type ShippingInfo } from "./types";
  * Shipping step logic - manages shipping address form.
  */
 export const shippingLogic = logic("checkout.shippingLogic", () => {
+  // Get dependencies at factory level (not inside actions!)
+  const $auth = authLogic();
+
   // Form data
   /** Shipping address form data (firstName, lastName, email, address, etc.) */
   const info = signal<ShippingInfo>(DEFAULT_SHIPPING_INFO, {
@@ -35,7 +38,6 @@ export const shippingLogic = logic("checkout.shippingLogic", () => {
 
   /** Pre-fill shipping form from logged-in user profile */
   const prefillFromUser = () => {
-    const $auth = authLogic();
     const user = $auth.user();
     if (user) {
       info.set((prev) => ({

@@ -8,7 +8,10 @@ import { SHIPPING_COST, TAX_RATE, type OrderSummary } from "./types";
  * Order logic - manages order totals and order placement.
  */
 export const orderLogic = logic("checkout.orderLogic", () => {
+  // Get dependencies at factory level (not inside actions!)
   const $cart = cartLogic();
+  const $shipping = shippingLogic();
+  const $payment = paymentLogic();
 
   // Processing state
   /** Whether an order is currently being processed */
@@ -39,9 +42,6 @@ export const orderLogic = logic("checkout.orderLogic", () => {
   // Actions
   /** Submit order to API and clear cart on success */
   const placeOrder = async () => {
-    const $shipping = shippingLogic();
-    const $payment = paymentLogic();
-
     isProcessing.set(true);
 
     // Simulate API call
@@ -65,7 +65,8 @@ export const orderLogic = logic("checkout.orderLogic", () => {
     };
 
     summary.set(orderSummary);
-    $cart.clearCart();
+    // Clear cart after successful order (uses internal method)
+    $cart._clearAfterOrder();
     isProcessing.set(false);
 
     return orderSummary;
