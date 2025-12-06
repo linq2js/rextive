@@ -11,6 +11,15 @@ export type * from "./types";
 // Re-export signal.on types
 export type { SignalOnControl } from "./signal.on";
 
+// Re-export signal.action types
+export type {
+  Action,
+  ActionContext,
+  ActionDeps,
+  ActionOptions,
+  ActionEquals,
+} from "./signal.action";
+
 // Re-export TASK_TYPE constant
 export { TASK_TYPE } from "./types";
 
@@ -21,6 +30,7 @@ import { tag as tagImpl } from "./tag";
 import { signalOn } from "./signal.on";
 import { signalUse } from "./signal.use";
 import { signalFrom } from "./signal.from";
+import { signalAction } from "./signal.action";
 import { getErrorTrace } from "./utils/errorTracking";
 
 /** Combined signal API type */
@@ -30,6 +40,7 @@ export type SignalApi = typeof signalBase & {
   on: typeof signalOn;
   use: typeof signalUse;
   from: typeof signalFrom;
+  action: typeof signalAction;
   trace: typeof getErrorTrace;
 };
 
@@ -40,6 +51,7 @@ export const signal: SignalApi = Object.assign(signalBase, {
   on: signalOn,
   use: signalUse,
   from: signalFrom,
+  action: signalAction,
   trace: getErrorTrace,
 });
 

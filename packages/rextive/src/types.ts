@@ -1,6 +1,8 @@
 export const SIGNAL_TYPE = Symbol("SIGNAL_TYPE");
 export const TAG_TYPE = Symbol("TAG_TYPE");
 
+export type Nullable<T> = T | undefined;
+
 /**
  * Unique symbol brands for tag kind discrimination.
  *

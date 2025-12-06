@@ -13,6 +13,7 @@ import { createSignalContext } from "./createSignalContext";
 import { EqualsStrategy } from "./utils/resolveEquals";
 import { signalOn } from "./signal.on";
 import { signalFrom } from "./signal.from";
+import { signalAction } from "./signal.action";
 import { getErrorTrace } from "./utils/errorTracking";
 import { autoPrefix } from "./utils/nameGenerator";
 
@@ -248,4 +249,14 @@ export function signal(...args: any[]): any {
 // Attach namespace methods to signal function
 signal.on = signalOn;
 signal.from = signalFrom;
+signal.action = signalAction;
 signal.trace = getErrorTrace;
+
+// Re-export action types
+export type {
+  Action,
+  ActionContext,
+  ActionDeps,
+  ActionOptions,
+  ActionEquals,
+} from "./signal.action";

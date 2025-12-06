@@ -1,4 +1,4 @@
-
+import React, { StrictMode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { act } from "react";
 import { provider } from "./provider";
@@ -7,14 +7,37 @@ import { useState } from "react";
 import { rx } from "./rx";
 import { signal } from "../signal";
 import { disposable } from "../disposable";
-import { MutableSignal } from "../types";
 import "@testing-library/jest-dom";
+import { Mutable } from "../types";
 
-describe("provider", () => {
+// Test wrapper types
+type WrapperMode = "normal" | "strict";
+
+const wrappers: {
+  mode: WrapperMode;
+  Wrapper: React.FC<{ children: React.ReactNode }>;
+}[] = [
+  {
+    mode: "normal",
+    Wrapper: ({ children }) => <>{children}</>,
+  },
+  {
+    mode: "strict",
+    Wrapper: ({ children }) => <StrictMode>{children}</StrictMode>,
+  },
+];
+
+// Run all tests in both normal and StrictMode
+describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
+  // Helper to wrap render with the current mode's wrapper
+  const renderWithWrapper = (ui: React.ReactElement) => {
+    return render(<Wrapper>{ui}</Wrapper>);
+  };
+
   describe("basic functionality", () => {
     it("should create a provider and hook", () => {
       const [useTheme, ThemeProvider] = provider<
-        { theme: MutableSignal<string> },
+        { theme: Mutable<string> },
         string
       >({
         name: "Theme",
@@ -33,7 +56,7 @@ describe("provider", () => {
 
     it("should provide and consume context signal", () => {
       const [useCount, CountProvider] = provider<
-        { count: MutableSignal<number> },
+        { count: Mutable<number> },
         number
       >({
         name: "Count",
@@ -51,7 +74,7 @@ describe("provider", () => {
         return <div data-testid="count">{rx(count)}</div>;
       }
 
-      render(
+      renderWithWrapper(
         <CountProvider value={42}>
           <Consumer />
         </CountProvider>
@@ -61,7 +84,7 @@ describe("provider", () => {
     });
 
     it("should throw error when hook is used outside provider", () => {
-      const [useTheme] = provider<{ theme: MutableSignal<string> }, string>({
+      const [useTheme] = provider<{ theme: Mutable<string> }, string>({
         name: "Theme",
         create: (value) => {
           const theme = signal(value);
@@ -79,7 +102,7 @@ describe("provider", () => {
 
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      expect(() => render(<Consumer />)).toThrow(
+      expect(() => renderWithWrapper(<Consumer />)).toThrow(
         "Theme context not found. Make sure you're using the component within <ThemeProvider>."
       );
 
@@ -88,7 +111,7 @@ describe("provider", () => {
 
     it("should update when value prop changes", async () => {
       const [useCount, CountProvider] = provider<
-        { count: MutableSignal<number> },
+        { count: Mutable<number> },
         number
       >({
         name: "Count",
@@ -106,7 +129,7 @@ describe("provider", () => {
         return <div data-testid="count">{rx(count)}</div>;
       }
 
-      function Wrapper() {
+      function WrapperComponent() {
         const [count, setCount] = useState(0);
         return (
           <CountProvider value={count}>
@@ -116,7 +139,7 @@ describe("provider", () => {
         );
       }
 
-      render(<Wrapper />);
+      renderWithWrapper(<WrapperComponent />);
 
       expect(screen.getByTestId("count")).toHaveTextContent("0");
 
@@ -133,7 +156,7 @@ describe("provider", () => {
   describe("equality options", () => {
     it("should accept predefined equality string", () => {
       const [useUser, UserProvider] = provider<
-        { user: MutableSignal<{ name: string }> },
+        { user: Mutable<{ name: string }> },
         { name: string }
       >({
         name: "User",
@@ -151,7 +174,7 @@ describe("provider", () => {
         return <div data-testid="name">{rx(user, (u) => u.name)}</div>;
       }
 
-      render(
+      renderWithWrapper(
         <UserProvider value={{ name: "Alice" }}>
           <Consumer />
         </UserProvider>
@@ -167,7 +190,7 @@ describe("provider", () => {
       ) => a.id === b.id;
 
       const [useItem, ItemProvider] = provider<
-        { item: MutableSignal<{ id: number; name: string }> },
+        { item: Mutable<{ id: number; name: string }> },
         { id: number; name: string }
       >({
         name: "Item",
@@ -185,7 +208,7 @@ describe("provider", () => {
         return <div data-testid="item">{rx(item, (i) => i.name)}</div>;
       }
 
-      render(
+      renderWithWrapper(
         <ItemProvider value={{ id: 1, name: "New Item" }}>
           <Consumer />
         </ItemProvider>
@@ -196,7 +219,7 @@ describe("provider", () => {
 
     it("should accept full options object", () => {
       const [useData, DataProvider] = provider<
-        { data: MutableSignal<{ count: number }> },
+        { data: Mutable<{ count: number }> },
         { count: number }
       >({
         name: "Data",
@@ -217,7 +240,7 @@ describe("provider", () => {
         return <div data-testid="count">{rx(data, (d) => d.count)}</div>;
       }
 
-      render(
+      renderWithWrapper(
         <DataProvider value={{ count: 5 }}>
           <Consumer />
         </DataProvider>
@@ -230,7 +253,7 @@ describe("provider", () => {
   describe("nested providers", () => {
     it("should support nested providers of same type", () => {
       const [useTheme, ThemeProvider] = provider<
-        { theme: MutableSignal<string> },
+        { theme: Mutable<string> },
         string
       >({
         name: "Theme",
@@ -260,7 +283,7 @@ describe("provider", () => {
         );
       }
 
-      render(
+      renderWithWrapper(
         <ThemeProvider value="light">
           <Outer />
         </ThemeProvider>
@@ -272,7 +295,7 @@ describe("provider", () => {
 
     it("should support multiple different providers", () => {
       const [useTheme, ThemeProvider] = provider<
-        { theme: MutableSignal<string> },
+        { theme: Mutable<string> },
         string
       >({
         name: "Theme",
@@ -286,7 +309,7 @@ describe("provider", () => {
       });
 
       const [useUser, UserProvider] = provider<
-        { user: MutableSignal<{ name: string }> },
+        { user: Mutable<{ name: string }> },
         { name: string }
       >({
         name: "User",
@@ -310,7 +333,7 @@ describe("provider", () => {
         );
       }
 
-      render(
+      renderWithWrapper(
         <ThemeProvider value="dark">
           <UserProvider value={{ name: "Alice" }}>
             <Consumer />
@@ -325,10 +348,7 @@ describe("provider", () => {
 
   describe("type safety", () => {
     it("should enforce correct value type", () => {
-      const [, CountProvider] = provider<
-        { count: MutableSignal<number> },
-        number
-      >({
+      const [, CountProvider] = provider<{ count: Mutable<number> }, number>({
         name: "Count",
         create: (value) => {
           const count = signal(value);
@@ -340,12 +360,12 @@ describe("provider", () => {
       });
 
       // This should compile
-      render(<CountProvider value={42}>Content</CountProvider>);
+      renderWithWrapper(<CountProvider value={42}>Content</CountProvider>);
     });
 
     it("should return correct context types", () => {
       const [useUser] = provider<
-        { user: MutableSignal<{ name: string; age: number }> },
+        { user: Mutable<{ name: string; age: number }> },
         { name: string; age: number }
       >({
         name: "User",
@@ -386,7 +406,7 @@ describe("provider", () => {
       };
 
       const [useCounter, CounterProvider] = provider<
-        { counter: MutableSignal<Counter> },
+        { counter: Mutable<Counter> },
         Counter
       >({
         name: "Counter",
@@ -410,7 +430,7 @@ describe("provider", () => {
       }
 
       const increment = vi.fn();
-      render(
+      renderWithWrapper(
         <CounterProvider value={{ count: 5, increment, decrement: vi.fn() }}>
           <Consumer />
         </CounterProvider>
@@ -427,7 +447,7 @@ describe("provider", () => {
 
     it("should handle arrays", () => {
       const [useItems, ItemsProvider] = provider<
-        { items: MutableSignal<string[]> },
+        { items: Mutable<string[]> },
         string[]
       >({
         name: "Items",
@@ -453,7 +473,7 @@ describe("provider", () => {
         ));
       }
 
-      render(
+      renderWithWrapper(
         <ItemsProvider value={["Apple", "Banana", "Cherry"]}>
           <Consumer />
         </ItemsProvider>
@@ -466,7 +486,7 @@ describe("provider", () => {
 
     it("should handle null and undefined in union types", () => {
       const [useOptional, OptionalProvider] = provider<
-        { value: MutableSignal<string | null> },
+        { value: Mutable<string | null> },
         string | null
       >({
         name: "Optional",
@@ -485,17 +505,21 @@ describe("provider", () => {
       }
 
       const { rerender } = render(
-        <OptionalProvider value={null}>
-          <Consumer />
-        </OptionalProvider>
+        <Wrapper>
+          <OptionalProvider value={null}>
+            <Consumer />
+          </OptionalProvider>
+        </Wrapper>
       );
 
       expect(screen.getByTestId("value")).toHaveTextContent("empty");
 
       rerender(
-        <OptionalProvider value="Hello">
-          <Consumer />
-        </OptionalProvider>
+        <Wrapper>
+          <OptionalProvider value="Hello">
+            <Consumer />
+          </OptionalProvider>
+        </Wrapper>
       );
 
       expect(screen.getByTestId("value")).toHaveTextContent("Hello");
@@ -504,10 +528,7 @@ describe("provider", () => {
 
   describe("error messages", () => {
     it("should include provider name in error message", () => {
-      const [useCustomName] = provider<
-        { value: MutableSignal<number> },
-        number
-      >({
+      const [useCustomName] = provider<{ value: Mutable<number> }, number>({
         name: "CustomName",
         create: (value) => {
           const val = signal(value);
@@ -525,24 +546,22 @@ describe("provider", () => {
 
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      expect(() => render(<Consumer />)).toThrow(/CustomName/);
+      expect(() => renderWithWrapper(<Consumer />)).toThrow(/CustomName/);
 
       spy.mockRestore();
     });
 
     it("should provide helpful error message", () => {
-      const [useMyContext] = provider<{ value: MutableSignal<number> }, number>(
-        {
-          name: "MyContext",
-          create: (value) => {
-            const val = signal(value);
-            return disposable({ value: val });
-          },
-          update: (context, value) => {
-            context.value.set(value);
-          },
-        }
-      );
+      const [useMyContext] = provider<{ value: Mutable<number> }, number>({
+        name: "MyContext",
+        create: (value) => {
+          const val = signal(value);
+          return disposable({ value: val });
+        },
+        update: (context, value) => {
+          context.value.set(value);
+        },
+      });
 
       function Consumer() {
         useMyContext();
@@ -551,7 +570,7 @@ describe("provider", () => {
 
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      expect(() => render(<Consumer />)).toThrow(
+      expect(() => renderWithWrapper(<Consumer />)).toThrow(
         /Make sure you're using the component within/
       );
 
@@ -564,7 +583,7 @@ describe("provider", () => {
       const contexts: any[] = [];
 
       const [useCount, CountProvider] = provider<
-        { count: MutableSignal<number> },
+        { count: Mutable<number> },
         number
       >({
         name: "Count",
@@ -584,7 +603,7 @@ describe("provider", () => {
         return <div data-testid="count">{rx(count)}</div>;
       }
 
-      function Wrapper() {
+      function WrapperComponent() {
         const [count, setCount] = useState(0);
         return (
           <>
@@ -596,19 +615,18 @@ describe("provider", () => {
         );
       }
 
-      render(<Wrapper />);
+      renderWithWrapper(<WrapperComponent />);
 
-      // Should have one context created
-      expect(contexts.length).toBe(1);
-      const firstContext = contexts[0];
+      // In StrictMode, create is called twice but only one context is kept
+      // So we check that after clicking, no new context is created
+      const initialCount = contexts.length;
 
       act(() => {
         screen.getByRole("button").click();
       });
 
-      // Should still be the same context instance (not recreated)
-      expect(contexts.length).toBe(1);
-      expect(contexts[0]).toBe(firstContext);
+      // Should not create new context on update
+      expect(contexts.length).toBe(initialCount);
     });
   });
 
@@ -645,7 +663,7 @@ describe("provider", () => {
         );
       }
 
-      render(
+      renderWithWrapper(
         <ThemeProvider value={{ theme: "dark", fontSize: 16 }}>
           <Consumer />
         </ThemeProvider>
@@ -690,7 +708,7 @@ describe("provider", () => {
         );
       }
 
-      render(
+      renderWithWrapper(
         <StoreProvider value={0}>
           <Consumer />
         </StoreProvider>
