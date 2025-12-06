@@ -929,7 +929,10 @@ export type When<TValue, TInit, TKind extends SignalKind> = {
   <N extends AnySignal<any>>(
     notifier: N | readonly N[],
     action: SignalWhenAction,
-    filter?: (notifier: N, self: SignalOf<TValue, TKind, TInit>) => boolean
+    filter?: (
+      notifier: NonNullSignal<N>,
+      self: SignalOf<TValue, TKind, TInit>
+    ) => boolean
   ): SignalOf<TValue, TKind, TInit>;
 
   /**
@@ -995,9 +998,18 @@ export type When<TValue, TInit, TKind extends SignalKind> = {
    */
   <N extends AnySignal<any>>(
     notifier: N | readonly N[],
-    action: (notifier: N, self: SignalOf<TValue, TKind, TInit>) => void
+    action: (
+      notifier: NonNullSignal<N>,
+      self: SignalOf<TValue, TKind, TInit>
+    ) => void
   ): SignalOf<TValue, TKind, TInit>;
 };
+
+export type NonNullSignal<S> = S extends Computed<infer T>
+  ? Computed<T, any>
+  : S extends Mutable<infer T, any>
+  ? Mutable<T>
+  : S;
 
 export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
   /**
@@ -1046,6 +1058,24 @@ export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    * // Consumer API:
    * authLogic().login({ username: "admin", password: "123" });
    * authLogic().loginRequest();  // Read current value
+   * ```
+   *
+   * @example Action dispatch with .when()
+   * ```ts
+   * type TodoAction = { type: "add"; text: string } | { type: "edit"; id: number };
+   *
+   * const [todoAction, dispatch] = signal<TodoAction>().tuple;
+   *
+   * // React to actions
+   * todoList.when(todoAction, (action) => {
+   *   const a = action();
+   *   if (a?.type === "add") addTodo(a.text);
+   *   if (a?.type === "edit") editTodo(a.id);
+   * });
+   *
+   * // Dispatch actions
+   * dispatch({ type: "add", text: "Buy milk" });
+   * dispatch({ type: "edit", id: 1 });
    * ```
    */
   readonly tuple: readonly [

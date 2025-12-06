@@ -1,10 +1,15 @@
 {
   "$schema": "https://jsr.io/schema/config-file.v1.json",
   "name": "@ging/rextive",
-  "version": "2.38.1",
+  "version": "2.39.0",
   "license": "MIT",
   "description": "A reactive state management library with explicit dependencies - works with React, Deno, and vanilla JS",
-  "runtimes": ["deno", "node", "browser", "bun"],
+  "runtimes": [
+    "deno",
+    "node",
+    "browser",
+    "bun"
+  ],
   "imports": {
     "lodash/isEqual": "npm:lodash@4/isEqual",
     "lodash/debounce": "npm:lodash@4/debounce",
@@ -21,7 +26,12 @@
     "./devtools-panel": "./src/devtools-panel/index.ts",
     "./op": "./src/op/index.ts"
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "README.md", "LICENSE"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "README.md",
+    "LICENSE"
+  ],
   "exclude": [
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
@@ -31,7 +41,12 @@
     "src/global.d.ts"
   ],
   "publish": {
-    "include": ["src/**/*.ts", "src/**/*.tsx", "README.md", "LICENSE"],
+    "include": [
+      "src/**/*.ts",
+      "src/**/*.tsx",
+      "README.md",
+      "LICENSE"
+    ],
     "exclude": [
       "src/**/*.test.ts",
       "src/**/*.test.tsx",

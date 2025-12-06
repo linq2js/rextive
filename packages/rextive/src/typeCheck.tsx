@@ -3156,7 +3156,7 @@ function signalWhenTests() {
   expectType<Mutable<number>>(total);
 
   // Reducer with different notifier type
-  const strLength = signal(0).when(stringNotifier, (self, notifierSig) => {
+  const strLength = signal(0).when(stringNotifier, (notifierSig, self) => {
     expectType<Mutable<string>>(notifierSig);
     expectType<Mutable<number>>(self);
     return self() + notifierSig().length;
@@ -3295,7 +3295,7 @@ function signalWhenTests() {
 
   // Reducer with complex type
   const updateUser = signal<Partial<User>>({});
-  const userWithReducer = userSignal.when(updateUser, (self, n) => {
+  const userWithReducer = userSignal.when(updateUser, (n, self) => {
     expectType<Mutable<User | null>>(self);
     expectType<Mutable<Partial<User>>>(n);
     const current = self();
@@ -3331,7 +3331,7 @@ function signalWhenTests() {
   type Event = { type: "START" | "COMPLETE" | "FAIL" };
 
   const events = signal<Event | null>(null);
-  const state = signal<State>("idle").when(events, (self, notifierSig) => {
+  const state = signal<State>("idle").when(events, (notifierSig, self) => {
     expectType<Mutable<Event | null>>(notifierSig);
     expectType<Mutable<State>>(self);
 

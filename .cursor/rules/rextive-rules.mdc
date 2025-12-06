@@ -627,10 +627,10 @@ userData.when(refreshTrigger, "refresh", (notifier, self) => notifier() > 5);
 const increment = signal(0);
 const counter = signal(0);
 
-// Action callback receives (self, notifier) and returns void
+// Action callback receives (notifier, self) and returns void
 // Use self.set() to update the value
-counter.when(increment, (self, notifier) => {
-  self.set(prev => prev + notifier());
+counter.when(increment, (notifier, self) => {
+  self.set((prev) => prev + notifier());
 });
 ```
 
@@ -647,7 +647,7 @@ fetchedData.when(refreshTrigger, "refresh");
 fetchedData.when(refreshTrigger, "stale");
 
 // Action callback: use self.refresh() or self.stale()
-fetchedData.when(refreshTrigger, (self, notifier) => {
+fetchedData.when(refreshTrigger, (notifier, self) => {
   if (notifier() > 0) {
     self.refresh();
   }
@@ -670,8 +670,8 @@ userData.when([trigger1, trigger2], "refresh", (notifier, self) => {
   return notifier() > 0;
 });
 
-// Action callback receives (self, notifier)
-userData.when([trigger1, trigger2], (self, notifier) => {
+// Action callback receives (notifier, self)
+userData.when([trigger1, trigger2], (notifier, self) => {
   console.log("Triggered by:", notifier());
   self.refresh();
 });
@@ -682,6 +682,26 @@ userData.when([trigger1, trigger2], (self, notifier) => {
 ```tsx
 // .when() returns this for chaining
 userData.when(refreshTrigger, "refresh").when(resetTrigger, "reset");
+```
+
+**Action Dispatch Pattern with `.tuple`:**
+
+```tsx
+type TodoAction = { type: "add"; text: string } | { type: "edit"; id: number };
+
+// Use .tuple to get [signal, setter] for semantic naming
+const [todoAction, dispatch] = signal<TodoAction>().tuple;
+
+// React to actions
+todoList.when(todoAction, (action) => {
+  const a = action();
+  if (a?.type === "add") addTodo(a.text);
+  if (a?.type === "edit") editTodo(a.id);
+});
+
+// Dispatch actions
+dispatch({ type: "add", text: "Buy milk" });
+dispatch({ type: "edit", id: 1 });
 ```
 
 **Cleanup:**
@@ -698,9 +718,9 @@ userData.when(trigger, "refresh", (notifier, self) => {
 });
 
 // Action callback errors - routed through signal's error handling
-counter.when(increment, (self, notifier) => {
+counter.when(increment, (notifier, self) => {
   if (notifier() < 0) throw new Error("Negative not allowed");
-  self.set(prev => prev + notifier());
+  self.set((prev) => prev + notifier());
 });
 ```
 
@@ -710,11 +730,11 @@ counter.when(increment, (self, notifier) => {
 // ❌ BAD - Circular dependency
 const a = signal(0);
 const b = signal(0);
-a.when(b, (self, notifier) => self.set(notifier())); // a depends on b
-b.when(a, (self, notifier) => self.set(notifier())); // b depends on a - INFINITE LOOP!
+a.when(b, (notifier, self) => self.set(notifier())); // a depends on b
+b.when(a, (notifier, self) => self.set(notifier())); // b depends on a - INFINITE LOOP!
 
-// ❌ BAD - "reset" on computed signals
-computed.when(trigger, "reset"); // Throws error! Use "refresh" or "stale"
+// ❌ BAD - "reset" on computed signals (TypeScript error)
+computed.when(trigger, "reset"); // Use "refresh" or "stale" instead
 ```
 
 ---
@@ -1285,17 +1305,17 @@ const refreshTrigger = signal(0);
 const userData = asyncSignal.pipe(refreshOn(refreshTrigger));
 
 // Click to refresh immediately
-<button onClick={() => refreshTrigger.set(v => v + 1)}>Refresh</button>
+<button onClick={() => refreshTrigger.set((v) => v + 1)}>Refresh</button>;
 ```
 
 **With filter:**
 
 ```tsx
-const networkStatus = signal<'online' | 'offline'>('online');
+const networkStatus = signal<"online" | "offline">("online");
 
 // Only refresh when coming back online
 const data = asyncSignal.pipe(
-  refreshOn(networkStatus, (status) => status() === 'online')
+  refreshOn(networkStatus, (status) => status() === "online")
 );
 ```
 
@@ -1310,10 +1330,11 @@ const cacheInvalidate = signal(0);
 const userData = asyncSignal.pipe(staleOn(cacheInvalidate));
 
 // Mark data as stale (won't refetch until accessed)
-cacheInvalidate.set(v => v + 1);
+cacheInvalidate.set((v) => v + 1);
 ```
 
 **Use `staleOn` vs `refreshOn`:**
+
 - `refreshOn` - Immediate recomputation (use for active data)
 - `staleOn` - Lazy recomputation (use for cached/background data)
 
@@ -1325,25 +1346,27 @@ Triggers `.reset()` on a mutable signal when notifier(s) change:
 import { resetOn } from "rextive/op";
 
 const clearTrigger = signal<void>();
-const formData = signal({ name: '', email: '' }).pipe(
-  resetOn(clearTrigger)
-);
+const formData = signal({ name: "", email: "" }).pipe(resetOn(clearTrigger));
 
 // Reset form after submission
-<button onClick={() => {
-  submitForm(formData());
-  clearTrigger.set(undefined as void);
-}}>Submit & Clear</button>
+<button
+  onClick={() => {
+    submitForm(formData());
+    clearTrigger.set(undefined as void);
+  }}
+>
+  Submit & Clear
+</button>;
 ```
 
 **With filter:**
 
 ```tsx
-const routeChange = signal<string>('/home');
+const routeChange = signal<string>("/home");
 
 // Reset filters when navigating away from /products
-const productFilters = signal({ category: 'all', sort: 'name' }).pipe(
-  resetOn(routeChange, (route) => !route().startsWith('/products'))
+const productFilters = signal({ category: "all", sort: "name" }).pipe(
+  resetOn(routeChange, (route) => !route().startsWith("/products"))
 );
 ```
 
@@ -1507,15 +1530,15 @@ export const myLogic = logic("myLogic", () => {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 1. DEPENDENCIES - Import other logics (at factory level!)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const $auth = authLogic();       // Shared singleton
-  const $config = configLogic();   // Shared singleton
+  const $auth = authLogic(); // Shared singleton
+  const $config = configLogic(); // Shared singleton
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 2. STATE - Signals and computed values
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const items = signal<Item[]>([], { name: "myLogic.items" });
   const filter = signal("all", { name: "myLogic.filter" });
-  
+
   // Computed signals
   const filtered = signal(
     { items, filter },
@@ -1529,7 +1552,7 @@ export const myLogic = logic("myLogic", () => {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const socket = new WebSocket($config.wsUrl);
   const interval = setInterval(() => refresh(), 60000);
-  
+
   // Signal subscriptions
   $auth.user.on(() => {
     if (!$auth.user()) items.reset();
@@ -1578,13 +1601,13 @@ export const myLogic = logic("myLogic", () => {
 
 **Section Breakdown:**
 
-| Section | Purpose | Guidelines |
-|---------|---------|------------|
-| **Dependencies** | Import other logics | Always at factory level, not inside methods |
-| **State** | Signals & computed | Name signals for debugging: `{ name: "logic.signal" }` |
-| **Side Effects** | External resources | WebSockets, timers, event listeners, subscriptions |
-| **Methods** | Business logic | Keep pure when possible, use signals for state |
-| **Return** | Public API + cleanup | Include `dispose()` if you have side effects |
+| Section          | Purpose              | Guidelines                                             |
+| ---------------- | -------------------- | ------------------------------------------------------ |
+| **Dependencies** | Import other logics  | Always at factory level, not inside methods            |
+| **State**        | Signals & computed   | Name signals for debugging: `{ name: "logic.signal" }` |
+| **Side Effects** | External resources   | WebSockets, timers, event listeners, subscriptions     |
+| **Methods**      | Business logic       | Keep pure when possible, use signals for state         |
+| **Return**       | Public API + cleanup | Include `dispose()` if you have side effects           |
 
 **⚠️ Common Mistakes:**
 
@@ -1601,7 +1624,7 @@ const myLogic = logic("myLogic", () => {
 // ✅ GOOD: Get logic at factory level
 const myLogic = logic("myLogic", () => {
   const $auth = authLogic(); // ✅ Called once during initialization
-  
+
   const doSomething = () => {
     return $auth.user(); // Uses captured reference
   };
@@ -1614,7 +1637,9 @@ const myLogic = logic("myLogic", () => {
 const myLogic = logic("myLogic", () => {
   const socket = new WebSocket("wss://...");
   // No dispose! Memory leak when instance is disposed
-  return { /* ... */ };
+  return {
+    /* ... */
+  };
 });
 
 // ✅ GOOD: Clean up external resources
@@ -1640,12 +1665,12 @@ const myLogic = logic("myLogic", () => {
 
 // ✅ GOOD: Only dispose what you own
 const myLogic = logic("myLogic", () => {
-  const $auth = authLogic();           // Shared - DON'T dispose
-  const tabs = [tabLogic.create()];    // Owned - MUST dispose
-  
+  const $auth = authLogic(); // Shared - DON'T dispose
+  const tabs = [tabLogic.create()]; // Owned - MUST dispose
+
   return {
     dispose: () => {
-      tabs.forEach(t => t.dispose()); // ✅ Dispose owned only
+      tabs.forEach((t) => t.dispose()); // ✅ Dispose owned only
     },
   };
 });
@@ -1709,13 +1734,17 @@ export function UserMenu() {
   return rx(() => {
     const user = $auth.user();
     const itemCount = $cart.itemCount();
-    return <div>{user?.name} ({itemCount})</div>;
+    return (
+      <div>
+        {user?.name} ({itemCount})
+      </div>
+    );
   });
 }
 
 // ❌ BAD - Ambiguous naming
 export function UserMenu() {
-  const auth = authLogic();  // Easy to confuse with local 'auth' object
+  const auth = authLogic(); // Easy to confuse with local 'auth' object
   const cart = cartLogic();
 
   return rx(() => {
@@ -1877,11 +1906,11 @@ describe("UserMenu", () => {
 
 **`mockLogic` API:**
 
-| Method | Description |
-|--------|-------------|
-| `.default(partial)` | Set default mock values (merged with overrides) |
+| Method               | Description                                       |
+| -------------------- | ------------------------------------------------- |
+| `.default(partial)`  | Set default mock values (merged with overrides)   |
 | `.provide(partial?)` | Apply mock to logic registry, returns merged mock |
-| `.clear()` | Clear defaults, overrides, and logic registry |
+| `.clear()`           | Clear defaults, overrides, and logic registry     |
 
 **Option 2: Using `logic.provide()` (For Logic Unit Tests)**
 
@@ -1910,11 +1939,11 @@ describe("userStore", () => {
 
 **When to Use Each:**
 
-| Scenario | Recommended |
-|----------|-------------|
-| Testing React components | `mockLogic()` from `rextive/test` |
-| Testing logic units directly | `logic.provide()` + `logic.create()` |
-| Library/SDK testing | `logic.provide()` with partial override |
+| Scenario                     | Recommended                             |
+| ---------------------------- | --------------------------------------- |
+| Testing React components     | `mockLogic()` from `rextive/test`       |
+| Testing logic units directly | `logic.provide()` + `logic.create()`    |
+| Library/SDK testing          | `logic.provide()` with partial override |
 
 ---
 
@@ -2086,6 +2115,25 @@ action.on(() => {
 // Dispatch actions - triggers even with same value!
 action.set({ type: "refresh" });
 action.set({ type: "refresh" }); // Triggers again!
+```
+
+**Using `.tuple` for cleaner action dispatch:**
+
+```tsx
+type TodoAction = { type: "add"; text: string } | { type: "edit"; id: number };
+
+// .tuple gives [signal, setter] with semantic naming
+const [todoAction, dispatch] = signal<TodoAction>().tuple;
+
+// React using .when()
+todoList.when(todoAction, (action) => {
+  const a = action();
+  if (a.type === "add") addTodo(a.text);
+  if (a.type === "edit") editTodo(a.id);
+});
+
+// Dispatch with semantic setter
+dispatch({ type: "add", text: "Buy milk" });
 ```
 
 **Key difference from regular signals:**
@@ -2292,7 +2340,8 @@ function Component() {
 - `.tryGet()` - Get value safely ⭐
 - `.pause()` / `.resume()` / `.paused()` - Control (computed only)
 - `.when(notifier, action, filter?)` - React to other signals with action string ⭐
-- `.when(notifier, callback)` - React to other signals with action callback `(self, notifier) => void` ⭐
+- `.when(notifier, callback)` - React to other signals with action callback `(notifier, self) => void` ⭐
+- `.tuple` - Get `[signal, setter]` tuple for semantic naming
 
 ### Static Methods
 
