@@ -1,5 +1,6 @@
-import { noop, once } from "lodash/fp";
 import { tryDispose } from "./disposable";
+import { noop } from "./utils/noop";
+import { once } from "./utils/once";
 import { withHooks } from "./hooks";
 import { dev, emitter } from "./react";
 import {

@@ -1,5 +1,5 @@
-import { once } from "lodash/fp";
 import { Disposable, ExDisposable, UnionToIntersection } from "./types";
+import { once } from "./utils/once";
 
 /**
  * Error thrown when one or more services fail to dispose.
