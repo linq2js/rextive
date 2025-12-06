@@ -1,7 +1,6 @@
-import { signal, logic } from "rextive";
+import { signal, logic, AC, task } from "rextive";
 import { authApi } from "@/api/client";
 import type { User, LoginCredentials } from "@/api/types";
-import { debounce, to } from "rextive/op";
 
 // Helper to get/set token from localStorage
 const tokenStorage = {
@@ -44,8 +43,6 @@ export const authLogic = logic("authLogic", () => {
   });
   const user = signal<User | null>(null, { name: "auth.user" });
   const loginModalOpen = signal(false, { name: "auth.loginModalOpen" });
-  const loginError = signal<string | null>(null, { name: "auth.loginError" });
-  const isLoggingIn = signal(false, { name: "auth.isLoggingIn" });
   const isRestoring = signal(false, { name: "auth.isRestoring" });
 
   // Computed: is authenticated
@@ -53,25 +50,48 @@ export const authLogic = logic("authLogic", () => {
     name: "auth.isAuthenticated",
   });
 
-  // Actions
-  const login = async (credentials: LoginCredentials) => {
-    loginError.set(null);
-    isLoggingIn.set(true);
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LOGIN ACTION - mutation pattern with signal.action
+  // ═══════════════════════════════════════════════════════════════════════════
+  const loginAction = signal.action(
+    async (ctx: AC<LoginCredentials>) => {
+      const userData = await authApi.login(ctx.payload);
 
-    try {
-      const userData = await authApi.login(credentials);
       signal.batch(() => {
         user.set(userData);
         token.set(userData.accessToken);
         loginModalOpen.set(false);
       });
-    } catch (err) {
-      loginError.set(err instanceof Error ? err.message : "Login failed");
-      throw err;
-    } finally {
-      isLoggingIn.set(false);
+
+      return userData;
+    },
+    {
+      name: "auth.login",
+      onError: (error) => {
+        console.error("Login failed:", error);
+      },
     }
+  );
+
+  // Task wrapper for login state (loading/error/value)
+  const loginTask = loginAction.result.pipe(task(null as User | null));
+
+  // Login helper that dispatches and returns promise
+  const login = (credentials: LoginCredentials) => {
+    return loginAction.dispatch(credentials);
   };
+
+  // Computed: login error message
+  const loginError = loginTask.to(
+    (state) =>
+      state.error instanceof Error ? state.error.message : state.error ?? null,
+    { name: "auth.loginError" }
+  );
+
+  // Computed: is logging in
+  const isLoggingIn = loginTask.to((state) => state.loading, {
+    name: "auth.isLoggingIn",
+  });
 
   const logout = () => {
     signal.batch(() => {
@@ -81,7 +101,6 @@ export const authLogic = logic("authLogic", () => {
   };
 
   const openLoginModal = () => {
-    loginError.set(null);
     loginModalOpen.set(true);
   };
 
@@ -130,6 +149,15 @@ export const authLogic = logic("authLogic", () => {
     isRestoring,
     /** Computed: true when user is authenticated */
     isAuthenticated,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LOGIN ACTION (for advanced usage)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /** Login action - use loginTask for loading/error states */
+    loginAction,
+    /** Login task with loading/error/value state */
+    loginTask,
 
     // ═══════════════════════════════════════════════════════════════════════════
     // ACTIONS

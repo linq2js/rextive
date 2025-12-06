@@ -1,11 +1,11 @@
-import { signal, logic, wait } from "rextive";
+import { signal, logic, type ActionContext } from "rextive";
 import { cartLogic } from "../cartLogic";
 import { shippingLogic } from "./shippingLogic";
 import { paymentLogic } from "./paymentLogic";
 import { SHIPPING_COST, TAX_RATE, type OrderSummary } from "./types";
 
-/** Order request - triggers order processing when set */
-type OrderRequest = {
+/** Order request payload for placeOrder action */
+type OrderPayload = {
   cartItems: Array<{
     product: {
       id: number;
@@ -25,7 +25,7 @@ type OrderRequest = {
 
 /**
  * Order logic - manages order totals and order placement.
- * Uses reactive pattern: setting orderRequest triggers async processing.
+ * Uses signal.action for the mutation pattern.
  */
 export const orderLogic = logic("checkout.orderLogic", () => {
   // Get dependencies at factory level (not inside actions!)
@@ -53,26 +53,15 @@ export const orderLogic = logic("checkout.orderLogic", () => {
   );
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // REACTIVE ORDER PROCESSING
+  // ORDER ACTION - mutation pattern with signal.action
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /** Order request - set this to trigger order processing */
-  const orderRequest = signal<OrderRequest | null>(null, {
-    name: "order.request",
-  });
-
-  /**
-   * Async order processing - reactive signal that returns Promise<OrderSummary | null>.
-   * Use with wait() in components for Suspense integration.
-   */
-  const orderAsync = signal(
-    { orderRequest },
-    async ({ deps, safe }): Promise<OrderSummary | null> => {
-      const request = deps.orderRequest;
-      if (!request) return null;
+  const orderAction = signal.action(
+    async (ctx: ActionContext<OrderPayload>) => {
+      const request = ctx.payload;
 
       // Simulate API call (2 second delay)
-      await safe(wait.delay(2000));
+      await ctx.safe(new Promise((r) => setTimeout(r, 2000)));
 
       // Simulate random API error (30% chance)
       if (Math.random() < 0.3) {
@@ -101,19 +90,37 @@ export const orderLogic = logic("checkout.orderLogic", () => {
 
       return orderSummary;
     },
-    { name: "order.async" }
+    { name: "order.action" }
   );
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // NOTE: When to use task() operator vs task.from() in UI:
+  //
+  // Use task() pipe operator when:
+  //   1. You need a non-null/undefined initial value to display
+  //   2. You want stale-while-revalidate: keep showing prev/initial value
+  //      during loading/error states (e.g., data refresh, polling)
+  //
+  // Otherwise, use task.from() in UI:
+  //   - Access loading/error/value states directly from promise
+  //   - Show loading spinner, error messages, or success content appropriately
+  //   - Best for mutations where you want to show errors clearly
+  //
+  // For order placement: We DON'T use task() because:
+  //   - No meaningful initial value to display
+  //   - On error, we want to show error message, not "previous order"
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ACTIONS
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Submit order - triggers reactive processing pipeline.
+   * Submit order - dispatches the action with current cart/shipping/payment data.
    * Returns the promise so caller can await completion.
    */
   const placeOrder = () => {
-    orderRequest.set({
+    return orderAction.dispatch({
       cartItems: $cart.items(),
       subtotal: $cart.subtotal(),
       shipping: shippingCost(),
@@ -122,13 +129,12 @@ export const orderLogic = logic("checkout.orderLogic", () => {
       shippingInfo: $shipping.info(),
       paymentMethod: $payment.method(),
     });
-    // Return the promise for caller to await
-    return orderAsync();
   };
 
-  /** Reset order state */
+  /** Reset order state by refreshing the action result */
   const reset = () => {
-    orderRequest.set(null);
+    // Reset is handled by starting fresh - the task will show initial state
+    // when no order has been placed yet
   };
 
   return {
@@ -144,14 +150,11 @@ export const orderLogic = logic("checkout.orderLogic", () => {
     total,
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // ORDER ASYNC (Use with wait() for Suspense)
+    // ORDER RESULT (for UI state)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Async order signal - returns Promise<OrderSummary | null>.
-     * Use wait(orderAsync()) in components for Suspense integration.
-     */
-    orderAsync,
+    /** Order result signal - use task.from(orderResult()) in UI for loading/error/value */
+    orderResult: orderAction.result,
 
     // ═══════════════════════════════════════════════════════════════════════════
     // ACTIONS

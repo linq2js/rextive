@@ -1,5 +1,4 @@
-import { wait } from "rextive";
-import { rx } from "rextive/react";
+import { rx, task } from "rextive/react";
 import { checkoutLogic, orderLogic } from "@/logic/checkout";
 
 const formatCurrency = (amount: number) =>
@@ -13,9 +12,75 @@ export function OrderComplete() {
   const $order = orderLogic();
 
   return rx(() => {
-    // Use wait() for Suspense integration - parent handles loading/error
-    const summary = wait($order.orderAsync());
+    // Use task.from() for mutations - show errors clearly, no stale data
+    const state = task.from($order.orderResult());
 
+    // Show loading state
+    if (state.loading) {
+      return (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto mb-6 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
+          <h3 className="text-xl font-semibold text-warm-900 mb-2">
+            Processing Your Order...
+          </h3>
+          <p className="text-warm-600">
+            Please wait while we confirm your payment.
+          </p>
+        </div>
+      );
+    }
+
+    // Show error state
+    if (state.error) {
+      return (
+        <div className="text-center py-8">
+          <div className="w-20 h-20 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
+            <svg
+              className="w-10 h-10 text-red-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </div>
+          <h3 className="text-2xl font-bold text-warm-900 mb-2">
+            Order Failed
+          </h3>
+          <p className="text-warm-600 mb-6">
+            {state.error instanceof Error
+              ? state.error.message
+              : "Something went wrong. Please try again."}
+          </p>
+          <button
+            onClick={() => $checkout.goToStep("review")}
+            className="btn-secondary py-3 px-8"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            Back to Review
+          </button>
+        </div>
+      );
+    }
+
+    const summary = state.value;
     if (!summary) return null;
 
     return (

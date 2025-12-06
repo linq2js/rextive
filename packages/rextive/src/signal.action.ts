@@ -26,6 +26,14 @@ export type ActionEquals<TPayload, TResult> =
       result?: ActionEqualsOption<TResult>;
     };
 
+export type WithInitialPayload<TPayload> = {
+  /**
+   * Initial payload value. If provided, the action handler runs immediately
+   * with this payload (instead of waiting for first dispatch).
+   */
+  initialPayload: TPayload;
+};
+
 export type ActionOptions<TPayload, TResult> = {
   /**
    * Debug name for the action signals.
@@ -43,12 +51,6 @@ export type ActionOptions<TPayload, TResult> = {
    * Plugins to extend the result signal's behavior.
    */
   use?: UseList<TResult, "computed">;
-
-  /**
-   * Initial payload value. If provided, the action handler runs immediately
-   * with this payload (instead of waiting for first dispatch).
-   */
-  initialPayload?: TPayload;
 
   /**
    * Called when the action handler throws (sync) or rejects (async).
@@ -121,7 +123,12 @@ export type ActionDeps<TDependencies extends SignalMap> = {
 /**
  * Action instance returned by signal.action()
  */
-export type Action<TPayload, TResult> = {
+export type Action<
+  TPayload,
+  TResult,
+  TMode extends "lazy" | "eager" = "lazy"
+> = {
+  readonly mode: TMode;
   /**
    * Dispatch the action with a payload.
    * Triggers recomputation of `result` and updates `payload` signal.
@@ -137,7 +144,9 @@ export type Action<TPayload, TResult> = {
    *
    * **Note:** Value is `undefined` before first `dispatch()` call.
    */
-  payload: Signal<TPayload, undefined>;
+  payload: TMode extends "lazy"
+    ? Signal<TPayload, undefined>
+    : Signal<TPayload>;
 
   /**
    * Computed signal containing the result of the last action execution.
@@ -145,7 +154,7 @@ export type Action<TPayload, TResult> = {
    * **Note:** If accessed before first `dispatch()`, the handler runs with
    * `ctx.payload === undefined`. Handle this case in your handler.
    */
-  result: Computed<TResult>;
+  result: Computed<TMode extends "lazy" ? TResult | undefined : TResult>;
 };
 
 // ============================================================================
@@ -228,7 +237,21 @@ export function signalAction<
     deps: ActionDeps<TDependencies>
   ) => TResult,
   options?: ActionOptions<TPayload, TResult>
-): Action<TPayload, TResult>;
+): Action<TPayload, TResult, "lazy">;
+
+export function signalAction<
+  TPayload,
+  TResult,
+  TDependencies extends SignalMap
+>(
+  dependencies: TDependencies,
+  handler: (
+    context: ActionContext<TPayload>,
+    deps: ActionDeps<TDependencies>
+  ) => TResult,
+  options: ActionOptions<TPayload, TResult> &
+    NoInfer<WithInitialPayload<TPayload>>
+): Action<TPayload, TResult, "eager">;
 
 /**
  * Create an action without dependencies
@@ -274,7 +297,13 @@ export function signalAction<
 export function signalAction<TPayload, TResult>(
   handler: (context: ActionContext<TPayload>) => TResult,
   options?: ActionOptions<TPayload, TResult>
-): Action<TPayload, TResult>;
+): Action<TPayload, TResult, "lazy">;
+
+export function signalAction<TPayload, TResult>(
+  handler: (context: ActionContext<TPayload>) => TResult,
+  options: ActionOptions<TPayload, TResult> &
+    NoInfer<WithInitialPayload<TPayload>>
+): Action<TPayload, TResult, "eager">;
 
 // ============================================================================
 // Implementation
@@ -284,7 +313,7 @@ export function signalAction<
   TPayload,
   TResult,
   TDependencies extends SignalMap
->(...args: any[]): Action<TPayload, TResult> {
+>(...args: any[]): Action<TPayload, TResult, "lazy" | "eager"> {
   // Parse arguments based on overload
   let dependencies: TDependencies | undefined;
   let handler: (
@@ -385,13 +414,17 @@ export function signalAction<
     return resultSignal();
   };
 
+  let mode = "lazy";
+
   if (options && "initialPayload" in options) {
+    mode = "eager";
     payloadSignal.set(options.initialPayload as TPayload);
   }
 
   return {
+    mode,
     dispatch,
     payload: payloadSignal,
     result: resultSignal,
-  };
+  } as unknown as Action<TPayload, TResult, "lazy" | "eager">;
 }

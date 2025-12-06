@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { rx } from "rextive/react";
 import { checkoutLogic } from "@/logic/checkout";
 import { CheckoutSteps } from "./CheckoutSteps";
@@ -6,8 +5,6 @@ import { ShippingForm } from "./ShippingForm";
 import { PaymentForm } from "./PaymentForm";
 import { OrderReview } from "./OrderReview";
 import { OrderComplete } from "./OrderComplete";
-import { OrderLoading } from "./OrderLoading";
-import { OrderErrorBoundary } from "./OrderErrorBoundary";
 
 export function CheckoutModal() {
   const $checkout = checkoutLogic();
@@ -75,13 +72,7 @@ export function CheckoutModal() {
               {step === "shipping" && <ShippingForm />}
               {step === "payment" && <PaymentForm />}
               {step === "review" && <OrderReview />}
-              {step === "complete" && (
-                <ErrorBoundary>
-                  <Suspense fallback={<OrderLoading />}>
-                    <OrderComplete />
-                  </Suspense>
-                </ErrorBoundary>
-              )}
+              {step === "complete" && <OrderComplete />}
             </div>
           </div>
         </div>
@@ -89,6 +80,3 @@ export function CheckoutModal() {
     );
   });
 }
-
-// Use OrderErrorBoundary as ErrorBoundary
-const ErrorBoundary = OrderErrorBoundary;

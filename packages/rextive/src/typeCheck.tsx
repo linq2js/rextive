@@ -3708,6 +3708,200 @@ function operatorOptionsTests() {
     delayed;
 }
 
+// =============================================================================
+// signal.action() Type Tests
+// =============================================================================
+
+import type { Action, ActionContext, AC, ActionDeps } from "./signal.action";
+
+function signalActionTests() {
+  // -----------------------------------------------------------------------------
+  // Test 1: ActionContext type alias
+  // -----------------------------------------------------------------------------
+
+  type CtxString = ActionContext<string>;
+  type ACString = AC<string>;
+
+  // AC is shorthand for ActionContext
+  const ctx1: CtxString = {} as ACString;
+  const ctx2: ACString = {} as CtxString;
+
+  // ActionContext extends SignalContext with payload property
+  function testContext(ctx: ActionContext<{ id: number }>) {
+    expectType<{ id: number }>(ctx.payload);
+    expectType<AbortSignal>(ctx.abortSignal);
+    expectType<() => boolean>(ctx.aborted);
+    expectType<(fn: VoidFunction) => void>(ctx.onCleanup);
+  }
+  void testContext, ctx1, ctx2;
+
+  // -----------------------------------------------------------------------------
+  // Test 2: Lazy mode (default) - payload and result can be undefined
+  // -----------------------------------------------------------------------------
+
+  // Action without dependencies - lazy mode
+  const lazyAction: Action<string, number, "lazy"> = {} as any;
+
+  // Payload signal type: Signal<TPayload, undefined> - value can be undefined before dispatch
+  expectType<Signal<string, undefined>>(lazyAction.payload);
+  expectType<string | undefined>(lazyAction.payload());
+
+  // Result computed type: Computed<TResult | undefined> - can be undefined before dispatch
+  expectType<Computed<number | undefined>>(lazyAction.result);
+  expectType<number | undefined>(lazyAction.result());
+
+  // Mode should be "lazy"
+  expectType<"lazy">(lazyAction.mode);
+
+  // Dispatch returns the result type (not undefined because dispatch sets payload)
+  expectType<(payload: string) => number>(lazyAction.dispatch);
+
+  // -----------------------------------------------------------------------------
+  // Test 3: Eager mode (with initialPayload) - payload and result always defined
+  // -----------------------------------------------------------------------------
+
+  // Action with initialPayload - eager mode
+  const eagerAction: Action<string, number, "eager"> = {} as any;
+
+  // Payload signal type: Signal<TPayload> - always has value (initialPayload set at creation)
+  expectType<Signal<string>>(eagerAction.payload);
+  expectType<string>(eagerAction.payload());
+
+  // Result computed type: Computed<TResult> - always has value
+  expectType<Computed<number>>(eagerAction.result);
+  expectType<number>(eagerAction.result());
+
+  // Mode should be "eager"
+  expectType<"eager">(eagerAction.mode);
+
+  // Dispatch signature is the same
+  expectType<(payload: string) => number>(eagerAction.dispatch);
+
+  // -----------------------------------------------------------------------------
+  // Test 4: Type differences between lazy and eager modes
+  // -----------------------------------------------------------------------------
+
+  // Lazy mode payload includes undefined
+  type LazyPayloadType = Action<string, number, "lazy">["payload"];
+  type LazyPayloadValue = ReturnType<LazyPayloadType>;
+  expectType<LazyPayloadValue>("" as string | undefined);
+
+  // Eager mode payload does NOT include undefined
+  type EagerPayloadType = Action<string, number, "eager">["payload"];
+  type EagerPayloadValue = ReturnType<EagerPayloadType>;
+  expectType<EagerPayloadValue>("" as string);
+
+  // Lazy mode result includes undefined
+  type LazyResultType = Action<string, number, "lazy">["result"];
+  type LazyResultValue = ReturnType<LazyResultType>;
+  expectType<LazyResultValue>(0 as number | undefined);
+
+  // Eager mode result does NOT include undefined
+  type EagerResultType = Action<string, number, "eager">["result"];
+  type EagerResultValue = ReturnType<EagerResultType>;
+  expectType<EagerResultValue>(0 as number);
+
+  // -----------------------------------------------------------------------------
+  // Test 5: ActionDeps type - resolved dependency values
+  // -----------------------------------------------------------------------------
+
+  const numSig = signal(42);
+  const strSig = signal("hello");
+
+  type TestDeps = { num: typeof numSig; str: typeof strSig };
+  type ResolvedDeps = ActionDeps<TestDeps>;
+
+  // ActionDeps extracts the value types from signals
+  expectType<ResolvedDeps>({} as { num: number; str: string });
+
+  // -----------------------------------------------------------------------------
+  // Test 6: Async action types
+  // -----------------------------------------------------------------------------
+
+  // Async lazy action - result is Promise<T> | undefined
+  const asyncLazyAction: Action<string, Promise<number>, "lazy"> = {} as any;
+  expectType<Computed<Promise<number> | undefined>>(asyncLazyAction.result);
+
+  // Async eager action - result is Promise<T>
+  const asyncEagerAction: Action<string, Promise<number>, "eager"> = {} as any;
+  expectType<Computed<Promise<number>>>(asyncEagerAction.result);
+
+  // -----------------------------------------------------------------------------
+  // Test 7: Complex payload types
+  // -----------------------------------------------------------------------------
+
+  interface Credentials {
+    username: string;
+    password: string;
+  }
+
+  interface User {
+    id: number;
+    name: string;
+  }
+
+  // Complex types work correctly
+  const loginAction: Action<Credentials, Promise<User>, "lazy"> = {} as any;
+  expectType<Signal<Credentials, undefined>>(loginAction.payload);
+  expectType<Computed<Promise<User> | undefined>>(loginAction.result);
+  expectType<(payload: Credentials) => Promise<User>>(loginAction.dispatch);
+
+  // -----------------------------------------------------------------------------
+  // Test 8: Void payload (trigger-only actions)
+  // -----------------------------------------------------------------------------
+
+  const refreshAction: Action<void, number[], "lazy"> = {} as any;
+  expectType<Signal<void, undefined>>(refreshAction.payload);
+  expectType<(payload: void) => number[]>(refreshAction.dispatch);
+
+  // Can call dispatch without arguments when payload is void
+  // (This is a runtime behavior, but the type allows it)
+
+  // -----------------------------------------------------------------------------
+  // Test 9: Union and nullable types
+  // -----------------------------------------------------------------------------
+
+  // Nullable result type
+  const nullableAction: Action<string, User | null, "lazy"> = {} as any;
+  expectType<Computed<User | null | undefined>>(nullableAction.result);
+
+  // With eager mode, only the original type (no extra undefined)
+  const nullableEagerAction: Action<string, User | null, "eager"> = {} as any;
+  expectType<Computed<User | null>>(nullableEagerAction.result);
+
+  // -----------------------------------------------------------------------------
+  // Test 10: Mode type literal inference
+  // -----------------------------------------------------------------------------
+
+  // Mode is a literal type, not just string
+  function checkMode<M extends "lazy" | "eager">(action: Action<any, any, M>) {
+    return action.mode;
+  }
+
+  const lazyMode = checkMode(lazyAction);
+  expectType<"lazy">(lazyMode);
+
+  const eagerMode = checkMode(eagerAction);
+  expectType<"eager">(eagerMode);
+
+  // -----------------------------------------------------------------------------
+  // Cleanup
+  // -----------------------------------------------------------------------------
+
+  void lazyAction,
+    eagerAction,
+    asyncLazyAction,
+    asyncEagerAction,
+    loginAction,
+    refreshAction,
+    nullableAction,
+    nullableEagerAction,
+    lazyMode,
+    eagerMode,
+    numSig,
+    strSig;
+}
+
 export {
   signalTests,
   taskTests,
@@ -3727,6 +3921,7 @@ export {
   signalFromTests,
   signalWhenTests,
   operatorOptionsTests,
+  signalActionTests,
 };
 
 // =============================================================================

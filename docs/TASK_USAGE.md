@@ -138,6 +138,88 @@ function UserProfile() {
 
 ---
 
+## ⚠️ When NOT to Use `signal.pipe(task())`
+
+**Mutations** (create, update, delete operations) should typically NOT use the `task()` operator. Use `task.from()` in the UI instead.
+
+### Why?
+
+1. **No meaningful initial value** - Mutations don't have a "default" result
+2. **Errors should be shown clearly** - Not hidden behind stale data
+3. **Users expect feedback** - Clear loading → success/error flow
+
+### Example: Order Placement (Mutation)
+
+```tsx
+// ❌ BAD: Using task() for mutation
+const orderAction = signal.action(async (ctx) => {
+  await submitOrder(ctx.payload);
+  return { orderId: "123", status: "confirmed" };
+});
+
+// Don't do this - null is not a meaningful initial value
+const orderTask = orderAction.result.pipe(task(null));
+
+// ✅ GOOD: Use task.from() in UI for mutations
+function OrderButton() {
+  const $order = orderLogic();
+
+  return rx(() => {
+    // Access state directly from the action result
+    const state = task.from($order.orderAction.result());
+
+    return (
+      <div>
+        <button
+          onClick={() => $order.placeOrder()}
+          disabled={state.loading}
+        >
+          {state.loading ? "Processing..." : "Place Order"}
+        </button>
+
+        {/* Show error prominently - don't hide it! */}
+        {state.error && (
+          <div className="error">
+            Order failed: {String(state.error)}
+            <button onClick={() => $order.placeOrder()}>Retry</button>
+          </div>
+        )}
+
+        {/* Show success */}
+        {state.value && (
+          <div className="success">
+            Order #{state.value.orderId} confirmed!
+          </div>
+        )}
+      </div>
+    );
+  });
+}
+```
+
+### Decision Flowchart
+
+```
+Is this a QUERY (fetching data) or MUTATION (changing data)?
+│
+├─ QUERY → Do you have a meaningful default value?
+│   │
+│   ├─ YES → Do you want stale-while-revalidate?
+│   │   │
+│   │   ├─ YES → ✅ Use signal.pipe(task(defaultValue))
+│   │   │
+│   │   └─ NO → Use task.from() in UI
+│   │
+│   └─ NO → Use task.from() in UI
+│
+└─ MUTATION → ✅ Use task.from() in UI
+    - Show loading spinner during action
+    - Show error message on failure
+    - Show success confirmation on completion
+```
+
+---
+
 ## Practical Example: Search Results
 
 ### With `task.from()` - Results disappear during search
@@ -270,7 +352,23 @@ function UserProfile() {
 
 Choose your approach based on the UX you want:
 
-- **`task.from()`**: Content is replaced during loading/error → Use for initial loads, auth checks
-- **`signal.pipe(task())`**: Content persists during loading/error → Use for refreshes, search, dashboards
+| Scenario | Approach | Reason |
+|----------|----------|--------|
+| **Mutations** (create/update/delete) | `task.from()` in UI | Show errors clearly, no meaningful default |
+| **Initial data load** | `task.from()` in UI | Show skeleton/placeholder |
+| **Data refresh / polling** | `signal.pipe(task(default))` | Keep stale data visible |
+| **Search results** | `signal.pipe(task([]))` | Keep previous results |
+| **Dashboards with auto-refresh** | `signal.pipe(task(default))` | Stale-while-revalidate |
+
+**Key Rules:**
+
+1. **Use `task()` operator** when:
+   - You have a meaningful non-null/undefined initial value
+   - You want stale-while-revalidate (keep showing prev/initial during loading/error)
+
+2. **Use `task.from()` in UI** when:
+   - It's a mutation (order placement, form submission, etc.)
+   - You don't have a meaningful default value
+   - You want to show errors prominently (not hidden behind stale data)
 
 Both approaches provide the same `{ loading, error, value, status }` interface, making it easy to switch between them as your requirements evolve.
