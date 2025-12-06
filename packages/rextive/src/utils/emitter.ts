@@ -61,7 +61,27 @@ export interface Emitter<T = void> {
    * @param payload - The value to pass to all listeners
    */
   emitAndClear(payload: T): void;
-  size: number;
+
+  /**
+   * Emit to all listeners, clear, and "settle" the emitter.
+   *
+   * After settling:
+   * - Any new `on()` call immediately invokes the listener with the settled payload
+   * - Returns a no-op unsubscribe function
+   * - `emit()` and `emitAndClear()` become no-ops
+   *
+   * Useful for one-time events where late subscribers should still receive the value
+   * (similar to Promise behavior).
+   *
+   * @param payload - The final value to pass to all listeners
+   */
+  settle(payload: T): void;
+
+  /** Number of registered listeners */
+  readonly size: number;
+
+  /** Whether the emitter has been settled */
+  readonly settled: boolean;
 }
 
 /**
@@ -108,7 +128,14 @@ export function emitter<T = void>(
    */
   const listeners = new Set<Listener<T>>(initialListeners ?? []);
 
-  const emit = (payload: T, clear: boolean) => {
+  /** Settled state - once settled, late subscribers get the payload immediately */
+  let settledPayload: T | undefined;
+  let isSettled = false;
+
+  const noop = () => {};
+
+  // Internal emit - always executes (doesn't check isSettled)
+  const doEmit = (payload: T, clear: boolean) => {
     // Create snapshot - necessary because Set.forEach includes items added during iteration
     const copy = Array.from(listeners);
     if (clear) {
@@ -125,6 +152,9 @@ export function emitter<T = void>(
     get size() {
       return listeners.size;
     },
+    get settled() {
+      return isSettled;
+    },
     /**
      * Adds one or more listeners to the emitter.
      *
@@ -134,6 +164,9 @@ export function emitter<T = void>(
      * **Important**: The unsubscribe function is idempotent - calling it multiple
      * times is safe and won't cause errors. If the same listener is added multiple
      * times, it will only be called once per emit (Set deduplication).
+     *
+     * **Settled behavior**: If the emitter is settled, listeners are called
+     * immediately with the settled payload and a no-op unsubscribe is returned.
      *
      * @param newListeners - Single listener or array of listeners to add
      * @returns An unsubscribe function that removes the listener(s)
@@ -160,6 +193,14 @@ export function emitter<T = void>(
         ];
       }
 
+      // If settled, call listeners immediately and return no-op
+      if (isSettled) {
+        for (const listener of newListeners) {
+          listener(settledPayload as T);
+        }
+        return noop;
+      }
+
       for (const listener of newListeners) {
         listeners.add(listener);
       }
@@ -182,10 +223,13 @@ export function emitter<T = void>(
      * Performance: For typical use cases (< 20 listeners), Array.from() overhead
      * is negligible compared to calling the listener functions themselves.
      *
+     * **Settled behavior**: After `settle()` is called, `emit()` becomes a no-op.
+     *
      * @param payload - The value to pass to all listeners
      */
     emit(payload: T): void {
-      emit(payload, false);
+      if (isSettled) return;
+      doEmit(payload, false);
     },
     /**
      * Removes all registered listeners.
@@ -200,10 +244,33 @@ export function emitter<T = void>(
     /**
      * Emits an event to all registered listeners and then clears all listeners.
      *
+     * **Settled behavior**: After `settle()` is called, `emitAndClear()` becomes a no-op.
+     *
      * @param payload - The value to pass to all listeners
      */
     emitAndClear(payload: T): void {
-      emit(payload, true);
+      if (isSettled) return;
+      doEmit(payload, true);
+    },
+
+    /**
+     * Emit to all listeners, clear, and "settle" the emitter.
+     *
+     * After settling:
+     * - Any new `on()` call immediately invokes the listener with the settled payload
+     * - Returns a no-op unsubscribe function
+     * - `emit()` and `emitAndClear()` become no-ops
+     *
+     * **Important**: `isSettled` is set BEFORE emitting so that listeners
+     * added during emission see the settled state and get called immediately.
+     *
+     * @param payload - The final value to pass to all listeners
+     */
+    settle(payload: T): void {
+      if (isSettled) return;
+      settledPayload = payload;
+      isSettled = true;
+      doEmit(payload, true);
     },
   };
 }

@@ -19,8 +19,11 @@ export function ProductCard({ product, index }: ProductCardProps) {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    cart.addItem(product);
-    cart.openDrawer();
+    // Only open drawer if addItem succeeds
+    // If not authenticated or stock exceeded, drawer won't open
+    if (cart.addItem(product)) {
+      cart.openDrawer();
+    }
   };
 
   const handleClick = () => {
@@ -34,7 +37,7 @@ export function ProductCard({ product, index }: ProductCardProps) {
       onClick={handleClick}
     >
       {/* Image */}
-      <div className="relative aspect-square overflow-hidden bg-warm-100">
+      <div className="relative aspect-square overflow-hidden bg-white dark:bg-warm-800">
         <img
           src={product.thumbnail}
           alt={product.title}
@@ -51,7 +54,7 @@ export function ProductCard({ product, index }: ProductCardProps) {
 
         {/* Stock badge */}
         {product.stock < 10 && (
-          <span className="absolute top-3 right-3 badge bg-amber-100 text-amber-700">
+          <span className="absolute top-3 right-3 badge bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
             Only {product.stock} left
           </span>
         )}
@@ -83,12 +86,12 @@ export function ProductCard({ product, index }: ProductCardProps) {
       {/* Content */}
       <div className="p-4">
         {/* Category */}
-        <p className="text-xs text-warm-500 uppercase tracking-wider mb-1">
+        <p className="text-xs text-warm-600 dark:text-warm-400 uppercase tracking-wider mb-1">
           {product.category}
         </p>
 
         {/* Title */}
-        <h3 className="font-medium text-warm-900 line-clamp-2 mb-2 group-hover:text-brand-600 transition-colors">
+        <h3 className="font-medium text-warm-900 dark:text-warm-100 line-clamp-2 mb-2 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
           {product.title}
         </h3>
 
@@ -101,7 +104,7 @@ export function ProductCard({ product, index }: ProductCardProps) {
                 className={`w-4 h-4 ${
                   i < Math.round(product.rating)
                     ? "text-amber-400"
-                    : "text-warm-200"
+                    : "text-warm-200 dark:text-warm-700"
                 }`}
                 fill="currentColor"
                 viewBox="0 0 20 20"
@@ -110,7 +113,7 @@ export function ProductCard({ product, index }: ProductCardProps) {
               </svg>
             ))}
           </div>
-          <span className="text-xs text-warm-500">
+          <span className="text-xs text-warm-600 dark:text-warm-400">
             ({product.rating.toFixed(1)})
           </span>
         </div>
@@ -118,11 +121,11 @@ export function ProductCard({ product, index }: ProductCardProps) {
         {/* Price */}
         <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold text-warm-900">
+            <span className="text-lg font-bold text-warm-900 dark:text-warm-100">
               ${discountedPrice.toFixed(2)}
             </span>
             {hasDiscount && (
-              <span className="text-sm text-warm-400 line-through">
+              <span className="text-sm text-warm-500 dark:text-warm-500 line-through">
                 ${product.price.toFixed(2)}
               </span>
             )}

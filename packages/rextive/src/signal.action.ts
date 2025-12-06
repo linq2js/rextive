@@ -353,7 +353,10 @@ export function signalAction<
   // Create result computed signal
   const resultSignal = signal(
     resultDeps,
-    (computeContext: ComputedSignalContext<typeof resultDeps>) => {
+    (computeContext) => {
+      if (!computeContext.deps.__payload && computeContext.nth === 0) {
+        return undefined;
+      }
       // Build action context with payload
       // Note: We use 'as unknown as' for 'use' because ActionContext extends SignalContext
       // but has additional payload property that doesn't affect the 'use' function semantics
@@ -400,8 +403,8 @@ export function signalAction<
     },
     {
       name: name ? `${name}.result` : actionId + ".result",
-      equals: resultEquals,
-      use,
+      equals: resultEquals as any,
+      use: use as any[],
     }
   );
 
@@ -411,7 +414,7 @@ export function signalAction<
     payloadSignal.set(payload);
 
     // Return current result value
-    return resultSignal();
+    return resultSignal() as TResult;
   };
 
   let mode = "lazy";

@@ -2,6 +2,7 @@ import { signal, logic } from "rextive";
 import { rx } from "rextive/react";
 import { debounce, to } from "rextive/op";
 import { productsLogic } from "@/logic/productsLogic";
+import { routerLogic } from "@/logic/routerLogic";
 
 /**
  * Local logic for SearchBar - manages input debouncing.
@@ -26,9 +27,26 @@ export const searchBarLogic = logic("searchBarLogic", () => {
 
 export function SearchBar() {
   const $search = searchBarLogic();
+  const $router = routerLogic();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    $search.input.set(e.target.value);
+    const value = e.target.value;
+    $search.input.set(value);
+
+    // Navigate to home and scroll to products when user starts typing
+    if (value.length > 0) {
+      const route = $router.route();
+      if (route.page !== "home") {
+        $router.goHome();
+      }
+      // Scroll to products section after a short delay
+      setTimeout(() => {
+        const productsSection = document.getElementById("products");
+        if (productsSection) {
+          productsSection.scrollIntoView({ behavior: "smooth" });
+        }
+      }, 100);
+    }
   };
 
   return (

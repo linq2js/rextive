@@ -15,6 +15,14 @@
     min-height: 100vh;
   }
 
+  /* Dark mode body */
+  .dark body {
+    @apply bg-warm-950 text-warm-100;
+    background-image: 
+      radial-gradient(ellipse at top, rgba(207, 127, 91, 0.03) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(102, 120, 86, 0.03) 0%, transparent 50%);
+  }
+
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     @apply w-2;
@@ -24,12 +32,24 @@
     @apply bg-warm-100;
   }
   
+  .dark ::-webkit-scrollbar-track {
+    @apply bg-warm-900;
+  }
+  
   ::-webkit-scrollbar-thumb {
     @apply bg-warm-300 rounded-full;
   }
   
+  .dark ::-webkit-scrollbar-thumb {
+    @apply bg-warm-700 rounded-full;
+  }
+  
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-warm-400;
+  }
+  
+  .dark ::-webkit-scrollbar-thumb:hover {
+    @apply bg-warm-600;
   }
 }
 
@@ -51,13 +71,17 @@
   .btn-secondary {
     @apply btn bg-warm-200 text-warm-800
            hover:bg-warm-300 active:bg-warm-400
-           focus:ring-warm-400;
+           focus:ring-warm-400
+           dark:bg-warm-800 dark:text-warm-200
+           dark:hover:bg-warm-700 dark:active:bg-warm-600;
   }
   
   .btn-ghost {
     @apply btn bg-transparent text-warm-600
            hover:bg-warm-100 active:bg-warm-200
-           focus:ring-warm-300;
+           focus:ring-warm-300
+           dark:text-warm-400
+           dark:hover:bg-warm-800 dark:active:bg-warm-700;
   }
 
   .btn-sage {
@@ -70,7 +94,8 @@
   .card {
     @apply bg-white rounded-2xl shadow-sm border border-warm-200/50
            transition-shadow duration-200
-           hover:shadow-md;
+           hover:shadow-md
+           dark:bg-warm-900 dark:border-warm-800/50 dark:hover:shadow-warm-950/50;
   }
 
   /* Input styles */
@@ -78,7 +103,8 @@
     @apply w-full px-4 py-2.5 rounded-lg border border-warm-300
            bg-white text-warm-900 placeholder:text-warm-400
            transition-all duration-200
-           focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500;
+           focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500
+           dark:bg-warm-900 dark:border-warm-700 dark:text-warm-100 dark:placeholder:text-warm-500;
   }
 
   /* Badge styles */
@@ -87,21 +113,25 @@
   }
   
   .badge-brand {
-    @apply badge bg-brand-100 text-brand-700;
+    @apply badge bg-brand-100 text-brand-700
+           dark:bg-brand-900/50 dark:text-brand-300;
   }
   
   .badge-sage {
-    @apply badge bg-sage-100 text-sage-700;
+    @apply badge bg-sage-100 text-sage-700
+           dark:bg-sage-900/50 dark:text-sage-300;
   }
 
   /* Skeleton loading */
   .skeleton {
-    @apply bg-warm-200 rounded animate-pulse;
+    @apply bg-warm-200 rounded animate-pulse
+           dark:bg-warm-800;
   }
   
   .skeleton-shimmer {
     @apply bg-gradient-to-r from-warm-200 via-warm-100 to-warm-200
-           bg-[length:200%_100%] animate-shimmer rounded;
+           bg-[length:200%_100%] animate-shimmer rounded
+           dark:from-warm-800 dark:via-warm-700 dark:to-warm-800;
   }
 }
 
@@ -114,6 +144,10 @@
   /* Glass effect */
   .glass {
     @apply bg-white/70 backdrop-blur-md;
+  }
+  
+  .dark .glass {
+    @apply bg-warm-900/80 backdrop-blur-md;
   }
 
   /* Stagger animation delays */

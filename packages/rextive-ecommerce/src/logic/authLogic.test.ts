@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { logic } from "rextive";
+import { logic, task } from "rextive";
 import { authLogic } from "./authLogic";
 
 // Mock localStorage
@@ -70,7 +70,11 @@ describe("authLogic", () => {
     ).rejects.toThrow();
 
     expect(auth.user()).toBeNull();
-    expect(auth.loginError()).toBe("Invalid credentials");
+
+    // Use task.from() to check error state
+    const state = task.from(auth.loginResult());
+    expect(state.error).toBeInstanceOf(Error);
+    expect((state.error as Error).message).toBe("Invalid credentials");
   });
 
   it("should logout and clear state", async () => {
@@ -103,15 +107,15 @@ describe("authLogic", () => {
     expect(auth.loginModalOpen()).toBe(false);
   });
 
-  it("should clear login error when opening modal", () => {
+  it("should have no error initially", () => {
     const auth = authLogic.create();
 
-    // Manually set an error (simulating a failed login)
-    auth.openLoginModal();
-    expect(auth.loginError()).toBeNull();
+    // Before any login attempt, loginResult has no error
+    const state = task.from(auth.loginResult());
+    expect(state.error).toBeUndefined();
   });
 
-  it("should set isLoggingIn during login", async () => {
+  it("should show loading state during login", async () => {
     let resolveLogin: (value: unknown) => void;
     const loginPromise = new Promise((resolve) => {
       resolveLogin = resolve;
@@ -126,12 +130,16 @@ describe("authLogic", () => {
 
     const loginCall = auth.login({ username: "emilys", password: "pass" });
 
-    expect(auth.isLoggingIn()).toBe(true);
+    // Use task.from() to check loading state
+    const loadingState = task.from(auth.loginResult());
+    expect(loadingState.loading).toBe(true);
 
     resolveLogin!(mockUser);
     await loginCall;
 
-    expect(auth.isLoggingIn()).toBe(false);
+    // After completion, loading is false
+    const doneState = task.from(auth.loginResult());
+    expect(doneState.loading).toBe(false);
   });
 
   it("should close modal after successful login", async () => {

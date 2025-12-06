@@ -16,8 +16,8 @@ export function Logo() {
           />
         </svg>
       </div>
-      <span className="font-bold text-xl text-warm-900 hidden sm:block">
-        Rextive<span className="text-brand-600">Shop</span>
+      <span className="font-bold text-xl text-warm-900 dark:text-warm-100 hidden sm:block">
+        <span className="dark:text-warm-100">Shop</span>
       </span>
     </a>
   );

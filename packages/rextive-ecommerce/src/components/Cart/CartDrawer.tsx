@@ -23,7 +23,7 @@ export function CartDrawer() {
 
         {/* Drawer */}
         <aside
-          className={`fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-out ${
+          className={`fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-warm-900 shadow-2xl z-50 transform transition-transform duration-300 ease-out ${
             isOpen ? "translate-x-0" : "translate-x-full"
           }`}
           aria-label="Shopping cart"

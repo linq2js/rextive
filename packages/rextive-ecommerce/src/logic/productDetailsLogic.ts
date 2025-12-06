@@ -66,7 +66,7 @@ export const productDetailsLogic = logic("productDetailsLogic", () => {
   return {
     // Signals
     productId,
-    productTask,
+    productAsync,
     selectedImageIndex,
     quantity,
 
@@ -79,4 +79,3 @@ export const productDetailsLogic = logic("productDetailsLogic", () => {
     reset,
   };
 });
-

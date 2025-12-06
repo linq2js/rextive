@@ -1,28 +1,7 @@
-import { signal, logic, AC, task } from "rextive";
+import { signal, logic, type ActionContext } from "rextive";
 import { authApi } from "@/api/client";
 import type { User, LoginCredentials } from "@/api/types";
-
-// Helper to get/set token from localStorage
-const tokenStorage = {
-  get: (): string | null => {
-    try {
-      return localStorage.getItem("auth_token");
-    } catch {
-      return null;
-    }
-  },
-  set: (token: string | null) => {
-    try {
-      if (token) {
-        localStorage.setItem("auth_token", token);
-      } else {
-        localStorage.removeItem("auth_token");
-      }
-    } catch {
-      // Ignore storage errors
-    }
-  },
-};
+import { persistLogic } from "./persistLogic";
 
 /**
  * Auth logic - handles user authentication with JWT tokens.
@@ -33,13 +12,12 @@ const tokenStorage = {
  * - Testability via logic.provide() and logic.clear()
  */
 export const authLogic = logic("authLogic", () => {
-  // Load initial token from storage
-  const initialToken = tokenStorage.get();
+  const { persist } = persistLogic();
 
   // Core state (signals)
-  const token = signal<string | null>(initialToken, {
+  const token = signal<string | null>(null, {
     name: "auth.token",
-    onChange: tokenStorage.set, // Auto-save on change
+    use: [persist("token")], // Auto-loads from localStorage, auto-saves on change
   });
   const user = signal<User | null>(null, { name: "auth.user" });
   const loginModalOpen = signal(false, { name: "auth.loginModalOpen" });
@@ -54,7 +32,7 @@ export const authLogic = logic("authLogic", () => {
   // LOGIN ACTION - mutation pattern with signal.action
   // ═══════════════════════════════════════════════════════════════════════════
   const loginAction = signal.action(
-    async (ctx: AC<LoginCredentials>) => {
+    async (ctx: ActionContext<LoginCredentials>) => {
       const userData = await authApi.login(ctx.payload);
 
       signal.batch(() => {
@@ -73,25 +51,10 @@ export const authLogic = logic("authLogic", () => {
     }
   );
 
-  // Task wrapper for login state (loading/error/value)
-  const loginTask = loginAction.result.pipe(task(null as User | null));
-
   // Login helper that dispatches and returns promise
   const login = (credentials: LoginCredentials) => {
     return loginAction.dispatch(credentials);
   };
-
-  // Computed: login error message
-  const loginError = loginTask.to(
-    (state) =>
-      state.error instanceof Error ? state.error.message : state.error ?? null,
-    { name: "auth.loginError" }
-  );
-
-  // Computed: is logging in
-  const isLoggingIn = loginTask.to((state) => state.loading, {
-    name: "auth.isLoggingIn",
-  });
 
   const logout = () => {
     signal.batch(() => {
@@ -125,8 +88,8 @@ export const authLogic = logic("authLogic", () => {
     }
   };
 
-  // Auto-restore on creation (if we have a token)
-  if (initialToken) {
+  // Auto-restore on creation (if we have a token from persistor)
+  if (token()) {
     restoreSession();
   }
 
@@ -141,23 +104,17 @@ export const authLogic = logic("authLogic", () => {
     token,
     /** Whether login modal is currently shown */
     loginModalOpen,
-    /** Error message from last login attempt (null on success) */
-    loginError,
-    /** Whether a login request is in progress */
-    isLoggingIn,
     /** Whether session restoration from token is in progress */
     isRestoring,
     /** Computed: true when user is authenticated */
     isAuthenticated,
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // LOGIN ACTION (for advanced usage)
+    // LOGIN RESULT (for UI state)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /** Login action - use loginTask for loading/error states */
-    loginAction,
-    /** Login task with loading/error/value state */
-    loginTask,
+    /** Login result signal - use task.from(loginResult()) in UI for loading/error/value */
+    loginResult: loginAction.result,
 
     // ═══════════════════════════════════════════════════════════════════════════
     // ACTIONS

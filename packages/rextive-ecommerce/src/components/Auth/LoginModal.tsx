@@ -1,5 +1,5 @@
 import { signal, logic } from "rextive";
-import { rx } from "rextive/react";
+import { rx, task } from "rextive/react";
 import { authLogic } from "@/logic/authLogic";
 
 /**
@@ -41,8 +41,14 @@ export function LoginModal() {
 
   return rx(() => {
     const isOpen = $auth.loginModalOpen();
-    const error = $auth.loginError();
-    const loading = $auth.isLoggingIn();
+    const loginState = task.from($auth.loginResult());
+    const loading = loginState.loading;
+    const error =
+      loginState.error instanceof Error
+        ? loginState.error.message
+        : loginState.error
+        ? String(loginState.error)
+        : null;
     const username = $form.username();
     const password = $form.password();
 

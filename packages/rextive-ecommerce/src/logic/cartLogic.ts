@@ -2,6 +2,7 @@ import { signal, logic } from "rextive";
 import { persistor } from "rextive/plugins";
 import type { Product, LocalCartItem } from "@/api/types";
 import { authLogic } from "./authLogic";
+import { alertLogic } from "./alertLogic";
 
 // Persistor for cart items
 const persist = persistor<{ items: LocalCartItem[] }>({
@@ -32,6 +33,7 @@ const persist = persistor<{ items: LocalCartItem[] }>({
 export const cartLogic = logic("cartLogic", () => {
   // Get auth logic for checking authentication
   const $auth = authLogic();
+  const $alert = alertLogic();
 
   // Helper to require auth - returns true if authenticated, false if showing login modal
   const requireAuth = (): boolean => {
@@ -76,13 +78,39 @@ export const cartLogic = logic("cartLogic", () => {
   );
 
   // Actions (require authentication)
-  const addItem = (product: Product, quantity = 1) => {
-    if (!requireAuth()) return;
+  /**
+   * Add a product to cart.
+   * @returns true if added successfully, false if validation failed
+   */
+  const addItem = (product: Product, quantity = 1): boolean => {
+    if (!requireAuth()) return false;
+
+    const currentItems = items();
+    const existing = currentItems.find((item) => item.productId === product.id);
+    const currentQty = existing?.quantity ?? 0;
+    const newTotalQty = currentQty + quantity;
+
+    // Check if exceeds stock
+    if (newTotalQty > product.stock) {
+      const available = product.stock - currentQty;
+      if (available <= 0) {
+        $alert.warning(
+          `You already have the maximum available (${product.stock}) in your cart.`,
+          `Cannot add "${product.title}"`
+        );
+      } else {
+        $alert.warning(
+          `Only ${available} more available.\n${currentQty} already in cart, ${product.stock} total in stock.`,
+          `Cannot add ${quantity} "${product.title}"`
+        );
+      }
+      return false;
+    }
 
     items.set((current) => {
-      const existing = current.find((item) => item.productId === product.id);
+      const existingItem = current.find((item) => item.productId === product.id);
 
-      if (existing) {
+      if (existingItem) {
         return current.map((item) =>
           item.productId === product.id
             ? { ...item, quantity: item.quantity + quantity }
@@ -92,6 +120,8 @@ export const cartLogic = logic("cartLogic", () => {
 
       return [...current, { productId: product.id, product, quantity }];
     });
+
+    return true;
   };
 
   const removeItem = (productId: number) => {
@@ -102,19 +132,39 @@ export const cartLogic = logic("cartLogic", () => {
     );
   };
 
-  const updateQuantity = (productId: number, quantity: number) => {
-    if (!requireAuth()) return;
+  /**
+   * Update quantity of a specific item.
+   * @returns true if updated successfully, false if validation failed
+   */
+  const updateQuantity = (productId: number, quantity: number): boolean => {
+    if (!requireAuth()) return false;
 
     if (quantity <= 0) {
       removeItem(productId);
-      return;
+      return true;
+    }
+
+    const currentItems = items();
+    const item = currentItems.find((i) => i.productId === productId);
+
+    if (!item) return false;
+
+    // Check if exceeds stock
+    if (quantity > item.product.stock) {
+      $alert.warning(
+        `Only ${item.product.stock} available in stock.`,
+        `Cannot set quantity to ${quantity}`
+      );
+      return false;
     }
 
     items.set((current) =>
-      current.map((item) =>
-        item.productId === productId ? { ...item, quantity } : item
+      current.map((i) =>
+        i.productId === productId ? { ...i, quantity } : i
       )
     );
+
+    return true;
   };
 
   const clearCart = () => {

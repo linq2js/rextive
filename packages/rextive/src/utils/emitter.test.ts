@@ -396,4 +396,259 @@ describe("emitter", () => {
       expect(listener).toHaveBeenCalledWith(undefined);
     });
   });
+
+  describe("settle functionality", () => {
+    it("should emit to all listeners and clear when settled", () => {
+      const eventEmitter = emitter<string>();
+      const listener1 = vi.fn();
+      const listener2 = vi.fn();
+
+      eventEmitter.on(listener1);
+      eventEmitter.on(listener2);
+      eventEmitter.settle("final");
+
+      expect(listener1).toHaveBeenCalledWith("final");
+      expect(listener2).toHaveBeenCalledWith("final");
+      expect(eventEmitter.size).toBe(0);
+    });
+
+    it("should set settled to true after settle", () => {
+      const eventEmitter = emitter<string>();
+
+      expect(eventEmitter.settled).toBe(false);
+      eventEmitter.settle("done");
+      expect(eventEmitter.settled).toBe(true);
+    });
+
+    it("should call late subscribers immediately with settled payload", () => {
+      const eventEmitter = emitter<string>();
+      eventEmitter.settle("settled-value");
+
+      const lateListener = vi.fn();
+      eventEmitter.on(lateListener);
+
+      expect(lateListener).toHaveBeenCalledWith("settled-value");
+      expect(lateListener).toHaveBeenCalledTimes(1);
+    });
+
+    it("should return no-op unsubscribe for late subscribers", () => {
+      const eventEmitter = emitter<string>();
+      eventEmitter.settle("done");
+
+      const lateListener = vi.fn();
+      const unsub = eventEmitter.on(lateListener);
+
+      // Calling unsub should be safe (no-op)
+      unsub();
+      unsub(); // Multiple calls should be safe
+    });
+
+    it("should not add late subscribers to listeners set", () => {
+      const eventEmitter = emitter<string>();
+      eventEmitter.settle("done");
+
+      const lateListener = vi.fn();
+      eventEmitter.on(lateListener);
+
+      // Size should still be 0 (late subscribers are not added)
+      expect(eventEmitter.size).toBe(0);
+    });
+
+    it("should make emit a no-op after settle", () => {
+      const eventEmitter = emitter<string>();
+      const listener = vi.fn();
+
+      eventEmitter.settle("final");
+      eventEmitter.on(listener);
+
+      // Reset the mock after the immediate call
+      listener.mockReset();
+
+      // emit should be a no-op
+      eventEmitter.emit("ignored");
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it("should make emitAndClear a no-op after settle", () => {
+      const eventEmitter = emitter<string>();
+      eventEmitter.settle("final");
+
+      const listener = vi.fn();
+      eventEmitter.on(listener);
+      listener.mockReset();
+
+      // emitAndClear should be a no-op
+      eventEmitter.emitAndClear("ignored");
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it("should only settle once (subsequent settle calls are no-ops)", () => {
+      const eventEmitter = emitter<string>();
+      eventEmitter.settle("first");
+
+      const listener = vi.fn();
+      eventEmitter.on(listener);
+      expect(listener).toHaveBeenCalledWith("first");
+
+      listener.mockReset();
+
+      // Second settle should be ignored
+      eventEmitter.settle("second");
+      eventEmitter.on(listener);
+
+      // Should still receive "first", not "second"
+      expect(listener).toHaveBeenCalledWith("first");
+    });
+
+    it("should work with void payload", () => {
+      const eventEmitter = emitter<void>();
+      const listener = vi.fn();
+
+      eventEmitter.on(listener);
+      eventEmitter.settle(undefined);
+
+      expect(listener).toHaveBeenCalledWith(undefined);
+      expect(eventEmitter.settled).toBe(true);
+
+      // Late subscriber should receive undefined
+      const lateListener = vi.fn();
+      eventEmitter.on(lateListener);
+      expect(lateListener).toHaveBeenCalledWith(undefined);
+    });
+
+    it("should work with object payload", () => {
+      const eventEmitter = emitter<{ status: string }>();
+      const payload = { status: "complete" };
+
+      eventEmitter.settle(payload);
+
+      const listener = vi.fn();
+      eventEmitter.on(listener);
+
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it("should handle settle with map function for late subscribers", () => {
+      const eventEmitter = emitter<{ type: string; data: number }>();
+      eventEmitter.settle({ type: "success", data: 42 });
+
+      const listener = vi.fn();
+      eventEmitter.on(
+        (e) => (e.type === "success" ? { value: e.data } : undefined),
+        listener
+      );
+
+      expect(listener).toHaveBeenCalledWith(42);
+    });
+
+    it("should not call late subscriber if map returns undefined", () => {
+      const eventEmitter = emitter<{ type: string; data: number }>();
+      eventEmitter.settle({ type: "error", data: 0 });
+
+      const listener = vi.fn();
+      eventEmitter.on(
+        (e) => (e.type === "success" ? { value: e.data } : undefined),
+        listener
+      );
+
+      // Listener should not be called because map returned undefined
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it("should handle listener adding new listener during settle emission", () => {
+      const eventEmitter = emitter<string>();
+      const callOrder: string[] = [];
+
+      // First listener adds a new listener during emission
+      eventEmitter.on((payload) => {
+        callOrder.push(`first: ${payload}`);
+
+        // Add a new listener during settle emission
+        // Since settle sets isSettled=true BEFORE emit, this new listener
+        // should be called immediately with the settled payload
+        eventEmitter.on((p) => {
+          callOrder.push(`added-during-settle: ${p}`);
+        });
+      });
+
+      eventEmitter.settle("done");
+
+      // First listener called with "done"
+      // New listener added during emission gets called immediately (settled behavior)
+      expect(callOrder).toEqual(["first: done", "added-during-settle: done"]);
+    });
+
+    it("should immediately call nested listeners added during settle", () => {
+      const eventEmitter = emitter<number>();
+      const nestedListener = vi.fn();
+
+      eventEmitter.on(() => {
+        // Add listener during settle - should be called immediately
+        eventEmitter.on(nestedListener);
+      });
+
+      eventEmitter.settle(42);
+
+      // Nested listener should have been called immediately with settled value
+      expect(nestedListener).toHaveBeenCalledWith(42);
+      expect(nestedListener).toHaveBeenCalledTimes(1);
+    });
+
+    it("should handle array of listeners added during settle", () => {
+      const eventEmitter = emitter<string>();
+      const listener1 = vi.fn();
+      const listener2 = vi.fn();
+
+      eventEmitter.on(() => {
+        // Add array of listeners during settle
+        eventEmitter.on([listener1, listener2]);
+      });
+
+      eventEmitter.settle("value");
+
+      // Both listeners should be called immediately
+      expect(listener1).toHaveBeenCalledWith("value");
+      expect(listener2).toHaveBeenCalledWith("value");
+    });
+
+    it("should handle deeply nested listener additions during settle", () => {
+      const eventEmitter = emitter<number>();
+      const callOrder: string[] = [];
+
+      eventEmitter.on((v) => {
+        callOrder.push(`L1: ${v}`);
+        eventEmitter.on((v) => {
+          callOrder.push(`L2: ${v}`);
+          eventEmitter.on((v) => {
+            callOrder.push(`L3: ${v}`);
+          });
+        });
+      });
+
+      eventEmitter.settle(1);
+
+      // All nested listeners should be called immediately with settled value
+      expect(callOrder).toEqual(["L1: 1", "L2: 1", "L3: 1"]);
+    });
+
+    it("should preserve settled payload for listeners added at any depth", () => {
+      const eventEmitter = emitter<{ id: number }>();
+      const payload = { id: 123 };
+      const collectedPayloads: { id: number }[] = [];
+
+      eventEmitter.on((p) => {
+        collectedPayloads.push(p);
+        eventEmitter.on((p) => {
+          collectedPayloads.push(p);
+        });
+      });
+
+      eventEmitter.settle(payload);
+
+      // All payloads should be the same reference
+      expect(collectedPayloads).toHaveLength(2);
+      expect(collectedPayloads[0]).toBe(payload);
+      expect(collectedPayloads[1]).toBe(payload);
+    });
+  });
 });

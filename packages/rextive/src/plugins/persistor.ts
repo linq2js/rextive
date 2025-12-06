@@ -1,3 +1,4 @@
+import { emitter } from "../utils/emitter";
 import type { AnySignal, Plugin, Signal } from "../types";
 import { isPromiseLike } from "../utils/isPromiseLike";
 
@@ -181,42 +182,42 @@ export function persistor<
   const cleanups = new Map<string, VoidFunction>();
 
   // Memoized load - only call load() once, cache the result
-  let loadCache: PersistedValues<TData> | null = null;
-  let loadPromise: Promise<PersistedValues<TData>> | null = null;
+  let loadStatus: "idle" | "loading" | "loaded" | "error" = "idle";
+  const onLoaded = emitter<PersistedValues<TData>>();
 
-  const getLoadedValues = async (): Promise<PersistedValues<TData>> => {
-    if (!load) return {} as PersistedValues<TData>;
-
-    // Return cached value if already loaded
-    if (loadCache !== null) return loadCache;
-
-    // Return in-flight promise if currently loading (deduplication)
-    if (loadPromise !== null) return loadPromise;
-
-    // Start new load
-    try {
-      const result = load();
-      if (isPromiseLike(result)) {
-        loadPromise = result
-          .then((values) => {
-            loadCache = values;
-            loadPromise = null;
-            return values;
-          })
-          .catch((error) => {
-            loadPromise = null;
-            if (onError) onError(error, "load");
-            return {} as PersistedValues<TData>;
-          });
-        return loadPromise;
+  const loadValues = (callback: (values: PersistedValues<TData>) => void) => {
+    if (loadStatus === "idle") {
+      loadStatus = "loading";
+      if (!load) {
+        loadStatus = "loaded";
+        onLoaded.settle({});
       } else {
-        loadCache = result;
-        return result;
+        // Start new load
+        try {
+          const result = load();
+          if (isPromiseLike(result)) {
+            result
+              .then((values) => {
+                loadStatus = "loaded";
+                onLoaded.settle(values);
+              })
+              .catch((error) => {
+                loadStatus = "error";
+                onError?.(error, "load");
+                onLoaded.settle({});
+              });
+          } else {
+            loadStatus = "loaded";
+            onLoaded.settle(result);
+          }
+        } catch (error) {
+          loadStatus = "error";
+          onError?.(error, "load");
+          onLoaded.settle({});
+        }
       }
-    } catch (error) {
-      if (onError) onError(error, "load");
-      return {} as PersistedValues<TData>;
     }
+    onLoaded.on(callback);
   };
 
   // Save a single key (individual mode) - type: "merge"
@@ -249,14 +250,14 @@ export function persistor<
 
   // Load values for a specific key (individual mode)
   const loadForKey = async (key: string, signal: AnySignal<any>) => {
-    const values = await getLoadedValues();
-
-    if (key in (values as Record<string, any>)) {
-      const value = (values as Record<string, any>)[key];
-      if (value !== null && value !== undefined) {
-        safeHydrate(signal, value);
+    loadValues((values) => {
+      if (key in (values as Record<string, any>)) {
+        const value = (values as Record<string, any>)[key];
+        if (value !== null && value !== undefined) {
+          safeHydrate(signal, value);
+        }
       }
-    }
+    });
   };
 
   // The dual-purpose function
@@ -320,17 +321,17 @@ export function persistor<
 
     // Load initial values (uses memoized getLoadedValues)
     const loadGroup = async () => {
-      const loaded = await getLoadedValues();
-
-      for (const key in loaded) {
-        if (key in signals) {
-          const signal = signals[key];
-          const value = (loaded as Record<string, any>)[key];
-          if (value !== null && value !== undefined) {
-            safeHydrate(signal, value);
+      loadValues((values) => {
+        for (const key in values) {
+          if (key in signals) {
+            const signal = signals[key];
+            const value = (values as Record<string, any>)[key];
+            if (value !== null && value !== undefined) {
+              safeHydrate(signal, value);
+            }
           }
         }
-      }
+      });
     };
 
     // Start loading
@@ -355,4 +356,3 @@ export function persistor<
 
   return persistorFn as Persistor<TData>;
 }
-
