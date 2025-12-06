@@ -1,5 +1,5 @@
 /**
- * @module rextive/operators
+ * @module rextive/op
  *
  * Signal operators for transforming and combining signals.
  *

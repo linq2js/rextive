@@ -1,6 +1,6 @@
 import { signal, validate } from "rextive";
 import { persistor } from "rextive/plugins";
-import { debounce, to } from "rextive/operators";
+import { debounce, to } from "rextive/op";
 import { z } from "zod";
 import type { Todo, TodoFilter, OfflineChange } from "../types/todo";
 

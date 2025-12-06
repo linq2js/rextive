@@ -12,7 +12,7 @@ import {
 } from "../types";
 import { getHooks } from "../hooks";
 import { is } from "../is";
-import { autoPrefix } from "./nameGenerator";
+import { operatorId, chainName } from "./nameGenerator";
 
 /**
  * Creates an operator that transforms an async signal into a Task signal with guaranteed `value`.
@@ -58,9 +58,15 @@ export function task<TValue>(
 ): (
   source: Signal<PromiseLike<TValue>>
 ) => Computed<Task<TValue> & { value: TValue }> {
+  // Generate unique operator ID once per task() call
+  const opId = operatorId("task");
+
   return (source) => {
     // Store previous successful value for stale-while-revalidate pattern
     let prev: { value: TValue } | undefined;
+
+    // Generate chained name: "source.displayName → #task-N"
+    const name = options?.name ?? chainName(source.displayName, opId);
 
     return source.to(
       (value, context: SignalContext): Task<TValue> & { value: TValue } => {
@@ -96,10 +102,7 @@ export function task<TValue>(
           value: prev ? prev.value : initial, // Override: always defined, never undefined
         } as Task<TValue> & { value: TValue };
       },
-      {
-        ...options,
-        name: options?.name ?? autoPrefix(`task(${source.displayName})`),
-      }
+      { ...options, name }
     );
   };
 }

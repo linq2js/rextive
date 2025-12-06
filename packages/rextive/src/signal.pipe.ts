@@ -7,7 +7,7 @@
  * @param operators - Array of operator functions that transform signals
  * @returns The final transformed signal with automatic cleanup
  */
-export function pipeSignals(
+export function signalPipe(
   source: any,
   operators: Array<(source: any) => any>
 ): any {

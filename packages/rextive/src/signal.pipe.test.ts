@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { signal } from "./signal";
-import { to, scan } from "./operators";
+import { to, scan } from "./op";
 
 describe("signal.pipe()", () => {
   it("should chain single transformation", () => {

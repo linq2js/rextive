@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, cleanup } from "@testing-library/react";
 import React, { StrictMode } from "react";
 import { signal, disposable } from "../index";
-import { focus } from "../operators/focus";
+import { focus } from "../op/focus";
 import { useScope } from "./useScope";
 import { rx } from "./rx";
 

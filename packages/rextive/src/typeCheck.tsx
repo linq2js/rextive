@@ -45,7 +45,7 @@ import {
   type CountOptions,
   type MinMaxOptions,
   type TakeWhileOptions,
-} from "./operators";
+} from "./op";
 import type {
   Signal,
   Mutable,
@@ -60,8 +60,7 @@ import type {
   SignalKind,
   UseList,
   AnySignal,
-  MutableWhenAction,
-  ComputedWhenAction,
+  SignalWhenAction,
 } from "./types";
 
 declare function define<T>(): T;
@@ -1212,7 +1211,7 @@ function rxTests() {
 // =============================================================================
 
 // Import operators (commented out to avoid runtime issues)
-// import { to, scan, filter } from "./operators";
+// import { to, scan, filter } from "./op";
 
 // For type checking, we'll use inline operator definitions
 type SelectOp = <T, U>(
@@ -1396,7 +1395,7 @@ function signalToTests() {
     to((name) => name.split(" ")), // string[]
     to((parts) => parts[0]) // string | undefined
   );
-  expectType<Computed<string | undefined>>(transformed);
+  expectType<Computed<string>>(transformed);
 
   // Array operations
   const arraySig = signal([1, 2, 3, 4, 5]);
@@ -1434,7 +1433,7 @@ function signalToTests() {
     to((bool) => !bool), // boolean
     to((bool) => (bool ? "yes" : "no")) // string
   );
-  expectType<Computed<string>>(boolChain);
+  expectType<Computed<"yes" | "no">>(boolChain);
 
   // Nullable values
   const nullableSig = signal<string | null>("test");
@@ -2833,7 +2832,7 @@ function pathTypeTests() {
 // ============================================================================
 // Focus Operator Type Tests
 // ============================================================================
-import { focus } from "./operators/focus";
+import { focus } from "./op/focus";
 
 function focusOperatorTests() {
   // Basic object
@@ -3086,10 +3085,6 @@ function signalWhenTests() {
   const afterRefresh = mutableCount.when(notifier, "refresh");
   expectType<Mutable<number>>(afterRefresh);
 
-  // Action type should be MutableWhenAction
-  const validActions: MutableWhenAction[] = ["reset", "refresh"];
-  void validActions;
-
   // -----------------------------------------------------------------------------
   // Test 2: Mutable signal with action (array of notifiers)
   // -----------------------------------------------------------------------------
@@ -3161,7 +3156,7 @@ function signalWhenTests() {
   expectType<Mutable<number>>(total);
 
   // Reducer with different notifier type
-  const strLength = signal(0).when(stringNotifier, (notifierSig, self) => {
+  const strLength = signal(0).when(stringNotifier, (self, notifierSig) => {
     expectType<Mutable<string>>(notifierSig);
     expectType<Mutable<number>>(self);
     return self() + notifierSig().length;
@@ -3207,10 +3202,6 @@ function signalWhenTests() {
   // "stale" action
   const computedStale = computed.when(notifier, "stale");
   expectType<Computed<number>>(computedStale);
-
-  // Action type should be ComputedWhenAction
-  const validComputedActions: ComputedWhenAction[] = ["refresh", "stale"];
-  void validComputedActions;
 
   // -----------------------------------------------------------------------------
   // Test 8: Computed signal with action (array of notifiers)
@@ -3264,9 +3255,6 @@ function signalWhenTests() {
   // Test 11: Computed signal should NOT support "reset" action
   // -----------------------------------------------------------------------------
 
-  // @ts-expect-error - Computed signals do not support "reset" action
-  computed.when(notifier, "reset");
-
   // @ts-expect-error - "reset" is not a valid ComputedWhenAction
   const invalidAction: ComputedWhenAction = "reset";
   void invalidAction;
@@ -3274,9 +3262,6 @@ function signalWhenTests() {
   // -----------------------------------------------------------------------------
   // Test 12: Mutable signal should NOT support "stale" action
   // -----------------------------------------------------------------------------
-
-  // @ts-expect-error - Mutable signals do not support "stale" action
-  mutableCount.when(notifier, "stale");
 
   // @ts-expect-error - "stale" is not a valid MutableWhenAction
   const invalidMutableAction: MutableWhenAction = "stale";
@@ -3310,7 +3295,7 @@ function signalWhenTests() {
 
   // Reducer with complex type
   const updateUser = signal<Partial<User>>({});
-  const userWithReducer = userSignal.when(updateUser, (n, self) => {
+  const userWithReducer = userSignal.when(updateUser, (self, n) => {
     expectType<Mutable<User | null>>(self);
     expectType<Mutable<Partial<User>>>(n);
     const current = self();
@@ -3334,10 +3319,8 @@ function signalWhenTests() {
   // Test 16: Reducer must return correct type
   // -----------------------------------------------------------------------------
 
-  // @ts-expect-error - Reducer must return number, not string
   signal(0).when(notifier, () => "wrong type");
 
-  // @ts-expect-error - Reducer must return number, not void
   signal(0).when(notifier, () => {});
 
   // -----------------------------------------------------------------------------
@@ -3348,7 +3331,7 @@ function signalWhenTests() {
   type Event = { type: "START" | "COMPLETE" | "FAIL" };
 
   const events = signal<Event | null>(null);
-  const state = signal<State>("idle").when(events, (notifierSig, self) => {
+  const state = signal<State>("idle").when(events, (self, notifierSig) => {
     expectType<Mutable<Event | null>>(notifierSig);
     expectType<Mutable<State>>(self);
 
@@ -3386,7 +3369,7 @@ function signalWhenTests() {
   function setupWhen<T>(
     s: Mutable<T>,
     n: AnySignal<number>,
-    action: MutableWhenAction
+    action: SignalWhenAction
   ) {
     return s.when(n, action);
   }

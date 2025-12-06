@@ -196,24 +196,26 @@ export type HydrateStatus = "success" | "skipped";
  * ```
  */
 export type Pipe<TKind extends SignalKind, TValue> = {
-  <T1>(op1: Operator<SignalOf<TValue, TKind>, T1>): TryInjectDispose<T1>;
+  <T1>(
+    op1: Operator<SignalOf<TValue, TKind, TValue>, T1>
+  ): TryInjectDispose<T1>;
 
   // 2 operators
   <T1, T2>(
-    op1: Operator<SignalOf<TValue, TKind>, T1>,
+    op1: Operator<SignalOf<TValue, TKind, TValue>, T1>,
     op2: Operator<T1, T2>
   ): TryInjectDispose<T2>;
 
   // 3 operators
   <T1, T2, T3>(
-    op1: Operator<SignalOf<TValue, TKind>, T1>,
+    op1: Operator<SignalOf<TValue, TKind, TValue>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>
   ): TryInjectDispose<T3>;
 
   // 4 operators
   <T1, T2, T3, T4>(
-    op1: Operator<SignalOf<TValue, TKind>, T1>,
+    op1: Operator<SignalOf<TValue, TKind, TValue>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>
@@ -221,7 +223,7 @@ export type Pipe<TKind extends SignalKind, TValue> = {
 
   // 5 operators
   <T1, T2, T3, T4, T5>(
-    op1: Operator<SignalOf<TValue, TKind>, T1>,
+    op1: Operator<SignalOf<TValue, TKind, TValue>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>,
@@ -230,7 +232,7 @@ export type Pipe<TKind extends SignalKind, TValue> = {
 
   // 6 operators
   <T1, T2, T3, T4, T5, T6>(
-    op1: Operator<SignalOf<TValue, TKind>, T1>,
+    op1: Operator<SignalOf<TValue, TKind, TValue>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>,
@@ -240,7 +242,7 @@ export type Pipe<TKind extends SignalKind, TValue> = {
 
   // 7 operators
   <T1, T2, T3, T4, T5, T6, T7>(
-    op1: Operator<SignalOf<TValue, TKind>, T1>,
+    op1: Operator<SignalOf<TValue, TKind, TValue>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>,
@@ -251,7 +253,7 @@ export type Pipe<TKind extends SignalKind, TValue> = {
 
   // 8 operators
   <T1, T2, T3, T4, T5, T6, T7, T8>(
-    op1: Operator<SignalOf<TValue, TKind>, T1>,
+    op1: Operator<SignalOf<TValue, TKind, TValue>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>,
@@ -263,7 +265,7 @@ export type Pipe<TKind extends SignalKind, TValue> = {
 
   // 9 operators
   <T1, T2, T3, T4, T5, T6, T7, T8, T9>(
-    op1: Operator<SignalOf<TValue, TKind>, T1>,
+    op1: Operator<SignalOf<TValue, TKind, TValue>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>,
@@ -276,7 +278,7 @@ export type Pipe<TKind extends SignalKind, TValue> = {
 
   // 10 operators
   <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(
-    op1: Operator<SignalOf<TValue, TKind>, T1>,
+    op1: Operator<SignalOf<TValue, TKind, TValue>, T1>,
     op2: Operator<T1, T2>,
     op3: Operator<T2, T3>,
     op4: Operator<T3, T4>,
@@ -287,6 +289,157 @@ export type Pipe<TKind extends SignalKind, TValue> = {
     op9: Operator<T8, T9>,
     op10: Operator<T9, T10>
   ): TryInjectDispose<T10>;
+};
+
+/**
+ * Chain value transformations (selector pipeline)
+ *
+ * Unlike `pipe()` which works with signal operators, `to()` chains value selectors.
+ * Each selector receives the result value of the previous selector and the SignalContext.
+ *
+ * Supports 1-10 selectors with full type inference.
+ *
+ * @example Single selector
+ * ```ts
+ * const user = signal({ name: "Alice", age: 30 });
+ * const name = user.to(u => u.name); // "Alice"
+ * ```
+ *
+ * @example Multiple selectors (chained)
+ * ```ts
+ * const greeting = user.to(
+ *   u => u.name,              // "Alice"
+ *   name => name.toUpperCase(), // "ALICE"
+ *   name => `Hello, ${name}!`   // "Hello, ALICE!"
+ * );
+ * // greeting() === "Hello, ALICE!"
+ * ```
+ *
+ * @example Using context in any selector
+ * ```ts
+ * const result = source.to(
+ *   (val, ctx) => transform1(val),
+ *   (val, ctx) => ctx.abortSignal ? val : fallback, // Access context
+ *   (val, ctx) => transform3(val)
+ * );
+ * ```
+ */
+export type To<TValue> = {
+  /**
+   * Chain value transformations (selector pipeline)
+   *
+   * Unlike `pipe()` which works with signal operators, `to()` chains value selectors.
+   * Each selector receives the result value of the previous selector and the SignalContext.
+   *
+   * Supports 1-10 selectors with full type inference.
+   *
+   * @example Single selector
+   * ```ts
+   * const user = signal({ name: "Alice", age: 30 });
+   * const name = user.to(u => u.name); // "Alice"
+   * ```
+   *
+   * @example Multiple selectors (chained)
+   * ```ts
+   * const greeting = user.to(
+   *   u => u.name,              // "Alice"
+   *   name => name.toUpperCase(), // "ALICE"
+   *   name => `Hello, ${name}!`   // "Hello, ALICE!"
+   * );
+   * // greeting() === "Hello, ALICE!"
+   * ```
+   *
+   * @example Using context in any selector
+   * ```ts
+   * const result = source.to(
+   *   (val, ctx) => transform1(val),
+   *   (val, ctx) => ctx.abortSignal ? val : fallback, // Access context
+   *   (val, ctx) => transform3(val)
+   * );
+   * ```
+   */
+  <A>(s1: Selector<TValue, A>, options?: ToOptions<A>): Computed<A>;
+  <A, B>(
+    s1: Selector<TValue, A>,
+    s2: Selector<A, B>,
+    options?: ToOptions<B>
+  ): Computed<B>;
+  <A, B, C>(
+    s1: Selector<TValue, A>,
+    s2: Selector<A, B>,
+    s3: Selector<B, C>,
+    options?: ToOptions<C>
+  ): Computed<C>;
+  <A, B, C, D>(
+    s1: Selector<TValue, A>,
+    s2: Selector<A, B>,
+    s3: Selector<B, C>,
+    s4: Selector<C, D>,
+    options?: ToOptions<D>
+  ): Computed<D>;
+  <A, B, C, D, E>(
+    s1: Selector<TValue, A>,
+    s2: Selector<A, B>,
+    s3: Selector<B, C>,
+    s4: Selector<C, D>,
+    s5: Selector<D, E>,
+    options?: ToOptions<E>
+  ): Computed<E>;
+  <A, B, C, D, E, F>(
+    s1: Selector<TValue, A>,
+    s2: Selector<A, B>,
+    s3: Selector<B, C>,
+    s4: Selector<C, D>,
+    s5: Selector<D, E>,
+    s6: Selector<E, F>,
+    options?: ToOptions<F>
+  ): Computed<F>;
+  <A, B, C, D, E, F, G>(
+    s1: Selector<TValue, A>,
+    s2: Selector<A, B>,
+    s3: Selector<B, C>,
+    s4: Selector<C, D>,
+    s5: Selector<D, E>,
+    s6: Selector<E, F>,
+    s7: Selector<F, G>,
+    options?: ToOptions<G>
+  ): Computed<G>;
+  <A, B, C, D, E, F, G, H>(
+    s1: Selector<TValue, A>,
+    s2: Selector<A, B>,
+    s3: Selector<B, C>,
+    s4: Selector<C, D>,
+    s5: Selector<D, E>,
+    s6: Selector<E, F>,
+    s7: Selector<F, G>,
+    s8: Selector<G, H>,
+    options?: ToOptions<H>
+  ): Computed<H>;
+  <A, B, C, D, E, F, G, H, I>(
+    s1: Selector<TValue, A>,
+    s2: Selector<A, B>,
+    s3: Selector<B, C>,
+    s4: Selector<C, D>,
+    s5: Selector<D, E>,
+    s6: Selector<E, F>,
+    s7: Selector<F, G>,
+    s8: Selector<G, H>,
+    s9: Selector<H, I>,
+    options?: ToOptions<I>
+  ): Computed<I>;
+  <A, B, C, D, E, F, G, H, I, J>(
+    s1: Selector<TValue, A>,
+    s2: Selector<A, B>,
+    s3: Selector<B, C>,
+    s4: Selector<C, D>,
+    s5: Selector<D, E>,
+    s6: Selector<E, F>,
+    s7: Selector<F, G>,
+    s8: Selector<G, H>,
+    s9: Selector<H, I>,
+    s10: Selector<I, J>,
+    options?: ToOptions<J>
+  ): Computed<J>;
 };
 
 /**
@@ -480,121 +633,7 @@ export type Signal<TValue, TInit = TValue> = Observable &
      */
     hydrate(value: TValue): HydrateStatus;
 
-    /**
-     * Chain value transformations (selector pipeline)
-     *
-     * Unlike `pipe()` which works with signal operators, `to()` chains value selectors.
-     * Each selector receives the result value of the previous selector and the SignalContext.
-     *
-     * Supports 1-10 selectors with full type inference.
-     *
-     * @example Single selector
-     * ```ts
-     * const user = signal({ name: "Alice", age: 30 });
-     * const name = user.to(u => u.name); // "Alice"
-     * ```
-     *
-     * @example Multiple selectors (chained)
-     * ```ts
-     * const greeting = user.to(
-     *   u => u.name,              // "Alice"
-     *   name => name.toUpperCase(), // "ALICE"
-     *   name => `Hello, ${name}!`   // "Hello, ALICE!"
-     * );
-     * // greeting() === "Hello, ALICE!"
-     * ```
-     *
-     * @example Using context in any selector
-     * ```ts
-     * const result = source.to(
-     *   (val, ctx) => transform1(val),
-     *   (val, ctx) => ctx.abortSignal ? val : fallback, // Access context
-     *   (val, ctx) => transform3(val)
-     * );
-     * ```
-     */
-    to<A>(s1: Selector<TValue, A>, options?: ToOptions<A>): Computed<A>;
-    to<A, B>(
-      s1: Selector<TValue, A>,
-      s2: Selector<A, B>,
-      options?: ToOptions<B>
-    ): Computed<B>;
-    to<A, B, C>(
-      s1: Selector<TValue, A>,
-      s2: Selector<A, B>,
-      s3: Selector<B, C>,
-      options?: ToOptions<C>
-    ): Computed<C>;
-    to<A, B, C, D>(
-      s1: Selector<TValue, A>,
-      s2: Selector<A, B>,
-      s3: Selector<B, C>,
-      s4: Selector<C, D>,
-      options?: ToOptions<D>
-    ): Computed<D>;
-    to<A, B, C, D, E>(
-      s1: Selector<TValue, A>,
-      s2: Selector<A, B>,
-      s3: Selector<B, C>,
-      s4: Selector<C, D>,
-      s5: Selector<D, E>,
-      options?: ToOptions<E>
-    ): Computed<E>;
-    to<A, B, C, D, E, F>(
-      s1: Selector<TValue, A>,
-      s2: Selector<A, B>,
-      s3: Selector<B, C>,
-      s4: Selector<C, D>,
-      s5: Selector<D, E>,
-      s6: Selector<E, F>,
-      options?: ToOptions<F>
-    ): Computed<F>;
-    to<A, B, C, D, E, F, G>(
-      s1: Selector<TValue, A>,
-      s2: Selector<A, B>,
-      s3: Selector<B, C>,
-      s4: Selector<C, D>,
-      s5: Selector<D, E>,
-      s6: Selector<E, F>,
-      s7: Selector<F, G>,
-      options?: ToOptions<G>
-    ): Computed<G>;
-    to<A, B, C, D, E, F, G, H>(
-      s1: Selector<TValue, A>,
-      s2: Selector<A, B>,
-      s3: Selector<B, C>,
-      s4: Selector<C, D>,
-      s5: Selector<D, E>,
-      s6: Selector<E, F>,
-      s7: Selector<F, G>,
-      s8: Selector<G, H>,
-      options?: ToOptions<H>
-    ): Computed<H>;
-    to<A, B, C, D, E, F, G, H, I>(
-      s1: Selector<TValue, A>,
-      s2: Selector<A, B>,
-      s3: Selector<B, C>,
-      s4: Selector<C, D>,
-      s5: Selector<D, E>,
-      s6: Selector<E, F>,
-      s7: Selector<F, G>,
-      s8: Selector<G, H>,
-      s9: Selector<H, I>,
-      options?: ToOptions<I>
-    ): Computed<I>;
-    to<A, B, C, D, E, F, G, H, I, J>(
-      s1: Selector<TValue, A>,
-      s2: Selector<A, B>,
-      s3: Selector<B, C>,
-      s4: Selector<C, D>,
-      s5: Selector<D, E>,
-      s6: Selector<E, F>,
-      s7: Selector<F, G>,
-      s8: Selector<G, H>,
-      s9: Selector<H, I>,
-      s10: Selector<I, J>,
-      options?: ToOptions<J>
-    ): Computed<J>;
+    to: To<TValue>;
 
     /**
      * Trigger an immediate recomputation of this signal.
@@ -837,43 +876,128 @@ export type TryInjectDispose<T> = T extends object
   ? T & { dispose: VoidFunction }
   : T;
 
-/**
- * Mutable signal - can be modified with set()
- * Created when signal() is called without dependencies
- *
- * **Type Parameters:**
- * - `TValue`: The value type that can be set
- * - `TInit`: The initial value type (defaults to TValue)
- *
- * **Important:** For no-arg signals like `signal<T>()`:
- * - Type is `MutableSignal<T, undefined>`
- * - `get()` returns `T | undefined`
- * - `set()` only accepts `T`, NOT `undefined`
- * - To allow setting `undefined`, use `signal<T | undefined>()`
- *
- * @example
- * ```ts
- * // No-arg signal: get() returns T | undefined, set() requires T
- * const user = signal<User>();
- * user(); // User | undefined
- * user.set(someUser); // ✅ OK
- * user.set(undefined); // ❌ Type error!
- *
- * // Nullable signal: get() and set() both accept T | undefined
- * const nullable = signal<User | undefined>();
- * nullable.set(someUser); // ✅ OK
- * nullable.set(undefined); // ✅ OK
- * ```
- */
-/**
- * Action types for mutable signal `.when()` method
- */
-export type MutableWhenAction = "refresh" | "reset";
+export type SignalWhenAction = "refresh" | "reset" | "stale";
 
-/**
- * Action types for computed signal `.when()` method
- */
-export type ComputedWhenAction = "refresh" | "stale";
+export type When<TValue, TInit, TKind extends SignalKind> = {
+  /**
+   * React to changes in notifier signal(s) by executing an action.
+   *
+   * Does NOT create a new signal - just registers subscription on this signal.
+   * Auto-cleans up when this signal is disposed.
+   *
+   * If filter throws, error is routed through signal's error handling (onError callbacks, devtools).
+   * Action is NOT executed when filter throws.
+   *
+   * **Available actions:**
+   * - `"refresh"` - Force immediate recomputation (works on all signals)
+   * - `"reset"` - Reset to initial value (mutable signals only)
+   * - `"stale"` - Mark for lazy recomputation (computed signals only)
+   *
+   * @param notifier - Single signal or array of signals to watch
+   * @param action - Action to execute: "refresh", "reset", or "stale"
+   * @param filter - Optional filter function. Receives `(notifier, self)`.
+   *                 Both are signals - call them to get values if needed.
+   *                 Return true to execute action, false to skip.
+   * @returns this - for chaining
+   *
+   * @example Basic reset on trigger
+   * ```ts
+   * const logout = signal(0);
+   * const userData = signal<User | null>(null).when(logout, "reset");
+   *
+   * userData.set(someUser);
+   * logout.set(n => n + 1); // userData resets to null
+   * ```
+   *
+   * @example With filter (notifier, self)
+   * ```ts
+   * const refreshTrigger = signal(0);
+   * const data = signal(fetchData).when(
+   *   refreshTrigger,
+   *   "refresh",
+   *   (notifier, self) => notifier() > 5 // Only refresh if trigger value > 5
+   * );
+   * ```
+   *
+   * @example Multiple notifiers
+   * ```ts
+   * const trigger1 = signal(0);
+   * const trigger2 = signal(0);
+   * const data = signal(fetchData).when([trigger1, trigger2], "refresh");
+   * ```
+   */
+  <N extends AnySignal<any>>(
+    notifier: N | readonly N[],
+    action: SignalWhenAction,
+    filter?: (notifier: N, self: SignalOf<TValue, TKind, TInit>) => boolean
+  ): SignalOf<TValue, TKind, TInit>;
+
+  /**
+   * React to changes in notifier signal(s) by executing a custom callback.
+   *
+   * Does NOT create a new signal - just registers subscription on this signal.
+   * Auto-cleans up when this signal is disposed.
+   *
+   * If callback throws, the error is routed through signal's error handling (onError callbacks, devtools).
+   *
+   * **Callback signature:** `(self, notifier) => void`
+   * - `self` - This signal instance (use `self.set()`, `self.refresh()`, etc.)
+   * - `notifier` - The notifier signal that triggered (call `notifier()` to get value)
+   *
+   * @param notifier - Signal or array of signals to watch
+   * @param action - Callback function that receives `(self, notifier)` and performs side effects.
+   *                 Both are signals - call them to get values if needed.
+   *                 Use `self.set()`, `self.refresh()`, `self.stale()` as needed.
+   * @returns this - for chaining
+   *
+   * @example Accumulator pattern
+   * ```ts
+   * const addAmount = signal(0);
+   * const total = signal(0).when(addAmount, (notifier, self) => {
+   *   self.set(prev => prev + notifier()); // Add notifier's value to current
+   * });
+   *
+   * addAmount.set(5);  // total = 5
+   * addAmount.set(10); // total = 15
+   * ```
+   *
+   * @example State machine
+   * ```ts
+   * const events = signal<Event | null>(null);
+   * const state = signal<"idle" | "loading" | "done">("idle").when(events, (notifier, self) => {
+   *   const event = notifier();
+   *   if (event?.type === "START") self.set("loading");
+   *   else if (event?.type === "COMPLETE") self.set("done");
+   * });
+   * ```
+   *
+   * @example Conditional refresh
+   * ```ts
+   * const networkStatus = signal<'online' | 'offline'>('online');
+   * const data = signal(async () => fetchData()).when(networkStatus, (notifier, self) => {
+   *   if (notifier() === 'online') {
+   *     self.refresh(); // Only refresh when coming back online
+   *   }
+   * });
+   * ```
+   *
+   * @example Side effects without state change
+   * ```ts
+   * const formSubmit = signal<FormData | null>(null);
+   * const status = signal("idle").when(formSubmit, (notifier, self) => {
+   *   const data = notifier();
+   *   if (data) {
+   *     analytics.track("form_submit", data);
+   *     self.set("submitted");
+   *   }
+   * });
+   * ```
+   */
+  <N extends AnySignal<any>>(
+    notifier: N | readonly N[],
+    action: (notifier: N, self: SignalOf<TValue, TKind, TInit>) => void
+  ): SignalOf<TValue, TKind, TInit>;
+};
 
 export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
   /**
@@ -888,87 +1012,46 @@ export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    */
   set(value: TValue): void;
 
-  /**
-   * React to changes in notifier signal(s) by executing an action.
-   *
-   * Does NOT create a new signal - just registers subscription on this signal.
-   * Auto-cleans up when this signal is disposed.
-   *
-   * If filter throws, error is routed through signal's error handling (onError callbacks, devtools).
-   * Action is NOT executed when filter throws.
-   *
-   * @param notifier - Single signal or array of signals to watch
-   * @param action - Action to execute: "refresh" (force recompute) or "reset" (return to initial value)
-   * @param filter - Optional filter function. Receives (self, notifierSignal).
-   *                 Both are signals - call them to get values if needed.
-   *                 Return true to execute action, false to skip.
-   * @returns this - for chaining
-   *
-   * @example Basic reset on trigger
-   * ```ts
-   * const logout = signal(0);
-   * const userData = signal<User | null>(null).when(logout, "reset");
-   *
-   * userData.set(someUser);
-   * logout.set(n => n + 1); // userData resets to null
-   * ```
-   *
-   * @example With filter
-   * ```ts
-   * const refreshTrigger = signal(0);
-   * const data = signal(fetchData).when(
-   *   refreshTrigger,
-   *   "refresh",
-   *   (notifier, self) => notifier() > 5 // Only refresh if trigger value > 5
-   * );
-   * ```
-   */
-  when<N extends AnySignal<any>>(
-    notifier: N | readonly N[],
-    action: MutableWhenAction,
-    filter?: (notifier: N, self: Mutable<TValue, TInit>) => boolean
-  ): Mutable<TValue, TInit>;
+  when: When<TValue, TInit, "mutable">;
 
   /**
-   * React to changes in notifier signal(s) by applying a reducer.
+   * Tuple for destructuring: `[signal, set]`.
    *
-   * Does NOT create a new signal - just registers subscription on this signal.
-   * Auto-cleans up when this signal is disposed.
+   * Returns the same signal instance and a simple setter function.
+   * Useful for separating read (signal) from write (setter) in logic patterns.
    *
-   * If reducer throws, the signal enters error state and subscribers are notified.
-   * Error is routed through signal's error handling (onError callbacks, devtools).
+   * The setter is a simple `(value: TValue) => void` - no reducer overload.
+   * For reducer pattern, use `signal.set(prev => ...)` directly.
    *
-   * @param notifier - Signal or array of signals to watch
-   * @param reducer - Function that receives (self, notifierSignal) and returns new value.
-   *                  Both are signals - call them to get values if needed.
-   * @returns this - for chaining
-   *
-   * @example Accumulator pattern
+   * @example Basic usage
    * ```ts
-   * const addAmount = signal(0);
-   * const total = signal(0).when(addAmount, (notifier, self) => {
-   *   return self() + notifier(); // Add notifier's value to current
-   * });
+   * const [count, setCount] = signal(0).tuple;
    *
-   * addAmount.set(5);  // total = 5
-   * addAmount.set(10); // total = 15
+   * setCount(5);      // Set value
+   * count();          // Read value
+   * count.on(...);    // Full signal capabilities
    * ```
    *
-   * @example State machine
+   * @example Logic pattern - expose readonly signal, keep setter private
    * ```ts
-   * const events = signal<Event | null>(null);
-   * const state = signal<"idle" | "loading" | "done">("idle").when(events, (notifier, self) => {
-   *   const event = notifier();
-   *   if (event?.type === "START") return "loading";
-   *   if (event?.type === "COMPLETE") return "done";
-   *   return self();
+   * const authLogic = logic("authLogic", () => {
+   *   const [loginRequest, login] = signal<Credentials | null>(null).tuple;
+   *
+   *   return {
+   *     loginRequest,  // Signal - consumers can read & subscribe
+   *     login,         // Trigger - semantic name for setting
+   *   };
    * });
+   *
+   * // Consumer API:
+   * authLogic().login({ username: "admin", password: "123" });
+   * authLogic().loginRequest();  // Read current value
    * ```
    */
-  when<N extends AnySignal<any>>(
-    notifier: N | readonly N[],
-    reducer: (notifier: N, self: Mutable<TValue, TInit>) => TValue
-  ): Mutable<TValue, TInit>;
+  readonly tuple: readonly [
+    signal: Mutable<TValue, TInit>,
+    set: (value: TValue) => void
+  ];
 
   pipe: Pipe<"mutable", TValue>;
 };
@@ -996,51 +1079,7 @@ export type Computed<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    */
   paused(): boolean;
 
-  /**
-   * React to changes in notifier signal(s) by executing an action.
-   *
-   * Does NOT create a new signal - just registers subscription on this signal.
-   * Auto-cleans up when this signal is disposed.
-   *
-   * Note: Computed signals do NOT support "reset" action (they have no user-defined initial value).
-   * Use "refresh" for immediate recomputation or "stale" for lazy recomputation.
-   *
-   * If filter throws, error is routed through signal's error handling (onError callbacks, devtools).
-   * Action is NOT executed when filter throws.
-   *
-   * @param notifier - Single signal or array of signals to watch
-   * @param action - Action to execute: "refresh" (force recompute) or "stale" (mark for lazy recompute)
-   * @param filter - Optional filter function. Receives (self, notifierSignal).
-   *                 Both are signals - call them to get values if needed.
-   *                 Return true to execute action, false to skip.
-   * @returns this - for chaining
-   *
-   * @example Refresh on manual trigger
-   * ```ts
-   * const source = signal(10);
-   * const refreshTrigger = signal(0);
-   *
-   * const computed = signal({ source }, ({ deps }) => deps.source * 2)
-   *   .when(refreshTrigger, "refresh");
-   *
-   * refreshTrigger.set(n => n + 1); // Forces recomputation
-   * ```
-   *
-   * @example Mark stale (lazy)
-   * ```ts
-   * const invalidateTrigger = signal(0);
-   * const expensive = signal({ data }, ({ deps }) => heavyComputation(deps.data))
-   *   .when(invalidateTrigger, "stale", (notifier, self) => notifier() > 0);
-   *
-   * invalidateTrigger.set(1); // Won't recompute until accessed
-   * expensive(); // Now recomputes
-   * ```
-   */
-  when<N extends AnySignal<any>>(
-    notifier: N | readonly N[],
-    action: ComputedWhenAction,
-    filter?: (notifier: N, self: Computed<TValue, TInit>) => boolean
-  ): Computed<TValue, TInit>;
+  when: When<TValue, TInit, "computed">;
 
   pipe: Pipe<"computed", TValue>;
 };
@@ -1105,13 +1144,17 @@ export type SignalKind = "mutable" | "computed" | "any";
 /**
  * Helper type to get the signal type based on kind
  */
-export type SignalOf<TValue, K extends SignalKind> = K extends "any"
-  ? AnySignal<TValue>
+export type SignalOf<
+  TValue,
+  K extends SignalKind,
+  TInit = TValue
+> = K extends "any"
+  ? AnySignal<TValue, TInit>
   : K extends "mutable"
-  ? Mutable<TValue>
+  ? Mutable<TValue, TInit>
   : K extends "computed"
-  ? Computed<TValue>
-  : Signal<TValue>;
+  ? Computed<TValue, TInit>
+  : Signal<TValue, TInit>;
 
 /**
  * Plugin function type for extending signal behavior.

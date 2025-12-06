@@ -13,17 +13,18 @@ import { scheduleNotification } from "./batch";
 import { SIGNAL_TYPE } from "./is";
 import { FallbackError } from "./common";
 import { resolveEquals } from "./utils/resolveEquals";
-import { pipeSignals } from "./utils/pipeSignals";
+import { signalPipe } from "./signal.pipe";
 import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
 import { getHooks, emit } from "./hooks";
 import { nextName, nextUid } from "./utils/nameGenerator";
-import { resolveSelectorsRequired } from "./operators/resolveSelectors";
+import { resolveSelectorsRequired } from "./op/resolveSelectors";
 import {
   trackAsync,
   addErrorTrace,
   type SignalErrorWhen,
 } from "./utils/errorTracking";
+import { signalWhen } from "./signal.when";
 
 /**
  * Create a computed signal (with dependencies)
@@ -346,7 +347,7 @@ export function createComputedSignal(
   };
 
   const pipe = function (...operators: Array<(source: any) => any>): any {
-    return pipeSignals(instance, operators);
+    return signalPipe(instance, operators);
   };
 
   const to = function (
@@ -403,50 +404,11 @@ export function createComputedSignal(
    * @param options - Optional configuration
    * @returns this - for chaining
    */
-  const when = (
-    notifier: any | readonly any[],
-    action: "refresh" | "stale",
-    filter?: (notifier: any, self: Computed<any>) => boolean
-  ) => {
-    // Ensure instance is created
-    const self = instanceRef!;
-
-    // Validate action - "reset" is not allowed for computed signals
-    if ((action as string) === "reset") {
-      throw new Error(
-        'Computed signals do not support "reset" action. Use "refresh" or "stale" instead.'
-      );
-    }
-
-    // Normalize notifiers to array
-    const notifiers = Array.isArray(notifier) ? notifier : [notifier];
-
-    for (const n of notifiers) {
-      const unsubscribe = n.on(() => {
-        try {
-          // Run filter if provided - receives (notifier, self) signals
-          if (filter) {
-            const shouldProceed = filter(n, self);
-            if (!shouldProceed) return;
-          }
-
-          // Execute action
-          if (action === "refresh") {
-            self.refresh();
-          } else if (action === "stale") {
-            self.stale();
-          }
-        } catch (error) {
-          // Filter threw - route through signal's error handling, skip action
-          throwError(error, "when:filter", false);
-        }
-      });
-
-      onDispose.on(unsubscribe);
-    }
-
-    return self;
-  };
+  const when = signalWhen<Computed<any>>({
+    getSelf: () => instanceRef!,
+    onDispose,
+    throwError,
+  });
 
   const instance: Computed<any> = Object.assign(get, {
     [SIGNAL_TYPE]: true,

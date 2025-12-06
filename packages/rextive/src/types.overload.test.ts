@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { signal } from "./signal";
-import { to } from "./operators";
+import { to } from "./op";
 
 describe("pipe() explicit overloads", () => {
   it("should infer types correctly with 1 operator", () => {

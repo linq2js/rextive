@@ -94,4 +94,75 @@ describe("createMutableSignal", () => {
       expect(computeFn).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("tuple property", () => {
+    it("should return [signal, set] tuple for destructuring", () => {
+      const countSignal = signal(0);
+      const [count, setCount] = countSignal.tuple;
+
+      // Signal should be the exact same instance
+      expect(count).toBe(countSignal);
+
+      // Read via destructured signal
+      expect(count()).toBe(0);
+
+      // Set via destructured setter
+      setCount(5);
+      expect(count()).toBe(5);
+    });
+
+    it("should work with semantic naming pattern", () => {
+      interface Credentials {
+        username: string;
+        password: string;
+      }
+
+      const [loginRequest, login] = signal<Credentials | null>(null).tuple;
+
+      // Initial state
+      expect(loginRequest()).toBeNull();
+
+      // Trigger login
+      login({ username: "admin", password: "123" });
+      expect(loginRequest()).toEqual({ username: "admin", password: "123" });
+    });
+
+    it("should preserve full signal capabilities on destructured signal", () => {
+      const [count, setCount] = signal(0).tuple;
+      const listener = vi.fn();
+
+      // Can still use .on()
+      count.on(listener);
+
+      setCount(10);
+      expect(listener).toHaveBeenCalled();
+
+      // Can still use .to()
+      const doubled = count.to((x) => x * 2);
+      expect(doubled()).toBe(20);
+    });
+
+    it("should allow reset via signal method", () => {
+      const [value, setValue] = signal(42).tuple;
+
+      setValue(100);
+      expect(value()).toBe(100);
+
+      // Can still use signal methods
+      value.reset();
+      expect(value()).toBe(42);
+    });
+
+    it("setter should be simple value setter (not reducer)", () => {
+      const [count, setCount] = signal(0).tuple;
+
+      // Direct value setting works
+      setCount(10);
+      expect(count()).toBe(10);
+
+      // For reducer, use signal.set() directly
+      count.set((prev) => prev + 5);
+      expect(count()).toBe(15);
+    });
+  });
 });

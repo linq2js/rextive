@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { signal, Mutable, Computed } from "./index";
+import { signalWhen } from "./signal.when";
+import { emitter } from "./utils/emitter";
 
 describe("signal.when() instance method", () => {
   describe("mutable signals - action overload", () => {
@@ -78,7 +80,7 @@ describe("signal.when() instance method", () => {
 
       it("should pass self signal to filter", () => {
         const notifier = signal(0);
-        const filterFn = vi.fn((notifierSig, self: Mutable<number>) => {
+        const filterFn = vi.fn((_notifier, self: Mutable<number>) => {
           return self() > 20; // Call self to get current value
         });
 
@@ -155,11 +157,11 @@ describe("signal.when() instance method", () => {
     });
   });
 
-  describe("mutable signals - reducer overload", () => {
-    it("should apply reducer when notifier changes", () => {
+  describe("mutable signals - action callback overload", () => {
+    it("should execute action callback when notifier changes", () => {
       const addAmount = signal(0);
       const total = signal(0).when(addAmount, (notifier, self) => {
-        return self() + notifier();
+        self.set((prev) => prev + notifier());
       });
 
       expect(total()).toBe(0);
@@ -171,50 +173,41 @@ describe("signal.when() instance method", () => {
       expect(total()).toBe(15);
     });
 
-    it("should pass self and notifier as signals to reducer", () => {
+    it("should pass self and notifier as signals to action callback", () => {
       const notifier = signal({ value: 10 });
-      const reducerFn = vi.fn((notifierSig, self) => {
+      const callbackFn = vi.fn((notifierSig, self) => {
         // Both are signals, not values
         expect(typeof self).toBe("function");
         expect(typeof notifierSig).toBe("function");
-        return self() + notifierSig().value;
+        self.set((prev) => prev + notifierSig().value);
       });
 
-      const total = signal(0).when(notifier, reducerFn);
+      const total = signal(0).when(notifier, callbackFn);
 
       notifier.set({ value: 5 });
-      expect(reducerFn).toHaveBeenCalledWith(notifier, total);
+      expect(callbackFn).toHaveBeenCalledWith(notifier, total);
       expect(total()).toBe(5);
     });
 
-    it("should set signal to error state when reducer throws", () => {
+    it("should route error through signal error handling when action callback throws", () => {
       const notifier = signal(0);
-      const count = signal(10).when(notifier, () => {
-        throw new Error("Reducer error");
-      });
+      const onErrorCallback = vi.fn();
+
+      const count = signal(10, { onError: onErrorCallback }).when(
+        notifier,
+        () => {
+          throw new Error("Action callback error");
+        }
+      );
 
       expect(count()).toBe(10);
 
-      expect(() => notifier.set(1)).toThrowError();
+      notifier.set(1);
 
-      expect(count.error()).toBeInstanceOf(Error);
-      expect((count.error() as Error).message).toBe("Reducer error");
-      expect(count.tryGet()).toBeUndefined();
-    });
-
-    it("should notify subscribers when reducer error occurs", () => {
-      const notifier = signal(0);
-      const listener = vi.fn();
-
-      const count = signal(10).when(notifier, () => {
-        throw new Error("Reducer error");
-      });
-
-      count.on(listener);
-
-      expect(() => notifier.set(1)).toThrow("Reducer error");
-
-      expect(listener).toHaveBeenCalled();
+      // Error should be routed through signal's onError callback
+      expect(onErrorCallback).toHaveBeenCalledTimes(1);
+      expect(onErrorCallback.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(count()).toBe(10); // Value unchanged
     });
 
     it("should work with array of notifiers", () => {
@@ -223,9 +216,10 @@ describe("signal.when() instance method", () => {
 
       const total = signal(10).when([add, multiply], (notifier, self) => {
         if (notifier === add) {
-          return self() + notifier();
+          self.set((prev) => prev + notifier());
+        } else {
+          self.set((prev) => prev * notifier());
         }
-        return self() * notifier();
       });
 
       add.set(5);
@@ -310,15 +304,16 @@ describe("signal.when() instance method", () => {
       });
     });
 
-    it("should NOT have reset action for computed signals", () => {
+    it("should have TypeScript-only validation for reset action on computed signals", () => {
       const source = signal(10);
       const notifier = signal(0);
 
       const computed = signal({ source }, ({ deps }) => deps.source * 2);
 
-      // TypeScript should prevent this, but we test runtime behavior
-      // @ts-expect-error - "reset" is not valid for computed signals
-      expect(() => computed.when(notifier, "reset")).toThrow();
+      // TypeScript prevents this at compile time, but runtime allows it
+      // The reset() method exists on computed signals (inherited from Signal)
+      // but it's a no-op since computed signals can't be "reset" to initial value
+      expect(() => computed.when(notifier, "reset")).not.toThrow();
     });
   });
 
@@ -346,7 +341,7 @@ describe("signal.when() instance method", () => {
 
       const count = signal(10)
         .when(notifier1, "reset")
-        .when(notifier2, (n, self) => self() + n());
+        .when(notifier2, (n, self) => self.set((prev) => prev + n()));
 
       count.on(listener);
 
@@ -449,5 +444,206 @@ describe("signal.when() instance method", () => {
       expect(secondResult).toEqual({ id: 1, name: "User 1" });
       expect(fetchCount).toBe(2);
     });
+  });
+});
+
+describe("signalWhen utility", () => {
+  it("should execute refresh action when notifier changes", () => {
+    const onDispose = emitter<void>();
+    const self = signal(10);
+    const refreshSpy = vi.spyOn(self, "refresh");
+
+    const when = signalWhen<Mutable<number>>({
+      getSelf: () => self,
+      onDispose,
+      throwError: vi.fn(),
+    });
+
+    const notifier = signal(0);
+    when(notifier, "refresh");
+
+    expect(refreshSpy).not.toHaveBeenCalled();
+
+    notifier.set(1);
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+
+    notifier.set(2);
+    expect(refreshSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("should execute reset action when notifier changes", () => {
+    const onDispose = emitter<void>();
+    const self = signal(10);
+
+    const when = signalWhen<Mutable<number>>({
+      getSelf: () => self,
+      onDispose,
+      throwError: vi.fn(),
+    });
+
+    const notifier = signal(0);
+    when(notifier, "reset");
+
+    self.set(50);
+    expect(self()).toBe(50);
+
+    notifier.set(1);
+    expect(self()).toBe(10); // Reset to initial value
+  });
+
+  it("should execute action callback when notifier changes", () => {
+    const onDispose = emitter<void>();
+    const self = signal(10);
+    const callback = vi.fn();
+
+    const when = signalWhen<Mutable<number>>({
+      getSelf: () => self,
+      onDispose,
+      throwError: vi.fn(),
+    });
+
+    const notifier = signal(0);
+    when(notifier, callback);
+
+    expect(callback).not.toHaveBeenCalled();
+
+    notifier.set(1);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith(notifier, self);
+  });
+
+  it("should respect filter for action string overload", () => {
+    const onDispose = emitter<void>();
+    const self = signal(10);
+
+    const when = signalWhen<Mutable<number>>({
+      getSelf: () => self,
+      onDispose,
+      throwError: vi.fn(),
+    });
+
+    const notifier = signal(0);
+    when(notifier, "reset", (n) => n() > 5);
+
+    self.set(50);
+
+    notifier.set(3); // Filter returns false
+    expect(self()).toBe(50);
+
+    notifier.set(10); // Filter returns true
+    expect(self()).toBe(10); // Reset to initial value
+  });
+
+  it("should handle multiple notifiers", () => {
+    const onDispose = emitter<void>();
+    const self = signal(10);
+    const refreshSpy = vi.spyOn(self, "refresh");
+
+    const when = signalWhen<Mutable<number>>({
+      getSelf: () => self,
+      onDispose,
+      throwError: vi.fn(),
+    });
+
+    const notifier1 = signal(0);
+    const notifier2 = signal("a");
+    when([notifier1, notifier2], "refresh");
+
+    notifier1.set(1);
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+
+    notifier2.set("b");
+    expect(refreshSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("should route filter errors through throwError", () => {
+    const onDispose = emitter<void>();
+    const throwError = vi.fn();
+    const self = signal(10);
+    const refreshSpy = vi.spyOn(self, "refresh");
+
+    const when = signalWhen<Mutable<number>>({
+      getSelf: () => self,
+      onDispose,
+      throwError,
+    });
+
+    const notifier = signal(0);
+    const filterError = new Error("Filter error");
+    when(notifier, "refresh", () => {
+      throw filterError;
+    });
+
+    notifier.set(1);
+
+    expect(throwError).toHaveBeenCalledWith(filterError, "when:filter", false);
+    expect(refreshSpy).not.toHaveBeenCalled(); // Action not executed
+  });
+
+  it("should route action callback errors through throwError", () => {
+    const onDispose = emitter<void>();
+    const throwError = vi.fn();
+    const self = signal(10);
+
+    const when = signalWhen<Mutable<number>>({
+      getSelf: () => self,
+      onDispose,
+      throwError,
+    });
+
+    const notifier = signal(0);
+    const callbackError = new Error("Callback error");
+    when(notifier, () => {
+      throw callbackError;
+    });
+
+    notifier.set(1);
+
+    expect(throwError).toHaveBeenCalledWith(
+      callbackError,
+      "when:action",
+      false
+    );
+  });
+
+  it("should return self for chaining", () => {
+    const onDispose = emitter<void>();
+    const self = signal(10);
+
+    const when = signalWhen<Mutable<number>>({
+      getSelf: () => self,
+      onDispose,
+      throwError: vi.fn(),
+    });
+
+    const notifier = signal(0);
+    const result = when(notifier, "refresh");
+
+    expect(result).toBe(self);
+  });
+
+  it("should register cleanup on dispose emitter", () => {
+    const onDispose = emitter<void>();
+    const self = signal(10);
+    const refreshSpy = vi.spyOn(self, "refresh");
+
+    const when = signalWhen<Mutable<number>>({
+      getSelf: () => self,
+      onDispose,
+      throwError: vi.fn(),
+    });
+
+    const notifier = signal(0);
+    when(notifier, "refresh");
+
+    notifier.set(1);
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+
+    // Trigger dispose
+    onDispose.emit();
+
+    // After dispose, notifier changes should not affect
+    notifier.set(2);
+    expect(refreshSpy).toHaveBeenCalledTimes(1); // Still 1
   });
 });

@@ -42,18 +42,19 @@ import {
 import { scheduleNotification } from "./batch";
 import { FallbackError } from "./common";
 import { resolveEquals } from "./utils/resolveEquals";
-import { pipeSignals } from "./utils/pipeSignals";
+import { signalPipe } from "./signal.pipe";
 import { createComputedSignal } from "./createComputedSignal";
 import { createSignalContext } from "./createSignalContext";
 import { attacher } from "./attacher";
 import { getHooks, emit } from "./hooks";
 import { nextName, nextUid } from "./utils/nameGenerator";
-import { resolveSelectorsRequired } from "./operators/resolveSelectors";
+import { resolveSelectorsRequired } from "./op/resolveSelectors";
 import {
   trackAsync,
   addErrorTrace,
   type SignalErrorWhen,
 } from "./utils/errorTracking";
+import { signalWhen } from "./signal.when";
 
 /**
  * Create a mutable signal instance
@@ -383,7 +384,7 @@ export function createMutableSignal(
    * - The call signature of the signal: signal()
    */
   const get = () => {
-    getHooks().onSignalAccess(instance);
+    getHooks().onSignalAccess(instanceRef!);
     // Lazy evaluation: compute on first access
     // Allow reading last value even after disposal (but don't recompute)
     if (!current && !disposed) {
@@ -571,7 +572,7 @@ export function createMutableSignal(
    * @returns New signal with transformations applied
    */
   const pipe = function (...operators: Array<(source: any) => any>): any {
-    return pipeSignals(instance, operators);
+    return signalPipe(instance, operators);
   };
 
   /**
@@ -683,56 +684,11 @@ export function createMutableSignal(
    * @param options - Options (only for action overload)
    * @returns this - for chaining
    */
-  const when = (
-    notifier: any,
-    actionOrReducer: "reset" | "refresh" | ((notifier: any, self: any) => any),
-    filter?: (notifier: any, self: any) => boolean
-  ) => {
-    // Ensure instance is created (when is called after instance creation via Object.assign)
-    const self = instanceRef!;
-
-    // Normalize notifiers to array
-    const notifiers = Array.isArray(notifier) ? notifier : [notifier];
-
-    // Determine if this is action or reducer overload
-    const isActionOverload = typeof actionOrReducer === "string";
-
-    // Subscribe to each notifier
-    for (const n of notifiers) {
-      const unsubscribe = n.on(() => {
-        if (isActionOverload) {
-          // Action overload: run filter, then execute action
-          const action = actionOrReducer as "reset" | "refresh";
-
-          try {
-            // Run filter if provided - receives (notifier, self) signals
-            if (filter) {
-              const shouldProceed = filter(n, self);
-              if (!shouldProceed) return;
-            }
-
-            // Execute action
-            if (action === "reset") {
-              self.reset();
-            } else if (action === "refresh") {
-              self.refresh();
-            }
-          } catch (error) {
-            // Filter threw - route through signal's error handling, skip action
-            throwError(error, "when:filter", false);
-          }
-        } else {
-          // Reducer overload: apply reducer - receives (notifier, self) signals
-          const reducer = actionOrReducer as (notifier: any, self: any) => any;
-          self.set(() => reducer(n, self));
-        }
-      });
-
-      onDispose.on(unsubscribe);
-    }
-
-    return self;
-  };
+  const when = signalWhen<Mutable<any>>({
+    getSelf: () => instanceRef!,
+    onDispose,
+    throwError,
+  });
 
   // ============================================================================
   // 9. SIGNAL INSTANCE CREATION
@@ -761,7 +717,7 @@ export function createMutableSignal(
     dispose, // Clean up resources
     disposed: isDisposed, // Check if disposed
     error: () => {
-      getHooks().onSignalAccess(instance);
+      getHooks().onSignalAccess(instanceRef!);
       // Ensure computation runs if lazy
       if (!current && !disposed) {
         recompute("compute:initial");
@@ -769,7 +725,7 @@ export function createMutableSignal(
       return current?.error;
     },
     tryGet: () => {
-      getHooks().onSignalAccess(instance);
+      getHooks().onSignalAccess(instanceRef!);
       // Ensure computation runs if lazy
       if (!current && !disposed) {
         recompute("compute:initial");
@@ -802,6 +758,15 @@ export function createMutableSignal(
 
   // Store reference for use in methods above
   instanceRef = instance as unknown as Mutable<any>;
+
+  // Add tuple property as a getter (Object.assign doesn't work with getters)
+  Object.defineProperty(instance, "tuple", {
+    get() {
+      return [instanceRef, (value: any) => set(value)] as const;
+    },
+    enumerable: true,
+    configurable: false,
+  });
 
   // ============================================================================
   // 10. INITIALIZATION

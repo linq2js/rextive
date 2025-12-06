@@ -34,7 +34,7 @@ export default defineConfig({
       },
       {
         find: "rextive/op",
-        replacement: resolve(rextiveSrc, "op.ts"),
+        replacement: resolve(rextiveSrc, "op/index.ts"),
       },
       {
         find: /^rextive$/,

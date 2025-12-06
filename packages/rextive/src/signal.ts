@@ -168,17 +168,6 @@ export function signal<TValue>(
     NoInfer<SignalExtraOptions<TValue, "mutable" | "any">>
 ): Mutable<TValue>;
 
-export function signal<TValue, TInit>(
-  value: TInit,
-  equals: "strict" | "shallow" | "deep"
-): Mutable<TValue, TInit>;
-
-export function signal<TValue, TInit>(
-  value: TInit,
-  options?: SignalOptions<TValue> &
-    NoInfer<SignalExtraOptions<TValue, "mutable" | "any">>
-): Mutable<TValue, TInit>;
-
 /**
  * Create computed signal from dependencies with equality string shortcut
  * @param dependencies - Map of signals to depend on
@@ -211,9 +200,21 @@ export function signal<TValue, TDependencies extends SignalMap>(
 export function signal<TValue, TDependencies extends SignalMap>(
   dependencies: TDependencies,
   compute: (context: ComputedSignalContext<NoInfer<TDependencies>>) => TValue,
-  options?: SignalOptions<TValue> &
-    NoInfer<SignalExtraOptions<TValue, "computed" | "any">>
+  options?: SignalOptions<NoInfer<TValue>> &
+    SignalExtraOptions<TValue, "computed" | "any">
 ): Computed<TValue>;
+
+export function signal<TValue, TInit>(
+  value: TInit,
+  equals: "strict" | "shallow" | "deep"
+): Mutable<TValue, TInit>;
+
+export function signal<TValue, TInit>(
+  value: TInit,
+  options?: SignalOptions<TValue> &
+    NoInfer<SignalExtraOptions<TValue, "mutable" | "any">>
+): Mutable<TValue, TInit>;
+
 export function signal(...args: any[]): any {
   // Overload 1: signal() - no arguments
   if (args.length === 0) {

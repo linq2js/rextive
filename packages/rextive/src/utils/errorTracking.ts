@@ -14,7 +14,8 @@ export type SignalErrorWhen =
   | "compute:dependency" // When dependency changes trigger recompute
   | "set" // When set() is called
   | "when:filter" // When .when() filter function throws
-  | "when:reducer"; // When .when() reducer function throws
+  | "when:reducer" // When .when() reducer function throws
+  | "when:action"; // When .when() action function throws
 
 /**
  * Trace information attached to an error.

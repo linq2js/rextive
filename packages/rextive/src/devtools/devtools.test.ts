@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { signal } from "../signal";
 import { tag } from "../tag";
-import { to } from "../operators";
+
 import {
   enableDevTools,
   disableDevTools,
@@ -129,9 +129,9 @@ describe("rextive/devtools", () => {
       expect(allCounters.some((s) => s.signal === sig1 && s.disposed)).toBe(
         true
       );
-      expect(
-        allCounters.some((s) => s.signal === sig2 && !s.disposed)
-      ).toBe(true);
+      expect(allCounters.some((s) => s.signal === sig2 && !s.disposed)).toBe(
+        true
+      );
 
       // Total should be 2
       expect(getSignals().size).toBe(2);

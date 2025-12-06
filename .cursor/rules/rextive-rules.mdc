@@ -602,9 +602,9 @@ count.dispose();
 
 #### `.when()` - React to Other Signals ⭐ NEW
 
-React to changes in other signals by triggering actions or applying reducers.
+React to changes in other signals by triggering actions.
 
-**For Mutable Signals - Action-based:**
+**Overload 1: Action String (for both Mutable and Computed)**
 
 ```tsx
 const refreshTrigger = signal(0);
@@ -613,21 +613,25 @@ const userData = signal({ name: "John" });
 // Refresh when trigger changes
 userData.when(refreshTrigger, "refresh");
 
-// Reset when trigger changes
+// Reset when trigger changes (mutable only)
 userData.when(refreshTrigger, "reset");
 
 // With filter - only trigger when condition is met
-userData.when(refreshTrigger, "refresh", (self, notifier) => notifier() > 5);
+// Filter receives (notifier, self)
+userData.when(refreshTrigger, "refresh", (notifier, self) => notifier() > 5);
 ```
 
-**For Mutable Signals - Reducer-based:**
+**Overload 2: Action Callback (for both Mutable and Computed)**
 
 ```tsx
 const increment = signal(0);
 const counter = signal(0);
 
-// Update value based on notifier
-counter.when(increment, (self, notifier) => self() + notifier());
+// Action callback receives (self, notifier) and returns void
+// Use self.set() to update the value
+counter.when(increment, (self, notifier) => {
+  self.set(prev => prev + notifier());
+});
 ```
 
 **For Computed Signals:**
@@ -638,11 +642,16 @@ const fetchedData = signal({ userId }, async ({ deps }) =>
   fetchUser(deps.userId)
 );
 
-// Refresh (immediate recompute)
+// Action string: "refresh" or "stale"
 fetchedData.when(refreshTrigger, "refresh");
-
-// Stale (lazy recompute on next access)
 fetchedData.when(refreshTrigger, "stale");
+
+// Action callback: use self.refresh() or self.stale()
+fetchedData.when(refreshTrigger, (self, notifier) => {
+  if (notifier() > 0) {
+    self.refresh();
+  }
+});
 
 // Note: "reset" is NOT supported for computed signals
 ```
@@ -656,9 +665,15 @@ const trigger2 = signal(0);
 // React to any of multiple signals
 userData.when([trigger1, trigger2], "refresh");
 
-// Filter receives the specific notifier that changed
-userData.when([trigger1, trigger2], "refresh", (self, notifier) => {
-  return notifier() > 0; // notifier is the one that triggered
+// Filter receives (notifier, self) - notifier is the one that triggered
+userData.when([trigger1, trigger2], "refresh", (notifier, self) => {
+  return notifier() > 0;
+});
+
+// Action callback receives (self, notifier)
+userData.when([trigger1, trigger2], (self, notifier) => {
+  console.log("Triggered by:", notifier());
+  self.refresh();
 });
 ```
 
@@ -677,40 +692,26 @@ Subscriptions created by `.when()` are automatically cleaned up when the signal 
 
 ```tsx
 // Filter errors - action is NOT executed, error routed to signal's onError
-userData.when(trigger, "refresh", (self, notifier) => {
+userData.when(trigger, "refresh", (notifier, self) => {
   if (notifier() < 0) throw new Error("Invalid"); // Action skipped, onError called
   return true;
 });
 
-// Reducer errors - signal enters ERROR state
+// Action callback errors - routed through signal's error handling
 counter.when(increment, (self, notifier) => {
   if (notifier() < 0) throw new Error("Negative not allowed");
-  return self() + notifier();
+  self.set(prev => prev + notifier());
 });
-// After error: counter.error() returns the error, counter() throws
 ```
 
 **⚠️ Common Pitfalls:**
 
 ```tsx
-// ❌ BAD - Accessing disposed signal in filter/reducer
-const data = signal([]);
-data.when(trigger, (self, notifier) => {
-  return self().concat(notifier()); // May throw if self is disposed
-});
-
-// ✅ GOOD - Check for disposal or use tryGet()
-data.when(trigger, (self, notifier) => {
-  const current = self.tryGet();
-  if (!current) return []; // Handle disposed/error state
-  return current.concat(notifier());
-});
-
 // ❌ BAD - Circular dependency
 const a = signal(0);
 const b = signal(0);
-a.when(b, (self, notifier) => notifier()); // a depends on b
-b.when(a, (self, notifier) => notifier()); // b depends on a - INFINITE LOOP!
+a.when(b, (self, notifier) => self.set(notifier())); // a depends on b
+b.when(a, (self, notifier) => self.set(notifier())); // b depends on a - INFINITE LOOP!
 
 // ❌ BAD - "reset" on computed signals
 computed.when(trigger, "reset"); // Throws error! Use "refresh" or "stale"
@@ -2290,8 +2291,8 @@ function Component() {
 - `.error()` - Get error safely ⭐
 - `.tryGet()` - Get value safely ⭐
 - `.pause()` / `.resume()` / `.paused()` - Control (computed only)
-- `.when(notifier, action, filter?)` - React to other signals ⭐
-- `.when(notifier, reducer)` - Update value when notifier changes (mutable only) ⭐
+- `.when(notifier, action, filter?)` - React to other signals with action string ⭐
+- `.when(notifier, callback)` - React to other signals with action callback `(self, notifier) => void` ⭐
 
 ### Static Methods
 

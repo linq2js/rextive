@@ -115,7 +115,7 @@ describe("awaited() helper", () => {
   });
 
   it("should work with .pipe() and to operator", async () => {
-    const { to } = await import("./operators");
+    const { to } = await import("./op");
 
     const data = signal(Promise.resolve(5));
     const doubled = data.pipe(to(awaited((x) => x * 2)));

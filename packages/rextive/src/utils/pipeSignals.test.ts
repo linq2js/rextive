@@ -1,27 +1,27 @@
 import { describe, it, expect, vi } from "vitest";
-import { pipeSignals } from "./pipeSignals";
+import { signalPipe } from "../signal.pipe";
 import { signal } from "../signal";
-import { to } from "../operators";
+import { to } from "../op";
 import { is } from "../is";
 
 describe("pipeSignals", () => {
   it("should return source when no operators provided", () => {
     const source = signal(5);
-    const result = pipeSignals(source, []);
+    const result = signalPipe(source, []);
 
     expect(result).toBe(source);
   });
 
   it("should apply single operator", () => {
     const source = signal(5);
-    const result = pipeSignals(source, [(s) => to((x: number) => x * 2)(s)]);
+    const result = signalPipe(source, [(s) => to((x: number) => x * 2)(s)]);
 
     expect(result()).toBe(10);
   });
 
   it("should chain multiple operators", () => {
     const source = signal(5);
-    const result = pipeSignals(source, [
+    const result = signalPipe(source, [
       (s) => to((x: number) => x * 2)(s),
       (s) => to((x: number) => x + 1)(s),
       (s) => to((x: number) => `Value: ${x}`)(s),
@@ -44,7 +44,7 @@ describe("pipeSignals", () => {
       return s;
     };
 
-    const result = pipeSignals(source, [
+    const result = signalPipe(source, [
       (s) => trackDispose(to((x: number) => x * 2)(s), intermediate1Spy),
       (s) => trackDispose(to((x: number) => x + 1)(s), intermediate2Spy),
       (s) => to((x: number) => `Value: ${x}`)(s),
@@ -65,7 +65,7 @@ describe("pipeSignals", () => {
     const originalDispose = source.dispose;
 
     // Single operator that returns the same signal
-    const result = pipeSignals(source, [(s) => s]);
+    const result = signalPipe(source, [(s) => s]);
 
     // Should return the source as-is
     expect(result).toBe(source);
@@ -75,7 +75,7 @@ describe("pipeSignals", () => {
   it("should handle operators that return the same signal", () => {
     const source = signal(5);
 
-    const result = pipeSignals(source, [
+    const result = signalPipe(source, [
       (s) => {
         // Side effect but returns same signal
         s.on(() => console.log("changed"));
@@ -100,7 +100,7 @@ describe("pipeSignals", () => {
       return s;
     };
 
-    const result = pipeSignals(source, [
+    const result = signalPipe(source, [
       (s) => s, // Returns same
       (s) => trackDispose(to((x: number) => x * 2)(s), spy), // Creates new
       (s) => s, // Returns same
@@ -119,7 +119,7 @@ describe("pipeSignals", () => {
     const source = signal(5);
 
     // Create a mock operator that returns an object without dispose
-    const result = pipeSignals(source, [
+    const result = signalPipe(source, [
       (s) => to((x: number) => x * 2)(s),
       (s) => ({ ...s, dispose: undefined }), // Remove dispose
     ]);
@@ -131,7 +131,7 @@ describe("pipeSignals", () => {
   describe("displayName", () => {
     it("should preserve user-defined name on result signal", () => {
       const source = signal(5, { name: "myCount" });
-      const result = pipeSignals(source, [
+      const result = signalPipe(source, [
         (s) => to((x: number) => x * 2, { name: "userDefinedName" })(s),
       ]);
 
@@ -141,7 +141,7 @@ describe("pipeSignals", () => {
 
     it("should not rename when result is the same as source", () => {
       const source = signal(5, { name: "myCount" });
-      const result = pipeSignals(source, [(s) => s]);
+      const result = signalPipe(source, [(s) => s]);
 
       // Should return source as-is with original name
       expect(result.displayName).toBe("myCount");
@@ -152,7 +152,7 @@ describe("pipeSignals", () => {
       const source = signal(5, { name: "myCount" });
 
       // Operator that returns a non-signal object
-      const result = pipeSignals(source, [(s) => ({ value: s() * 2 })]);
+      const result = signalPipe(source, [(s) => ({ value: s() * 2 })]);
 
       // Result is not a signal, so no renaming
       expect(result.displayName).toBeUndefined();
@@ -170,7 +170,7 @@ describe("pipeSignals", () => {
       expect(is(computed)).toBe(true);
 
       // Now pipe it
-      const result = pipeSignals(source, [(s) => to((x: number) => x * 2)(s)]);
+      const result = signalPipe(source, [(s) => to((x: number) => x * 2)(s)]);
 
       // The rename should trigger because:
       // 1. result !== source (true)

@@ -32,8 +32,7 @@ export default defineConfig({
           __dirname,
           "src/devtools-panel/index.ts"
         ),
-        "operators/index": resolve(__dirname, "src/operators/index.ts"),
-        op: resolve(__dirname, "src/op.ts"),
+        "op/index": resolve(__dirname, "src/op/index.ts"),
         "test/index": resolve(__dirname, "src/test/index.ts"),
       },
       formats: ["es"],
@@ -90,7 +89,7 @@ export default defineConfig({
         "**/src/index.ts",
         "**/src/react/index.ts",
         "**/src/typeCheck.tsx", // Type-only tests
-        "**/src/op.ts", // Re-export only
+        "**/src/op/index.ts", // Re-export only
         "**/src/cache/index.ts", // Re-export only
         "**/src/immer/index.ts", // Re-export only
         "**/src/plugins/index.ts", // Re-export only
