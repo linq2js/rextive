@@ -1,9 +1,4 @@
-import {
-  createContext,
-  PropsWithChildren,
-  useContext,
-  useLayoutEffect,
-} from "react";
+import { createContext, PropsWithChildren, useContext, useEffect } from "react";
 import { ExDisposable, Signal } from "../types";
 import { useScope } from "./useScope";
 import { is } from "../is";
@@ -172,8 +167,8 @@ export function provider<TContext, TValue>(
       }) as TContext;
 
       // Update the context when props.value changes
-      // Using useLayoutEffect ensures this happens synchronously before paint
-      useLayoutEffect(() => {
+      // Using useEffect ensures this happens synchronously before paint
+      useEffect(() => {
         if (options.update) {
           options.update(scope, props.value);
         }

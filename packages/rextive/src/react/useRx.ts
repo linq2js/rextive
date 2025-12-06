@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Hooks, withHooks } from "../hooks";
 import { AnySignal, Task } from "../types";
 import { emitter } from "../utils/emitter";
@@ -131,8 +131,8 @@ export function useRx<T>(fn: () => T): T {
   controller.signals.clear();
 
   // Set up subscriptions AFTER render completes
-  // useLayoutEffect runs synchronously after DOM mutations but before paint
-  useLayoutEffect(() => {
+  // useEffect runs synchronously after DOM mutations but before paint
+  useEffect(() => {
     factory.commit();
 
     // Create cleanup emitter to collect unsubscribe functions

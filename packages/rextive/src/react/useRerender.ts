@@ -1,5 +1,5 @@
 import debounce from "lodash/debounce";
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { RerenderOptions, RerenderFunction } from "./types";
 
 /**
@@ -40,7 +40,7 @@ export function useRerender<TData = void>(
 
   // Track rendering state: set to true during render, false after paint
   // Cleanup cancels any pending debounced calls on unmount
-  useLayoutEffect(() => {
+  useEffect(() => {
     return controller.onMount();
   }, [controller]); // Controller is stable but included for exhaustive-deps
 
@@ -205,7 +205,7 @@ class RerenderController<TData = void> {
 
   /**
    * Called during render phase to update controller state
-   * Must be called before useLayoutEffect runs to track rendering correctly
+   * Must be called before useEffect runs to track rendering correctly
    */
   onRender(newOptions: RerenderOptions, newData: TData | undefined) {
     this.isRendering = true; // Set true during render
@@ -218,7 +218,7 @@ class RerenderController<TData = void> {
   }
 
   /**
-   * Called after paint via useLayoutEffect
+   * Called after paint via useEffect
    * Returns cleanup function for component unmount
    */
   onMount() {

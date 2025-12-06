@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { dev } from "../utils/dev";
 import { tryDispose } from "../disposable";
 
@@ -224,7 +224,7 @@ export function useLifecycle(
 
   // Setup mount/cleanup lifecycle
   // Re-run when target changes (only in object lifecycle mode)
-  useLayoutEffect(
+  useEffect(
     () => {
       return ref.onMount(target);
     },
@@ -232,7 +232,7 @@ export function useLifecycle(
   );
 
   // Call update callback after render (with optional deps)
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (updateCallback) {
       if (hasTarget) {
         (updateCallback as any)(target);

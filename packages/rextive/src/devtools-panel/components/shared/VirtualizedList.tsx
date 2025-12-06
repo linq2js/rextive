@@ -8,7 +8,7 @@ import React, {
   useRef,
   useCallback,
   useMemo,
-  useLayoutEffect,
+  useEffect,
 } from "react";
 
 export interface VirtualizedListProps<T> {
@@ -51,12 +51,12 @@ export function VirtualizedList<T>({
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(0);
-  
+
   // Store measured heights for each item
   const measuredHeights = useRef<Map<string | number, number>>(new Map());
-  
+
   // Update container height on resize
-  useLayoutEffect(() => {
+  useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
@@ -104,28 +104,32 @@ export function VirtualizedList<T>({
     // Binary search for start index
     let low = 0;
     let high = items.length - 1;
-    
+
     while (low < high) {
       const mid = Math.floor((low + high) / 2);
-      const itemBottom = itemMeasurements[mid].offset + itemMeasurements[mid].height;
-      
+      const itemBottom =
+        itemMeasurements[mid].offset + itemMeasurements[mid].height;
+
       if (itemBottom <= scrollTop) {
         low = mid + 1;
       } else {
         high = mid;
       }
     }
-    
+
     const visibleStart = Math.max(0, low - overscan);
-    
+
     // Find end index
     const scrollBottom = scrollTop + containerHeight;
     let endIdx = visibleStart;
-    
-    while (endIdx < items.length && itemMeasurements[endIdx].offset < scrollBottom) {
+
+    while (
+      endIdx < items.length &&
+      itemMeasurements[endIdx].offset < scrollBottom
+    ) {
       endIdx++;
     }
-    
+
     const visibleEnd = Math.min(items.length, endIdx + overscan);
 
     return {
@@ -135,21 +139,24 @@ export function VirtualizedList<T>({
   }, [items.length, itemMeasurements, scrollTop, containerHeight, overscan]);
 
   // Measure item after render
-  const measureItem = useCallback((key: string | number, element: HTMLElement | null) => {
-    if (element) {
-      const height = element.getBoundingClientRect().height;
-      const currentHeight = measuredHeights.current.get(key);
-      
-      if (currentHeight !== height) {
-        measuredHeights.current.set(key, height);
-        // Force re-render to update positions
-        // Using a micro-task to batch multiple measurements
-        Promise.resolve().then(() => {
-          setScrollTop(prev => prev); // Trigger re-calculation
-        });
+  const measureItem = useCallback(
+    (key: string | number, element: HTMLElement | null) => {
+      if (element) {
+        const height = element.getBoundingClientRect().height;
+        const currentHeight = measuredHeights.current.get(key);
+
+        if (currentHeight !== height) {
+          measuredHeights.current.set(key, height);
+          // Force re-render to update positions
+          // Using a micro-task to batch multiple measurements
+          Promise.resolve().then(() => {
+            setScrollTop((prev) => prev); // Trigger re-calculation
+          });
+        }
       }
-    }
-  }, []);
+    },
+    []
+  );
 
   // Visible items
   const visibleItems = useMemo(() => {
@@ -208,10 +215,7 @@ export function VirtualizedList<T>({
             const key = getItemKey(item, actualIndex);
 
             return (
-              <div
-                key={key}
-                ref={(el) => measureItem(key, el)}
-              >
+              <div key={key} ref={(el) => measureItem(key, el)}>
                 {renderItem(item, actualIndex)}
               </div>
             );
@@ -230,9 +234,8 @@ export function useItemKey<T>(
 ): (item: T, index: number) => string | number {
   const keyFnRef = useRef(keyFn);
   keyFnRef.current = keyFn;
-  
+
   return useCallback((item: T, index: number) => {
     return keyFnRef.current(item, index);
   }, []);
 }
-

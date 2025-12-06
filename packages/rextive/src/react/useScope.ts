@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import {
   useLifecycle,
@@ -252,7 +252,7 @@ export function useScope<TScope extends Record<string, any>>(
   const { result: scope } = controller;
 
   // Commit on mount, schedule dispose on cleanup
-  useLayoutEffect(() => {
+  useEffect(() => {
     controller.commit();
 
     // Call mount/ready callback after commit
@@ -271,7 +271,7 @@ export function useScope<TScope extends Record<string, any>>(
   }, [controller]);
 
   // Call update callback after render (with optional deps)
-  useLayoutEffect(() => {
+  useEffect(() => {
     updateCallback?.(scope);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, updateDeps);
