@@ -4,10 +4,10 @@ interface CartEmptyProps {
 
 export function CartEmpty({ onClose }: CartEmptyProps) {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center">
-      <div className="w-20 h-20 rounded-full bg-warm-100 flex items-center justify-center mb-4">
+    <div className="flex flex-col items-center justify-center h-full text-center p-6">
+      <div className="w-20 h-20 rounded-full bg-stone-100 dark:bg-slate-800 flex items-center justify-center mb-4">
         <svg
-          className="w-10 h-10 text-warm-400"
+          className="w-10 h-10 text-stone-400 dark:text-slate-500"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -20,10 +20,10 @@ export function CartEmpty({ onClose }: CartEmptyProps) {
           />
         </svg>
       </div>
-      <h3 className="text-lg font-medium text-warm-900 mb-2">
+      <h3 className="text-lg font-medium text-stone-900 dark:text-white mb-2">
         Your cart is empty
       </h3>
-      <p className="text-warm-500 mb-6">
+      <p className="text-stone-500 dark:text-slate-400 mb-6">
         Looks like you haven't added anything yet
       </p>
       <button onClick={onClose} className="btn-primary">
@@ -32,4 +32,3 @@ export function CartEmpty({ onClose }: CartEmptyProps) {
     </div>
   );
 }
-

@@ -1,7 +1,6 @@
 import { signal } from "./signal";
 import {
   Computed,
-  ComputedSignalContext,
   EqualsFn,
   Mutable,
   Signal,
@@ -34,7 +33,11 @@ export type WithInitialPayload<TPayload> = {
   initialPayload: TPayload;
 };
 
-export type ActionOptions<TPayload, TResult> = {
+export type ActionOptions<
+  TPayload,
+  TResult,
+  TMode extends "lazy" | "eager" = "lazy"
+> = {
   /**
    * Debug name for the action signals.
    * Creates `${name}.payload` and `${name}.result` signals.
@@ -45,12 +48,16 @@ export type ActionOptions<TPayload, TResult> = {
    * Custom equality for payload and/or result signals.
    * String shortcut applies to result only (payload uses notifier behavior).
    */
-  equals?: ActionEquals<TPayload, TResult>;
+  equals?: TMode extends "lazy"
+    ? ActionEquals<TPayload | undefined, TResult | undefined>
+    : ActionEquals<TPayload, TResult>;
 
   /**
    * Plugins to extend the result signal's behavior.
    */
-  use?: UseList<TResult, "computed">;
+  use?: TMode extends "lazy"
+    ? UseList<TResult | undefined, "computed">
+    : UseList<TResult, "computed">;
 
   /**
    * Called when the action handler throws (sync) or rejects (async).
@@ -249,7 +256,7 @@ export function signalAction<
     context: ActionContext<TPayload>,
     deps: ActionDeps<TDependencies>
   ) => TResult,
-  options: ActionOptions<TPayload, TResult> &
+  options: ActionOptions<TPayload, TResult, "eager"> &
     NoInfer<WithInitialPayload<TPayload>>
 ): Action<TPayload, TResult, "eager">;
 
@@ -301,7 +308,7 @@ export function signalAction<TPayload, TResult>(
 
 export function signalAction<TPayload, TResult>(
   handler: (context: ActionContext<TPayload>) => TResult,
-  options: ActionOptions<TPayload, TResult> &
+  options: ActionOptions<TPayload, TResult, "eager"> &
     NoInfer<WithInitialPayload<TPayload>>
 ): Action<TPayload, TResult, "eager">;
 
@@ -342,6 +349,7 @@ export function signalAction<
     name: name ? `${name}.payload` : actionId + ".payload",
     onChange: options?.onDispatch,
   }) as unknown as Mutable<TPayload, undefined>;
+  let dispatched = false;
 
   // Build dependencies for the result computed signal
   // ONLY include __payload - user deps are read at dispatch time, not reactive
@@ -350,26 +358,29 @@ export function signalAction<
     __payload: payloadSignal,
   };
 
-  // Create result computed signal
+  // effect ot update result signal when payload changes
   const resultSignal = signal(
     resultDeps,
-    (computeContext) => {
-      if (!computeContext.deps.__payload && computeContext.nth === 0) {
+    (context) => {
+      // always depends on payload signal
+      const payload = context.deps.__payload;
+
+      if (!dispatched) {
         return undefined;
       }
       // Build action context with payload
       // Note: We use 'as unknown as' for 'use' because ActionContext extends SignalContext
       // but has additional payload property that doesn't affect the 'use' function semantics
       const actionContext: ActionContext<TPayload> = Object.assign(
-        { payload: computeContext.deps.__payload },
-        computeContext
+        { payload },
+        context
       );
 
       try {
         // Execute handler with action context and deps
         const result = handler(
           actionContext,
-          computeContext.deps as ActionDeps<TDependencies>
+          context.deps as ActionDeps<TDependencies>
         );
 
         if (options?.onSuccess || options?.onError) {
@@ -377,7 +388,7 @@ export function signalAction<
           if (isPromiseLike(result)) {
             // Use safe() to handle abort - returns never-resolving promise if aborted
             // In that case, onSuccess/onError won't be called (correct behavior)
-            computeContext.safe(result).then(
+            context.safe(result).then(
               (resolvedResult) => {
                 options?.onSuccess?.(resolvedResult as Awaited<TResult>);
               },
@@ -410,6 +421,7 @@ export function signalAction<
 
   // Create dispatch function
   const dispatch = (payload: TPayload): TResult => {
+    dispatched = true;
     // Set payload (triggers result recomputation)
     payloadSignal.set(payload);
 
@@ -421,6 +433,7 @@ export function signalAction<
 
   if (options && "initialPayload" in options) {
     mode = "eager";
+    dispatched = true;
     payloadSignal.set(options.initialPayload as TPayload);
   }
 

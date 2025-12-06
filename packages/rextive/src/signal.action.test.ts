@@ -266,7 +266,7 @@ describe("signal.action", () => {
         (ctx: AC<number>) => ({ value: ctx.payload }),
         {
           equals: {
-            result: (a, b) => a.value === b.value,
+            result: (a, b) => a?.value === b?.value,
           },
         }
       );

@@ -485,7 +485,7 @@ export function createMutableSignal(
         const next = typeof value === "function" ? value(peek()) : value;
 
         // Skip if value unchanged (optimization)
-        if (equals(current?.value, next)) return;
+        if (current && equals(current.value, next)) return;
 
         // Mark as modified (prevents future hydration)
         hasBeenModified = true;

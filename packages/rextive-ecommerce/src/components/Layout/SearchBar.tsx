@@ -1,59 +1,45 @@
-import { signal, logic } from "rextive";
-import { rx } from "rextive/react";
-import { debounce, to } from "rextive/op";
+import { rx, useScope, disposable } from "rextive/react";
+import { signal } from "rextive";
 import { productsLogic } from "@/logic/productsLogic";
-import { routerLogic } from "@/logic/routerLogic";
 
-/**
- * Local logic for SearchBar - manages input debouncing.
- * Not exported, only used by this component.
- */
-export const searchBarLogic = logic("searchBarLogic", () => {
-  const $products = productsLogic();
+export function searchBarLogic() {
+  const products = productsLogic();
+  const inputValue = signal("", { name: "searchBar.inputValue" });
 
-  const input = signal("", { name: "searchBar.input" });
-  // Update products search when debounced value changes
-  input.pipe(debounce(300), to($products.setSearch));
-
-  const clear = () => {
-    input.set("");
+  const handleSearch = (value: string) => {
+    inputValue.set(value);
+    products.setSearch(value);
   };
 
-  return {
-    input,
-    clear,
+  const clearSearch = () => {
+    inputValue.set("");
+    products.setSearch("");
   };
-});
+
+  return { inputValue, handleSearch, clearSearch };
+}
 
 export function SearchBar() {
-  const $search = searchBarLogic();
-  const $router = routerLogic();
+  const scope = useScope(() =>
+    disposable({
+      ...searchBarLogic(),
+    })
+  );
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    $search.input.set(value);
+  return rx(() => {
+    const value = scope.inputValue();
 
-    // Navigate to home and scroll to products when user starts typing
-    if (value.length > 0) {
-      const route = $router.route();
-      if (route.page !== "home") {
-        $router.goHome();
-      }
-      // Scroll to products section after a short delay
-      setTimeout(() => {
-        const productsSection = document.getElementById("products");
-        if (productsSection) {
-          productsSection.scrollIntoView({ behavior: "smooth" });
-        }
-      }, 100);
-    }
-  };
-
-  return (
-    <div className="relative">
-      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+    return (
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Search products..."
+          value={value}
+          onChange={(e) => scope.handleSearch(e.target.value)}
+          className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-stone-200 dark:border-slate-700 bg-stone-50 dark:bg-slate-800/50 text-stone-900 dark:text-slate-100 placeholder:text-stone-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all"
+        />
         <svg
-          className="w-5 h-5 text-warm-400"
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 dark:text-slate-500"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -65,29 +51,13 @@ export function SearchBar() {
             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
           />
         </svg>
-      </div>
-
-      {rx(() => (
-        <input
-          type="text"
-          placeholder="Search products..."
-          value={$search.input()}
-          onChange={handleChange}
-          className="input pl-10 pr-10 py-2"
-        />
-      ))}
-
-      {/* Clear button */}
-      {rx(() => {
-        if (!$search.input()) return null;
-
-        return (
+        {value && (
           <button
-            onClick={() => $search.clear()}
-            className="absolute inset-y-0 right-0 pr-3 flex items-center text-warm-400 hover:text-warm-600 transition-colors"
+            onClick={() => scope.clearSearch()}
+            className="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 dark:text-slate-500 hover:text-stone-600 dark:hover:text-slate-300 transition-colors"
           >
             <svg
-              className="w-5 h-5"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -100,8 +70,8 @@ export function SearchBar() {
               />
             </svg>
           </button>
-        );
-      })}
-    </div>
-  );
+        )}
+      </div>
+    );
+  });
 }

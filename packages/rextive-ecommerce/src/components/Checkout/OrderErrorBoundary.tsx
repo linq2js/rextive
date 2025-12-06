@@ -31,7 +31,7 @@ export class OrderErrorBoundary extends Component<Props, State> {
       return (
         <div className="text-center py-8">
           {/* Error Icon */}
-          <div className="w-20 h-20 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
+          <div className="w-20 h-20 mx-auto mb-6 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
             <svg
               className="w-10 h-10 text-red-500"
               fill="none"
@@ -47,10 +47,10 @@ export class OrderErrorBoundary extends Component<Props, State> {
             </svg>
           </div>
 
-          <h3 className="text-2xl font-bold text-warm-900 mb-2">
+          <h3 className="text-2xl font-bold text-stone-900 dark:text-white mb-2">
             Order Failed
           </h3>
-          <p className="text-warm-600 mb-6 max-w-sm mx-auto">
+          <p className="text-stone-600 dark:text-slate-400 mb-6 max-w-sm mx-auto">
             {error.message || "An unexpected error occurred while processing your order."}
           </p>
 
@@ -80,4 +80,3 @@ export class OrderErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
-

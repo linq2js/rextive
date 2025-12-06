@@ -3,36 +3,41 @@ import { cartLogic } from "@/logic/cartLogic";
 import { CartHeader } from "./CartHeader";
 import { CartItemsList } from "./CartItemsList";
 import { CartFooter } from "./CartFooter";
+import { CartEmpty } from "./CartEmpty";
 
 export function CartDrawer() {
-  const { drawerOpen, closeDrawer } = cartLogic();
+  const { drawerOpen, closeDrawer, itemCount } = cartLogic();
 
   return rx(() => {
-    const isOpen = drawerOpen();
+    const open = drawerOpen();
+    const count = itemCount();
 
     return (
       <>
         {/* Backdrop */}
-        <div
-          className={`fixed inset-0 bg-warm-900/50 backdrop-blur-sm z-50 transition-opacity duration-300 ${
-            isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-          onClick={() => closeDrawer()}
-          aria-hidden="true"
-        />
+        {open && (
+          <div
+            className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm z-50 animate-fade-in"
+            onClick={() => closeDrawer()}
+          />
+        )}
 
         {/* Drawer */}
         <aside
-          className={`fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-warm-900 shadow-2xl z-50 transform transition-transform duration-300 ease-out ${
-            isOpen ? "translate-x-0" : "translate-x-full"
+          className={`fixed top-0 right-0 h-full w-full sm:w-96 bg-white dark:bg-slate-900 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-out border-l border-stone-200 dark:border-slate-800 ${
+            open ? "translate-x-0" : "translate-x-full"
           }`}
-          aria-label="Shopping cart"
         >
-          <div className="flex flex-col h-full">
-            <CartHeader />
-            <CartItemsList />
-            <CartFooter />
-          </div>
+          <CartHeader />
+
+          {count === 0 ? (
+            <CartEmpty onClose={() => closeDrawer()} />
+          ) : (
+            <>
+              <CartItemsList />
+              <CartFooter />
+            </>
+          )}
         </aside>
       </>
     );

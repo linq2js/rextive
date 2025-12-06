@@ -17,7 +17,7 @@ export function PaymentForm() {
 
     return (
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-warm-900 mb-4">
+        <h3 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">
           Payment Method
         </h3>
 
@@ -27,8 +27,8 @@ export function PaymentForm() {
               key={option.id}
               className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all ${
                 selected === option.id
-                  ? "border-brand-500 bg-brand-50"
-                  : "border-warm-200 hover:border-warm-300"
+                  ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20"
+                  : "border-stone-200 dark:border-slate-700 hover:border-stone-300 dark:hover:border-slate-600"
               }`}
             >
               <input
@@ -42,14 +42,14 @@ export function PaymentForm() {
               <span className="text-2xl mr-3">{option.icon}</span>
               <span
                 className={`font-medium ${
-                  selected === option.id ? "text-brand-700" : "text-warm-700"
+                  selected === option.id ? "text-brand-700 dark:text-brand-400" : "text-stone-700 dark:text-slate-300"
                 }`}
               >
                 {option.label}
               </span>
               {selected === option.id && (
                 <svg
-                  className="w-5 h-5 ml-auto text-brand-600"
+                  className="w-5 h-5 ml-auto text-brand-600 dark:text-brand-400"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -65,12 +65,12 @@ export function PaymentForm() {
         </div>
 
         {selected === "card" && (
-          <div className="mt-6 p-4 bg-warm-50 rounded-xl space-y-4">
-            <p className="text-sm text-warm-500 mb-2">
+          <div className="mt-6 p-4 bg-stone-50 dark:bg-slate-800/50 rounded-xl space-y-4 border border-stone-200 dark:border-slate-700">
+            <p className="text-sm text-stone-500 dark:text-slate-400 mb-2">
               Demo mode - no real payment will be processed
             </p>
             <div>
-              <label className="block text-sm font-medium text-warm-700 mb-1">
+              <label className="block text-sm font-medium text-stone-700 dark:text-slate-300 mb-1">
                 Card Number
               </label>
               <input
@@ -82,7 +82,7 @@ export function PaymentForm() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1">
+                <label className="block text-sm font-medium text-stone-700 dark:text-slate-300 mb-1">
                   Expiry
                 </label>
                 <input
@@ -93,7 +93,7 @@ export function PaymentForm() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1">
+                <label className="block text-sm font-medium text-stone-700 dark:text-slate-300 mb-1">
                   CVC
                 </label>
                 <input

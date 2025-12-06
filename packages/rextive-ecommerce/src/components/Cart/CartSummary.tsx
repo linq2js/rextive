@@ -14,7 +14,7 @@ export function CartSummary({ subtotal, discount, onClear }: CartSummaryProps) {
   };
 
   return (
-    <div className="border-t border-warm-200 dark:border-warm-700 px-6 py-4 space-y-4 bg-warm-50 dark:bg-warm-800">
+    <div className="border-t border-stone-200 dark:border-slate-800 px-6 py-4 space-y-4 bg-stone-50 dark:bg-slate-950">
       {/* Summary */}
       <div className="space-y-2 text-sm">
         {discount > 0 && (
@@ -23,16 +23,16 @@ export function CartSummary({ subtotal, discount, onClear }: CartSummaryProps) {
             <span>-${discount.toFixed(2)}</span>
           </div>
         )}
-        <div className="flex justify-between text-warm-600 dark:text-warm-400">
+        <div className="flex justify-between text-stone-500 dark:text-slate-400">
           <span>Shipping</span>
           <span>Calculated at checkout</span>
         </div>
       </div>
 
       {/* Total */}
-      <div className="flex justify-between items-center py-3 border-t border-warm-200 dark:border-warm-700">
-        <span className="text-lg font-semibold text-warm-900 dark:text-warm-100">Subtotal</span>
-        <span className="text-2xl font-bold text-warm-900 dark:text-warm-100">
+      <div className="flex justify-between items-center py-3 border-t border-stone-200 dark:border-slate-800">
+        <span className="text-lg font-semibold text-stone-900 dark:text-white">Subtotal</span>
+        <span className="text-2xl font-bold text-stone-900 dark:text-white">
           ${subtotal.toFixed(2)}
         </span>
       </div>
@@ -58,7 +58,7 @@ export function CartSummary({ subtotal, discount, onClear }: CartSummaryProps) {
             />
           </svg>
         </button>
-        <button onClick={onClear} className="btn-ghost w-full text-warm-600 dark:text-warm-400">
+        <button onClick={onClear} className="btn-ghost w-full text-stone-500 dark:text-slate-400">
           Clear Cart
         </button>
       </div>

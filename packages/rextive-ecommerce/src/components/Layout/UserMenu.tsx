@@ -8,7 +8,7 @@ export function UserMenu() {
     // Show loading while restoring session
     if (isRestoring()) {
       return (
-        <div className="flex items-center gap-2 text-warm-600">
+        <div className="flex items-center gap-2 text-stone-500 dark:text-slate-400">
           <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
             <circle
               className="opacity-25"
@@ -35,18 +35,18 @@ export function UserMenu() {
       return (
         <div className="flex items-center gap-3">
           <div className="hidden sm:block text-right">
-            <p className="text-sm font-medium text-warm-900 dark:text-warm-100">
+            <p className="text-sm font-medium text-stone-900 dark:text-white">
               {currentUser.firstName}
             </p>
-            <p className="text-xs text-warm-600 dark:text-warm-400">Welcome back!</p>
+            <p className="text-xs text-stone-500 dark:text-slate-400">Welcome back!</p>
           </div>
           <button
             onClick={() => logout()}
-            className="btn-ghost p-2"
+            className="p-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-slate-800 transition-colors"
             title="Logout"
           >
             <svg
-              className="w-5 h-5"
+              className="w-5 h-5 text-stone-600 dark:text-slate-300"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

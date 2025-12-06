@@ -54,7 +54,7 @@ export function SortSelect() {
         return (
           <>
             <label
-              className={`text-sm ${isDisabled ? "text-warm-300" : "text-warm-500"}`}
+              className={`text-sm ${isDisabled ? "text-stone-300 dark:text-slate-600" : "text-stone-500 dark:text-slate-400"}`}
             >
               Sort by:
             </label>

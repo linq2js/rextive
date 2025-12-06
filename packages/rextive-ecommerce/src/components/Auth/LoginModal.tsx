@@ -1,196 +1,182 @@
-import { signal, logic } from "rextive";
-import { rx, task } from "rextive/react";
+import { rx, useScope, disposable, task } from "rextive/react";
+import { signal } from "rextive";
 import { authLogic } from "@/logic/authLogic";
 
-/**
- * Local logic for LoginModal - manages form state.
- * Using singleton pattern - form state persists across modal open/close.
- */
-const loginFormLogic = logic("loginFormLogic", () => {
-  const username = signal("emilys", { name: "loginForm.username" });
-  const password = signal("emilyspass", { name: "loginForm.password" });
-
-  const reset = () => {
-    username.set("emilys");
-    password.set("emilyspass");
-  };
-
-  return {
-    username,
-    password,
-    reset,
-  };
-});
-
 export function LoginModal() {
-  const $auth = authLogic();
-  // Use singleton - form state persists. No useScope needed.
-  const $form = loginFormLogic();
+  const { loginModalOpen, closeLoginModal, login, loginResult } = authLogic();
+
+  const scope = useScope(() =>
+    disposable({
+      username: signal("emilys", { name: "loginModal.username" }),
+      password: signal("emilyspass", { name: "loginModal.password" }),
+    })
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await $auth.login({
-        username: $form.username(),
-        password: $form.password(),
-      });
+      await login({ username: scope.username(), password: scope.password() });
+      scope.username.reset();
+      scope.password.reset();
     } catch {
-      // Error is handled in authLogic
+      // Error is handled by loginResult
     }
   };
 
   return rx(() => {
-    const isOpen = $auth.loginModalOpen();
-    const loginState = task.from($auth.loginResult());
-    const loading = loginState.loading;
-    const error =
-      loginState.error instanceof Error
-        ? loginState.error.message
-        : loginState.error
-        ? String(loginState.error)
-        : null;
-    const username = $form.username();
-    const password = $form.password();
+    const open = loginModalOpen();
+    const state = task.from(loginResult);
+    const loading = state.loading;
+    const errorMessage = state.error ? String(state.error) : null;
+
+    if (!open) return null;
 
     return (
-      <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         {/* Backdrop */}
         <div
-          className={`fixed inset-0 bg-warm-900/50 backdrop-blur-sm z-50 transition-opacity duration-300 ${
-            isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-          onClick={() => $auth.closeLoginModal()}
-          aria-hidden="true"
+          className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm animate-fade-in"
+          onClick={() => closeLoginModal()}
         />
 
         {/* Modal */}
-        <div
-          className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-300 ${
-            isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-        >
-          <div
-            className={`bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-300 ${
-              isOpen ? "scale-100" : "scale-95"
-            }`}
-            onClick={(e) => e.stopPropagation()}
+        <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-8 animate-slide-up border border-stone-200 dark:border-slate-800">
+          {/* Close button */}
+          <button
+            onClick={() => closeLoginModal()}
+            className="absolute top-4 right-4 p-2 rounded-xl hover:bg-stone-100 dark:hover:bg-slate-800 transition-colors"
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-warm-200">
-              <h2 className="text-xl font-semibold text-warm-900">Sign In</h2>
-              <button
-                onClick={() => $auth.closeLoginModal()}
-                className="btn-ghost p-2"
-                aria-label="Close"
+            <svg
+              className="w-5 h-5 text-stone-500 dark:text-slate-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 bg-brand-100 dark:bg-brand-900/40 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg
+                className="w-7 h-7 text-brand-600 dark:text-brand-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-stone-900 dark:text-white">
+              Welcome Back
+            </h2>
+            <p className="text-stone-500 dark:text-slate-400 mt-2">
+              Sign in to access your cart and orders
+            </p>
+          </div>
+
+          {/* Demo credentials notice */}
+          <div className="mb-6 p-4 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800 rounded-xl text-sm">
+            <p className="text-brand-700 dark:text-brand-300 font-medium mb-1">
+              Demo Credentials
+            </p>
+            <p className="text-brand-600 dark:text-brand-400">
+              Username:{" "}
+              <code className="font-mono bg-brand-100 dark:bg-brand-900/40 px-1 rounded">
+                emilys
+              </code>
+            </p>
+            <p className="text-brand-600 dark:text-brand-400">
+              Password:{" "}
+              <code className="font-mono bg-brand-100 dark:bg-brand-900/40 px-1 rounded">
+                emilyspass
+              </code>
+            </p>
+          </div>
+
+          {/* Error message */}
+          {errorMessage && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400">
+              {errorMessage}
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-stone-700 dark:text-slate-300 mb-1.5">
+                Username
+              </label>
+              <input
+                type="text"
+                value={scope.username()}
+                onChange={(e) => scope.username.set(e.target.value)}
+                className="input"
+                placeholder="Enter your username"
+                disabled={loading}
+              />
             </div>
 
-            {/* Body */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {/* Demo credentials notice */}
-              <div className="bg-brand-50 border border-brand-200 rounded-lg p-3 text-sm text-brand-700">
-                <p className="font-medium">Demo Credentials</p>
-                <p className="text-brand-600">
-                  Username: emilys / Password: emilyspass
-                </p>
-              </div>
-
-              {/* Error message */}
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-                  {error}
-                </div>
-              )}
-
-              {/* Username */}
-              <div>
-                <label
-                  htmlFor="username"
-                  className="block text-sm font-medium text-warm-700 mb-1"
-                >
-                  Username
-                </label>
-                <input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => $form.username.set(e.target.value)}
-                  className="input w-full"
-                  placeholder="Enter username"
-                  required
-                />
-              </div>
-
-              {/* Password */}
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-warm-700 mb-1"
-                >
-                  Password
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => $form.password.set(e.target.value)}
-                  className="input w-full"
-                  placeholder="Enter password"
-                  required
-                />
-              </div>
-
-              {/* Submit */}
-              <button
-                type="submit"
+            <div>
+              <label className="block text-sm font-medium text-stone-700 dark:text-slate-300 mb-1.5">
+                Password
+              </label>
+              <input
+                type="password"
+                value={scope.password()}
+                onChange={(e) => scope.password.set(e.target.value)}
+                className="input"
+                placeholder="Enter your password"
                 disabled={loading}
-                className="btn-primary w-full py-3 disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <svg
-                      className="animate-spin w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    Signing in...
-                  </>
-                ) : (
-                  "Sign In"
-                )}
-              </button>
-            </form>
-          </div>
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full py-3 text-lg mt-6"
+            >
+              {loading ? (
+                <>
+                  <svg
+                    className="animate-spin w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Signing in...
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </button>
+          </form>
         </div>
-      </>
+      </div>
     );
   });
 }

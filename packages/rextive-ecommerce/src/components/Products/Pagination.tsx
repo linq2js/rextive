@@ -69,7 +69,7 @@ export function Pagination() {
           {pages.map((page, index) => {
             if (page === "ellipsis") {
               return (
-                <span key={`ellipsis-${index}`} className="px-2 text-warm-400">
+                <span key={`ellipsis-${index}`} className="px-2 text-stone-400 dark:text-slate-500">
                   ...
                 </span>
               );
@@ -79,10 +79,10 @@ export function Pagination() {
               <button
                 key={page}
                 onClick={() => setPage(page)}
-                className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${
+                className={`w-10 h-10 rounded-xl text-sm font-medium transition-all ${
                   page === current
                     ? "bg-brand-600 text-white shadow-lg shadow-brand-500/30"
-                    : "text-warm-600 hover:bg-warm-100"
+                    : "text-stone-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-800"
                 }`}
                 aria-label={`Page ${page}`}
                 aria-current={page === current ? "page" : undefined}

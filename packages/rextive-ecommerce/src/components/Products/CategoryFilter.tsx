@@ -16,7 +16,7 @@ export function CategoryFilter() {
             className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
               selected === null
                 ? "bg-brand-600 text-white shadow-lg shadow-brand-500/30"
-                : "bg-warm-100 text-warm-600 hover:bg-warm-200"
+                : "bg-stone-100 dark:bg-slate-800 text-stone-600 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-700"
             }`}
           >
             All
@@ -51,7 +51,7 @@ export function CategoryFilter() {
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all capitalize ${
                   selected === cat.slug
                     ? "bg-brand-600 text-white shadow-lg shadow-brand-500/30"
-                    : "bg-warm-100 text-warm-600 hover:bg-warm-200"
+                    : "bg-stone-100 dark:bg-slate-800 text-stone-600 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-700"
                 }`}
               >
                 {cat.name}
@@ -59,7 +59,7 @@ export function CategoryFilter() {
             ))}
 
             {value.length > 6 && (
-              <button className="px-4 py-2 rounded-full text-sm font-medium bg-warm-100 text-warm-600 hover:bg-warm-200 transition-all">
+              <button className="px-4 py-2 rounded-full text-sm font-medium bg-stone-100 dark:bg-slate-800 text-stone-600 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-700 transition-all">
                 +{value.length - 6} more
               </button>
             )}

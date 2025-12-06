@@ -19,13 +19,13 @@ export function ShippingForm() {
 
     return (
       <form onSubmit={handleSubmit} className="space-y-4">
-        <h3 className="text-lg font-semibold text-warm-900 mb-4">
+        <h3 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">
           Shipping Information
         </h3>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-warm-700 mb-1">
+            <label className="block text-sm font-medium text-stone-700 dark:text-slate-300 mb-1">
               First Name
             </label>
             <input
@@ -37,7 +37,7 @@ export function ShippingForm() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-warm-700 mb-1">
+            <label className="block text-sm font-medium text-stone-700 dark:text-slate-300 mb-1">
               Last Name
             </label>
             <input
@@ -51,7 +51,7 @@ export function ShippingForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-warm-700 mb-1">
+          <label className="block text-sm font-medium text-stone-700 dark:text-slate-300 mb-1">
             Email
           </label>
           <input
@@ -64,7 +64,7 @@ export function ShippingForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-warm-700 mb-1">
+          <label className="block text-sm font-medium text-stone-700 dark:text-slate-300 mb-1">
             Address
           </label>
           <input
@@ -79,7 +79,7 @@ export function ShippingForm() {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-warm-700 mb-1">
+            <label className="block text-sm font-medium text-stone-700 dark:text-slate-300 mb-1">
               City
             </label>
             <input
@@ -91,7 +91,7 @@ export function ShippingForm() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-warm-700 mb-1">
+            <label className="block text-sm font-medium text-stone-700 dark:text-slate-300 mb-1">
               Postal Code
             </label>
             <input
@@ -105,7 +105,7 @@ export function ShippingForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-warm-700 mb-1">
+          <label className="block text-sm font-medium text-stone-700 dark:text-slate-300 mb-1">
             Country
           </label>
           <select

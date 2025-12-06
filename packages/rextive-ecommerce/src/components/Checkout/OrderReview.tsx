@@ -34,13 +34,13 @@ export function OrderReview() {
 
     return (
       <div className="space-y-6">
-        <h3 className="text-lg font-semibold text-warm-900">
+        <h3 className="text-lg font-semibold text-stone-900 dark:text-white">
           Review Your Order
         </h3>
 
         {/* Items */}
-        <div className="bg-warm-50 rounded-xl p-4">
-          <h4 className="font-medium text-warm-900 mb-3">Order Items</h4>
+        <div className="bg-stone-50 dark:bg-slate-800/50 rounded-xl p-4 border border-stone-200 dark:border-slate-700">
+          <h4 className="font-medium text-stone-900 dark:text-white mb-3">Order Items</h4>
           <div className="space-y-3">
             {items.map((item) => (
               <div key={item.productId} className="flex items-center gap-3">
@@ -50,12 +50,12 @@ export function OrderReview() {
                   className="w-12 h-12 object-cover rounded-lg"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-warm-900 truncate">
+                  <p className="text-sm font-medium text-stone-900 dark:text-white truncate">
                     {item.product.title}
                   </p>
-                  <p className="text-xs text-warm-500">Qty: {item.quantity}</p>
+                  <p className="text-xs text-stone-500 dark:text-slate-400">Qty: {item.quantity}</p>
                 </div>
-                <p className="text-sm font-medium text-warm-900">
+                <p className="text-sm font-medium text-stone-900 dark:text-white">
                   {formatCurrency(
                     item.product.price *
                       (1 - item.product.discountPercentage / 100) *
@@ -68,17 +68,17 @@ export function OrderReview() {
         </div>
 
         {/* Shipping */}
-        <div className="bg-warm-50 rounded-xl p-4">
+        <div className="bg-stone-50 dark:bg-slate-800/50 rounded-xl p-4 border border-stone-200 dark:border-slate-700">
           <div className="flex justify-between items-start mb-2">
-            <h4 className="font-medium text-warm-900">Shipping Address</h4>
+            <h4 className="font-medium text-stone-900 dark:text-white">Shipping Address</h4>
             <button
               onClick={() => $checkout.goToStep("shipping")}
-              className="text-sm text-brand-600 hover:text-brand-700"
+              className="text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300"
             >
               Edit
             </button>
           </div>
-          <div className="text-sm text-warm-600">
+          <div className="text-sm text-stone-600 dark:text-slate-300">
             <p>
               {info.firstName} {info.lastName}
             </p>
@@ -87,43 +87,43 @@ export function OrderReview() {
               {info.city}, {info.postalCode}
             </p>
             <p>{info.country}</p>
-            <p className="mt-1 text-warm-500">{info.email}</p>
+            <p className="mt-1 text-stone-500 dark:text-slate-400">{info.email}</p>
           </div>
         </div>
 
         {/* Payment */}
-        <div className="bg-warm-50 rounded-xl p-4">
+        <div className="bg-stone-50 dark:bg-slate-800/50 rounded-xl p-4 border border-stone-200 dark:border-slate-700">
           <div className="flex justify-between items-start mb-2">
-            <h4 className="font-medium text-warm-900">Payment Method</h4>
+            <h4 className="font-medium text-stone-900 dark:text-white">Payment Method</h4>
             <button
               onClick={() => $checkout.goToStep("payment")}
-              className="text-sm text-brand-600 hover:text-brand-700"
+              className="text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300"
             >
               Edit
             </button>
           </div>
-          <p className="text-sm text-warm-600">{paymentLabel}</p>
+          <p className="text-sm text-stone-600 dark:text-slate-300">{paymentLabel}</p>
         </div>
 
         {/* Summary */}
-        <div className="border-t border-warm-200 pt-4 space-y-2">
+        <div className="border-t border-stone-200 dark:border-slate-700 pt-4 space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-warm-600">Subtotal</span>
-            <span className="text-warm-900">{formatCurrency(subtotal)}</span>
+            <span className="text-stone-600 dark:text-slate-400">Subtotal</span>
+            <span className="text-stone-900 dark:text-white">{formatCurrency(subtotal)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-warm-600">Shipping</span>
-            <span className="text-warm-900">
+            <span className="text-stone-600 dark:text-slate-400">Shipping</span>
+            <span className="text-stone-900 dark:text-white">
               {formatCurrency(shippingCost)}
             </span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-warm-600">Tax (8%)</span>
-            <span className="text-warm-900">{formatCurrency(taxAmount)}</span>
+            <span className="text-stone-600 dark:text-slate-400">Tax (8%)</span>
+            <span className="text-stone-900 dark:text-white">{formatCurrency(taxAmount)}</span>
           </div>
-          <div className="flex justify-between text-lg font-semibold pt-2 border-t border-warm-200">
-            <span className="text-warm-900">Total</span>
-            <span className="text-brand-600">
+          <div className="flex justify-between text-lg font-semibold pt-2 border-t border-stone-200 dark:border-slate-700">
+            <span className="text-stone-900 dark:text-white">Total</span>
+            <span className="text-brand-600 dark:text-brand-400">
               {formatCurrency(totalAmount)}
             </span>
           </div>

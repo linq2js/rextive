@@ -19,11 +19,11 @@ export function OrderComplete() {
     if (state.loading) {
       return (
         <div className="text-center py-12">
-          <div className="w-16 h-16 mx-auto mb-6 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
-          <h3 className="text-xl font-semibold text-warm-900 mb-2">
+          <div className="w-16 h-16 mx-auto mb-6 border-4 border-brand-200 dark:border-brand-800 border-t-brand-600 rounded-full animate-spin" />
+          <h3 className="text-xl font-semibold text-stone-900 dark:text-white mb-2">
             Processing Your Order...
           </h3>
-          <p className="text-warm-600">
+          <p className="text-stone-600 dark:text-slate-400">
             Please wait while we confirm your payment.
           </p>
         </div>
@@ -34,7 +34,7 @@ export function OrderComplete() {
     if (state.error) {
       return (
         <div className="text-center py-8">
-          <div className="w-20 h-20 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
+          <div className="w-20 h-20 mx-auto mb-6 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
             <svg
               className="w-10 h-10 text-red-500"
               fill="none"
@@ -49,10 +49,10 @@ export function OrderComplete() {
               />
             </svg>
           </div>
-          <h3 className="text-2xl font-bold text-warm-900 mb-2">
+          <h3 className="text-2xl font-bold text-stone-900 dark:text-white mb-2">
             Order Failed
           </h3>
-          <p className="text-warm-600 mb-6">
+          <p className="text-stone-600 dark:text-slate-400 mb-6">
             {state.error instanceof Error
               ? state.error.message
               : "Something went wrong. Please try again."}
@@ -86,7 +86,7 @@ export function OrderComplete() {
     return (
       <div className="text-center py-8">
         {/* Success Icon */}
-        <div className="w-20 h-20 mx-auto mb-6 bg-green-100 rounded-full flex items-center justify-center">
+        <div className="w-20 h-20 mx-auto mb-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
           <svg
             className="w-10 h-10 text-green-500"
             fill="none"
@@ -102,51 +102,51 @@ export function OrderComplete() {
           </svg>
         </div>
 
-        <h3 className="text-2xl font-bold text-warm-900 mb-2">
+        <h3 className="text-2xl font-bold text-stone-900 dark:text-white mb-2">
           Order Confirmed!
         </h3>
-        <p className="text-warm-600 mb-6">
+        <p className="text-stone-600 dark:text-slate-400 mb-6">
           Thank you for your purchase. Your order has been placed successfully.
         </p>
 
         {/* Order ID */}
-        <div className="bg-warm-50 rounded-xl p-4 mb-6 inline-block">
-          <p className="text-sm text-warm-500">Order ID</p>
-          <p className="text-lg font-mono font-bold text-brand-600">
+        <div className="bg-stone-50 dark:bg-slate-800/50 rounded-xl p-4 mb-6 inline-block border border-stone-200 dark:border-slate-700">
+          <p className="text-sm text-stone-500 dark:text-slate-400">Order ID</p>
+          <p className="text-lg font-mono font-bold text-brand-600 dark:text-brand-400">
             {summary.orderId}
           </p>
         </div>
 
         {/* Order Details */}
-        <div className="bg-warm-50 rounded-xl p-4 text-left mb-6">
-          <h4 className="font-medium text-warm-900 mb-3">Order Summary</h4>
+        <div className="bg-stone-50 dark:bg-slate-800/50 rounded-xl p-4 text-left mb-6 border border-stone-200 dark:border-slate-700">
+          <h4 className="font-medium text-stone-900 dark:text-white mb-3">Order Summary</h4>
           <div className="space-y-2 text-sm">
             {summary.items.map((item, index) => (
               <div key={index} className="flex justify-between">
-                <span className="text-warm-600">
+                <span className="text-stone-600 dark:text-slate-400">
                   {item.name} × {item.quantity}
                 </span>
-                <span className="text-warm-900">
+                <span className="text-stone-900 dark:text-white">
                   {formatCurrency(item.price * item.quantity)}
                 </span>
               </div>
             ))}
-            <div className="border-t border-warm-200 pt-2 mt-2">
+            <div className="border-t border-stone-200 dark:border-slate-700 pt-2 mt-2">
               <div className="flex justify-between">
-                <span className="text-warm-600">Subtotal</span>
-                <span>{formatCurrency(summary.subtotal)}</span>
+                <span className="text-stone-600 dark:text-slate-400">Subtotal</span>
+                <span className="text-stone-900 dark:text-white">{formatCurrency(summary.subtotal)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-warm-600">Shipping</span>
-                <span>{formatCurrency(summary.shipping)}</span>
+                <span className="text-stone-600 dark:text-slate-400">Shipping</span>
+                <span className="text-stone-900 dark:text-white">{formatCurrency(summary.shipping)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-warm-600">Tax</span>
-                <span>{formatCurrency(summary.tax)}</span>
+                <span className="text-stone-600 dark:text-slate-400">Tax</span>
+                <span className="text-stone-900 dark:text-white">{formatCurrency(summary.tax)}</span>
               </div>
-              <div className="flex justify-between font-semibold text-base pt-2 border-t border-warm-200 mt-2">
-                <span>Total</span>
-                <span className="text-brand-600">
+              <div className="flex justify-between font-semibold text-base pt-2 border-t border-stone-200 dark:border-slate-700 mt-2">
+                <span className="text-stone-900 dark:text-white">Total</span>
+                <span className="text-brand-600 dark:text-brand-400">
                   {formatCurrency(summary.total)}
                 </span>
               </div>
@@ -155,9 +155,9 @@ export function OrderComplete() {
         </div>
 
         {/* Shipping Info */}
-        <div className="bg-warm-50 rounded-xl p-4 text-left mb-6">
-          <h4 className="font-medium text-warm-900 mb-2">Shipping to</h4>
-          <div className="text-sm text-warm-600">
+        <div className="bg-stone-50 dark:bg-slate-800/50 rounded-xl p-4 text-left mb-6 border border-stone-200 dark:border-slate-700">
+          <h4 className="font-medium text-stone-900 dark:text-white mb-2">Shipping to</h4>
+          <div className="text-sm text-stone-600 dark:text-slate-300">
             <p>
               {summary.shippingInfo.firstName} {summary.shippingInfo.lastName}
             </p>
@@ -170,9 +170,9 @@ export function OrderComplete() {
         </div>
 
         {/* Confirmation Message */}
-        <p className="text-sm text-warm-500 mb-6">
+        <p className="text-sm text-stone-500 dark:text-slate-400 mb-6">
           A confirmation email has been sent to{" "}
-          <span className="font-medium text-warm-700">
+          <span className="font-medium text-stone-700 dark:text-slate-200">
             {summary.shippingInfo.email}
           </span>
         </p>

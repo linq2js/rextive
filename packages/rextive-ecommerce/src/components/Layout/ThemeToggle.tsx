@@ -11,14 +11,14 @@ export function ThemeToggle() {
     return (
       <button
         onClick={() => $theme.toggle()}
-        className="p-2 rounded-lg hover:bg-warm-100 dark:hover:bg-warm-800 transition-colors"
+        className="p-2.5 rounded-xl bg-stone-100 dark:bg-slate-800 hover:bg-stone-200 dark:hover:bg-slate-700 transition-all duration-200"
         aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
         title={`Switch to ${isDark ? "light" : "dark"} mode`}
       >
         {isDark ? (
           // Sun icon for dark mode (click to switch to light)
           <svg
-            className="w-5 h-5 text-amber-400"
+            className="w-5 h-5 text-gold-400"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -33,7 +33,7 @@ export function ThemeToggle() {
         ) : (
           // Moon icon for light mode (click to switch to dark)
           <svg
-            className="w-5 h-5 text-warm-600"
+            className="w-5 h-5 text-stone-600"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -50,4 +50,3 @@ export function ThemeToggle() {
     );
   });
 }
-

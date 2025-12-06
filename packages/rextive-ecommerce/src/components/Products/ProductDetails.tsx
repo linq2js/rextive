@@ -18,18 +18,18 @@ function StarRating({ rating }: { rating: number }) {
       {[...Array(fullStars)].map((_, i) => (
         <svg
           key={`full-${i}`}
-          className="w-5 h-5 text-yellow-400 fill-current"
+          className="w-5 h-5 text-amber-400 fill-current"
           viewBox="0 0 20 20"
         >
           <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
         </svg>
       ))}
       {hasHalfStar && (
-        <svg className="w-5 h-5 text-yellow-400" viewBox="0 0 20 20">
+        <svg className="w-5 h-5 text-amber-400" viewBox="0 0 20 20">
           <defs>
             <linearGradient id="half">
               <stop offset="50%" stopColor="currentColor" />
-              <stop offset="50%" stopColor="#d1d5db" />
+              <stop offset="50%" stopColor="#e7e5e4" />
             </linearGradient>
           </defs>
           <path
@@ -41,13 +41,13 @@ function StarRating({ rating }: { rating: number }) {
       {[...Array(emptyStars)].map((_, i) => (
         <svg
           key={`empty-${i}`}
-          className="w-5 h-5 text-gray-300 fill-current"
+          className="w-5 h-5 text-stone-200 dark:text-slate-700 fill-current"
           viewBox="0 0 20 20"
         >
           <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
         </svg>
       ))}
-      <span className="text-sm text-warm-600 dark:text-warm-400 ml-2">
+      <span className="text-sm text-stone-600 dark:text-slate-400 ml-2">
         ({rating.toFixed(1)})
       </span>
     </div>
@@ -62,10 +62,10 @@ function ProductLoading() {
   return (
     <div className="relative">
       {/* Spinner overlay */}
-      <div className="absolute inset-0 flex items-center justify-center z-10 bg-warm-50/80 dark:bg-warm-900/50 backdrop-blur-sm">
-        <div className="flex flex-col items-center bg-white dark:bg-warm-800 p-6 rounded-xl shadow-lg">
-          <div className="w-12 h-12 border-4 border-warm-300 dark:border-warm-700 border-t-brand-600 rounded-full animate-spin mb-3" />
-          <p className="text-warm-700 dark:text-warm-300 font-medium">
+      <div className="absolute inset-0 flex items-center justify-center z-10 bg-stone-50/80 dark:bg-slate-950/80 backdrop-blur-sm">
+        <div className="flex flex-col items-center bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl border border-stone-200 dark:border-slate-800">
+          <div className="w-12 h-12 border-4 border-stone-200 dark:border-slate-700 border-t-brand-600 rounded-full animate-spin mb-3" />
+          <p className="text-stone-700 dark:text-slate-300 font-medium">
             Loading product...
           </p>
         </div>
@@ -75,12 +75,12 @@ function ProductLoading() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         {/* Image gallery skeleton */}
         <div className="space-y-4">
-          <div className="aspect-square bg-warm-200 dark:bg-warm-800 rounded-2xl animate-pulse border border-warm-300 dark:border-warm-700" />
+          <div className="aspect-square skeleton-shimmer rounded-2xl border border-stone-200 dark:border-slate-800" />
           <div className="flex gap-2">
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="w-20 h-20 bg-warm-200 dark:bg-warm-800 rounded-lg animate-pulse"
+                className="w-20 h-20 skeleton rounded-xl"
               />
             ))}
           </div>
@@ -88,11 +88,11 @@ function ProductLoading() {
 
         {/* Info skeleton */}
         <div className="space-y-4">
-          <div className="h-8 bg-warm-200 dark:bg-warm-800 rounded w-3/4 animate-pulse" />
-          <div className="h-6 bg-warm-200 dark:bg-warm-800 rounded w-1/2 animate-pulse" />
-          <div className="h-4 bg-warm-200 dark:bg-warm-800 rounded animate-pulse" />
-          <div className="h-4 bg-warm-200 dark:bg-warm-800 rounded w-2/3 animate-pulse" />
-          <div className="h-12 bg-warm-200 dark:bg-warm-800 rounded w-full mt-6 animate-pulse" />
+          <div className="h-8 skeleton rounded-lg w-3/4" />
+          <div className="h-6 skeleton rounded-lg w-1/2" />
+          <div className="h-4 skeleton rounded-lg" />
+          <div className="h-4 skeleton rounded-lg w-2/3" />
+          <div className="h-12 skeleton rounded-xl w-full mt-6" />
         </div>
       </div>
     </div>
@@ -106,7 +106,7 @@ function ProductError({ error }: { error: unknown }) {
 
   return (
     <div className="text-center py-16">
-      <div className="w-20 h-20 mx-auto mb-6 bg-red-100 dark:bg-red-900/50 rounded-full flex items-center justify-center">
+      <div className="w-20 h-20 mx-auto mb-6 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
         <svg
           className="w-10 h-10 text-red-500"
           fill="none"
@@ -121,10 +121,10 @@ function ProductError({ error }: { error: unknown }) {
           />
         </svg>
       </div>
-      <h3 className="text-xl font-semibold text-warm-900 dark:text-warm-100 mb-2">
+      <h3 className="text-xl font-semibold text-stone-900 dark:text-white mb-2">
         Oops! Something went wrong
       </h3>
-      <p className="text-warm-600 dark:text-warm-400 mb-6">{message}</p>
+      <p className="text-stone-600 dark:text-slate-400 mb-6">{message}</p>
       <button
         onClick={() => $router.goHome()}
         className="btn-primary py-3 px-8"
@@ -151,7 +151,7 @@ function ProductImageGallery({ product }: { product: Product }) {
     return (
       <div className="space-y-4">
         {/* Main image */}
-        <div className="aspect-square bg-white dark:bg-warm-800 rounded-2xl overflow-hidden border border-warm-200 dark:border-warm-700">
+        <div className="aspect-square bg-white dark:bg-slate-900 rounded-2xl overflow-hidden border border-stone-200 dark:border-slate-800 shadow-sm">
           <img
             src={currentImage}
             alt={product.title}
@@ -166,10 +166,10 @@ function ProductImageGallery({ product }: { product: Product }) {
               <button
                 key={idx}
                 onClick={() => $details.selectImage(idx)}
-                className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                className={`flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all ${
                   idx === selectedIndex
                     ? "border-brand-500 ring-2 ring-brand-200 dark:ring-brand-700"
-                    : "border-transparent hover:border-warm-300 dark:hover:border-warm-600"
+                    : "border-transparent hover:border-stone-300 dark:hover:border-slate-600"
                 }`}
               >
                 <img src={img} alt="" className="w-full h-full object-cover" />
@@ -196,18 +196,18 @@ function ProductInfo({ product }: { product: Product }) {
       <div className="space-y-6">
         {/* Category & Brand */}
         <div className="flex items-center gap-2 text-sm">
-          <span className="px-3 py-1 bg-warm-100 dark:bg-warm-800 text-warm-700 dark:text-warm-300 rounded-full capitalize">
+          <span className="px-3 py-1.5 bg-stone-100 dark:bg-slate-800 text-stone-700 dark:text-slate-300 rounded-full capitalize font-medium">
             {product.category}
           </span>
           {product.brand && (
-            <span className="text-warm-600 dark:text-warm-400">
+            <span className="text-stone-500 dark:text-slate-400">
               {product.brand}
             </span>
           )}
         </div>
 
         {/* Title */}
-        <h1 className="text-3xl font-bold text-warm-900 dark:text-warm-100">
+        <h1 className="text-3xl font-bold text-stone-900 dark:text-white">
           {product.title}
         </h1>
 
@@ -216,15 +216,15 @@ function ProductInfo({ product }: { product: Product }) {
 
         {/* Price */}
         <div className="flex items-baseline gap-3">
-          <span className="text-3xl font-bold text-warm-900 dark:text-warm-100">
+          <span className="text-3xl font-bold text-stone-900 dark:text-white">
             ${discountedPrice.toFixed(2)}
           </span>
           {hasDiscount && (
             <>
-              <span className="text-xl text-warm-500 dark:text-warm-500 line-through">
+              <span className="text-xl text-stone-400 dark:text-slate-500 line-through">
                 ${product.price.toFixed(2)}
               </span>
-              <span className="px-2 py-1 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 text-sm font-medium rounded">
+              <span className="px-2 py-1 bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 text-sm font-medium rounded-lg">
                 -{Math.round(product.discountPercentage)}%
               </span>
             </>
@@ -232,7 +232,7 @@ function ProductInfo({ product }: { product: Product }) {
         </div>
 
         {/* Description */}
-        <p className="text-warm-600 dark:text-warm-400 leading-relaxed">
+        <p className="text-stone-600 dark:text-slate-300 leading-relaxed">
           {product.description}
         </p>
 
@@ -247,31 +247,31 @@ function ProductInfo({ product }: { product: Product }) {
                 : "bg-red-500"
             }`}
           />
-          <span className="text-sm text-warm-600 dark:text-warm-400">
+          <span className="text-sm text-stone-600 dark:text-slate-400">
             {product.availabilityStatus} ({product.stock} in stock)
           </span>
         </div>
 
         {/* Quantity selector */}
         <div className="flex items-center gap-4">
-          <span className="text-warm-800 dark:text-warm-300 font-medium">
+          <span className="text-stone-800 dark:text-slate-200 font-medium">
             Quantity:
           </span>
-          <div className="flex items-center border border-warm-300 dark:border-warm-700 rounded-lg bg-warm-50 dark:bg-warm-800">
+          <div className="flex items-center border border-stone-300 dark:border-slate-700 rounded-xl bg-stone-50 dark:bg-slate-800 overflow-hidden">
             <button
               onClick={() => $details.decrementQuantity()}
               disabled={quantity <= 1}
-              className="px-4 py-2 text-warm-700 dark:text-warm-400 hover:bg-warm-100 dark:hover:bg-warm-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-l-lg"
+              className="px-4 py-2 text-stone-700 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               −
             </button>
-            <span className="px-4 py-2 font-medium text-warm-900 dark:text-warm-200 bg-white dark:bg-warm-800 border-x border-warm-300 dark:border-warm-700">
+            <span className="px-4 py-2 font-medium text-stone-900 dark:text-white bg-white dark:bg-slate-900 border-x border-stone-300 dark:border-slate-700">
               {quantity}
             </span>
             <button
               onClick={() => $details.incrementQuantity()}
               disabled={quantity >= product.stock}
-              className="px-4 py-2 text-warm-700 dark:text-warm-400 hover:bg-warm-100 dark:hover:bg-warm-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-r-lg"
+              className="px-4 py-2 text-stone-700 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               +
             </button>
@@ -294,33 +294,33 @@ function ProductInfo({ product }: { product: Product }) {
         </button>
 
         {/* Product details */}
-        <div className="border-t border-warm-200 dark:border-warm-700 pt-6 space-y-4">
-          <h3 className="font-semibold text-warm-900 dark:text-warm-100">
+        <div className="border-t border-stone-200 dark:border-slate-800 pt-6 space-y-4">
+          <h3 className="font-semibold text-stone-900 dark:text-white">
             Product Details
           </h3>
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <dt className="text-warm-600 dark:text-warm-500">SKU</dt>
-              <dd className="text-warm-900 dark:text-warm-200">
+              <dt className="text-stone-500 dark:text-slate-500">SKU</dt>
+              <dd className="text-stone-900 dark:text-slate-200">
                 {product.sku}
               </dd>
             </div>
             <div>
-              <dt className="text-warm-600 dark:text-warm-500">Weight</dt>
-              <dd className="text-warm-900 dark:text-warm-200">
+              <dt className="text-stone-500 dark:text-slate-500">Weight</dt>
+              <dd className="text-stone-900 dark:text-slate-200">
                 {product.weight} kg
               </dd>
             </div>
             <div>
-              <dt className="text-warm-600 dark:text-warm-500">Dimensions</dt>
-              <dd className="text-warm-900 dark:text-warm-200">
+              <dt className="text-stone-500 dark:text-slate-500">Dimensions</dt>
+              <dd className="text-stone-900 dark:text-slate-200">
                 {product.dimensions.width} × {product.dimensions.height} ×{" "}
                 {product.dimensions.depth} cm
               </dd>
             </div>
             <div>
-              <dt className="text-warm-600 dark:text-warm-500">Min. Order</dt>
-              <dd className="text-warm-900 dark:text-warm-200">
+              <dt className="text-stone-500 dark:text-slate-500">Min. Order</dt>
+              <dd className="text-stone-900 dark:text-slate-200">
                 {product.minimumOrderQuantity} units
               </dd>
             </div>
@@ -329,7 +329,7 @@ function ProductInfo({ product }: { product: Product }) {
 
         {/* Shipping & Warranty */}
         <div className="grid grid-cols-2 gap-4 text-sm">
-          <div className="p-4 bg-warm-100/60 dark:bg-warm-800/50 rounded-lg border border-warm-200/50 dark:border-warm-700/50">
+          <div className="p-4 bg-stone-50 dark:bg-slate-800/50 rounded-xl border border-stone-200 dark:border-slate-700">
             <div className="flex items-center gap-2 mb-2">
               <svg
                 className="w-5 h-5 text-brand-600 dark:text-brand-400"
@@ -344,15 +344,15 @@ function ProductInfo({ product }: { product: Product }) {
                   d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
                 />
               </svg>
-              <span className="font-medium text-warm-800 dark:text-warm-100">
+              <span className="font-medium text-stone-800 dark:text-white">
                 Shipping
               </span>
             </div>
-            <p className="text-warm-600 dark:text-warm-400">
+            <p className="text-stone-600 dark:text-slate-400">
               {product.shippingInformation}
             </p>
           </div>
-          <div className="p-4 bg-warm-100/60 dark:bg-warm-800/50 rounded-lg border border-warm-200/50 dark:border-warm-700/50">
+          <div className="p-4 bg-stone-50 dark:bg-slate-800/50 rounded-xl border border-stone-200 dark:border-slate-700">
             <div className="flex items-center gap-2 mb-2">
               <svg
                 className="w-5 h-5 text-brand-600 dark:text-brand-400"
@@ -367,18 +367,18 @@ function ProductInfo({ product }: { product: Product }) {
                   d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
                 />
               </svg>
-              <span className="font-medium text-warm-800 dark:text-warm-100">
+              <span className="font-medium text-stone-800 dark:text-white">
                 Warranty
               </span>
             </div>
-            <p className="text-warm-600 dark:text-warm-400">
+            <p className="text-stone-600 dark:text-slate-400">
               {product.warrantyInformation}
             </p>
           </div>
         </div>
 
         {/* Return policy */}
-        <div className="p-4 bg-sage-100/60 dark:bg-sage-900/30 rounded-lg border border-sage-200/50 dark:border-sage-800/50 text-sm">
+        <div className="p-4 bg-sage-50 dark:bg-sage-900/20 rounded-xl border border-sage-200 dark:border-sage-800 text-sm">
           <div className="flex items-center gap-2 mb-2">
             <svg
               className="w-5 h-5 text-sage-600 dark:text-sage-400"
@@ -393,11 +393,11 @@ function ProductInfo({ product }: { product: Product }) {
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            <span className="font-medium text-warm-800 dark:text-warm-100">
+            <span className="font-medium text-stone-800 dark:text-white">
               Return Policy
             </span>
           </div>
-          <p className="text-warm-600 dark:text-warm-400">
+          <p className="text-stone-600 dark:text-slate-400">
             {product.returnPolicy}
           </p>
         </div>
@@ -412,35 +412,35 @@ function ProductReviews({ product }: { product: Product }) {
   }
 
   return (
-    <div className="mt-12 border-t border-warm-200 dark:border-warm-700 pt-8">
-      <h2 className="text-2xl font-bold text-warm-900 dark:text-warm-100 mb-6">
+    <div className="mt-12 border-t border-stone-200 dark:border-slate-800 pt-8">
+      <h2 className="text-2xl font-bold text-stone-900 dark:text-white mb-6">
         Customer Reviews ({product.reviews.length})
       </h2>
       <div className="space-y-6">
         {product.reviews.map((review, idx) => (
           <div
             key={idx}
-            className="p-6 bg-warm-50 dark:bg-warm-800/50 rounded-xl"
+            className="p-6 bg-stone-50 dark:bg-slate-900/50 rounded-2xl border border-stone-200 dark:border-slate-800"
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-brand-100 dark:bg-brand-900/50 rounded-full flex items-center justify-center">
+                <div className="w-10 h-10 bg-brand-100 dark:bg-brand-900/40 rounded-full flex items-center justify-center">
                   <span className="text-brand-600 dark:text-brand-400 font-medium">
                     {review.reviewerName.charAt(0).toUpperCase()}
                   </span>
                 </div>
                 <div>
-                  <p className="font-medium text-warm-900 dark:text-warm-100">
+                  <p className="font-medium text-stone-900 dark:text-white">
                     {review.reviewerName}
                   </p>
-                  <p className="text-xs text-warm-600 dark:text-warm-400">
+                  <p className="text-xs text-stone-500 dark:text-slate-500">
                     {new Date(review.date).toLocaleDateString()}
                   </p>
                 </div>
               </div>
               <StarRating rating={review.rating} />
             </div>
-            <p className="text-warm-700 dark:text-warm-300">{review.comment}</p>
+            <p className="text-stone-700 dark:text-slate-300">{review.comment}</p>
           </div>
         ))}
       </div>
@@ -484,7 +484,7 @@ export function ProductDetails() {
         {/* Back button */}
         <button
           onClick={() => $router.goHome()}
-          className="flex items-center gap-2 text-warm-600 dark:text-warm-400 hover:text-warm-900 dark:hover:text-warm-200 mb-8 transition-colors"
+          className="flex items-center gap-2 text-stone-600 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white mb-8 transition-colors"
         >
           <svg
             className="w-5 h-5"

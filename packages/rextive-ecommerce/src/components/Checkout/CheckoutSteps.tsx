@@ -27,7 +27,7 @@ export function CheckoutSteps() {
                     ? "bg-green-500 text-white"
                     : index === currentIndex
                     ? "bg-brand-600 text-white shadow-lg shadow-brand-500/30"
-                    : "bg-warm-200 text-warm-500"
+                    : "bg-stone-200 dark:bg-slate-700 text-stone-500 dark:text-slate-400"
                 }`}
               >
                 {index < currentIndex ? (
@@ -50,7 +50,7 @@ export function CheckoutSteps() {
               </div>
               <span
                 className={`mt-2 text-xs font-medium ${
-                  index <= currentIndex ? "text-warm-900" : "text-warm-400"
+                  index <= currentIndex ? "text-stone-900 dark:text-white" : "text-stone-400 dark:text-slate-500"
                 }`}
               >
                 {step.label}
@@ -60,7 +60,7 @@ export function CheckoutSteps() {
             {index < steps.length - 1 && (
               <div
                 className={`w-16 sm:w-24 h-1 mx-2 rounded transition-all ${
-                  index < currentIndex ? "bg-green-500" : "bg-warm-200"
+                  index < currentIndex ? "bg-green-500" : "bg-stone-200 dark:bg-slate-700"
                 }`}
               />
             )}
@@ -70,4 +70,3 @@ export function CheckoutSteps() {
     );
   });
 }
-

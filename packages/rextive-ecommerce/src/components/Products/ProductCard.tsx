@@ -37,7 +37,7 @@ export function ProductCard({ product, index }: ProductCardProps) {
       onClick={handleClick}
     >
       {/* Image */}
-      <div className="relative aspect-square overflow-hidden bg-white dark:bg-warm-800">
+      <div className="relative aspect-square overflow-hidden bg-white dark:bg-slate-800">
         <img
           src={product.thumbnail}
           alt={product.title}
@@ -60,7 +60,7 @@ export function ProductCard({ product, index }: ProductCardProps) {
         )}
 
         {/* Quick add overlay */}
-        <div className="absolute inset-0 bg-warm-900/0 group-hover:bg-warm-900/40 transition-colors duration-300 flex items-center justify-center gap-3">
+        <div className="absolute inset-0 bg-stone-900/0 group-hover:bg-stone-900/40 dark:group-hover:bg-slate-950/60 transition-colors duration-300 flex items-center justify-center gap-3">
           <button
             onClick={handleAddToCart}
             className="btn-primary opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300"
@@ -86,12 +86,12 @@ export function ProductCard({ product, index }: ProductCardProps) {
       {/* Content */}
       <div className="p-4">
         {/* Category */}
-        <p className="text-xs text-warm-600 dark:text-warm-400 uppercase tracking-wider mb-1">
+        <p className="text-xs text-stone-500 dark:text-slate-400 uppercase tracking-wider mb-1">
           {product.category}
         </p>
 
         {/* Title */}
-        <h3 className="font-medium text-warm-900 dark:text-warm-100 line-clamp-2 mb-2 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+        <h3 className="font-medium text-stone-900 dark:text-white line-clamp-2 mb-2 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
           {product.title}
         </h3>
 
@@ -104,7 +104,7 @@ export function ProductCard({ product, index }: ProductCardProps) {
                 className={`w-4 h-4 ${
                   i < Math.round(product.rating)
                     ? "text-amber-400"
-                    : "text-warm-200 dark:text-warm-700"
+                    : "text-stone-200 dark:text-slate-700"
                 }`}
                 fill="currentColor"
                 viewBox="0 0 20 20"
@@ -113,7 +113,7 @@ export function ProductCard({ product, index }: ProductCardProps) {
               </svg>
             ))}
           </div>
-          <span className="text-xs text-warm-600 dark:text-warm-400">
+          <span className="text-xs text-stone-500 dark:text-slate-400">
             ({product.rating.toFixed(1)})
           </span>
         </div>
@@ -121,11 +121,11 @@ export function ProductCard({ product, index }: ProductCardProps) {
         {/* Price */}
         <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold text-warm-900 dark:text-warm-100">
+            <span className="text-lg font-bold text-stone-900 dark:text-white">
               ${discountedPrice.toFixed(2)}
             </span>
             {hasDiscount && (
-              <span className="text-sm text-warm-500 dark:text-warm-500 line-through">
+              <span className="text-sm text-stone-400 dark:text-slate-500 line-through">
                 ${product.price.toFixed(2)}
               </span>
             )}

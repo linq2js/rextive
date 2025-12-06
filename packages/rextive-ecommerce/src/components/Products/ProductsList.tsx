@@ -29,7 +29,7 @@ export function ProductsList({ loading, value }: ProductsListProps) {
 
 function StaleIndicator() {
   return (
-    <div className="text-center text-warm-500 text-sm animate-pulse-soft">
+    <div className="text-center text-stone-500 dark:text-slate-400 text-sm animate-pulse-soft">
       Updating results...
     </div>
   );
@@ -45,9 +45,8 @@ function ResultsInfo({
   total: number;
 }) {
   return (
-    <div className="text-center text-warm-500 text-sm">
+    <div className="text-center text-stone-500 dark:text-slate-400 text-sm">
       Showing {skip + 1}-{Math.min(skip + limit, total)} of {total} products
     </div>
   );
 }
-
