@@ -9,6 +9,15 @@ import { wrapDispose } from "../disposable";
 export type NotifierFilter<T = unknown> = (notifier: AnySignal<T>) => boolean;
 
 /**
+ * Operator type created by createOnOperator.
+ * Takes notifier(s) and optional filter, returns an operator function.
+ */
+export type OnOperator = <TSource extends Signal<any>, TNotifier>(
+  notifier: AnySignal<TNotifier> | readonly AnySignal<TNotifier>[],
+  filter?: NotifierFilter<TNotifier>
+) => (source: TSource) => TSource;
+
+/**
  * Creates an operator that refreshes the source signal when notifier(s) change.
  *
  * Triggers immediate recomputation of the source signal whenever any of the
@@ -57,7 +66,9 @@ export type NotifierFilter<T = unknown> = (notifier: AnySignal<T>) => boolean;
  * );
  * ```
  */
-export const refreshOn = createOnOperator((source) => source.refresh());
+export const refreshOn: OnOperator = createOnOperator((source) =>
+  source.refresh()
+);
 
 /**
  * Creates an operator that marks the source signal as stale when notifier(s) change.
@@ -120,11 +131,11 @@ export const refreshOn = createOnOperator((source) => source.refresh());
  * );
  * ```
  */
-export const staleOn = createOnOperator((source) => source.stale());
+export const staleOn: OnOperator = createOnOperator((source) => source.stale());
 
 function createOnOperator(
   action: (source: Signal<any>, notifier: AnySignal<any>) => void
-) {
+): OnOperator {
   return <TSource extends Signal<any>, TNotifier>(
     notifier: AnySignal<TNotifier> | readonly AnySignal<TNotifier>[],
     filter?: NotifierFilter<TNotifier>
@@ -212,4 +223,4 @@ function createOnOperator(
  *
  * @note Only works with mutable signals. Computed signals don't have `.reset()`.
  */
-export const resetOn = createOnOperator((source) => source.reset());
+export const resetOn: OnOperator = createOnOperator((source) => source.reset());
