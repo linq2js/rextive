@@ -1,10 +1,22 @@
 import { memo } from "react";
-import { rx } from "rextive/react";
+import { rx, useScope } from "rextive/react";
+import { signal } from "rextive";
 import { productsLogic } from "@/logic/productsLogic";
+
+const INITIAL_VISIBLE_COUNT = 6;
 
 export const CategoryFilter = memo(function CategoryFilter() {
   // Get singleton products logic
   const { category, categoriesTask, setCategory } = productsLogic();
+
+  // Local state for expanded view
+  const { isExpanded, toggleExpanded } = useScope("categoryFilter", () => {
+    const isExpanded = signal(false, { name: "categoryFilter.isExpanded" });
+    return {
+      isExpanded,
+      toggleExpanded: () => isExpanded.set((v) => !v),
+    };
+  });
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -29,6 +41,7 @@ export const CategoryFilter = memo(function CategoryFilter() {
       {rx(() => {
         const { loading, value } = categoriesTask();
         const selected = category();
+        const expanded = isExpanded();
 
         if (loading && value.length === 0) {
           return (
@@ -40,8 +53,11 @@ export const CategoryFilter = memo(function CategoryFilter() {
           );
         }
 
-        // Show first 6 categories
-        const displayCategories = value.slice(0, 6);
+        // Show all categories when expanded, otherwise show first 6
+        const displayCategories = expanded
+          ? value
+          : value.slice(0, INITIAL_VISIBLE_COUNT);
+        const hiddenCount = value.length - INITIAL_VISIBLE_COUNT;
 
         return (
           <>
@@ -59,9 +75,13 @@ export const CategoryFilter = memo(function CategoryFilter() {
               </button>
             ))}
 
-            {value.length > 6 && (
-              <button className="px-4 py-2 rounded-full text-sm font-medium bg-stone-100 dark:bg-slate-800 text-stone-600 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-700 transition-all">
-                +{value.length - 6} more
+            {/* Show more / Show less button */}
+            {hiddenCount > 0 && (
+              <button
+                onClick={toggleExpanded}
+                className="px-4 py-2 rounded-full text-sm font-medium bg-stone-100 dark:bg-slate-800 text-stone-600 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-700 transition-all"
+              >
+                {expanded ? "Show less" : `+${hiddenCount} more`}
               </button>
             )}
           </>

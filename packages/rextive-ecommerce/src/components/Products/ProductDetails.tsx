@@ -1,6 +1,7 @@
 import { memo } from "react";
-import { logic, provider, rx, signal, task, useScope } from "rextive/react";
+import { provider, rx, task, useScope } from "rextive/react";
 import { productDetailsLogic } from "@/logic/productDetailsLogic";
+import { productImageGalleryLogic } from "@/logic/productImageGalleryLogic";
 import { routerLogic } from "@/logic/routerLogic";
 import { cartLogic } from "@/logic/cartLogic";
 import type { Product } from "@/api/types";
@@ -95,7 +96,10 @@ const ProductLoading = memo(function ProductLoading() {
       {/* Spinner overlay */}
       <div className="absolute inset-0 flex items-center justify-center z-10 bg-stone-50/80 dark:bg-slate-950/80 backdrop-blur-sm">
         <div className="flex flex-col items-center bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl border border-stone-200 dark:border-slate-800">
-          <div className="w-12 h-12 border-4 border-stone-200 dark:border-slate-700 border-t-brand-600 rounded-full animate-spin mb-3" />
+          <div className="w-12 h-12 relative mb-3">
+            <div className="absolute inset-0 border-4 border-stone-200 dark:border-slate-700 rounded-full" />
+            <div className="absolute inset-0 border-4 border-brand-600 rounded-full border-t-transparent animate-spin" />
+          </div>
           <p className="text-stone-700 dark:text-slate-300 font-medium">
             Loading product...
           </p>
@@ -166,24 +170,6 @@ const ProductError = memo(function ProductError({ error }: { error: unknown }) {
 // ============================================================================
 // Product Section Components (receive product as prop)
 // ============================================================================
-
-export const productImageGalleryLogic = logic(
-  "productImageGalleryLogic",
-  () => {
-    const selectedImageIndex = signal(0, {
-      name: "productImageGallery.selectedImageIndex",
-    });
-
-    const selectImage = (index: number) => {
-      selectedImageIndex.set(index);
-    };
-
-    return {
-      selectImage,
-      selectedImageIndex,
-    };
-  }
-);
 
 const ProductImageGallery = memo(function ProductImageGallery({
   product,

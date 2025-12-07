@@ -1,24 +1,7 @@
 import { memo } from "react";
 import { rx, task } from "rextive/react";
-import { logic, signal } from "rextive";
 import { authLogic } from "@/logic/authLogic";
-
-export const loginLogic = logic("loginLogic", () => {
-  const { login } = authLogic();
-  const username = signal("emilys", { name: "loginModal.username" });
-  const password = signal("emilyspass", { name: "loginModal.password" });
-
-  return {
-    username,
-    password,
-    login() {
-      return login({
-        username: username(),
-        password: password(),
-      });
-    },
-  };
-});
+import { loginLogic } from "@/logic/loginLogic";
 
 export const LoginModal = memo(function LoginModal() {
   const { loginModalOpen, closeLoginModal, loginResult } = authLogic();

@@ -20,7 +20,10 @@ export const OrderComplete = memo(function OrderComplete() {
     if (state.loading) {
       return (
         <div className="text-center py-12">
-          <div className="w-16 h-16 mx-auto mb-6 border-4 border-brand-200 dark:border-brand-800 border-t-brand-600 rounded-full animate-spin" />
+          <div className="w-16 h-16 mx-auto mb-6 relative">
+            <div className="absolute inset-0 border-4 border-brand-200 dark:border-brand-800 rounded-full" />
+            <div className="absolute inset-0 border-4 border-brand-600 rounded-full border-t-transparent animate-spin" />
+          </div>
           <h3 className="text-xl font-semibold text-stone-900 dark:text-white mb-2">
             Processing Your Order...
           </h3>
@@ -120,7 +123,9 @@ export const OrderComplete = memo(function OrderComplete() {
 
         {/* Order Details */}
         <div className="bg-stone-50 dark:bg-slate-800/50 rounded-xl p-4 text-left mb-6 border border-stone-200 dark:border-slate-700">
-          <h4 className="font-medium text-stone-900 dark:text-white mb-3">Order Summary</h4>
+          <h4 className="font-medium text-stone-900 dark:text-white mb-3">
+            Order Summary
+          </h4>
           <div className="space-y-2 text-sm">
             {summary.items.map((item, index) => (
               <div key={index} className="flex justify-between">
@@ -134,16 +139,26 @@ export const OrderComplete = memo(function OrderComplete() {
             ))}
             <div className="border-t border-stone-200 dark:border-slate-700 pt-2 mt-2">
               <div className="flex justify-between">
-                <span className="text-stone-600 dark:text-slate-400">Subtotal</span>
-                <span className="text-stone-900 dark:text-white">{formatCurrency(summary.subtotal)}</span>
+                <span className="text-stone-600 dark:text-slate-400">
+                  Subtotal
+                </span>
+                <span className="text-stone-900 dark:text-white">
+                  {formatCurrency(summary.subtotal)}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-stone-600 dark:text-slate-400">Shipping</span>
-                <span className="text-stone-900 dark:text-white">{formatCurrency(summary.shipping)}</span>
+                <span className="text-stone-600 dark:text-slate-400">
+                  Shipping
+                </span>
+                <span className="text-stone-900 dark:text-white">
+                  {formatCurrency(summary.shipping)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-600 dark:text-slate-400">Tax</span>
-                <span className="text-stone-900 dark:text-white">{formatCurrency(summary.tax)}</span>
+                <span className="text-stone-900 dark:text-white">
+                  {formatCurrency(summary.tax)}
+                </span>
               </div>
               <div className="flex justify-between font-semibold text-base pt-2 border-t border-stone-200 dark:border-slate-700 mt-2">
                 <span className="text-stone-900 dark:text-white">Total</span>
@@ -157,7 +172,9 @@ export const OrderComplete = memo(function OrderComplete() {
 
         {/* Shipping Info */}
         <div className="bg-stone-50 dark:bg-slate-800/50 rounded-xl p-4 text-left mb-6 border border-stone-200 dark:border-slate-700">
-          <h4 className="font-medium text-stone-900 dark:text-white mb-2">Shipping to</h4>
+          <h4 className="font-medium text-stone-900 dark:text-white mb-2">
+            Shipping to
+          </h4>
           <div className="text-sm text-stone-600 dark:text-slate-300">
             <p>
               {summary.shippingInfo.firstName} {summary.shippingInfo.lastName}
