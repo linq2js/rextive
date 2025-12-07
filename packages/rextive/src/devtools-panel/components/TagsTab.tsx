@@ -3,7 +3,7 @@
  * Displays and manages the tags list
  */
 
-import React, { useState } from "react";
+import React, { useState, memo } from "react";
 import type { TagInfo, SignalInfo } from "../../devtools/types";
 import type { PanelPosition } from "../styles";
 import * as styles from "../styles";
@@ -22,7 +22,7 @@ interface TagsTabProps {
   onTakeSnapshotForTag?: (tagId: string, signalIds: string[]) => void;
 }
 
-export function TagsTab({
+export const TagsTab = memo(function TagsTab({
   tags,
   filteredTags,
   signals,
@@ -255,4 +255,4 @@ export function TagsTab({
       })}
     </div>
   );
-}
+});

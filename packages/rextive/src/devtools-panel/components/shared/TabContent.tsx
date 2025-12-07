@@ -3,7 +3,7 @@
  * Wrapper for tab content with optional search, filter bar, action bar, and main content
  */
 
-import React from "react";
+import React, { memo } from "react";
 import * as styles from "../../styles";
 import { SearchBox } from "./SearchBox";
 import { FilterBar } from "./FilterBar";
@@ -30,7 +30,7 @@ interface TabContentProps {
   children: React.ReactNode;
 }
 
-export function TabContent({
+export const TabContent = memo(function TabContent({
   searchBox,
   filterBar,
   actionBar,
@@ -67,5 +67,5 @@ export function TabContent({
       <div style={styles.contentStyles}>{children}</div>
     </div>
   );
-}
+});
 

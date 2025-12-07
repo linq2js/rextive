@@ -3,13 +3,13 @@
  * Unified filter bar with filter groups separated by dividers
  */
 
-import React from "react";
+import React, { memo } from "react";
 import * as styles from "../../styles";
 
 /**
  * Separator component for visual grouping
  */
-export function FilterSeparator(): React.ReactElement {
+export const FilterSeparator = memo(function FilterSeparator(): React.ReactElement {
   return (
     <div
       style={{
@@ -21,7 +21,7 @@ export function FilterSeparator(): React.ReactElement {
       }}
     />
   );
-}
+});
 
 interface FilterGroupProps {
   children: React.ReactNode;
@@ -31,7 +31,7 @@ interface FilterGroupProps {
  * FilterGroup component - keeps buttons together on the same line (no wrap within group)
  * Includes a left separator for visual grouping
  */
-export function FilterGroup({ children }: FilterGroupProps): React.ReactElement {
+export const FilterGroup = memo(function FilterGroup({ children }: FilterGroupProps): React.ReactElement {
   return (
     <div
       style={{
@@ -55,14 +55,14 @@ export function FilterGroup({ children }: FilterGroupProps): React.ReactElement 
       {children}
     </div>
   );
-}
+});
 
 interface FilterBarProps {
   /** All filter elements (use FilterSeparator for visual grouping) */
   filters?: React.ReactNode;
 }
 
-export function FilterBar({
+export const FilterBar = memo(function FilterBar({
   filters,
 }: FilterBarProps): React.ReactElement | null {
   if (!filters) {
@@ -85,5 +85,5 @@ export function FilterBar({
       {filters}
     </div>
   );
-}
+});
 

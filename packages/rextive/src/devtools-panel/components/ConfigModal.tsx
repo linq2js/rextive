@@ -3,7 +3,7 @@
  * Modal for DevTools configuration settings
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, memo } from "react";
 import { IconClose, IconSettings } from "../icons";
 import * as styles from "../styles";
 
@@ -29,7 +29,7 @@ interface ConfigModalProps {
   onSettingsChange: (settings: DevToolsSettings) => void;
 }
 
-export function ConfigModal({
+export const ConfigModal = memo(function ConfigModal({
   isOpen,
   onClose,
   settings,
@@ -314,4 +314,4 @@ export function ConfigModal({
       </div>
     </div>
   );
-}
+});

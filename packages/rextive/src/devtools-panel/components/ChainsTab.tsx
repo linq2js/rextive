@@ -3,7 +3,7 @@
  * Displays chain reactions
  */
 
-import React, { useState } from "react";
+import React, { useState, memo } from "react";
 import type { ChainReaction, SignalInfo } from "../../devtools/types";
 import * as styles from "../styles";
 import { IconClose } from "../icons";
@@ -17,7 +17,7 @@ interface ChainsTabProps {
   onChainsUpdate: () => void;
 }
 
-export function ChainsTab({
+export const ChainsTab = memo(function ChainsTab({
   chains,
   filteredChains,
   signals,
@@ -276,5 +276,5 @@ export function ChainsTab({
       })}
     </div>
   );
-}
+});
 

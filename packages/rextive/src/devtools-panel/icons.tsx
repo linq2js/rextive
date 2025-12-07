@@ -1,10 +1,12 @@
 // SVG Icons for consistent sizing in DevTools panel
+import { memo } from "react";
 
 interface IconProps {
   size?: number;
 }
 
-export const IconReset = ({ size = 16 }: IconProps) => (
+export const IconReset = memo(function IconReset({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -18,9 +20,11 @@ export const IconReset = ({ size = 16 }: IconProps) => (
     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
     <path d="M3 3v5h5" />
   </svg>
-);
+  );
+});
 
-export const IconArrowLeft = ({ size = 16 }: IconProps) => (
+export const IconArrowLeft = memo(function IconArrowLeft({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -33,9 +37,11 @@ export const IconArrowLeft = ({ size = 16 }: IconProps) => (
   >
     <path d="M19 12H5M12 19l-7-7 7-7" />
   </svg>
-);
+  );
+});
 
-export const IconArrowDown = ({ size = 16 }: IconProps) => (
+export const IconArrowDown = memo(function IconArrowDown({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -48,9 +54,11 @@ export const IconArrowDown = ({ size = 16 }: IconProps) => (
   >
     <path d="M12 5v14M19 12l-7 7-7-7" />
   </svg>
-);
+  );
+});
 
-export const IconChevronUp = ({ size = 16 }: IconProps) => (
+export const IconChevronUp = memo(function IconChevronUp({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -63,9 +71,11 @@ export const IconChevronUp = ({ size = 16 }: IconProps) => (
   >
     <path d="M18 15l-6-6-6 6" />
   </svg>
-);
+  );
+});
 
-export const IconChevronDown = ({ size = 16 }: IconProps) => (
+export const IconChevronDown = memo(function IconChevronDown({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -78,9 +88,11 @@ export const IconChevronDown = ({ size = 16 }: IconProps) => (
   >
     <path d="M6 9l6 6 6-6" />
   </svg>
-);
+  );
+});
 
-export const IconChevronLeft = ({ size = 16 }: IconProps) => (
+export const IconChevronLeft = memo(function IconChevronLeft({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -93,9 +105,11 @@ export const IconChevronLeft = ({ size = 16 }: IconProps) => (
   >
     <path d="M15 18l-6-6 6-6" />
   </svg>
-);
+  );
+});
 
-export const IconChevronRight = ({ size = 16 }: IconProps) => (
+export const IconChevronRight = memo(function IconChevronRight({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -108,9 +122,11 @@ export const IconChevronRight = ({ size = 16 }: IconProps) => (
   >
     <path d="M9 18l6-6-6-6" />
   </svg>
-);
+  );
+});
 
-export const IconCopy = ({ size = 16 }: IconProps) => (
+export const IconCopy = memo(function IconCopy({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -124,9 +140,11 @@ export const IconCopy = ({ size = 16 }: IconProps) => (
     <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
   </svg>
-);
+  );
+});
 
-export const IconEdit = ({ size = 16 }: IconProps) => (
+export const IconEdit = memo(function IconEdit({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -140,9 +158,11 @@ export const IconEdit = ({ size = 16 }: IconProps) => (
     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
   </svg>
-);
+  );
+});
 
-export const IconHistory = ({ size = 16 }: IconProps) => (
+export const IconHistory = memo(function IconHistory({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -157,9 +177,11 @@ export const IconHistory = ({ size = 16 }: IconProps) => (
     <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
     <path d="M12 7v5l4 2" />
   </svg>
-);
+  );
+});
 
-export const IconRefresh = ({ size = 16 }: IconProps) => (
+export const IconRefresh = memo(function IconRefresh({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -175,9 +197,11 @@ export const IconRefresh = ({ size = 16 }: IconProps) => (
     <path d="M3 22v-6h6" />
     <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
   </svg>
-);
+  );
+});
 
-export const IconTrash = ({ size = 16 }: IconProps) => (
+export const IconTrash = memo(function IconTrash({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -192,9 +216,11 @@ export const IconTrash = ({ size = 16 }: IconProps) => (
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
     <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </svg>
-);
+  );
+});
 
-export const IconClose = ({ size = 16 }: IconProps) => (
+export const IconClose = memo(function IconClose({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -207,9 +233,11 @@ export const IconClose = ({ size = 16 }: IconProps) => (
   >
     <path d="M18 6L6 18M6 6l12 12" />
   </svg>
-);
+  );
+});
 
-export const IconBolt = ({ size = 16 }: IconProps) => (
+export const IconBolt = memo(function IconBolt({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -218,9 +246,11 @@ export const IconBolt = ({ size = 16 }: IconProps) => (
   >
     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
   </svg>
-);
+  );
+});
 
-export const IconResetSmall = ({ size = 12 }: IconProps) => (
+export const IconResetSmall = memo(function IconResetSmall({ size = 12 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -234,9 +264,11 @@ export const IconResetSmall = ({ size = 12 }: IconProps) => (
     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
     <path d="M3 3v5h5" />
   </svg>
-);
+  );
+});
 
-export const IconHelp = ({ size = 16 }: IconProps) => (
+export const IconHelp = memo(function IconHelp({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -251,9 +283,11 @@ export const IconHelp = ({ size = 16 }: IconProps) => (
     <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
     <path d="M12 17h.01" />
   </svg>
-);
+  );
+});
 
-export const IconStar = ({ size = 16, filled = false }: IconProps & { filled?: boolean }) => (
+export const IconStar = memo(function IconStar({ size = 16, filled = false }: IconProps & { filled?: boolean }) {
+  return (
   <svg
     width={size}
     height={size}
@@ -266,9 +300,11 @@ export const IconStar = ({ size = 16, filled = false }: IconProps & { filled?: b
   >
     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
   </svg>
-);
+  );
+});
 
-export const IconCompare = ({ size = 16 }: IconProps) => (
+export const IconCompare = memo(function IconCompare({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -281,9 +317,11 @@ export const IconCompare = ({ size = 16 }: IconProps) => (
   >
     <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
   </svg>
-);
+  );
+});
 
-export const IconRevert = ({ size = 16 }: IconProps) => (
+export const IconRevert = memo(function IconRevert({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -299,9 +337,11 @@ export const IconRevert = ({ size = 16 }: IconProps) => (
     <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
     <path d="M3 21v-5h5" />
   </svg>
-);
+  );
+});
 
-export const IconSearch = ({ size = 16 }: IconProps) => (
+export const IconSearch = memo(function IconSearch({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -315,9 +355,11 @@ export const IconSearch = ({ size = 16 }: IconProps) => (
     <circle cx="11" cy="11" r="8" />
     <path d="M21 21l-4.35-4.35" />
   </svg>
-);
+  );
+});
 
-export const IconCamera = ({ size = 16 }: IconProps) => (
+export const IconCamera = memo(function IconCamera({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -331,9 +373,11 @@ export const IconCamera = ({ size = 16 }: IconProps) => (
     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
     <circle cx="12" cy="13" r="4" />
   </svg>
-);
+  );
+});
 
-export const IconUndo = ({ size = 16 }: IconProps) => (
+export const IconUndo = memo(function IconUndo({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -347,9 +391,11 @@ export const IconUndo = ({ size = 16 }: IconProps) => (
     <path d="M3 7v6h6" />
     <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
   </svg>
-);
+  );
+});
 
-export const IconRecord = ({ size = 16 }: IconProps) => (
+export const IconRecord = memo(function IconRecord({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -358,9 +404,11 @@ export const IconRecord = ({ size = 16 }: IconProps) => (
   >
     <circle cx="12" cy="12" r="8" />
   </svg>
-);
+  );
+});
 
-export const IconSettings = ({ size = 16 }: IconProps) => (
+export const IconSettings = memo(function IconSettings({ size = 16 }: IconProps) {
+  return (
   <svg
     width={size}
     height={size}
@@ -374,4 +422,5 @@ export const IconSettings = ({ size = 16 }: IconProps) => (
     <circle cx="12" cy="12" r="3" />
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
   </svg>
-);
+  );
+});

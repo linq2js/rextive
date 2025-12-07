@@ -3,7 +3,7 @@
  * Modal to compare two snapshots side-by-side
  */
 
-import React, { useMemo } from "react";
+import React, { useMemo, memo } from "react";
 import * as styles from "./styles";
 import { IconClose } from "./icons";
 
@@ -34,7 +34,7 @@ interface SnapshotDiffModalProps {
   currentStateSignals?: SnapshotSignal[];
 }
 
-export function SnapshotDiffModal({
+export const SnapshotDiffModal = memo(function SnapshotDiffModal({
   isOpen,
   onClose,
   snapshots,
@@ -469,6 +469,6 @@ export function SnapshotDiffModal({
       </div>
     </div>
   );
-}
+});
 
 export { CURRENT_STATE_ID };

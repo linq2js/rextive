@@ -3,7 +3,7 @@
  * Displays the event log with virtualization for performance
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, memo } from "react";
 import type { SignalInfo } from "../../devtools/types";
 import * as styles from "../styles";
 import { IconCopy, IconChevronRight, IconChevronDown } from "../icons";
@@ -30,7 +30,7 @@ interface EventsTabProps {
   onNavigateToTag: (tagId: string) => void;
 }
 
-export function EventsTab({
+export const EventsTab = memo(function EventsTab({
   events,
   filteredEvents,
   signals,
@@ -438,4 +438,4 @@ export function EventsTab({
       />
     </div>
   );
-}
+});

@@ -55,7 +55,11 @@ export const SortSelect = memo(function SortSelect() {
         return (
           <>
             <label
-              className={`text-sm ${isDisabled ? "text-stone-300 dark:text-slate-600" : "text-stone-500 dark:text-slate-400"}`}
+              className={`text-sm ${
+                isDisabled
+                  ? "text-stone-300 dark:text-slate-600"
+                  : "text-stone-500 dark:text-slate-400"
+              }`}
             >
               Sort by:
             </label>

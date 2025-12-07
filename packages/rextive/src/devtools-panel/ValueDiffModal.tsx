@@ -3,7 +3,7 @@
  * Shows side-by-side comparison of two signal values
  */
 
-import React from "react";
+import React, { memo } from "react";
 import { IconClose } from "./icons";
 import * as styles from "./styles";
 
@@ -58,7 +58,7 @@ function diffValues(oldValue: unknown, newValue: unknown): {
   };
 }
 
-export function ValueDiffModal({
+export const ValueDiffModal = memo(function ValueDiffModal({
   isOpen,
   onClose,
   signalName,
@@ -207,5 +207,5 @@ export function ValueDiffModal({
       </div>
     </div>
   );
-}
+});
 

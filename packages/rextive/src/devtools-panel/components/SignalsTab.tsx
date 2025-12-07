@@ -3,7 +3,7 @@
  * Displays and manages the signals list with virtualization for performance
  */
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, memo } from "react";
 import type { SignalInfo } from "../../devtools/types";
 import type { PanelPosition } from "../styles";
 import * as styles from "../styles";
@@ -35,7 +35,7 @@ interface SignalsTabProps {
   onCompare: (signalId: string, currentValue: unknown, historyValue: unknown, historyTimestamp: number) => void;
 }
 
-export function SignalsTab({
+export const SignalsTab = memo(function SignalsTab({
   signals,
   filteredSignals,
   position,
@@ -830,5 +830,5 @@ export function SignalsTab({
       style={styles.contentGridStyles(position)}
     />
   );
-}
+});
 

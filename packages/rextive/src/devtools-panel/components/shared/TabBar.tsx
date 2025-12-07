@@ -3,7 +3,7 @@
  * Displays tab headings/titles with optional flash animation
  */
 
-import React from "react";
+import React, { memo } from "react";
 import * as styles from "../../styles";
 
 interface TabBarProps {
@@ -14,7 +14,7 @@ interface TabBarProps {
   flashingTabs?: Set<string>;
 }
 
-export function TabBar({
+export const TabBar = memo(function TabBar({
   tabs,
   activeTab,
   onTabChange,
@@ -58,4 +58,4 @@ export function TabBar({
       })}
     </div>
   );
-}
+});

@@ -792,16 +792,40 @@ export function DevToolsPanel(): React.ReactElement | null {
   }, []);
 
   // Refresh data periodically when enabled
+  // Only update state if data actually changed to avoid unnecessary re-renders
   useEffect(() => {
     if (!enabled) return;
 
     const refresh = () => {
       const existingSignals = getSignals();
       const existingTags = getTags();
+      const newStats = getStats();
 
-      setSignals(new Map(existingSignals));
-      setTags(new Map(existingTags));
-      setStats(getStats());
+      // Only update signals if the map has different entries
+      setSignals((prev) => {
+        if (prev.size !== existingSignals.size) return new Map(existingSignals);
+        // Quick check: if sizes match, assume no change (full comparison would be expensive)
+        // The onDevToolsEvent handler will catch actual changes
+        return prev;
+      });
+
+      setTags((prev) => {
+        if (prev.size !== existingTags.size) return new Map(existingTags);
+        return prev;
+      });
+
+      // Only update stats if something changed
+      setStats((prev) => {
+        if (
+          prev.mutableCount !== newStats.mutableCount ||
+          prev.computedCount !== newStats.computedCount ||
+          prev.disposedCount !== newStats.disposedCount ||
+          prev.signalsWithErrors !== newStats.signalsWithErrors
+        ) {
+          return newStats;
+        }
+        return prev;
+      });
     };
 
     refresh();
@@ -3692,6 +3716,62 @@ export function DevToolsPanel(): React.ReactElement | null {
     return tab.charAt(0).toUpperCase() + tab.slice(1);
   };
 
+  // Memoize tabs array for TabBar
+  const tabs = useMemo(
+    () =>
+      (["signals", "snaps", "tags", "events", "chains"] as Tab[]).map(
+        (tab) => ({
+          id: tab,
+          label: renderTabLabel(tab),
+        })
+      ),
+    []
+  );
+
+  // Memoize tab change handler
+  const handleTabChange = useCallback(
+    (tabId: string) => updateActiveTab(tabId as Tab),
+    [updateActiveTab]
+  );
+
+  // Memoize search help click handler
+  const handleSearchHelpClick = useCallback(() => setShowSearchHelp(true), []);
+
+  // Memoize searchBox props based on active tab
+  const searchBoxProps = useMemo(() => {
+    if (activeTab === "chains") {
+      return {
+        value: chainFilter,
+        onChange: setChainFilter,
+        placeholder: "Filter by signal name...",
+        showHelp: false,
+        leftActions: undefined,
+      };
+    }
+    if (activeTab === "snaps") {
+      return {
+        value: snapshotSearch,
+        onChange: setSnapshotSearch,
+        placeholder: "Search snapshots...",
+        showHelp: false,
+        leftActions: undefined,
+      };
+    }
+    return {
+      value: searchQuery,
+      onChange: setSearchQuery,
+      placeholder: getSearchPlaceholder(activeTab),
+      showHelp: true,
+      onHelpClick: handleSearchHelpClick,
+    };
+  }, [
+    activeTab,
+    chainFilter,
+    snapshotSearch,
+    searchQuery,
+    handleSearchHelpClick,
+  ]);
+
   const isLeftCollapsed = position === "left" && !isExpanded;
   const currentSize = position === "bottom" ? sizeBottom : sizeLeft;
 
@@ -3824,44 +3904,15 @@ export function DevToolsPanel(): React.ReactElement | null {
           {isExpanded && (
             <>
               <TabBar
-                tabs={(
-                  ["signals", "snaps", "tags", "events", "chains"] as Tab[]
-                ).map((tab) => ({
-                  id: tab,
-                  label: renderTabLabel(tab),
-                }))}
+                tabs={tabs}
                 activeTab={activeTab}
-                onTabChange={(tabId) => updateActiveTab(tabId as Tab)}
+                onTabChange={handleTabChange}
                 flashingTabs={flashingTabs}
               />
 
               {/* Tab content with search, filters, and main content */}
               <TabContent
-                searchBox={
-                  activeTab === "chains"
-                    ? {
-                        value: chainFilter,
-                        onChange: setChainFilter,
-                        placeholder: "Filter by signal name...",
-                        showHelp: false,
-                        leftActions: undefined,
-                      }
-                    : activeTab === "snaps"
-                    ? {
-                        value: snapshotSearch,
-                        onChange: setSnapshotSearch,
-                        placeholder: "Search snapshots...",
-                        showHelp: false,
-                        leftActions: undefined,
-                      }
-                    : {
-                        value: searchQuery,
-                        onChange: setSearchQuery,
-                        placeholder: getSearchPlaceholder(activeTab),
-                        showHelp: true,
-                        onHelpClick: () => setShowSearchHelp(true),
-                      }
-                }
+                searchBox={searchBoxProps}
                 filterBar={
                   activeTab === "signals" ? (
                     <>

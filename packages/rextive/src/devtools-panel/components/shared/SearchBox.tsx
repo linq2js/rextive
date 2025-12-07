@@ -3,7 +3,7 @@
  * Optional main search box for tab content
  */
 
-import React from "react";
+import React, { memo } from "react";
 import * as styles from "../../styles";
 import { IconClose, IconHelp, IconSearch } from "../../icons";
 
@@ -16,7 +16,7 @@ interface SearchBoxProps {
   leftActions?: React.ReactNode;
 }
 
-export function SearchBox({
+export const SearchBox = memo(function SearchBox({
   value,
   onChange,
   placeholder = "Search...",
@@ -80,5 +80,5 @@ export function SearchBox({
       </div>
     </div>
   );
-}
+});
 

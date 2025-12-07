@@ -3,7 +3,7 @@
  * Displays a comprehensive guide for the advanced search functionality
  */
 
-import React from "react";
+import React, { memo } from "react";
 import { IconClose } from "./icons";
 import * as styles from "./styles";
 
@@ -12,7 +12,7 @@ interface SearchHelpModalProps {
   onClose: () => void;
 }
 
-export function SearchHelpModal({
+export const SearchHelpModal = memo(function SearchHelpModal({
   isOpen,
   onClose,
 }: SearchHelpModalProps): React.ReactElement | null {
@@ -172,5 +172,5 @@ name:user kind:mutable file:App.tsx tag:form`}
       </div>
     </div>
   );
-}
+});
 

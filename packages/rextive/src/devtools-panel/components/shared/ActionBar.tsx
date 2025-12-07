@@ -3,14 +3,14 @@
  * Action bar that can wrap if too many buttons
  */
 
-import React from "react";
+import React, { memo } from "react";
 import * as styles from "../../styles";
 
 interface ActionBarProps {
   children: React.ReactNode;
 }
 
-export function ActionBar({
+export const ActionBar = memo(function ActionBar({
   children,
 }: ActionBarProps): React.ReactElement | null {
   if (!children) {
@@ -33,5 +33,5 @@ export function ActionBar({
       {children}
     </div>
   );
-}
+});
 

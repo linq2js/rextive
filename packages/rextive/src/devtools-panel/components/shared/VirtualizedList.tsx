@@ -9,6 +9,7 @@ import React, {
   useCallback,
   useMemo,
   useEffect,
+  memo,
 } from "react";
 
 export interface VirtualizedListProps<T> {
@@ -37,7 +38,7 @@ interface ItemMeasurement {
   height: number;
 }
 
-export function VirtualizedList<T>({
+function VirtualizedListInner<T>({
   items,
   estimatedItemHeight,
   overscan = 3,
@@ -225,6 +226,9 @@ export function VirtualizedList<T>({
     </div>
   );
 }
+
+// Memo wrapper for the generic component
+export const VirtualizedList = memo(VirtualizedListInner) as typeof VirtualizedListInner;
 
 /**
  * Hook to create a stable key getter function
