@@ -251,7 +251,7 @@ function tryWait(value: unknown): any {
  * Internal component for rendering with automatic signal tracking.
  * Uses useRx to track any signals accessed during fn execution.
  */
-const Rx = memo((props: { fn: () => unknown }) => {
+const Rx = memo(function Rx(props: { fn: () => unknown }) {
   return <>{useRx(props.fn) ?? null}</>;
 });
 
