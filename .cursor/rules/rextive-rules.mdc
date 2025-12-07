@@ -1104,7 +1104,79 @@ const scope = useScope("myScope", () => {
 
 ---
 
-### 7. `provider()` - Signal Context ⭐ NEW
+### 7. `useStable()` - Dynamic Stable Getter ⭐ NEW
+
+Returns a function for creating stable references to values across renders. Solves the common React problem where inline objects/functions cause unnecessary re-renders.
+
+#### Basic Usage
+
+```tsx
+import { useStable } from 'rextive/react';
+
+// Create a typed stable getter
+const stable = useStable<{
+  onClick: () => void;
+  config: { theme: string };
+}>();
+
+// Single key-value: stable(key, value, equals?)
+const onClick = stable("onClick", () => handleClick());
+const config = stable("config", { theme: "dark" }, "shallow");
+
+// Partial object: stable(partial, equals?)
+const handlers = stable({
+  onSubmit: () => submitForm(),
+  onCancel: () => cancelForm(),
+});
+```
+
+#### Key Behaviors
+
+| Input Type | Behavior |
+|------------|----------|
+| **Functions** | Wrapped in stable reference that delegates to latest implementation |
+| **Objects/Arrays** | Cached if equal (based on equality strategy) |
+| **Primitives** | Returned directly |
+
+#### Equality Strategies
+
+```tsx
+// Default: Object.is (reference equality)
+stable("config", { theme: "dark" });
+
+// Shallow: Compare object keys/array elements
+stable("config", { theme: "dark" }, "shallow");
+
+// Deep: Deep comparison
+stable("config", { nested: { value: 1 } }, "deep");
+
+// Custom function
+stable("items", items, (a, b) => a.length === b.length);
+```
+
+#### Use Cases
+
+```tsx
+// 1. Stable callbacks for memoized children
+const onClick = stable("onClick", () => doSomething(latestState));
+return <MemoizedChild onClick={onClick} />;
+
+// 2. Stable objects for effect dependencies
+const config = stable("config", { endpoint, headers }, "shallow");
+useEffect(() => {
+  fetchData(config);
+}, [config]); // Won't re-run if config is shallowly equal
+
+// 3. Multiple handlers at once
+const { onSubmit, onCancel } = stable({
+  onSubmit: () => submit(),
+  onCancel: () => cancel(),
+});
+```
+
+---
+
+### 8. `provider()` - Signal Context ⭐ NEW
 
 Create type-safe React Context with three modes.
 
@@ -1184,7 +1256,7 @@ const [useAuth, AuthProvider] = provider<AuthContext, User | null>({
 
 ---
 
-### 8. Async Utilities
+### 9. Async Utilities
 
 #### `wait()` / `wait.all()` - Wait for All
 
@@ -1230,7 +1302,7 @@ await wait.delay(1000);
 
 ---
 
-### 9. `task.from()` - Async State Access
+### 10. `task.from()` - Async State Access
 
 Async signals return Promises. Use `task.from()` to access loading/error/success states:
 
@@ -1266,7 +1338,7 @@ state.error; // error if rejected
 
 ---
 
-### 10. Operators (`rextive/op`) ⭐ NEW
+### 11. Operators (`rextive/op`) ⭐ NEW
 
 ```tsx
 import { to, filter, scan, focus, debounce, throttle, pace } from "rextive/op";
@@ -1479,7 +1551,7 @@ const productFilters = signal({ category: "all", sort: "name" }).pipe(
 
 ---
 
-### 11. Plugins (`rextive/plugins`) ⭐ NEW
+### 12. Plugins (`rextive/plugins`) ⭐ NEW
 
 #### `persistor` - Auto-Persistence
 
@@ -1502,7 +1574,7 @@ const theme = signal("dark", { use: [persist("theme")] });
 
 ---
 
-### 12. Immer Integration (`rextive/immer`) ⭐ NEW
+### 13. Immer Integration (`rextive/immer`) ⭐ NEW
 
 ```tsx
 import { produce } from "rextive/immer";
@@ -1520,7 +1592,7 @@ state.set(
 
 ---
 
-### 13. Cache (`rextive/cache`) ⭐ NEW
+### 14. Cache (`rextive/cache`) ⭐ NEW
 
 ```tsx
 import { cache, staleOn, evictOn, lru } from "rextive/cache";
@@ -1546,7 +1618,7 @@ getUser.clear(); // Clear all
 
 ---
 
-### 14. DevTools (`rextive/devtools`) ⭐ NEW
+### 15. DevTools (`rextive/devtools`) ⭐ NEW
 
 ```tsx
 import { enableDevTools, DevToolsPanel } from "rextive/devtools";
@@ -1567,7 +1639,7 @@ function App() {
 
 ---
 
-### 15. Utilities
+### 16. Utilities
 
 #### `disposable(obj)` - Create Disposable ⭐ NEW
 
@@ -1601,7 +1673,7 @@ events.dispose();
 
 ---
 
-### 16. `logic()` - Reusable Logic Units
+### 17. `logic()` - Reusable Logic Units
 
 Create reusable, testable logic units that encapsulate signals and actions:
 
@@ -2607,6 +2679,7 @@ function Component() {
 - `rx()` - Reactive rendering (4 overloads)
 - `rx.use()` - Reactive hook ⭐
 - `useScope(key, factory, args?, options?)` - Scoped state with auto-dispose
+- `useStable<T>()` - Dynamic stable value getter for callbacks/objects ⭐
 - `provider()` - Signal context ⭐
 
 ### Operators (`rextive/op`) ⭐

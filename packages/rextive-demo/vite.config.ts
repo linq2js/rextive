@@ -18,6 +18,7 @@ export default defineConfig({
     },
   },
   resolve: {
+    dedupe: ["react", "react-dom"], // Ensure single React instance for wdyr
     alias: [
       // Map rextive imports to SOURCE files (not dist) for HMR
       {
@@ -27,6 +28,10 @@ export default defineConfig({
       {
         find: "rextive/devtools",
         replacement: resolve(rextiveSrc, "devtools/index.ts"),
+      },
+      {
+        find: "rextive/plugins",
+        replacement: resolve(rextiveSrc, "plugins/index.ts"),
       },
       {
         find: "rextive/react",
@@ -48,6 +53,7 @@ export default defineConfig({
       "rextive",
       "rextive/devtools",
       "rextive/devtools-panel",
+      "rextive/plugins",
       "rextive/react",
       "rextive/op",
     ],

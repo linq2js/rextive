@@ -6,7 +6,7 @@ import {
   useId,
   useRef,
 } from "react";
-import { EqualsFn, ExDisposable, Mutable, Signal } from "../types";
+import { EqualsFn, Mutable, Signal } from "../types";
 import { useScope } from "./useScope";
 import { is } from "../is";
 import { signal } from "../signal";
@@ -43,7 +43,7 @@ export type ProviderOptionsWithFactory<TContext, TValue> = {
   name: string;
 
   /** Factory to create context object. Called once on mount. */
-  create: (value: TValue) => ExDisposable & TContext;
+  create: (value: TValue) => TContext;
 
   /** Called when props.value changes. Auto-updates if scope is mutable signal. */
   update?: (context: NoInfer<TContext>, value: NoInfer<TValue>) => void;

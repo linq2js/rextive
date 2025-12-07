@@ -1,22 +1,50 @@
 import { memo } from "react";
 import { rx, useScope } from "rextive/react";
-import { signal } from "rextive";
+import { logic, signal } from "rextive";
 import { productsLogic } from "@/logic/productsLogic";
 
 const INITIAL_VISIBLE_COUNT = 6;
+
+export const categoryFilterLogic = logic("categoryFilterLogic", () => {
+  const isExpanded = signal(false, { name: "categoryFilter.isExpanded" });
+
+  return {
+    isExpanded,
+    toggleExpanded: () => isExpanded.set((v) => !v),
+  };
+});
+
+export const CategoryFilterItem = memo(function CategoryFilterItem(props: {
+  slug: string;
+  name: string;
+  selected: boolean;
+}) {
+  const { setCategory } = productsLogic();
+
+  return (
+    <button
+      key={props.slug}
+      onClick={() => setCategory(props.slug)}
+      className={`px-4 py-2 rounded-full text-sm font-medium transition-all capitalize ${
+        props.selected
+          ? "bg-brand-600 text-white shadow-lg shadow-brand-500/30"
+          : "bg-stone-100 dark:bg-slate-800 text-stone-600 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-700"
+      }`}
+    >
+      {props.name}
+    </button>
+  );
+});
 
 export const CategoryFilter = memo(function CategoryFilter() {
   // Get singleton products logic
   const { category, categoriesTask, setCategory } = productsLogic();
 
   // Local state for expanded view
-  const { isExpanded, toggleExpanded } = useScope("categoryFilter", () => {
-    const isExpanded = signal(false, { name: "categoryFilter.isExpanded" });
-    return {
-      isExpanded,
-      toggleExpanded: () => isExpanded.set((v) => !v),
-    };
-  });
+  const { isExpanded, toggleExpanded } = useScope(
+    "categoryFilter",
+    categoryFilterLogic
+  );
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -62,17 +90,12 @@ export const CategoryFilter = memo(function CategoryFilter() {
         return (
           <>
             {displayCategories.map((cat) => (
-              <button
+              <CategoryFilterItem
                 key={cat.slug}
-                onClick={() => setCategory(cat.slug)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all capitalize ${
-                  selected === cat.slug
-                    ? "bg-brand-600 text-white shadow-lg shadow-brand-500/30"
-                    : "bg-stone-100 dark:bg-slate-800 text-stone-600 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-700"
-                }`}
-              >
-                {cat.name}
-              </button>
+                slug={cat.slug}
+                name={cat.name}
+                selected={selected === cat.slug}
+              />
             ))}
 
             {/* Show more / Show less button */}

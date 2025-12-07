@@ -647,7 +647,7 @@ const { userData } = useScope(
 ### Other React Hooks
 
 - `useWatch(signals)` - Subscribe to signals and track changes
-- `useRerender()` - Manual rerender control
+- `useStable()` - Dynamic stable value getter for callbacks and objects
 - `rx()` - Reactive rendering helper
 - And more...
 

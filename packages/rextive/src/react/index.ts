@@ -35,9 +35,6 @@ export * from "../index";
 // React-specific exports
 // =============================================================================
 
-// Re-export React-specific types
-export type { RerenderOptions, RerenderFunction } from "./types";
-
 // Re-export useScope options
 export type { UseScopeOptions } from "./useScope";
 
@@ -46,3 +43,4 @@ export { rx } from "./rx";
 export { useScope } from "./useScope";
 export * from "./provider";
 export { useStable } from "./useStable";
+export type { StableGet } from "./useStable";

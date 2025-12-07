@@ -1,282 +1,228 @@
 /**
- * useStable - Creates a stable reference proxy for objects.
+ * useStable - Dynamic stable value getter for React components.
  *
- * This hook solves the common React problem where passing inline objects/functions
- * as props causes unnecessary re-renders because the reference changes every render.
+ * Returns a function that provides stable references for values across renders.
+ * This solves the common React problem where inline objects/functions cause
+ * unnecessary re-renders because references change every render.
  *
  * ## When to use
  *
  * ### 1. Callbacks for memoized children
  * Prevents `React.memo` children from re-rendering when parent re-renders:
  * ```tsx
- * const handlers = useStable({
- *   onClick: () => doSomething(latestState),
- *   onHover: () => doOther(latestProps),
+ * const stable = useStable<{ onClick: () => void }>();
+ *
+ * return <MemoizedChild onClick={stable("onClick", () => doSomething(latestState))} />;
+ * ```
+ *
+ * ### 2. Stable objects with custom equality
+ * ```tsx
+ * const stable = useStable<{ config: Config }>();
+ *
+ * const config = stable("config", { endpoint, headers }, "shallow");
+ * // Returns cached config if shallowly equal
+ * ```
+ *
+ * ### 3. Multiple values at once
+ * ```tsx
+ * const stable = useStable<{ handlers: Handlers }>();
+ *
+ * const { onClick, onHover } = stable({
+ *   onClick: () => handleClick(),
+ *   onHover: () => handleHover(),
  * });
- * return <MemoizedChild {...handlers} />; // Won't re-render unnecessarily
- * ```
- *
- * ### 2. Effect dependencies
- * Avoid infinite loops or unnecessary effect runs:
- * ```tsx
- * const config = useStable({ endpoint, headers, timeout });
- * useEffect(() => {
- *   fetchData(config); // Effect won't re-run if config values are the same
- * }, [config]); // Safe to use as dependency
- * ```
- *
- * ### 3. Memo dependencies
- * Stable references for `useMemo`/`useCallback` dependencies:
- * ```tsx
- * const filters = useStable({ search, sort, page });
- * const results = useMemo(() => {
- *   return processData(data, filters);
- * }, [data, filters]); // Won't recompute if filters are shallowly equal
  * ```
  *
  * ## How it works
  *
- * Creates a Proxy that wraps the input object. Property access returns:
- *
- * | Type | Behavior |
- * |------|----------|
- * | **Functions** | Stable wrapper that delegates to latest implementation |
- * | **Arrays** | Cached if shallowly equal (same elements) |
- * | **Objects** | Cached if shallowly equal (same keys/values) |
- * | **Dates** | Cached if same timestamp |
- * | **Sets** | Cached if same size and elements |
- * | **Maps** | Cached if same size and key-value pairs |
- * | **Primitives** | Returned directly (no caching needed) |
- *
- * ## Full Example
- *
- * ```tsx
- * function Parent() {
- *   const [count, setCount] = useState(0);
- *
- *   // Without useStable: callbacks object is recreated every render
- *   // causing Child to re-render even with React.memo
- *   const callbacks = useStable({
- *     increment: () => setCount(c => c + 1),
- *     decrement: () => setCount(c => c - 1),
- *     items: [1, 2, 3], // Also stabilized
- *   });
- *
- *   return <MemoizedChild callbacks={callbacks} />;
- * }
- * ```
- *
- * ## Why not useCallback?
- *
- * - `useCallback` requires listing all dependencies manually
- * - Multiple callbacks need multiple `useCallback` calls
- * - `useStable` automatically handles any number of functions/objects
- * - Functions always have access to the latest closure values
+ * | Input Type | Behavior |
+ * |------------|----------|
+ * | **Functions** | Wrapped in stable function that delegates to latest implementation |
+ * | **Objects/Arrays** | Cached and returned if equal (based on equality strategy) |
+ * | **Primitives** | Returned directly (always equal by reference) |
  *
  * @module useStable
  */
 
 import { useState } from "react";
-import { shallowEquals } from "../utils/shallowEquals";
+import { EqualsFn } from "../types";
+import { EqualsStrategy, resolveEquals } from "../utils/resolveEquals";
 
 /**
- * Options for useStable hook.
+ * Type for the stable getter function returned by useStable.
+ *
+ * Has two overloads:
+ * 1. Single key-value: `stable("key", value, equals?)`
+ * 2. Partial object: `stable({ key1: value1, key2: value2 }, equals?)`
  */
-export type UseStableOptions = {
+export type StableGet<TStable extends Record<string, unknown>> = {
   /**
-   * Custom equality function for comparing values.
-   * Defaults to Object.is for element comparison within shallowEquals.
+   * Get a stable reference for a single key-value pair.
+   *
+   * @param key - The key to cache the value under
+   * @param current - The current value
+   * @param equals - Optional equality strategy for comparison
+   * @returns Stable reference to the value
+   *
+   * @example
+   * ```tsx
+   * const handler = stable("onClick", () => doSomething());
+   * const config = stable("config", { theme: "dark" }, "shallow");
+   * ```
    */
-  equals?: (a: unknown, b: unknown) => boolean;
+  <K extends keyof TStable>(
+    key: K,
+    current: TStable[K],
+    equals?: EqualsStrategy | EqualsFn<TStable[K]>
+  ): TStable[K];
+
+  /**
+   * Get stable references for multiple key-value pairs at once.
+   *
+   * @param partial - Object containing key-value pairs to stabilize
+   * @param equals - Optional equality strategy for comparison
+   * @returns Object with stable references
+   *
+   * @example
+   * ```tsx
+   * const { onClick, onHover } = stable({
+   *   onClick: () => handleClick(),
+   *   onHover: () => handleHover(),
+   * });
+   * ```
+   */
+  <TPartial extends Partial<TStable>>(
+    partial: TPartial,
+    equals?: EqualsStrategy | EqualsFn<TPartial[keyof TPartial]>
+  ): TPartial;
 };
 
 /**
- * The result type of useStable - preserves the shape but ensures functions
- * have stable references.
- */
-export type UseStableResult<T extends object> = {
-  [K in keyof T]: T[K] extends (...args: any[]) => any
-    ? (...args: Parameters<T[K]>) => ReturnType<T[K]>
-    : T[K];
-};
-
-/**
- * Creates a stable reference proxy for an object.
+ * Creates a dynamic stable getter for values in React components.
  *
- * - Functions are wrapped in stable references that delegate to the latest implementation
- * - Objects and arrays are cached and returned if shallowly equal
- * - Dates are compared by timestamp
- * - Primitives are returned directly
- *
- * @param value - The object to stabilize
- * @param options - Optional configuration
- * @returns A proxy with stable references
+ * @template TStable - Record type defining the shape of stable values
+ * @returns A getter function for creating stable references
  *
  * @example
  * ```tsx
- * const handlers = useStable({
- *   onClick: () => console.log('clicked'),
- *   onHover: () => console.log('hovered'),
- *   config: { theme: 'dark' },
- * });
+ * // With type definition
+ * const stable = useStable<{
+ *   onClick: () => void;
+ *   config: { theme: string };
+ * }>();
  *
- * // handlers.onClick is always the same reference
- * // handlers.config is cached if shallowly equal
+ * // Single value
+ * const onClick = stable("onClick", () => console.log("clicked"));
+ *
+ * // With custom equality
+ * const config = stable("config", { theme: "dark" }, "shallow");
+ *
+ * // Multiple values
+ * const handlers = stable({
+ *   onSubmit: () => submitForm(),
+ *   onCancel: () => cancelForm(),
+ * });
  * ```
  */
-export function useStable<T extends object>(
-  value: T,
-  options: UseStableOptions = {}
-): UseStableResult<T> {
-  // Controller is created once and persists across renders
-  const [controller] = useState(() => new UseStableController(value, options));
-
-  // Update the controller with latest values on each render
-  controller.onRender(value, options);
-
-  return controller.proxy;
+export function useStable<
+  TStable extends Record<string, unknown> = Record<string, unknown>
+>(): StableGet<TStable> {
+  // Controller persists across renders, manages cache
+  const [controller] = useState(() => new StableController<TStable>());
+  return controller.get;
 }
 
 /**
- * Internal controller class that manages the proxy and cache.
- *
- * Separated from the hook to allow direct usage in non-React contexts
- * or for testing purposes.
+ * Internal controller that manages the stable value cache.
  */
-export class UseStableController<T extends object> {
-  /** Current value being proxied */
-  value: T;
-  /** Current options */
-  options: UseStableOptions;
-  /** The stable proxy object */
-  proxy: UseStableResult<T>;
+class StableController<TStable extends Record<string, unknown>> {
+  /**
+   * Cache for stable values, keyed by string key.
+   * Functions are stored as { fn: latestFn, stable: stableWrapper }
+   */
+  private cache = new Map<
+    string,
+    { value: unknown; stableWrapper?: (...args: unknown[]) => unknown }
+  >();
 
-  constructor(value: T, options: UseStableOptions = {}) {
-    // Cache stores stable references for functions and objects
-    const cache = new Map<keyof T, unknown>();
+  /**
+   * The stable getter function exposed to consumers.
+   */
+  get: StableGet<TStable>;
 
-    this.value = value;
-    this.options = options;
+  constructor() {
+    // Bind the getter to this instance
+    this.get = ((
+      keyOrPartial: string | Partial<TStable>,
+      currentOrEquals?: unknown,
+      equalsForKey?: EqualsStrategy | EqualsFn<unknown>
+    ): unknown => {
+      // Overload 2: Partial object
+      if (typeof keyOrPartial === "object" && keyOrPartial !== null) {
+        const partial = keyOrPartial as Partial<TStable>;
+        const equals = currentOrEquals as
+          | EqualsStrategy
+          | EqualsFn<unknown>
+          | undefined;
 
-    this.proxy = new Proxy(this.value, {
-      /**
-       * Intercept property access to return stable references.
-       */
-      get: (_target, prop) => {
-        const key = prop as keyof T;
-        const current = this.value[key];
-        let cachedValue = cache.get(key);
-
-        // Functions: Return stable wrapper that delegates to latest implementation
-        if (typeof current === "function") {
-          if (typeof cachedValue !== "function") {
-            // Create a stable wrapper function
-            cachedValue = (...args: any[]) => {
-              // Always call the LATEST function from this.value
-              return (this.value[key] as Function).call(this.value, ...args);
-            };
-            cache.set(key, cachedValue);
-          }
-          return cachedValue;
+        const result: Record<string, unknown> = {};
+        for (const key of Object.keys(partial)) {
+          result[key] = this.getStableValue(
+            key,
+            partial[key as keyof TStable],
+            equals
+          );
         }
+        return result;
+      }
 
-        // Objects (including Date)
-        if (current && typeof current === "object") {
-          // Arrays: Return cached if shallowly equal
-          if (Array.isArray(current)) {
-            if (
-              Array.isArray(cachedValue) &&
-              shallowEquals(current, cachedValue, this.options.equals)
-            ) {
-              return cachedValue;
-            }
-            cache.set(key, current);
-            return current;
-          }
-
-          // Dates: Compare by timestamp
-          if (current instanceof Date) {
-            if (
-              cachedValue instanceof Date &&
-              cachedValue.getTime() === current.getTime()
-            ) {
-              return cachedValue;
-            }
-            cache.set(key, current);
-            return current;
-          }
-
-          // Sets: Compare by size and element membership
-          if (current instanceof Set) {
-            if (
-              cachedValue instanceof Set &&
-              current.size === cachedValue.size &&
-              [...current].every((v) => cachedValue.has(v))
-            ) {
-              return cachedValue;
-            }
-            cache.set(key, current);
-            return current;
-          }
-
-          // Maps: Compare by size and key-value pairs
-          if (current instanceof Map) {
-            if (
-              cachedValue instanceof Map &&
-              current.size === cachedValue.size &&
-              [...current].every(
-                ([k, v]) =>
-                  cachedValue.has(k) && Object.is(cachedValue.get(k), v)
-              )
-            ) {
-              return cachedValue;
-            }
-            cache.set(key, current);
-            return current;
-          }
-
-          // Other objects: Return cached if shallowly equal
-          if (
-            cachedValue &&
-            shallowEquals(current, cachedValue, this.options.equals)
-          ) {
-            return cachedValue;
-          }
-          cache.set(key, current);
-          return current;
-        }
-
-        // Primitives: Return directly (no caching needed)
-        return current;
-      },
-
-      /**
-       * Enable Object.keys(), Object.entries(), Object.getOwnPropertyNames(), for...in, etc.
-       * Returns keys from the current value (not the original target).
-       */
-      ownKeys: () => Reflect.ownKeys(this.value),
-
-      /**
-       * Required for ownKeys to work properly with Object.keys().
-       * Returns property descriptors from the current value.
-       */
-      getOwnPropertyDescriptor: (_target, prop) =>
-        Reflect.getOwnPropertyDescriptor(this.value, prop),
-
-      /**
-       * Enable 'key' in proxy checks.
-       * Checks against the current value.
-       */
-      has: (_target, prop) => Reflect.has(this.value, prop),
-    }) as UseStableResult<T>;
+      // Overload 1: Single key-value
+      const key = keyOrPartial as string;
+      const current = currentOrEquals;
+      return this.getStableValue(key, current, equalsForKey);
+    }) as StableGet<TStable>;
   }
 
   /**
-   * Called on every render to update the current value and options.
-   * The proxy will use these new values for subsequent property accesses.
+   * Get or create a stable reference for a value.
    */
-  onRender(value: T, options: UseStableOptions) {
-    this.value = value;
-    this.options = options;
+  private getStableValue(
+    key: string,
+    current: unknown,
+    equals?: EqualsStrategy | EqualsFn<unknown>
+  ): unknown {
+    const cached = this.cache.get(key);
+
+    // Functions: Return stable wrapper that delegates to latest implementation
+    if (typeof current === "function") {
+      if (cached?.stableWrapper) {
+        // Update the cached function reference for the stable wrapper to call
+        cached.value = current;
+        return cached.stableWrapper;
+      }
+
+      // Create new stable wrapper
+      const entry = {
+        value: current,
+        stableWrapper: (...args: unknown[]) => {
+          // Always call the LATEST function
+          return (entry.value as Function)(...args);
+        },
+      };
+      this.cache.set(key, entry);
+      return entry.stableWrapper;
+    }
+
+    // Non-functions: Compare with equality and return cached if equal
+    if (cached && !cached.stableWrapper) {
+      const equalsFn = resolveEquals(equals) ?? Object.is;
+      if (equalsFn(cached.value, current)) {
+        return cached.value;
+      }
+    }
+
+    // Cache and return new value
+    this.cache.set(key, { value: current });
+    return current;
   }
 }

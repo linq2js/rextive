@@ -36,7 +36,7 @@ const createMaybeErrorSignal = () => {
  * - Proper async signal error handling pattern
  */
 export const ErrorDemo = () => {
-  const { maybeError } = useScope(createMaybeErrorSignal);
+  const { maybeError } = useScope("errorDemo", createMaybeErrorSignal);
 
   return (
     <div className="error-demo">

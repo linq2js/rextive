@@ -17,7 +17,7 @@ function FormEditorContent() {
   const { formConfig } = useFormContext();
 
   // Focus on config options
-  const config = useScope(() => ({
+  const config = useScope("formEditorConfig", () => ({
     enableDescription: formConfig.pipe(focus("enableDescription")),
     enableEffectiveDate: formConfig.pipe(focus("enableEffectiveDate")),
     enableBudget: formConfig.pipe(focus("enableBudget")),
@@ -116,7 +116,7 @@ function FormEditorContent() {
 // Optional field components using focus
 function DescriptionField() {
   const { formData } = useFormContext();
-  const { description } = useScope(() => ({
+  const { description } = useScope("descriptionField", () => ({
     description: formData.pipe(focus("description", () => "hello world")),
   }));
 
@@ -136,7 +136,7 @@ function DescriptionField() {
 
 function EffectiveDateField() {
   const { formData } = useFormContext();
-  const { effectiveDate } = useScope(() => ({
+  const { effectiveDate } = useScope("effectiveDateField", () => ({
     effectiveDate: formData.pipe(focus("effectiveDate", () => "")),
   }));
 
@@ -155,7 +155,7 @@ function EffectiveDateField() {
 
 function BudgetField() {
   const { formData } = useFormContext();
-  const { budget } = useScope(() => ({
+  const { budget } = useScope("budgetField", () => ({
     budget: formData.pipe(focus("budget", () => 0)),
   }));
 

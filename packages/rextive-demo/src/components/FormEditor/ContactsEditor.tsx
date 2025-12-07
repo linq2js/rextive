@@ -14,7 +14,7 @@ const generateId = () =>
 export function ContactsEditor() {
   const { formData } = useFormContext();
 
-  const scope = useScope(() => {
+  const scope = useScope("contactsEditor", () => {
     const contacts = formData.pipe(focus("contacts"));
     return {
       contacts,
@@ -69,37 +69,34 @@ function ContactItem({ index, onRemove }: ContactItemProps) {
   const { formData } = useFormContext();
 
   // Array item components must watch by index to recreate scope when indices shift
-  const scope = useScope(
-    () => {
-      const firstName = formData.pipe(focus(`contacts.${index}.firstName`));
-      const lastName = formData.pipe(focus(`contacts.${index}.lastName`));
-      const email = formData.pipe(focus(`contacts.${index}.email`));
-      const phone = formData.pipe(focus(`contacts.${index}.phone`, () => ""));
-      const role = formData.pipe(focus(`contacts.${index}.role`, () => ""));
-      const addresses = formData.pipe(focus(`contacts.${index}.addresses`));
+  const scope = useScope(`contactItem:${index}`, () => {
+    const firstName = formData.pipe(focus(`contacts.${index}.firstName`));
+    const lastName = formData.pipe(focus(`contacts.${index}.lastName`));
+    const email = formData.pipe(focus(`contacts.${index}.email`));
+    const phone = formData.pipe(focus(`contacts.${index}.phone`, () => ""));
+    const role = formData.pipe(focus(`contacts.${index}.role`, () => ""));
+    const addresses = formData.pipe(focus(`contacts.${index}.addresses`));
 
-      return {
-        firstName,
-        lastName,
-        email,
-        phone,
-        role,
-        addresses,
-        addAddress() {
-          const newAddress: Address = {
-            id: generateId(),
-            street: "",
-            city: "",
-            country: "",
-          };
-          addresses.set((prev) => [...prev, newAddress]);
-        },
-        removeAddress: (addrIndex: number) =>
-          addresses.set((prev) => prev.filter((_, i) => i !== addrIndex)),
-      };
-    },
-    { watch: [index] }
-  );
+    return {
+      firstName,
+      lastName,
+      email,
+      phone,
+      role,
+      addresses,
+      addAddress() {
+        const newAddress: Address = {
+          id: generateId(),
+          street: "",
+          city: "",
+          country: "",
+        };
+        addresses.set((prev) => [...prev, newAddress]);
+      },
+      removeAddress: (addrIndex: number) =>
+        addresses.set((prev) => prev.filter((_, i) => i !== addrIndex)),
+    };
+  });
 
   return (
     <div className="contact-item">
@@ -214,24 +211,21 @@ function AddressItem({
   const { formData } = useFormContext();
 
   // Array item components must watch by index to recreate scope when indices shift
-  const scope = useScope(
-    () => {
-      const basePath = `contacts.${contactIndex}.addresses.${addressIndex}`;
-      return {
-        street: formData.pipe(focus(`${basePath}.street` as any)),
-        city: formData.pipe(focus(`${basePath}.city` as any)),
-        state: formData.pipe(focus(`${basePath}.state` as any, () => "")),
-        postalCode: formData.pipe(
-          focus(`${basePath}.postalCode` as any, () => "")
-        ),
-        country: formData.pipe(focus(`${basePath}.country` as any)),
-        isPrimary: formData.pipe(
-          focus(`${basePath}.isPrimary` as any, () => false)
-        ),
-      };
-    },
-    { watch: [contactIndex, addressIndex] }
-  );
+  const scope = useScope(`addressItem:${contactIndex}:${addressIndex}`, () => {
+    const basePath = `contacts.${contactIndex}.addresses.${addressIndex}`;
+    return {
+      street: formData.pipe(focus(`${basePath}.street` as any)),
+      city: formData.pipe(focus(`${basePath}.city` as any)),
+      state: formData.pipe(focus(`${basePath}.state` as any, () => "")),
+      postalCode: formData.pipe(
+        focus(`${basePath}.postalCode` as any, () => "")
+      ),
+      country: formData.pipe(focus(`${basePath}.country` as any)),
+      isPrimary: formData.pipe(
+        focus(`${basePath}.isPrimary` as any, () => false)
+      ),
+    };
+  });
 
   return (
     <div className="address-item">

@@ -222,8 +222,8 @@ export function DevToolsPanel(): React.ReactElement | null {
   const [expandedSignal, setExpandedSignal] = useState<string | null>(null);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [flashingSignals, setFlashingSignals] = useState<
-    Map<string, "change" | "create">
-  >(new Map());
+    Record<string, "change" | "create">
+  >({});
   const [flashingTabs, setFlashingTabs] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [editingSignal, setEditingSignal] = useState<string | null>(null);
@@ -969,13 +969,12 @@ export function DevToolsPanel(): React.ReactElement | null {
         const existingTimeout = flashTimeoutsRef.current.get(signalId);
         if (existingTimeout) clearTimeout(existingTimeout);
 
-        setFlashingSignals((prev) => new Map(prev).set(signalId, type));
+        setFlashingSignals((prev) => ({ ...prev, [signalId]: type }));
 
         const timeout = setTimeout(() => {
           setFlashingSignals((prev) => {
-            const next = new Map(prev);
-            next.delete(signalId);
-            return next;
+            const { [signalId]: _, ...rest } = prev;
+            return rest;
           });
           flashTimeoutsRef.current.delete(signalId);
         }, 600);
@@ -1315,7 +1314,7 @@ export function DevToolsPanel(): React.ReactElement | null {
 
           const isExpanded = expandedSignal === info.id;
           const isHovered = hoveredItem === `signal-${info.id}`;
-          const flashType = flashingSignals.get(info.id) || null;
+          const flashType = flashingSignals[info.id] ?? null;
           const hasError = !info.disposed && signalError !== undefined;
 
           // Build hover tooltip with full name, UID, and source location
@@ -4026,6 +4025,10 @@ export function DevToolsPanel(): React.ReactElement | null {
                         {/* Diff button */}
                         <button
                           style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            whiteSpace: "nowrap",
                             padding: "3px 8px",
                             fontSize: "10px",
                             backgroundColor:

@@ -1,7 +1,7 @@
 /**
  * Form store using rextive signals and provider pattern
  */
-import { signal, disposable } from "rextive";
+import { signal } from "rextive";
 import { provider } from "rextive/react";
 import type { Mutable } from "rextive";
 import {
@@ -33,7 +33,7 @@ export const [useFormContext, FormContextProvider] = provider({
       name: "formConfig",
     });
 
-    return disposable({
+    return {
       formData,
       formConfig,
       updateId(newId?: string) {
@@ -43,7 +43,7 @@ export const [useFormContext, FormContextProvider] = provider({
           formConfig.set(defaultFormConfig);
         }
       },
-    });
+    };
   },
   update: (context, value) => {
     context.updateId(value.id);

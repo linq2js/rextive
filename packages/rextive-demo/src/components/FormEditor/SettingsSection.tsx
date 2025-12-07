@@ -10,6 +10,7 @@ export function SettingsSection() {
 
   // Focus on nested settings properties
   const { enableNotifications, notificationEmail, visibility } = useScope(
+    "settingsSection",
     () => ({
       enableNotifications: formData.pipe(focus("settings.enableNotifications")),
       notificationEmail: formData.pipe(

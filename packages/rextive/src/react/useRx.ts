@@ -92,11 +92,15 @@ export function useRx<T>(fn: () => T): T {
     if (scope.singals.size === 0) return;
 
     const onCleanup = emitter();
-    const handleChange = () => {
-      setRerenderState({});
-    };
     for (const signal of scope.singals) {
-      onCleanup.on(signal.on(handleChange));
+      onCleanup.on(
+        signal.on(() => {
+          setRerenderState({
+            signalId: signal.uid,
+            signalName: signal.displayName,
+          });
+        })
+      );
     }
     return () => {
       onCleanup.emitAndClear();

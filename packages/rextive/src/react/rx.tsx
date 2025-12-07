@@ -1,4 +1,4 @@
-import React, { memo, ReactElement, ReactNode } from "react";
+import React, { createElement, memo, ReactElement, ReactNode } from "react";
 import { Signal, ResolveAwaitable } from "../types";
 import { useRx } from "./useRx";
 import { is } from "../is";
@@ -185,12 +185,13 @@ export function rx(...args: any[]): ReactElement {
     const signal = first as Signal<any>;
     const second = args[1];
 
-    // Overload 2: rx(signal, selector)
+    // Overload 2: rx(signal, selectorProp)
     if (typeof second === "string") {
       const selector = second;
       return <Rx fn={() => tryWait(signal())?.[selector]} />;
     }
 
+    // Overload 3: rx(signal, selectorFn)
     if (typeof second === "function") {
       const selector = second;
       return <Rx fn={() => selector(tryWait(signal()))} />;
@@ -213,26 +214,7 @@ export function rx(...args: any[]): ReactElement {
       typeof first === "object") &&
     typeof args[1] === "object"
   ) {
-    const Component = first;
-    const props = args[1] || {};
-    const signalProps: Record<string, Signal<any>> = {};
-    const normalProps: Record<string, any> = {};
-    for (const [key, value] of Object.entries(props)) {
-      if (is(value)) {
-        signalProps[key] = value;
-      } else {
-        normalProps[key] = value;
-      }
-    }
-
-    return (
-      <Rx
-        fn={() => {
-          const resolvedProps = { ...normalProps, ...wait(signalProps) };
-          return <Component {...resolvedProps} />;
-        }}
-      />
-    );
+    return createElement(RxComponentWithProps, { __comp: first, ...args[1] });
   }
 
   // Invalid arguments
@@ -246,6 +228,31 @@ function tryWait(value: unknown): any {
   if (!isPromiseLike(value)) return value;
   return wait(value);
 }
+
+const RxComponentWithProps = memo(function RxComponentWithProps(
+  props: Record<string, unknown>
+) {
+  const { __comp, ...rest } = props;
+  const Component = __comp as React.ComponentType<any>;
+  const signalProps: Record<string, Signal<any>> = {};
+  const normalProps: Record<string, any> = {};
+  for (const [key, value] of Object.entries(rest)) {
+    if (is(value)) {
+      signalProps[key] = value;
+    } else {
+      normalProps[key] = value;
+    }
+  }
+
+  return (
+    <Rx
+      fn={() => {
+        const resolvedProps = { ...normalProps, ...wait(signalProps) };
+        return <Component {...resolvedProps} />;
+      }}
+    />
+  );
+});
 
 /**
  * Internal component for rendering with automatic signal tracking.

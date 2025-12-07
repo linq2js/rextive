@@ -98,8 +98,10 @@ function createPokemonSearch() {
  * - Async signal with abortSignal for cancellation
  */
 export function PokemonSearch() {
-  const { pokemonName, notifier, pokemonProfile } =
-    useScope(createPokemonSearch);
+  const { pokemonName, notifier, pokemonProfile } = useScope(
+    "pokemonSearch",
+    createPokemonSearch
+  );
 
   return (
     <div className="pokemon-search">

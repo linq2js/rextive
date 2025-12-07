@@ -1,552 +1,440 @@
 import { describe, it, expect } from "vitest";
-import { UseStableController } from "./useStable";
-
-describe("UseStableController", () => {
-  describe("functions", () => {
-    it("should return stable function reference", () => {
-      const value1 = { onClick: () => "first" };
-      const controller = new UseStableController(value1);
-
-      const fn1 = controller.proxy.onClick;
-
-      // Update with new function
-      const value2 = { onClick: () => "second" };
-      controller.onRender(value2, {});
-
-      const fn2 = controller.proxy.onClick;
-
-      // Same reference
-      expect(fn1).toBe(fn2);
-    });
-
-    it("should call the latest function implementation", () => {
-      let callCount = 0;
-      const value1 = {
-        increment: () => {
-          callCount += 1;
-        },
-      };
-      const controller = new UseStableController(value1);
-
-      controller.proxy.increment();
-      expect(callCount).toBe(1);
-
-      // Update with new implementation
-      const value2 = {
-        increment: () => {
-          callCount += 10;
-        },
-      };
-      controller.onRender(value2, {});
-
-      // Should call the NEW implementation
-      controller.proxy.increment();
-      expect(callCount).toBe(11);
-    });
-
-    it("should preserve function arguments and return value", () => {
-      const value = {
-        add: (a: number, b: number) => a + b,
-      };
-      const controller = new UseStableController(value);
-
-      expect(controller.proxy.add(2, 3)).toBe(5);
-    });
-
-    it("should bind this correctly for methods", () => {
-      const value = {
-        count: 10,
-        getCount() {
-          return this.count;
-        },
-      };
-      const controller = new UseStableController(value);
-
-      expect(controller.proxy.getCount()).toBe(10);
-
-      // Update count
-      controller.onRender({ count: 20, getCount: value.getCount }, {});
-      expect(controller.proxy.getCount()).toBe(20);
-    });
-  });
-
-  describe("arrays", () => {
-    it("should return cached array if shallowly equal", () => {
-      const value1 = { items: [1, 2, 3] };
-      const controller = new UseStableController(value1);
-
-      const arr1 = controller.proxy.items;
-
-      // Update with shallowly equal array
-      const value2 = { items: [1, 2, 3] };
-      controller.onRender(value2, {});
-
-      const arr2 = controller.proxy.items;
-
-      // Same reference (cached)
-      expect(arr1).toBe(arr2);
-    });
-
-    it("should return new array if not shallowly equal", () => {
-      const value1 = { items: [1, 2, 3] };
-      const controller = new UseStableController(value1);
-
-      const arr1 = controller.proxy.items;
-
-      // Update with different array
-      const value2 = { items: [1, 2, 4] };
-      controller.onRender(value2, {});
-
-      const arr2 = controller.proxy.items;
-
-      // Different reference
-      expect(arr1).not.toBe(arr2);
-      expect(arr2).toEqual([1, 2, 4]);
-    });
-
-    it("should detect array length changes", () => {
-      const value1 = { items: [1, 2, 3] };
-      const controller = new UseStableController(value1);
-
-      const arr1 = controller.proxy.items;
-
-      // Update with different length
-      const value2 = { items: [1, 2] };
-      controller.onRender(value2, {});
-
-      const arr2 = controller.proxy.items;
-
-      expect(arr1).not.toBe(arr2);
-    });
-  });
-
-  describe("objects", () => {
-    it("should return cached object if shallowly equal", () => {
-      const value1 = { config: { theme: "dark", size: 12 } };
-      const controller = new UseStableController(value1);
-
-      const obj1 = controller.proxy.config;
-
-      // Update with shallowly equal object
-      const value2 = { config: { theme: "dark", size: 12 } };
-      controller.onRender(value2, {});
-
-      const obj2 = controller.proxy.config;
-
-      // Same reference (cached)
-      expect(obj1).toBe(obj2);
-    });
-
-    it("should return new object if not shallowly equal", () => {
-      const value1 = { config: { theme: "dark" } };
-      const controller = new UseStableController(value1);
-
-      const obj1 = controller.proxy.config;
-
-      // Update with different object
-      const value2 = { config: { theme: "light" } };
-      controller.onRender(value2, {});
-
-      const obj2 = controller.proxy.config;
-
-      expect(obj1).not.toBe(obj2);
-      expect(obj2).toEqual({ theme: "light" });
-    });
-
-    it("should detect object key changes", () => {
-      const value1 = { config: { a: 1 } };
-      const controller = new UseStableController(value1);
-
-      const obj1 = controller.proxy.config;
-
-      // Update with different keys
-      const value2 = { config: { a: 1, b: 2 } };
-      controller.onRender(value2, {});
-
-      const obj2 = controller.proxy.config;
-
-      expect(obj1).not.toBe(obj2);
-    });
-  });
-
-  describe("dates", () => {
-    it("should return cached Date if same timestamp", () => {
-      const date1 = new Date("2024-01-01");
-      const value1 = { date: date1 };
-      const controller = new UseStableController(value1);
-
-      const d1 = controller.proxy.date;
-
-      // Update with same timestamp
-      const date2 = new Date("2024-01-01");
-      const value2 = { date: date2 };
-      controller.onRender(value2, {});
-
-      const d2 = controller.proxy.date;
-
-      // Same reference (cached)
-      expect(d1).toBe(d2);
-    });
-
-    it("should return new Date if different timestamp", () => {
-      const value1 = { date: new Date("2024-01-01") };
-      const controller = new UseStableController(value1);
-
-      const d1 = controller.proxy.date;
-
-      // Update with different timestamp
-      const value2 = { date: new Date("2024-06-15") };
-      controller.onRender(value2, {});
-
-      const d2 = controller.proxy.date;
-
-      expect(d1).not.toBe(d2);
-      expect(d2.toISOString()).toBe(new Date("2024-06-15").toISOString());
-    });
-  });
-
-  describe("sets", () => {
-    it("should return cached Set if same elements", () => {
-      const value1 = { ids: new Set([1, 2, 3]) };
-      const controller = new UseStableController(value1);
-
-      const set1 = controller.proxy.ids;
-
-      // Update with same elements (different reference)
-      const value2 = { ids: new Set([1, 2, 3]) };
-      controller.onRender(value2, {});
-
-      const set2 = controller.proxy.ids;
-
-      // Same reference (cached)
-      expect(set1).toBe(set2);
-    });
-
-    it("should return new Set if different elements", () => {
-      const value1 = { ids: new Set([1, 2, 3]) };
-      const controller = new UseStableController(value1);
-
-      const set1 = controller.proxy.ids;
-
-      // Update with different elements
-      const value2 = { ids: new Set([1, 2, 4]) };
-      controller.onRender(value2, {});
-
-      const set2 = controller.proxy.ids;
-
-      expect(set1).not.toBe(set2);
-      expect(set2).toEqual(new Set([1, 2, 4]));
-    });
-
-    it("should detect Set size changes", () => {
-      const value1 = { ids: new Set([1, 2, 3]) };
-      const controller = new UseStableController(value1);
-
-      const set1 = controller.proxy.ids;
-
-      // Update with different size
-      const value2 = { ids: new Set([1, 2]) };
-      controller.onRender(value2, {});
-
-      const set2 = controller.proxy.ids;
-
-      expect(set1).not.toBe(set2);
-    });
-
-    it("should handle Set with object elements (by reference)", () => {
-      const obj = { id: 1 };
-      const value1 = { items: new Set([obj]) };
-      const controller = new UseStableController(value1);
-
-      const set1 = controller.proxy.items;
-
-      // Same object reference in Set
-      const value2 = { items: new Set([obj]) };
-      controller.onRender(value2, {});
-
-      const set2 = controller.proxy.items;
-
-      // Same reference because Set.has uses reference equality
-      expect(set1).toBe(set2);
-    });
-
-    it("should detect different object references in Set", () => {
-      const value1 = { items: new Set([{ id: 1 }]) };
-      const controller = new UseStableController(value1);
-
-      const set1 = controller.proxy.items;
-
-      // Different object reference (even if equal content)
-      const value2 = { items: new Set([{ id: 1 }]) };
-      controller.onRender(value2, {});
-
-      const set2 = controller.proxy.items;
-
-      // Different because Set.has uses reference equality
-      expect(set1).not.toBe(set2);
-    });
-  });
-
-  describe("maps", () => {
-    it("should return cached Map if same key-value pairs", () => {
-      const value1 = {
-        data: new Map([
-          ["a", 1],
-          ["b", 2],
-        ]),
-      };
-      const controller = new UseStableController(value1);
-
-      const map1 = controller.proxy.data;
-
-      // Update with same key-value pairs (different reference)
-      const value2 = {
-        data: new Map([
-          ["a", 1],
-          ["b", 2],
-        ]),
-      };
-      controller.onRender(value2, {});
-
-      const map2 = controller.proxy.data;
-
-      // Same reference (cached)
-      expect(map1).toBe(map2);
-    });
-
-    it("should return new Map if different values", () => {
-      const value1 = { data: new Map([["a", 1]]) };
-      const controller = new UseStableController(value1);
-
-      const map1 = controller.proxy.data;
-
-      // Update with different value
-      const value2 = { data: new Map([["a", 2]]) };
-      controller.onRender(value2, {});
-
-      const map2 = controller.proxy.data;
-
-      expect(map1).not.toBe(map2);
-      expect(map2.get("a")).toBe(2);
-    });
-
-    it("should return new Map if different keys", () => {
-      const value1 = { data: new Map([["a", 1]]) };
-      const controller = new UseStableController(value1);
-
-      const map1 = controller.proxy.data;
-
-      // Update with different key
-      const value2 = { data: new Map([["b", 1]]) };
-      controller.onRender(value2, {});
-
-      const map2 = controller.proxy.data;
-
-      expect(map1).not.toBe(map2);
-    });
-
-    it("should detect Map size changes", () => {
-      const value1 = {
-        data: new Map([
-          ["a", 1],
-          ["b", 2],
-        ]),
-      };
-      const controller = new UseStableController(value1);
-
-      const map1 = controller.proxy.data;
-
-      // Update with different size
-      const value2 = { data: new Map([["a", 1]]) };
-      controller.onRender(value2, {});
-
-      const map2 = controller.proxy.data;
-
-      expect(map1).not.toBe(map2);
-    });
-
-    it("should handle Map with object keys (by reference)", () => {
-      const key = { id: 1 };
-      const value1 = { data: new Map([[key, "value"]]) };
-      const controller = new UseStableController(value1);
-
-      const map1 = controller.proxy.data;
-
-      // Same object key reference
-      const value2 = { data: new Map([[key, "value"]]) };
-      controller.onRender(value2, {});
-
-      const map2 = controller.proxy.data;
-
-      // Same reference because Map.has uses reference equality for keys
-      expect(map1).toBe(map2);
-    });
-
-    it("should use Object.is for value comparison", () => {
-      const value1 = { data: new Map([["a", NaN]]) };
-      const controller = new UseStableController(value1);
-
-      const map1 = controller.proxy.data;
-
-      // NaN === NaN is false, but Object.is(NaN, NaN) is true
-      const value2 = { data: new Map([["a", NaN]]) };
-      controller.onRender(value2, {});
-
-      const map2 = controller.proxy.data;
-
-      // Same reference because Object.is handles NaN correctly
-      expect(map1).toBe(map2);
-    });
-  });
-
-  describe("primitives", () => {
-    it("should return primitives directly", () => {
-      const value = {
-        count: 42,
-        name: "test",
-        active: true,
-        empty: null,
-        missing: undefined,
-      };
-      const controller = new UseStableController(value);
-
-      expect(controller.proxy.count).toBe(42);
-      expect(controller.proxy.name).toBe("test");
-      expect(controller.proxy.active).toBe(true);
-      expect(controller.proxy.empty).toBe(null);
-      expect(controller.proxy.missing).toBe(undefined);
-    });
-
-    it("should reflect updated primitive values", () => {
-      const value1 = { count: 1 };
-      const controller = new UseStableController(value1);
-
-      expect(controller.proxy.count).toBe(1);
-
-      controller.onRender({ count: 2 }, {});
-      expect(controller.proxy.count).toBe(2);
-    });
-  });
-
-  describe("custom equals", () => {
-    it("should use custom equals function", () => {
-      const value1 = { items: [1.001, 2.002] };
-      const controller = new UseStableController(value1, {
-        // Consider numbers equal if difference < 0.01
-        equals: (a, b) =>
-          typeof a === "number" && typeof b === "number"
-            ? Math.abs(a - b) < 0.01
-            : Object.is(a, b),
+import { renderHook } from "@testing-library/react";
+import { useStable } from "./useStable";
+
+describe("useStable", () => {
+  describe("single key-value (overload 1)", () => {
+    describe("functions", () => {
+      it("should return stable function reference", () => {
+        const { result, rerender } = renderHook(() => {
+          const stable = useStable<{ onClick: () => string }>();
+          return {
+            stable,
+            fn: stable("onClick", () => "first"),
+          };
+        });
+
+        const fn1 = result.current.fn;
+
+        // Rerender with new function
+        rerender();
+        const fn2 = result.current.stable("onClick", () => "second");
+
+        // Same reference
+        expect(fn1).toBe(fn2);
       });
 
-      const arr1 = controller.proxy.items;
+      it("should call the latest function implementation", () => {
+        let callCount = 0;
 
-      // Update with slightly different numbers
-      const value2 = { items: [1.005, 2.008] };
-      controller.onRender(value2, {
-        equals: (a, b) =>
-          typeof a === "number" && typeof b === "number"
-            ? Math.abs(a - b) < 0.01
-            : Object.is(a, b),
+        const { result, rerender } = renderHook(
+          ({ increment }) => {
+            const stable = useStable<{ increment: () => void }>();
+            return stable("increment", increment);
+          },
+          {
+            initialProps: {
+              increment: () => {
+                callCount += 1;
+              },
+            },
+          }
+        );
+
+        result.current();
+        expect(callCount).toBe(1);
+
+        // Update with new implementation
+        rerender({
+          increment: () => {
+            callCount += 10;
+          },
+        });
+
+        // Should call the NEW implementation
+        result.current();
+        expect(callCount).toBe(11);
       });
 
-      const arr2 = controller.proxy.items;
+      it("should preserve function arguments and return value", () => {
+        const { result } = renderHook(() => {
+          const stable = useStable<{ add: (a: number, b: number) => number }>();
+          return stable("add", (a: number, b: number) => a + b);
+        });
 
-      // Same reference because custom equals considers them equal
-      expect(arr1).toBe(arr2);
+        expect(result.current(2, 3)).toBe(5);
+      });
+    });
+
+    describe("objects", () => {
+      it("should return cached object if equal (default Object.is)", () => {
+        const obj = { theme: "dark" };
+        const { result, rerender } = renderHook(
+          ({ config }) => {
+            const stable = useStable<{ config: typeof config }>();
+            return stable("config", config);
+          },
+          { initialProps: { config: obj } }
+        );
+
+        const obj1 = result.current;
+
+        // Same reference - should return cached
+        rerender({ config: obj });
+        const obj2 = result.current;
+
+        expect(obj1).toBe(obj2);
+      });
+
+      it("should return new object if not equal (default Object.is)", () => {
+        const { result, rerender } = renderHook(
+          ({ config }) => {
+            const stable = useStable<{ config: { theme: string } }>();
+            return stable("config", config);
+          },
+          { initialProps: { config: { theme: "dark" } } }
+        );
+
+        const obj1 = result.current;
+
+        // New reference - should update
+        rerender({ config: { theme: "dark" } }); // Different reference even if same content
+        const obj2 = result.current;
+
+        expect(obj1).not.toBe(obj2);
+      });
+
+      it("should return cached object with shallow equality", () => {
+        const { result, rerender } = renderHook(
+          ({ config }) => {
+            const stable = useStable<{ config: { theme: string } }>();
+            return stable("config", config, "shallow");
+          },
+          { initialProps: { config: { theme: "dark" } } }
+        );
+
+        const obj1 = result.current;
+
+        // New reference but shallowly equal
+        rerender({ config: { theme: "dark" } });
+        const obj2 = result.current;
+
+        expect(obj1).toBe(obj2); // Cached because shallow equal
+      });
+
+      it("should return new object with shallow equality when different", () => {
+        const { result, rerender } = renderHook(
+          ({ config }) => {
+            const stable = useStable<{ config: { theme: string } }>();
+            return stable("config", config, "shallow");
+          },
+          { initialProps: { config: { theme: "dark" } } }
+        );
+
+        const obj1 = result.current;
+
+        // Different content
+        rerender({ config: { theme: "light" } });
+        const obj2 = result.current;
+
+        expect(obj1).not.toBe(obj2);
+        expect(obj2).toEqual({ theme: "light" });
+      });
+    });
+
+    describe("arrays", () => {
+      it("should return cached array with shallow equality", () => {
+        const { result, rerender } = renderHook(
+          ({ items }) => {
+            const stable = useStable<{ items: number[] }>();
+            return stable("items", items, "shallow");
+          },
+          { initialProps: { items: [1, 2, 3] } }
+        );
+
+        const arr1 = result.current;
+
+        // New reference but shallowly equal
+        rerender({ items: [1, 2, 3] });
+        const arr2 = result.current;
+
+        expect(arr1).toBe(arr2);
+      });
+
+      it("should return new array when different", () => {
+        const { result, rerender } = renderHook(
+          ({ items }) => {
+            const stable = useStable<{ items: number[] }>();
+            return stable("items", items, "shallow");
+          },
+          { initialProps: { items: [1, 2, 3] } }
+        );
+
+        const arr1 = result.current;
+
+        rerender({ items: [1, 2, 4] });
+        const arr2 = result.current;
+
+        expect(arr1).not.toBe(arr2);
+        expect(arr2).toEqual([1, 2, 4]);
+      });
+    });
+
+    describe("primitives", () => {
+      it("should return primitives directly", () => {
+        const { result } = renderHook(() => {
+          const stable = useStable<{
+            count: number;
+            name: string;
+            active: boolean;
+          }>();
+          return {
+            count: stable("count", 42),
+            name: stable("name", "test"),
+            active: stable("active", true),
+          };
+        });
+
+        expect(result.current.count).toBe(42);
+        expect(result.current.name).toBe("test");
+        expect(result.current.active).toBe(true);
+      });
+
+      it("should return cached primitive with strict equality", () => {
+        const { result, rerender } = renderHook(
+          ({ count }) => {
+            const stable = useStable<{ count: number }>();
+            return stable("count", count);
+          },
+          { initialProps: { count: 42 } }
+        );
+
+        const val1 = result.current;
+
+        rerender({ count: 42 });
+        const val2 = result.current;
+
+        // Primitives use Object.is by default
+        expect(val1).toBe(val2);
+      });
+    });
+
+    describe("custom equality", () => {
+      it("should use custom equals function", () => {
+        const { result, rerender } = renderHook(
+          ({ items }) => {
+            const stable = useStable<{ items: number[] }>();
+            // Custom equality: compare by length only
+            return stable("items", items, (a, b) => a.length === b.length);
+          },
+          { initialProps: { items: [1, 2, 3] } }
+        );
+
+        const arr1 = result.current;
+
+        // Different content but same length
+        rerender({ items: [4, 5, 6] });
+        const arr2 = result.current;
+
+        expect(arr1).toBe(arr2); // Cached because same length
+      });
     });
   });
 
-  describe("proxy traps", () => {
-    it("should support Object.keys()", () => {
-      const value = { a: 1, b: 2, c: 3 };
-      const controller = new UseStableController(value);
+  describe("partial object (overload 2)", () => {
+    it("should stabilize multiple values at once", () => {
+      const { result, rerender } = renderHook(() => {
+        const stable = useStable<{
+          onClick: () => void;
+          onHover: () => void;
+        }>();
+        return stable({
+          onClick: () => console.log("click"),
+          onHover: () => console.log("hover"),
+        });
+      });
 
-      expect(Object.keys(controller.proxy)).toEqual(["a", "b", "c"]);
+      const handlers1 = result.current;
+      const onClick1 = handlers1.onClick;
+      const onHover1 = handlers1.onHover;
+
+      rerender();
+
+      const handlers2 = result.current;
+      const onClick2 = handlers2.onClick;
+      const onHover2 = handlers2.onHover;
+
+      // Functions should be stable
+      expect(onClick1).toBe(onClick2);
+      expect(onHover1).toBe(onHover2);
     });
 
-    it("should support Object.entries()", () => {
-      const value = { a: 1, b: 2 };
-      const controller = new UseStableController(value);
-
-      expect(Object.entries(controller.proxy)).toEqual([
-        ["a", 1],
-        ["b", 2],
-      ]);
-    });
-
-    it("should support 'in' operator", () => {
-      const value = { exists: true };
-      const controller = new UseStableController(value);
-
-      expect("exists" in controller.proxy).toBe(true);
-      expect("missing" in controller.proxy).toBe(false);
-    });
-
-    it("should reflect key changes after onRender", () => {
-      const value1 = { a: 1 };
-      const controller = new UseStableController(value1);
-
-      expect(Object.keys(controller.proxy)).toEqual(["a"]);
-
-      // @ts-expect-error - b is not in the value
-      controller.onRender({ a: 1, b: 2 }, {});
-      expect(Object.keys(controller.proxy)).toEqual(["a", "b"]);
-    });
-
-    it("should support for...in loop", () => {
-      const value = { x: 1, y: 2 };
-      const controller = new UseStableController(value);
-
-      const keys: string[] = [];
-      for (const key in controller.proxy) {
-        keys.push(key);
-      }
-
-      expect(keys).toEqual(["x", "y"]);
-    });
-  });
-
-  describe("mixed scenarios", () => {
-    it("should handle object with multiple property types", () => {
-      const value = {
-        name: "test",
-        count: 42,
-        items: [1, 2, 3],
-        config: { theme: "dark" },
-        onClick: () => "clicked",
-        date: new Date("2024-01-01"),
-      };
-      const controller = new UseStableController(value);
-
-      // Access all properties
-      const fn = controller.proxy.onClick;
-      const arr = controller.proxy.items;
-      const obj = controller.proxy.config;
-      const date = controller.proxy.date;
-
-      // Update with same values (different references)
-      controller.onRender(
-        {
-          name: "test",
-          count: 42,
-          items: [1, 2, 3],
-          config: { theme: "dark" },
-          onClick: () => "new clicked",
-          date: new Date("2024-01-01"),
+    it("should stabilize objects with equality", () => {
+      const { result, rerender } = renderHook(
+        ({ config }) => {
+          const stable = useStable<{
+            config: { theme: string };
+            count: number;
+          }>();
+          return stable({ config, count: 42 }, "shallow");
         },
-        {}
+        { initialProps: { config: { theme: "dark" } } }
       );
 
-      // Functions, arrays, objects, dates should be cached
-      expect(controller.proxy.onClick).toBe(fn);
-      expect(controller.proxy.items).toBe(arr);
-      expect(controller.proxy.config).toBe(obj);
-      expect(controller.proxy.date).toBe(date);
+      const result1 = result.current;
 
-      // Primitives should reflect current value
-      expect(controller.proxy.name).toBe("test");
-      expect(controller.proxy.count).toBe(42);
+      // New reference but shallowly equal
+      rerender({ config: { theme: "dark" } });
+      const result2 = result.current;
+
+      expect(result1.config).toBe(result2.config);
+      expect(result1.count).toBe(result2.count);
+    });
+
+    it("should handle mixed types in partial", () => {
+      let clickCount = 0;
+
+      const { result, rerender } = renderHook(
+        ({ items }) => {
+          const stable = useStable<{
+            onClick: () => void;
+            items: number[];
+          }>();
+          return stable(
+            {
+              onClick: () => {
+                clickCount++;
+              },
+              items,
+            },
+            "shallow"
+          );
+        },
+        { initialProps: { items: [1, 2, 3] } }
+      );
+
+      const result1 = result.current;
+      result1.onClick();
+      expect(clickCount).toBe(1);
+
+      // Update items but same content
+      rerender({ items: [1, 2, 3] });
+      const result2 = result.current;
+
+      // Function should be stable
+      expect(result1.onClick).toBe(result2.onClick);
+      // Items should be cached (shallow equal)
+      expect(result1.items).toBe(result2.items);
+
+      // Function should still work with latest implementation
+      result2.onClick();
+      expect(clickCount).toBe(2);
+    });
+  });
+
+  describe("type safety", () => {
+    it("should infer correct types for single key", () => {
+      const { result } = renderHook(() => {
+        const stable = useStable<{
+          count: number;
+          name: string;
+          handler: (x: number) => string;
+        }>();
+
+        const count: number = stable("count", 42);
+        const name: string = stable("name", "test");
+        const handler: (x: number) => string = stable(
+          "handler",
+          (x) => `value: ${x}`
+        );
+
+        return { count, name, handler };
+      });
+
+      expect(result.current.count).toBe(42);
+      expect(result.current.name).toBe("test");
+      expect(result.current.handler(5)).toBe("value: 5");
+    });
+
+    it("should infer correct types for partial", () => {
+      const { result } = renderHook(() => {
+        const stable = useStable<{
+          a: number;
+          b: string;
+          c: boolean;
+        }>();
+
+        const partial = stable({ a: 1, b: "test" });
+
+        // TypeScript should know the shape
+        const a: number = partial.a;
+        const b: string = partial.b;
+
+        return { a, b };
+      });
+
+      expect(result.current.a).toBe(1);
+      expect(result.current.b).toBe("test");
+    });
+  });
+
+  describe("edge cases", () => {
+    it("should handle null and undefined values", () => {
+      const { result, rerender } = renderHook(
+        ({ value }) => {
+          const stable = useStable<{ value: string | null | undefined }>();
+          return stable("value", value);
+        },
+        { initialProps: { value: null as string | null | undefined } }
+      );
+
+      expect(result.current).toBe(null);
+
+      rerender({ value: undefined });
+      expect(result.current).toBe(undefined);
+
+      rerender({ value: "test" });
+      expect(result.current).toBe("test");
+    });
+
+    it("should handle deep equality for nested objects", () => {
+      const { result, rerender } = renderHook(
+        ({ config }) => {
+          const stable = useStable<{
+            config: { nested: { value: number } };
+          }>();
+          return stable("config", config, "deep");
+        },
+        { initialProps: { config: { nested: { value: 1 } } } }
+      );
+
+      const obj1 = result.current;
+
+      // Deeply equal but different references
+      rerender({ config: { nested: { value: 1 } } });
+      const obj2 = result.current;
+
+      expect(obj1).toBe(obj2); // Cached because deeply equal
+    });
+
+    it("should update when deep equality differs", () => {
+      const { result, rerender } = renderHook(
+        ({ config }) => {
+          const stable = useStable<{
+            config: { nested: { value: number } };
+          }>();
+          return stable("config", config, "deep");
+        },
+        { initialProps: { config: { nested: { value: 1 } } } }
+      );
+
+      const obj1 = result.current;
+
+      rerender({ config: { nested: { value: 2 } } });
+      const obj2 = result.current;
+
+      expect(obj1).not.toBe(obj2);
+      expect(obj2).toEqual({ nested: { value: 2 } });
     });
   });
 });

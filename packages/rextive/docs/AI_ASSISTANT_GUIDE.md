@@ -409,6 +409,61 @@ cancel(); // Stop all persistence
 start(); // Restart persistence
 ```
 
+### useStable
+
+Dynamic stable value getter for React components. Returns stable references for values across renders.
+
+```tsx
+import { useStable } from 'rextive/react';
+
+// Create a typed stable getter
+const stable = useStable<{
+  onClick: () => void;
+  config: { theme: string };
+}>();
+
+// Single key-value: stable(key, value, equals?)
+const onClick = stable("onClick", () => handleClick()); // Stable function reference
+const config = stable("config", { theme: "dark" }, "shallow"); // Cached if shallowly equal
+
+// Partial object: stable(partial, equals?)
+const handlers = stable({
+  onSubmit: () => submitForm(),
+  onCancel: () => cancelForm(),
+});
+```
+
+**Key behaviors:**
+- **Functions**: Wrapped in stable reference that always calls the latest implementation
+- **Objects/Arrays**: Cached if equal (based on equality strategy)
+- **Primitives**: Returned directly
+
+**Equality strategies:**
+- Default: `Object.is` (reference equality)
+- `"shallow"`: Shallow object/array comparison
+- `"deep"`: Deep comparison
+- Custom function: `(a, b) => boolean`
+
+**Use cases:**
+```tsx
+// 1. Stable callbacks for memoized children
+const onClick = stable("onClick", () => doSomething(latestState));
+return <MemoizedChild onClick={onClick} />;
+
+// 2. Stable objects for effect dependencies
+const config = stable("config", { endpoint, headers }, "shallow");
+useEffect(() => {
+  fetchData(config);
+}, [config]); // Won't re-run if config is shallowly equal
+
+// 3. Multiple handlers at once
+const { onSubmit, onCancel, onReset } = stable({
+  onSubmit: () => submit(),
+  onCancel: () => cancel(),
+  onReset: () => reset(),
+});
+```
+
 ## Best Practices
 
 ### 1. Explicit Dependencies
@@ -645,6 +700,7 @@ const scope = useScope(() => ({
 - **`signal.persist`**: For batch persistence of multiple signals
 - **`rx`**: For reactive rendering in components
 - **`useScope`**: For component-scoped signals with cleanup
+- **`useStable`**: For stable references to callbacks and objects
 - **`useAwaited`**: For Suspense integration (usually use `rx` instead)
 - **`useTask`**: For manual loading states (usually use `rx` instead)
 

@@ -19,6 +19,7 @@ export default defineConfig({
     },
   },
   resolve: {
+    dedupe: ["react", "react-dom"], // Ensure single React instance for wdyr
     alias: [
       // App alias
       {
