@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { alertLogic, type AlertType } from "@/logic/alertLogic";
 
@@ -71,7 +72,7 @@ const typeConfig: Record<
   },
 };
 
-export function AlertModal() {
+export const AlertModal = memo(function AlertModal() {
   const $alert = alertLogic();
 
   return rx(() => {
@@ -149,4 +150,4 @@ export function AlertModal() {
       </>
     );
   });
-}
+});

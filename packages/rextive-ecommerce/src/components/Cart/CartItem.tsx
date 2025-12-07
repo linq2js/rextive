@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { cartLogic } from "@/logic/cartLogic";
 import type { LocalCartItem } from "@/api/types";
 
@@ -5,7 +6,7 @@ interface CartItemProps {
   item: LocalCartItem;
 }
 
-export function CartItem({ item }: CartItemProps) {
+export const CartItem = memo(function CartItem({ item }: CartItemProps) {
   const { updateQuantity, removeItem } = cartLogic();
   const { product, quantity } = item;
 
@@ -78,7 +79,7 @@ export function CartItem({ item }: CartItemProps) {
       </button>
     </div>
   );
-}
+});
 
 interface QuantityControlsProps {
   quantity: number;

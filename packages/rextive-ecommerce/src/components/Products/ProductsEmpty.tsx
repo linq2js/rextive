@@ -1,4 +1,6 @@
-export function ProductsEmpty() {
+import { memo } from "react";
+
+export const ProductsEmpty = memo(function ProductsEmpty() {
   return (
     <div className="text-center py-16">
       <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-stone-100 dark:bg-slate-800 mb-4">
@@ -22,4 +24,4 @@ export function ProductsEmpty() {
       <p className="text-stone-500 dark:text-slate-400">Try adjusting your search or filters</p>
     </div>
   );
-}
+});

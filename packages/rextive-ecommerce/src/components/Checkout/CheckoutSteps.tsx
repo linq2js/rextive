@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { checkoutLogic, type CheckoutStep } from "@/logic/checkout";
 
@@ -7,7 +8,7 @@ const steps: { id: CheckoutStep; label: string }[] = [
   { id: "review", label: "Review" },
 ];
 
-export function CheckoutSteps() {
+export const CheckoutSteps = memo(function CheckoutSteps() {
   const { currentStep } = checkoutLogic();
 
   return rx(() => {
@@ -69,4 +70,4 @@ export function CheckoutSteps() {
       </div>
     );
   });
-}
+});

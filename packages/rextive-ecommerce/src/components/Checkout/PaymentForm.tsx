@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { paymentLogic, type PaymentMethod } from "@/logic/checkout";
 import { checkoutLogic } from "@/logic/checkout";
@@ -8,7 +9,7 @@ const paymentOptions: { id: PaymentMethod; label: string; icon: string }[] = [
   { id: "cod", label: "Cash on Delivery", icon: "💵" },
 ];
 
-export function PaymentForm() {
+export const PaymentForm = memo(function PaymentForm() {
   const $payment = paymentLogic();
   const { nextStep, prevStep } = checkoutLogic();
 
@@ -144,4 +145,4 @@ export function PaymentForm() {
       </div>
     );
   });
-}
+});

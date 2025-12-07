@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { ProductCard } from "./ProductCard";
 import type { Product } from "@/api/types";
 
@@ -11,7 +12,7 @@ interface ProductsListProps {
   };
 }
 
-export function ProductsList({ loading, value }: ProductsListProps) {
+export const ProductsList = memo(function ProductsList({ loading, value }: ProductsListProps) {
   return (
     <>
       {loading && <StaleIndicator />}
@@ -25,7 +26,7 @@ export function ProductsList({ loading, value }: ProductsListProps) {
       <ResultsInfo skip={value.skip} limit={value.limit} total={value.total} />
     </>
   );
-}
+});
 
 function StaleIndicator() {
   return (

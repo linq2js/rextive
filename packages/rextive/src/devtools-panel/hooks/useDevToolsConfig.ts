@@ -7,7 +7,7 @@ import type { PanelPosition } from "../styles";
 
 const STORAGE_KEY = "rextive-devtools-config";
 
-export type Tab = "signals" | "tags" | "events" | "chains" | "graph";
+export type Tab = "signals" | "tags" | "events" | "chains";
 
 interface DevToolsConfig {
   position: PanelPosition;

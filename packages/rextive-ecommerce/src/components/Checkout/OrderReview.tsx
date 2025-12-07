@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { shippingLogic, paymentLogic, orderLogic } from "@/logic/checkout";
 import { checkoutLogic } from "@/logic/checkout";
@@ -9,7 +10,7 @@ const formatCurrency = (amount: number) =>
     currency: "USD",
   }).format(amount);
 
-export function OrderReview() {
+export const OrderReview = memo(function OrderReview() {
   const $shipping = shippingLogic();
   const $payment = paymentLogic();
   const $order = orderLogic();
@@ -173,4 +174,4 @@ export function OrderReview() {
       </div>
     );
   });
-}
+});

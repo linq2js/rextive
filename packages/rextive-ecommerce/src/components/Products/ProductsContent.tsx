@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { productsLogic } from "@/logic/productsLogic";
 import { ProductsLoading } from "./ProductsLoading";
@@ -5,7 +6,7 @@ import { ProductsError } from "./ProductsError";
 import { ProductsEmpty } from "./ProductsEmpty";
 import { ProductsList } from "./ProductsList";
 
-export function ProductsContent() {
+export const ProductsContent = memo(function ProductsContent() {
   const { productsTask, refresh } = productsLogic();
 
   return rx(() => {
@@ -26,4 +27,4 @@ export function ProductsContent() {
 
     return <ProductsList loading={loading} value={value} />;
   });
-}
+});

@@ -23,51 +23,85 @@ This guide covers advanced patterns and techniques for power users who want to g
 
 React Context causes all consumers to re-render when any value changes. By combining signals with the `provider()` API, you get **surgical re-renders** - only components that access changed values update.
 
-### Creating a Signal-Based Context
+### Three Provider Modes
+
+#### Signal Mode (default)
+
+Wraps value in a mutable signal - simplest for reactive primitives:
+
+```tsx
+const [useTheme, ThemeProvider] = provider<"dark" | "light">({ name: "Theme" });
+
+// Provider
+<ThemeProvider value="dark"><App /></ThemeProvider>
+
+// Consumer
+const theme = useTheme();  // Mutable<"dark" | "light">
+rx(theme);                 // Reactive render
+theme.set("light");        // Update from anywhere
+```
+
+#### Raw Mode
+
+Passes value directly - perfect for logic instances:
+
+```tsx
+import { LogicType, useScope } from "rextive/react";
+import { productLogic } from "./logic/productLogic";
+
+type ProductInstance = LogicType<typeof productLogic>;
+
+const [useProduct, ProductProvider] = provider<ProductInstance>({
+  name: "Product",
+  raw: true  // Pass value directly, no signal wrapping
+});
+
+// Parent creates scope and provides it
+function ProductPage() {
+  const $product = useScope("product", productLogic);
+  return (
+    <ProductProvider value={$product}>
+      <ProductContent />
+    </ProductProvider>
+  );
+}
+
+// Children access the logic instance directly
+function ProductContent() {
+  const $product = useProduct();  // LogicType directly
+  return <div>{rx($product.quantity)}</div>;
+}
+```
+
+#### Factory Mode
+
+For complex contexts with custom initialization:
 
 ```tsx
 import { signal, rx, provider, disposable } from "rextive/react";
 
-// provider() returns a tuple: [useHook, Provider]
-// - name: identifies the context in DevTools
-// - create: factory function that receives the Provider's value prop
 const [useTheme, ThemeProvider] = provider({
   name: "Theme",
   create: (initial: "light" | "dark") => {
-    // Create reactive state
     const theme = signal(initial);
-
-    // Create actions that modify state
     const toggle = () => theme.set((t) => (t === "light" ? "dark" : "light"));
-
-    // disposable() ensures cleanup when provider unmounts
     return disposable({ theme, toggle });
   },
 });
 
-// Wrap your app (or part of it) with the Provider
-// The value prop is passed to the create() function
 function App() {
   return (
     <ThemeProvider value="dark">
       <Header />
-      <Content />
     </ThemeProvider>
   );
 }
 
-// Consumers get access to the signals and actions
 function Header() {
-  // useTheme() returns what create() returned
   const { theme, toggle } = useTheme();
-
   return (
     <header>
-      {/* Only this rx() block re-renders when theme changes */}
-      {/* The button outside rx() never re-renders */}
-      {rx(() => (
-        <span>Theme: {theme()}</span>
-      ))}
+      {rx(() => <span>Theme: {theme()}</span>)}
       <button onClick={toggle}>Toggle</button>
     </header>
   );
@@ -78,7 +112,6 @@ function Header() {
 
 ```tsx
 // ❌ Traditional Context: ALL consumers re-render when context changes
-// Even if a consumer only uses 'theme', it re-renders when 'user' changes
 const ThemeContext = createContext({ theme: "dark", user: null });
 
 function Consumer() {
@@ -87,7 +120,6 @@ function Consumer() {
 }
 
 // ✅ Rextive: Only rx() blocks that access changed signals re-render
-// If 'user' changes but 'theme' doesn't, this component stays untouched
 function Consumer() {
   const { theme } = useTheme();
   return rx(() => <div>{theme()}</div>); // Only re-renders when theme changes

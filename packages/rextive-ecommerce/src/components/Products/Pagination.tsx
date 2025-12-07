@@ -1,7 +1,8 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { productsLogic } from "@/logic/productsLogic";
 
-export function Pagination() {
+export const Pagination = memo(function Pagination() {
   // Get singleton products logic
   const { page, totalPages, setPage, prevPage, nextPage } = productsLogic();
 
@@ -117,4 +118,4 @@ export function Pagination() {
       </nav>
     );
   });
-}
+});

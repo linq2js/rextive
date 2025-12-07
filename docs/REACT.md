@@ -229,31 +229,63 @@ const scope = useScope("myScope", () => {
 
 ## `provider()` - Signal Context
 
-Create signal-based React Context with optimized rendering:
+Create type-safe React Context with three modes.
+
+### Mode 1: Signal Mode (default)
+
+Wraps value in a mutable signal. Perfect for reactive primitives:
 
 ```tsx
-const [useTheme, ThemeProvider] = provider({
-  name: "Theme",
-  create: (initialValue: "dark" | "light") => {
-    return signal(initialValue);
-  },
+const [useTheme, ThemeProvider] = provider<"dark" | "light">({
+  name: "Theme"
 });
 
-function App() {
-  return (
-    <ThemeProvider value="dark">
-      <ChildComponent />
-    </ThemeProvider>
-  );
-}
+// Provider
+<ThemeProvider value="dark"><App /></ThemeProvider>
 
+// Consumer - returns Mutable<"dark" | "light">
 function ChildComponent() {
   const theme = useTheme();
   return <div>Theme: {rx(theme)}</div>;
+  // theme.set("light") to update
 }
 ```
 
-### With Complex State
+### Mode 2: Raw Mode
+
+Passes value directly without wrapping. Perfect for logic instances:
+
+```tsx
+import { LogicType, useScope } from "rextive/react";
+import { productLogic } from "./logic/productLogic";
+
+type ProductInstance = LogicType<typeof productLogic>;
+
+const [useProduct, ProductProvider] = provider<ProductInstance>({
+  name: "Product",
+  raw: true  // Pass value directly
+});
+
+// Parent - create scope and provide
+function ProductPage() {
+  const $product = useScope("product", productLogic);
+  return (
+    <ProductProvider value={$product}>
+      <ProductContent />
+    </ProductProvider>
+  );
+}
+
+// Child - access logic instance directly
+function ProductContent() {
+  const $product = useProduct();  // LogicType directly
+  return <div>Qty: {rx($product.quantity)}</div>;
+}
+```
+
+### Mode 3: Factory Mode
+
+For complex contexts with custom initialization:
 
 ```tsx
 const [useSession, SessionProvider] = provider({
@@ -261,28 +293,30 @@ const [useSession, SessionProvider] = provider({
   create: (initialUser) => {
     const user = signal(initialUser);
     const isAuthenticated = user.to((u) => u !== null);
-
-    const login = async (credentials) => {
-      const userData = await api.login(credentials);
-      user.set(userData);
-    };
-
+    const login = async (creds) => user.set(await api.login(creds));
     const logout = () => user.set(null);
-
     return disposable({ user, isAuthenticated, login, logout });
   },
-  update: (context, newUser) => {
-    context.user.set(newUser);
-  },
+  update: (ctx, newUser) => ctx.user.set(newUser),
 });
 ```
 
+### Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `name` | `string` | Name for error messages |
+| `raw` | `boolean` | Pass value directly (default: `false`) |
+| `equals` | `EqualsFn` | Custom equality for raw mode value comparison |
+| `create` | `(value) => T` | Factory for factory mode |
+| `update` | `(ctx, value) => void` | Called when value prop changes (factory mode) |
+
 ### Benefits
 
-- ✅ **Lazy tracking** - Only subscribes to signals actually accessed
-- ✅ **Fine-grained updates** - Only `rx()` parts re-render
+- ✅ **Auto-dispose** - Signals disposed when provider unmounts
 - ✅ **Type-safe** - Full TypeScript inference
-- ✅ **Auto-cleanup** - Context disposed when provider unmounts
+- ✅ **Fine-grained** - Only `rx()` parts re-render
+- ✅ **StrictMode safe** - Handles double-renders correctly
 
 ---
 

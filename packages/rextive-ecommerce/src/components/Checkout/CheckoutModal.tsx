@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { checkoutLogic } from "@/logic/checkout";
 import { CheckoutSteps } from "./CheckoutSteps";
@@ -6,7 +7,7 @@ import { PaymentForm } from "./PaymentForm";
 import { OrderReview } from "./OrderReview";
 import { OrderComplete } from "./OrderComplete";
 
-export function CheckoutModal() {
+export const CheckoutModal = memo(function CheckoutModal() {
   const $checkout = checkoutLogic();
 
   return rx(() => {
@@ -79,4 +80,4 @@ export function CheckoutModal() {
       </>
     );
   });
-}
+});

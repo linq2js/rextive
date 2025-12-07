@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { cartLogic } from "@/logic/cartLogic";
 import { routerLogic } from "@/logic/routerLogic";
 import type { Product } from "@/api/types";
@@ -7,7 +8,7 @@ interface ProductCardProps {
   index: number;
 }
 
-export function ProductCard({ product, index }: ProductCardProps) {
+export const ProductCard = memo(function ProductCard({ product, index }: ProductCardProps) {
   // Get singleton cart logic
   const cart = cartLogic();
   const router = routerLogic();
@@ -155,4 +156,4 @@ export function ProductCard({ product, index }: ProductCardProps) {
       </div>
     </article>
   );
-}
+});

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { productsLogic } from "@/logic/productsLogic";
 
@@ -34,7 +35,7 @@ const sortOptions = [
   },
 ];
 
-export function SortSelect() {
+export const SortSelect = memo(function SortSelect() {
   // Get singleton products logic
   const { sortBy, sortOrder, category, search, setSort } = productsLogic();
 
@@ -82,4 +83,4 @@ export function SortSelect() {
       })}
     </div>
   );
-}
+});

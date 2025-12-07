@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { rx, task } from "rextive/react";
 import { checkoutLogic, orderLogic } from "@/logic/checkout";
 
@@ -7,7 +8,7 @@ const formatCurrency = (amount: number) =>
     currency: "USD",
   }).format(amount);
 
-export function OrderComplete() {
+export const OrderComplete = memo(function OrderComplete() {
   const $checkout = checkoutLogic();
   const $order = orderLogic();
 
@@ -203,4 +204,4 @@ export function OrderComplete() {
       </div>
     );
   });
-}
+});

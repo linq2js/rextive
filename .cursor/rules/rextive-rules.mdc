@@ -1106,29 +1106,81 @@ const scope = useScope("myScope", () => {
 
 ### 7. `provider()` - Signal Context ⭐ NEW
 
-Create signal-based React Context:
+Create type-safe React Context with three modes.
+
+#### Mode 1: Signal Mode (default)
+
+Wraps value in a mutable signal:
 
 ```tsx
-const [useTheme, ThemeProvider] = provider({
-  name: "Theme",
-  create: (initialValue: "dark" | "light") => {
-    return signal(initialValue);
-  },
+const [useTheme, ThemeProvider] = provider<"dark" | "light">({
+  name: "Theme"
 });
 
-function App() {
+<ThemeProvider value="dark"><App /></ThemeProvider>
+
+// Consumer - returns Mutable<"dark" | "light">
+const theme = useTheme();
+rx(theme);           // Renders: "dark"
+theme.set("light");  // Update from anywhere
+```
+
+#### Mode 2: Raw Mode
+
+Passes value directly. Perfect for logic instances:
+
+```tsx
+import { LogicType, useScope } from "rextive/react";
+
+type ProductInstance = LogicType<typeof productLogic>;
+
+const [useProduct, ProductProvider] = provider<ProductInstance>({
+  name: "Product",
+  raw: true  // Pass value directly
+});
+
+// Parent
+function ProductPage() {
+  const $product = useScope("product", productLogic);
   return (
-    <ThemeProvider value="dark">
-      <ChildComponent />
-    </ThemeProvider>
+    <ProductProvider value={$product}>
+      <ProductContent />
+    </ProductProvider>
   );
 }
 
-function ChildComponent() {
-  const theme = useTheme();
-  return <div>Theme: {rx(theme)}</div>;
+// Child - access logic directly
+function ProductContent() {
+  const $product = useProduct();
+  return <div>{rx($product.quantity)}</div>;
 }
 ```
+
+#### Mode 3: Factory Mode
+
+For complex contexts with custom initialization:
+
+```tsx
+const [useAuth, AuthProvider] = provider<AuthContext, User | null>({
+  name: "Auth",
+  create: (initialUser) => {
+    const user = signal(initialUser);
+    const login = async (creds) => { ... };
+    return { user, login };
+  },
+  update: (ctx, value) => ctx.user.set(value)
+});
+```
+
+#### Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `name` | `string` | Name for error messages |
+| `raw` | `boolean` | Pass value directly (default: `false`) |
+| `equals` | `EqualsFn` | Custom equality for raw mode |
+| `create` | `(value) => T` | Factory function (factory mode) |
+| `update` | `(ctx, value) => void` | Called on value change (factory mode) |
 
 ---
 

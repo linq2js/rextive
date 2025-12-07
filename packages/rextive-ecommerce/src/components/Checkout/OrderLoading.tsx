@@ -1,4 +1,6 @@
-export function OrderLoading() {
+import { memo } from "react";
+
+export const OrderLoading = memo(function OrderLoading() {
   return (
     <div className="text-center py-12">
       {/* Animated Spinner */}
@@ -22,4 +24,4 @@ export function OrderLoading() {
       </div>
     </div>
   );
-}
+});

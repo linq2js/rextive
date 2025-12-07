@@ -453,21 +453,30 @@ const { count, increment } = useScope("counter", counterLogic);
 
 ### `provider()`
 
-React context with signals:
+React context with three modes:
 
 ```tsx
-const ThemeContext = provider({
-  theme: signal("dark"),
-  toggleTheme: () => { /* ... */ },
-});
+// Signal mode (default) - wraps value in signal
+const [useTheme, ThemeProvider] = provider<"dark" | "light">({ name: "Theme" });
 
+// Raw mode - pass value directly (for logic instances)
+const [useStore, StoreProvider] = provider<StoreType>({ name: "Store", raw: true });
+
+// Factory mode - custom initialization
+const [useAuth, AuthProvider] = provider({
+  name: "Auth",
+  create: (user) => ({ user: signal(user) }),
+});
+```
+
+**Usage:**
+
+```tsx
 // Provide
-<ThemeContext.Provider value={/* optional override */}>
-  {children}
-</ThemeContext.Provider>
+<ThemeProvider value="dark">{children}</ThemeProvider>
 
 // Consume
-const { theme } = ThemeContext.use();
+const theme = useTheme();  // Mutable<"dark" | "light">
 ```
 
 ---

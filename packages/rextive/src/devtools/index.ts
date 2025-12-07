@@ -458,7 +458,7 @@ const devToolsHooks: DevTools = {
       }
     }
 
-    // Extract dependency signal IDs for graph building
+    // Extract dependency signal IDs
     const depIds = deps
       ? Object.values(deps).map((dep) => dep.uid)
       : undefined;
@@ -1105,27 +1105,3 @@ export function deleteChain(id: string): boolean {
   return $chainState().chains.delete(id);
 }
 
-/**
- * Build dependency graph from tracked signals and chain reactions.
- *
- * @returns Dependency graph with nodes and edges
- *
- * @example
- * ```ts
- * import { buildDependencyGraph, getSignals, getChainsList } from "rextive/devtools";
- *
- * const graph = buildDependencyGraph(getSignals(), getChainsList());
- * console.log("Nodes:", graph.nodes.size);
- * console.log("Edges:", graph.edges.length);
- * ```
- */
-export {
-  buildDependencyGraph,
-  getDependencies,
-  getDependents,
-} from "./utils/buildDependencyGraph";
-export type {
-  DependencyGraph,
-  GraphNode,
-  GraphEdge,
-} from "./utils/buildDependencyGraph";

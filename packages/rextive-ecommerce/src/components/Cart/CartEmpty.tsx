@@ -1,8 +1,10 @@
+import { memo } from "react";
+
 interface CartEmptyProps {
   onClose: () => void;
 }
 
-export function CartEmpty({ onClose }: CartEmptyProps) {
+export const CartEmpty = memo(function CartEmpty({ onClose }: CartEmptyProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center p-6">
       <div className="w-20 h-20 rounded-full bg-stone-100 dark:bg-slate-800 flex items-center justify-center mb-4">
@@ -31,4 +33,4 @@ export function CartEmpty({ onClose }: CartEmptyProps) {
       </button>
     </div>
   );
-}
+});

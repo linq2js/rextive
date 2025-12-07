@@ -1,7 +1,8 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { cartLogic } from "@/logic/cartLogic";
 
-export function CartHeader() {
+export const CartHeader = memo(function CartHeader() {
   const { itemCount, closeDrawer } = cartLogic();
 
   return (
@@ -55,4 +56,4 @@ export function CartHeader() {
       </button>
     </div>
   );
-}
+});

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { rx, task } from "rextive/react";
 import { logic, signal } from "rextive";
 import { authLogic } from "@/logic/authLogic";
@@ -19,7 +20,7 @@ export const loginLogic = logic("loginLogic", () => {
   };
 });
 
-export function LoginModal() {
+export const LoginModal = memo(function LoginModal() {
   const { loginModalOpen, closeLoginModal, loginResult } = authLogic();
   const $login = loginLogic();
 
@@ -185,4 +186,4 @@ export function LoginModal() {
       </div>
     );
   });
-}
+});

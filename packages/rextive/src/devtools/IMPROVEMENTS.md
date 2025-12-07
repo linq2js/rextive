@@ -44,21 +44,7 @@ This document outlines potential improvements and enhancements for the Rextive D
 
 ---
 
-### 4. **Signal Dependency Graph Visualization**
-**Current State:** Dependencies are tracked but not visualized.
-
-**Improvement:**
-- Visual graph showing signal dependencies
-- Interactive node-based diagram
-- Highlight computed signals and their dependencies
-- Show data flow direction
-- Filter by signal type, errors, etc.
-
-**Impact:** Better understanding of signal relationships and data flow.
-
----
-
-### 5. **Performance Profiling**
+### 4. **Performance Profiling**
 **Current State:** No performance metrics.
 
 **Improvement:**
@@ -402,9 +388,8 @@ This document outlines potential improvements and enhancements for the Rextive D
 
 ### Phase 2 (High Impact)
 5. Export/Import state (#2)
-6. Dependency graph (#4)
-7. Performance profiling (#5)
-8. Signal charts (#9)
+6. Performance profiling (#4)
+7. Signal charts (#8)
 
 ### Phase 3 (Advanced)
 9. Time travel (#3)

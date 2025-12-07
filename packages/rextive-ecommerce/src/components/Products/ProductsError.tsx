@@ -1,9 +1,11 @@
+import { memo } from "react";
+
 interface ProductsErrorProps {
   error: unknown;
   onRetry: () => void;
 }
 
-export function ProductsError({ error, onRetry }: ProductsErrorProps) {
+export const ProductsError = memo(function ProductsError({ error, onRetry }: ProductsErrorProps) {
   return (
     <div className="text-center py-16">
       <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
@@ -30,4 +32,4 @@ export function ProductsError({ error, onRetry }: ProductsErrorProps) {
       </button>
     </div>
   );
-}
+});

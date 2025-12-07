@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { cartLogic } from "@/logic/cartLogic";
 import { CartHeader } from "./CartHeader";
@@ -5,7 +6,7 @@ import { CartItemsList } from "./CartItemsList";
 import { CartFooter } from "./CartFooter";
 import { CartEmpty } from "./CartEmpty";
 
-export function CartDrawer() {
+export const CartDrawer = memo(function CartDrawer() {
   const { drawerOpen, closeDrawer, itemCount } = cartLogic();
 
   return rx(() => {
@@ -42,4 +43,4 @@ export function CartDrawer() {
       </>
     );
   });
-}
+});

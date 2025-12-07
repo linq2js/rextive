@@ -48,7 +48,8 @@ export function UserMenu() {
   return rx(() => {
     if (isRestoring()) return <LoadingSpinner />;
     const currentUser = user();
-    if (currentUser) return <UserProfile user={currentUser} onLogout={logout} />;
+    if (currentUser)
+      return <UserProfile user={currentUser} onLogout={logout} />;
     return <SignInButton onClick={openLoginModal} />;
   });
 }
@@ -91,12 +92,16 @@ const productsAsync = signal(
 // Task wrapper for stale-while-revalidate
 const productsTask = productsAsync.pipe(task(initialData));
 
-// In component - just access the state!
+// In component - stale-while-revalidate: show data + loading/error overlay
 return rx(() => {
   const { loading, error, value } = productsTask();
-  if (loading && !value.products.length) return <Loading />;
-  if (error) return <Error error={error} />;
-  return <ProductsList products={value.products} />;
+  return (
+    <div>
+      {loading && <LoadingOverlay />}
+      {error && <ErrorToast error={error} />}
+      <ProductsList products={value.products} />
+    </div>
+  );
 });
 ```
 
@@ -107,32 +112,38 @@ return rx(() => {
 ```
 src/
 ├── api/
-│   ├── client.ts          # API client functions
-│   └── types.ts           # TypeScript types
+│   ├── client.ts              # API client functions
+│   └── types.ts               # TypeScript types
 │
-├── logic/                  # 🧠 Business logic layer
-│   ├── authLogic.ts       # Authentication & user session
-│   ├── cartLogic.ts       # Shopping cart management
-│   ├── productsLogic.ts   # Products, search, pagination
-│   ├── alertLogic.ts      # Global alerts/notifications
-│   ├── routerLogic.ts     # Simple client-side routing
-│   ├── themeLogic.ts      # Dark/light mode
-│   ├── persistLogic.ts    # LocalStorage persistence
-│   └── checkout/          # Multi-step checkout flow
+├── logic/                     # 🧠 Business logic layer
+│   ├── authLogic.ts           # Authentication & user session
+│   ├── cartLogic.ts           # Shopping cart management
+│   ├── productsLogic.ts       # Products list, search, pagination
+│   ├── productDetailsLogic.ts # Single product details
+│   ├── alertLogic.ts          # Global alerts/notifications
+│   ├── routerLogic.ts         # Simple client-side routing
+│   ├── themeLogic.ts          # Dark/light mode
+│   ├── persistLogic.ts        # LocalStorage persistence
+│   └── checkout/              # Multi-step checkout flow
 │       ├── checkoutLogic.ts   # Flow coordinator
 │       ├── shippingLogic.ts   # Shipping form state
 │       ├── paymentLogic.ts    # Payment selection
-│       └── orderLogic.ts      # Order totals & placement
+│       ├── orderLogic.ts      # Order totals & placement
+│       └── types.ts           # Checkout types
 │
-├── components/            # 🎨 UI components (minimal logic)
-│   ├── Layout/           # Header, navigation, theme toggle
-│   ├── Products/         # Product grid, cards, filters
-│   ├── Cart/             # Cart drawer, items, summary
-│   ├── Checkout/         # Multi-step checkout modal
-│   ├── Auth/             # Login modal
-│   └── Common/           # Shared UI components
+├── components/                # 🎨 UI components (minimal logic)
+│   ├── Layout/                # Header, SearchBar, ThemeToggle, UserMenu
+│   ├── Products/              # ProductGrid, ProductCard, ProductDetails
+│   ├── Cart/                  # CartDrawer, CartItem, CartSummary
+│   ├── Checkout/              # CheckoutModal, ShippingForm, PaymentForm
+│   ├── Auth/                  # LoginModal
+│   └── Common/                # AlertModal
 │
-└── App.tsx               # Main app component
+├── test/                      # Test utilities
+│   ├── setup.ts               # Vitest setup
+│   └── utils.tsx              # Test helpers
+│
+└── App.tsx                    # Main app with routing
 ```
 
 ---
@@ -183,9 +194,9 @@ export const someLogic = logic("someLogic", () => {
   const filtered = items.to((list) => list.filter(/* ... */));
   const count = items.to((list) => list.length);
 
-  // 4. SIDE EFFECTS - Subscriptions, persistence
-  $auth.user.on(() => {
-    if (!$auth.user()) items.reset();
+  // 4. SIDE EFFECTS - Reactive effects using computed signals
+  signal({ user: $auth.user }, ({ deps }) => {
+    if (!deps.user) items.reset();
   });
 
   // 5. ACTIONS - Methods to mutate state
@@ -210,11 +221,11 @@ When consuming logic instances, use `$` prefix to distinguish from local variabl
 
 ```tsx
 function Component() {
-  const $auth = authLogic();   // Logic instance
-  const $cart = cartLogic();   // Logic instance
+  const $auth = authLogic(); // Logic instance
+  const $cart = cartLogic(); // Logic instance
 
   return rx(() => {
-    const user = $auth.user();   // Reading signal value
+    const user = $auth.user(); // Reading signal value
     const count = $cart.itemCount();
     // ...
   });
@@ -235,6 +246,7 @@ export function CartDrawer() {
   const { drawerOpen, closeDrawer, itemCount } = cartLogic();
 
   return rx(() => {
+    // reactive
     const open = drawerOpen();
     const count = itemCount();
 
@@ -361,11 +373,11 @@ Logics can depend on and react to each other:
 
 ```tsx
 export const cartLogic = logic("cartLogic", () => {
-  const $auth = authLogic();  // Get auth logic instance
+  const $auth = authLogic(); // Get auth logic instance
 
   const requireAuth = (): boolean => {
     if ($auth.isAuthenticated()) return true;
-    $auth.openLoginModal();  // Trigger login modal from cart
+    $auth.openLoginModal(); // Trigger login modal from cart
     return false;
   };
 
@@ -405,25 +417,25 @@ export function LoginModal() {
 
 ### Lines of Code Comparison
 
-| Feature          | Redux + RTK Query | Zustand | Rextive |
-|------------------|-------------------|---------|---------|
-| Auth Logic       | ~150 lines        | ~80     | ~60     |
-| Cart Logic       | ~200 lines        | ~100    | ~80     |
-| Products Logic   | ~180 lines        | ~90     | ~70     |
-| Component Hooks  | Many              | Few     | None*   |
+| Feature         | Redux + RTK Query | Zustand | Rextive |
+| --------------- | ----------------- | ------- | ------- |
+| Auth Logic      | ~150 lines        | ~80     | ~60     |
+| Cart Logic      | ~200 lines        | ~100    | ~80     |
+| Products Logic  | ~180 lines        | ~90     | ~70     |
+| Component Hooks | Many              | Few     | None\*  |
 
-*Rextive uses `rx()` for reactivity, not hooks.
+\*Rextive uses `rx()` for reactivity, not hooks.
 
 ### Key Differences
 
-| Aspect | Traditional | Rextive |
-|--------|-------------|---------|
-| State definition | Actions + Reducers + Selectors | Just `signal()` |
-| Derived state | `useMemo` / selectors | `.to()` transform |
-| Async handling | RTK Query / useEffect | Async signals |
-| Request cancellation | Manual AbortController | Automatic |
-| Loading states | Multiple flags | `task.from()` |
-| Testing | Mock React hooks | `logic.create()` |
+| Aspect               | Traditional                    | Rextive           |
+| -------------------- | ------------------------------ | ----------------- |
+| State definition     | Actions + Reducers + Selectors | Just `signal()`   |
+| Derived state        | `useMemo` / selectors          | `.to()` transform |
+| Async handling       | RTK Query / useEffect          | Async signals     |
+| Request cancellation | Manual AbortController         | Automatic         |
+| Loading states       | Multiple flags                 | `task.from()`     |
+| Testing              | Mock React hooks               | `logic.create()`  |
 
 ---
 
@@ -438,7 +450,7 @@ describe("authLogic", () => {
   it("should login successfully", async () => {
     mockFetch.mockResolvedValueOnce({ ok: true, json: () => mockUser });
 
-    const auth = authLogic.create();  // Create isolated instance
+    const auth = authLogic.create(); // Create isolated instance
     await auth.login({ username: "test", password: "pass" });
 
     expect(auth.user()).toEqual(mockUser);
@@ -548,5 +560,3 @@ Contributions are welcome! This demo serves as a reference implementation for Re
 ## 📄 License
 
 MIT © [linq2js](https://github.com/linq2js)
-
-

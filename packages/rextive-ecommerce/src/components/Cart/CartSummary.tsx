@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { cartLogic } from "@/logic/cartLogic";
 import { checkoutLogic } from "@/logic/checkout";
 
@@ -7,7 +8,7 @@ interface CartSummaryProps {
   onClear: () => void;
 }
 
-export function CartSummary({ subtotal, discount, onClear }: CartSummaryProps) {
+export const CartSummary = memo(function CartSummary({ subtotal, discount, onClear }: CartSummaryProps) {
   const handleCheckout = () => {
     cartLogic().closeDrawer();
     checkoutLogic().open();
@@ -64,4 +65,4 @@ export function CartSummary({ subtotal, discount, onClear }: CartSummaryProps) {
       </div>
     </div>
   );
-}
+});

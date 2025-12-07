@@ -1,6 +1,7 @@
+import { memo } from "react";
 import { routerLogic } from "@/logic/routerLogic";
 
-export function Logo() {
+export const Logo = memo(function Logo() {
   const router = routerLogic();
 
   return (
@@ -15,4 +16,4 @@ export function Logo() {
       </span>
     </button>
   );
-}
+});

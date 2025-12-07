@@ -1,8 +1,9 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { shippingLogic } from "@/logic/checkout";
 import { checkoutLogic } from "@/logic/checkout";
 
-export function ShippingForm() {
+export const ShippingForm = memo(function ShippingForm() {
   const $shipping = shippingLogic();
   const { nextStep } = checkoutLogic();
 
@@ -145,4 +146,4 @@ export function ShippingForm() {
       </form>
     );
   });
-}
+});

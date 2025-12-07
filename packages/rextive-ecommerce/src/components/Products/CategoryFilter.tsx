@@ -1,7 +1,8 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { productsLogic } from "@/logic/productsLogic";
 
-export function CategoryFilter() {
+export const CategoryFilter = memo(function CategoryFilter() {
   // Get singleton products logic
   const { category, categoriesTask, setCategory } = productsLogic();
 
@@ -68,4 +69,4 @@ export function CategoryFilter() {
       })}
     </div>
   );
-}
+});

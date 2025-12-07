@@ -31,6 +31,7 @@ interface SignalsTabProps {
   bookmarkedSignals: Set<string>;
   toggleBookmark: (signalId: string) => void;
   onNavigateToEvents: (signalName: string) => void;
+  onSearch: (query: string) => void;
   onCompare: (signalId: string, currentValue: unknown, historyValue: unknown, historyTimestamp: number) => void;
 }
 
@@ -42,6 +43,7 @@ export function SignalsTab({
   bookmarkedSignals,
   toggleBookmark,
   onNavigateToEvents,
+  onSearch,
   onCompare,
 }: SignalsTabProps): React.ReactElement {
   const [expandedSignal, setExpandedSignal] = useState<string | null>(null);
@@ -62,6 +64,30 @@ export function SignalsTab({
       return 0;
     });
   }, [filteredSignals, recentActivitySort]);
+
+  // Pre-compute signal names map for stable lookups
+  const signalNamesMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const [id, info] of signals) {
+      map.set(id, info.name);
+    }
+    return map;
+  }, [signals]);
+
+  // Pre-compute dependents map for all signals (only recalculate when signals change)
+  const dependentsMap = useMemo(() => {
+    const map = new Map<string, Array<{ id: string; name: string }>>();
+    for (const [, info] of signals) {
+      if (info.depIds) {
+        for (const depId of info.depIds) {
+          const existing = map.get(depId) || [];
+          existing.push({ id: info.id, name: info.name });
+          map.set(depId, existing);
+        }
+      }
+    }
+    return map;
+  }, [signals]);
 
   const getSignalKey = useCallback(
     (info: SignalInfo) => info.id,
@@ -545,6 +571,98 @@ export function SignalsTab({
                     )}
                   </div>
                 )}
+
+                {/* Dependencies (for computed signals) */}
+                {info.depIds && info.depIds.length > 0 && (
+                  <div style={{ marginTop: "6px", marginBottom: "6px" }}>
+                    <div
+                      style={{
+                        fontSize: "9px",
+                        color: styles.colors.textMuted,
+                        marginBottom: "4px",
+                      }}
+                    >
+                      Dependencies ({info.depIds.length}):
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "4px",
+                      }}
+                    >
+                      {info.depIds.map((depId) => {
+                        const depName = signalNamesMap.get(depId) || depId;
+                        return (
+                          <span
+                            key={depId}
+                            style={{
+                              fontSize: "9px",
+                              padding: "2px 6px",
+                              backgroundColor: styles.colors.bgHover,
+                              borderRadius: "3px",
+                              color: styles.colors.text,
+                              cursor: "pointer",
+                              fontFamily: styles.fontMono,
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSearch(depName);
+                            }}
+                            title={`${depName}\nUID: ${depId}\nClick to search`}
+                          >
+                            → {depName}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Dependents (signals that depend on this signal) */}
+                {dependentsMap.get(info.id)?.length ? (
+                  <div style={{ marginTop: "6px", marginBottom: "6px" }}>
+                    <div
+                      style={{
+                        fontSize: "9px",
+                        color: styles.colors.textMuted,
+                        marginBottom: "4px",
+                      }}
+                    >
+                      Dependents ({dependentsMap.get(info.id)!.length}):
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "4px",
+                      }}
+                    >
+                      {dependentsMap.get(info.id)!.map(({ id, name }) => (
+                        <span
+                          key={id}
+                          style={{
+                            fontSize: "9px",
+                            padding: "2px 6px",
+                            backgroundColor: styles.colors.bgHover,
+                            borderRadius: "3px",
+                            color: styles.colors.text,
+                            cursor: "pointer",
+                            fontFamily: styles.fontMono,
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSearch(name);
+                          }}
+                          title={`${name}\nUID: ${id}\nClick to search`}
+                        >
+                          ← {name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 {/* History */}
                 {info.history.length > 0 && (
                   <div style={{ marginTop: "6px" }}>
@@ -676,7 +794,10 @@ export function SignalsTab({
       bookmarkedSignals,
       toggleBookmark,
       onNavigateToEvents,
+      onSearch,
       onCompare,
+      signalNamesMap,
+      dependentsMap,
     ]
   );
 

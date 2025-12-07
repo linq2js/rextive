@@ -1,8 +1,10 @@
+import { memo } from "react";
+
 interface ProductSkeletonProps {
   index: number;
 }
 
-export function ProductSkeleton({ index }: ProductSkeletonProps) {
+export const ProductSkeleton = memo(function ProductSkeleton({ index }: ProductSkeletonProps) {
   return (
     <div
       className="card overflow-hidden animate-fade-in"
@@ -19,5 +21,5 @@ export function ProductSkeleton({ index }: ProductSkeletonProps) {
       </div>
     </div>
   );
-}
+});
 

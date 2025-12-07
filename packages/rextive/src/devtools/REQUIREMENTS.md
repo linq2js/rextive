@@ -464,7 +464,6 @@ interface ChainReaction {
 
 These are potential future features to consider:
 
-- [ ] Signal dependency graph visualization
 - [ ] Export/import signal snapshot
 - [ ] Time-travel debugging (restore historical values)
 - [ ] Signal grouping/folders

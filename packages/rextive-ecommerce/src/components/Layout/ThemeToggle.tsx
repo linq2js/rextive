@@ -1,7 +1,8 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { themeLogic } from "@/logic/themeLogic";
 
-export function ThemeToggle() {
+export const ThemeToggle = memo(function ThemeToggle() {
   const $theme = themeLogic();
 
   return rx(() => {
@@ -49,4 +50,4 @@ export function ThemeToggle() {
       </button>
     );
   });
-}
+});

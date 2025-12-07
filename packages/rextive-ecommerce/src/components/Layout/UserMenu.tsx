@@ -1,7 +1,8 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { authLogic } from "@/logic/authLogic";
 
-export function UserMenu() {
+export const UserMenu = memo(function UserMenu() {
   const { user, isRestoring, logout, openLoginModal } = authLogic();
 
   return rx(() => {
@@ -82,4 +83,4 @@ export function UserMenu() {
       </button>
     );
   });
-}
+});

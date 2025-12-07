@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { logic, provider, rx, signal, task, useScope } from "rextive/react";
 import { productDetailsLogic } from "@/logic/productDetailsLogic";
 import { routerLogic } from "@/logic/routerLogic";
@@ -38,7 +39,7 @@ const [useProductDetails, ProductDetailsProvider] =
 // Shared Components
 // ============================================================================
 
-function StarRating({ rating }: { rating: number }) {
+const StarRating = memo(function StarRating({ rating }: { rating: number }) {
   const fullStars = Math.floor(rating);
   const hasHalfStar = rating % 1 >= 0.5;
   const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
@@ -82,13 +83,13 @@ function StarRating({ rating }: { rating: number }) {
       </span>
     </div>
   );
-}
+});
 
 // ============================================================================
 // Loading / Error States
 // ============================================================================
 
-function ProductLoading() {
+const ProductLoading = memo(function ProductLoading() {
   return (
     <div className="relative">
       {/* Spinner overlay */}
@@ -124,9 +125,9 @@ function ProductLoading() {
       </div>
     </div>
   );
-}
+});
 
-function ProductError({ error }: { error: unknown }) {
+const ProductError = memo(function ProductError({ error }: { error: unknown }) {
   const $router = routerLogic();
   const message =
     error instanceof Error ? error.message : "Failed to load product";
@@ -160,7 +161,7 @@ function ProductError({ error }: { error: unknown }) {
       </button>
     </div>
   );
-}
+});
 
 // ============================================================================
 // Product Section Components (receive product as prop)
@@ -184,7 +185,11 @@ export const productImageGalleryLogic = logic(
   }
 );
 
-function ProductImageGallery({ product }: { product: Product }) {
+const ProductImageGallery = memo(function ProductImageGallery({
+  product,
+}: {
+  product: Product;
+}) {
   const $imageGallery = useScope(
     "productImageGallery",
     productImageGalleryLogic
@@ -228,9 +233,13 @@ function ProductImageGallery({ product }: { product: Product }) {
       </div>
     );
   });
-}
+});
 
-function ProductInfo({ product }: { product: Product }) {
+const ProductInfo = memo(function ProductInfo({
+  product,
+}: {
+  product: Product;
+}) {
   const $details = useProductDetails();
   const $cart = cartLogic();
 
@@ -452,9 +461,13 @@ function ProductInfo({ product }: { product: Product }) {
       </div>
     );
   });
-}
+});
 
-function ProductReviews({ product }: { product: Product }) {
+const ProductReviews = memo(function ProductReviews({
+  product,
+}: {
+  product: Product;
+}) {
   if (!product.reviews?.length) {
     return null;
   }
@@ -496,13 +509,17 @@ function ProductReviews({ product }: { product: Product }) {
       </div>
     </div>
   );
-}
+});
 
 // ============================================================================
 // Product Content (renders when product is loaded)
 // ============================================================================
 
-function ProductContent({ product }: { product: Product }) {
+const ProductContent = memo(function ProductContent({
+  product,
+}: {
+  product: Product;
+}) {
   return (
     <>
       {/* Product content */}
@@ -515,7 +532,7 @@ function ProductContent({ product }: { product: Product }) {
       <ProductReviews product={product} />
     </>
   );
-}
+});
 
 // ============================================================================
 // Main Export
@@ -528,7 +545,7 @@ function ProductContent({ product }: { product: Product }) {
  * to all child components via context, avoiding prop drilling
  * and singleton pattern issues.
  */
-export function ProductDetails() {
+export const ProductDetails = memo(function ProductDetails() {
   const $router = routerLogic();
   const $details = useScope("productDetails", productDetailsLogic);
 
@@ -578,4 +595,4 @@ export function ProductDetails() {
       })}
     </ProductDetailsProvider>
   );
-}
+});

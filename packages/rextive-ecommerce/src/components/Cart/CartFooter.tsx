@@ -1,8 +1,9 @@
+import { memo } from "react";
 import { rx } from "rextive/react";
 import { cartLogic } from "@/logic/cartLogic";
 import { CartSummary } from "./CartSummary";
 
-export function CartFooter() {
+export const CartFooter = memo(function CartFooter() {
   const { items, subtotal, totalDiscount, clearCart } = cartLogic();
 
   return rx(() => {
@@ -17,4 +18,4 @@ export function CartFooter() {
       />
     );
   });
-}
+});

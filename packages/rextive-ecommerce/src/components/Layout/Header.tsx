@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Logo } from "./Logo";
 import { SearchBar } from "./SearchBar";
 import { UserMenu } from "./UserMenu";
@@ -5,7 +6,7 @@ import { CartButton } from "./CartButton";
 import { ThemeToggle } from "./ThemeToggle";
 import { EqualsFn, EqualsStrategy } from "rextive";
 
-export function Header() {
+export const Header = memo(function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 z-40 glass">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -32,7 +33,7 @@ export function Header() {
       </div>
     </header>
   );
-}
+});
 
 export type UseScopeOptions = {
   equals?: EqualsStrategy | EqualsFn<any>;
