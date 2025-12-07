@@ -177,10 +177,10 @@ const getUser = cache(
 
 ```tsx
 function UserProfile({ userId }: { userId: string }) {
-  const scope = useScope(() => {
-    const { value, unref } = getUser(userId);
+  const scope = useScope("userProfile", (id) => {
+    const { value, unref } = getUser(id);
     return { value, dispose: unref };
-  }, { watch: [userId] });
+  }, [userId]);
 
   return rx(() => {
     const state = task.from(scope.value);

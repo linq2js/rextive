@@ -1,8 +1,38 @@
-import { rx, task } from "rextive/react";
+import { logic, provider, rx, signal, task, useScope } from "rextive/react";
 import { productDetailsLogic } from "@/logic/productDetailsLogic";
 import { routerLogic } from "@/logic/routerLogic";
 import { cartLogic } from "@/logic/cartLogic";
 import type { Product } from "@/api/types";
+import type { LogicType } from "rextive";
+
+// ============================================================================
+// Product Details Provider
+// ============================================================================
+
+type ProductDetailsInstance = LogicType<typeof productDetailsLogic>;
+
+/**
+ * Provider for productDetailsLogic instance.
+ * Allows child components to access the scoped logic via useProductDetails().
+ *
+ * Usage:
+ * ```tsx
+ * const $details = useScope("productDetails", productDetailsLogic);
+ *
+ * <ProductDetailsProvider value={$details}>
+ *   <ChildComponent />
+ * </ProductDetailsProvider>
+ *
+ * // In child component:
+ * const $details = useProductDetails();
+ * $details.quantity(); // Access signals directly
+ * ```
+ */
+const [useProductDetails, ProductDetailsProvider] =
+  provider<ProductDetailsInstance>({
+    name: "ProductDetails",
+    raw: true,
+  });
 
 // ============================================================================
 // Shared Components
@@ -78,10 +108,7 @@ function ProductLoading() {
           <div className="aspect-square skeleton-shimmer rounded-2xl border border-stone-200 dark:border-slate-800" />
           <div className="flex gap-2">
             {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="w-20 h-20 skeleton rounded-xl"
-              />
+              <div key={i} className="w-20 h-20 skeleton rounded-xl" />
             ))}
           </div>
         </div>
@@ -139,11 +166,32 @@ function ProductError({ error }: { error: unknown }) {
 // Product Section Components (receive product as prop)
 // ============================================================================
 
+export const productImageGalleryLogic = logic(
+  "productImageGalleryLogic",
+  () => {
+    const selectedImageIndex = signal(0, {
+      name: "productImageGallery.selectedImageIndex",
+    });
+
+    const selectImage = (index: number) => {
+      selectedImageIndex.set(index);
+    };
+
+    return {
+      selectImage,
+      selectedImageIndex,
+    };
+  }
+);
+
 function ProductImageGallery({ product }: { product: Product }) {
-  const $details = productDetailsLogic();
+  const $imageGallery = useScope(
+    "productImageGallery",
+    productImageGalleryLogic
+  );
 
   return rx(() => {
-    const selectedIndex = $details.selectedImageIndex();
+    const selectedIndex = $imageGallery.selectedImageIndex();
     const images =
       product.images.length > 0 ? product.images : [product.thumbnail];
     const currentImage = images[selectedIndex] || product.thumbnail;
@@ -165,7 +213,7 @@ function ProductImageGallery({ product }: { product: Product }) {
             {images.map((img, idx) => (
               <button
                 key={idx}
-                onClick={() => $details.selectImage(idx)}
+                onClick={() => $imageGallery.selectImage(idx)}
                 className={`flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all ${
                   idx === selectedIndex
                     ? "border-brand-500 ring-2 ring-brand-200 dark:ring-brand-700"
@@ -183,7 +231,7 @@ function ProductImageGallery({ product }: { product: Product }) {
 }
 
 function ProductInfo({ product }: { product: Product }) {
-  const $details = productDetailsLogic();
+  const $details = useProductDetails();
   const $cart = cartLogic();
 
   return rx(() => {
@@ -440,7 +488,9 @@ function ProductReviews({ product }: { product: Product }) {
               </div>
               <StarRating rating={review.rating} />
             </div>
-            <p className="text-stone-700 dark:text-slate-300">{review.comment}</p>
+            <p className="text-stone-700 dark:text-slate-300">
+              {review.comment}
+            </p>
           </div>
         ))}
       </div>
@@ -471,50 +521,61 @@ function ProductContent({ product }: { product: Product }) {
 // Main Export
 // ============================================================================
 
+/**
+ * Product details page with provider pattern.
+ *
+ * Uses ProductDetailsProvider to pass the scoped logic instance
+ * to all child components via context, avoiding prop drilling
+ * and singleton pattern issues.
+ */
 export function ProductDetails() {
   const $router = routerLogic();
-  const $details = productDetailsLogic();
+  const $details = useScope("productDetails", productDetailsLogic);
 
-  return rx(() => {
-    // Call productAsync() to get the Promise, then use task.from to track its state
-    const state = task.from($details.productAsync);
+  return (
+    <ProductDetailsProvider value={$details}>
+      {rx(() => {
+        // Call productAsync() to get the Promise, then use task.from to track its state
+        const state = task.from($details.productAsync);
 
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Back button */}
-        <button
-          onClick={() => $router.goHome()}
-          className="flex items-center gap-2 text-stone-600 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white mb-8 transition-colors"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10 19l-7-7m0 0l7-7m-7 7h18"
-            />
-          </svg>
-          <span>Back to Products</span>
-        </button>
+        return (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* Back button */}
+            <button
+              onClick={() => $router.goHome()}
+              className="flex items-center gap-2 text-stone-600 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white mb-8 transition-colors"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                />
+              </svg>
+              <span>Back to Products</span>
+            </button>
 
-        {/* Loading state */}
-        {state.status === "loading" ? <ProductLoading /> : null}
+            {/* Loading state */}
+            {state.status === "loading" ? <ProductLoading /> : null}
 
-        {/* Error state */}
-        {state.status === "error" && state.error ? (
-          <ProductError error={state.error} />
-        ) : null}
+            {/* Error state */}
+            {state.status === "error" && state.error ? (
+              <ProductError error={state.error} />
+            ) : null}
 
-        {/* Product loaded - render content */}
-        {state.status === "success" && state.value ? (
-          <ProductContent product={state.value} />
-        ) : null}
-      </div>
-    );
-  });
+            {/* Product loaded - render content */}
+            {state.status === "success" && state.value ? (
+              <ProductContent product={state.value} />
+            ) : null}
+          </div>
+        );
+      })}
+    </ProductDetailsProvider>
+  );
 }

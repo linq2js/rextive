@@ -99,25 +99,39 @@ function Component() {
 
 ---
 
-## `useScope()` - Component Lifecycle
+## `useScope()` - Scoped State Management
 
-Three modes for different use cases.
+Create cached scope instances with automatic lifecycle management.
 
-### Mode 1: Factory (Most Common)
+### Basic Usage
 
-Create component-scoped signals with auto-cleanup:
+```tsx
+useScope(key, factory);
+useScope(key, factory, options);
+useScope(key, factory, args);
+useScope(key, factory, args, options);
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `key` | `unknown` | Unique identifier for the scope |
+| `factory` | `() => TScope` | Factory function to create the scope |
+| `args` | `TArgs[]` | Arguments passed to factory (scope recreates when changed) |
+| `options` | `UseScopeOptions` | Custom equality for args comparison |
+
+### Basic Example
 
 ```tsx
 function TodoList() {
-  const scope = useScope(() => {
+  const scope = useScope("todoList", () => {
     const todos = signal([]);
     const filter = signal("all");
     
-    return disposable({
+    return {
       todos,
       filter,
       addTodo: (text) => todos.set(prev => [...prev, text]),
-    });
+    };
   });
 
   return (
@@ -129,92 +143,87 @@ function TodoList() {
 }
 ```
 
-#### Factory Mode Options
+### With Args (Recreates When Args Change)
 
 ```tsx
-useScope(factory, {
-  // Lifecycle callbacks
-  init: (scope) => {},      // Called when scope is created (before commit)
-  mount: (scope) => {},     // Called after scope is mounted (alias: ready)
-  ready: (scope) => {},     // Alias for mount
-  update: (scope) => {},    // Called after every render
-  cleanup: (scope) => {},   // Called during cleanup phase (before dispose)
-  dispose: (scope) => {},   // Called when scope is being disposed
+function UserProfile({ userId }: { userId: string }) {
+  const scope = useScope("userProfile", (id) => {
+    const user = signal(async () => fetchUser(id));
+    return { user };
+  }, [userId]);
+
+  return <div>{rx(scope.user, u => u?.name)}</div>;
+}
+```
+
+### Multiple Instances (User-Controlled Key)
+
+```tsx
+function Tab({ tabId }: { tabId: string }) {
+  // Each tab gets its own scope
+  const scope = useScope(`tab:${tabId}`, () => {
+    const content = signal("");
+    return { content };
+  });
+
+  return <div>{rx(scope.content)}</div>;
+}
+```
+
+### With Logic
+
+```tsx
+const counterLogic = logic("counterLogic", () => {
+  const count = signal(0);
+  return { count, increment: () => count.set(c => c + 1) };
+});
+
+function Counter() {
+  // Automatically uses logic.create()
+  const { count, increment } = useScope("counter", counterLogic);
+  return <button onClick={increment}>{rx(count)}</button>;
+}
+```
+
+### Custom Equality for Args
+
+```tsx
+// Options object
+useScope("data", factory, [filters], {
+  equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
+});
+
+// Strategy shorthand
+useScope("data", factory, [obj], "shallow");
+useScope("data", factory, [obj], "deep");
+
+// Custom function
+useScope("data", factory, [obj], (a, b) => a.id === b.id);
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Keyed caching** | Same key = same instance (handles StrictMode) |
+| **Args comparison** | Recreates scope when args change |
+| **Auto-dispose** | Signals inside factory are automatically disposed |
+| **Logic support** | Automatically uses `logic.create()` for Logic factories |
+
+### Additional Cleanup
+
+```tsx
+// Add dispose method for non-signal cleanup
+const scope = useScope("myScope", () => {
+  const data = signal([]);
+  const subscription = service.subscribe();
   
-  // Dependencies
-  watch: [dep1, dep2],      // Recreate scope when deps change
+  return {
+    data,
+    dispose: () => subscription.unsubscribe(),
+  };
 });
 ```
-
-#### Update with Dependencies
-
-```tsx
-// Run update only when specific deps change
-useScope(factory, {
-  update: [(scope) => scope.refresh(), dep1, dep2],
-});
-```
-
-#### Factory with Args
-
-```tsx
-// Type-safe: args match factory params & become watch deps
-const { userData } = useScope(
-  (userId, filter) => {
-    const userData = signal(fetchUser(userId, filter));
-    return { userData };
-  },
-  [userId, filter] // Args passed to factory & used as watch deps
-);
-```
-
-### Mode 2: Lifecycle
-
-Track component lifecycle phases:
-
-```tsx
-function Component() {
-  const getPhase = useScope({
-    init: () => console.log("Before first render"),
-    mount: () => console.log("After first paint"),
-    render: () => console.log("Every render"),
-    update: () => console.log("After every render"),
-    cleanup: () => console.log("React cleanup"),
-    dispose: () => console.log("True unmount"),
-  });
-
-  return <div>Phase: {getPhase()}</div>;
-}
-```
-
-### Mode 3: Object Tracking
-
-Track object reference changes:
-
-```tsx
-function UserAnalytics({ user }) {
-  useScope({
-    for: user,
-    init: (user) => analytics.track("session-start", user),
-    mount: (user) => startTracking(user),
-    cleanup: (user) => pauseTracking(user),
-    dispose: (user) => analytics.track("session-end", user),
-  });
-
-  return <div>Tracking: {user.name}</div>;
-}
-```
-
-### Lifecycle Phases
-
-| Phase | When | Runs in StrictMode | Use For |
-|-------|------|-------------------|---------|
-| **init** | Before first render | Once | Signal creation |
-| **mount/ready** | After first paint | Once | DOM measurements |
-| **render** | Every render | Every render | Tracking |
-| **update** | After every render | Every render | DOM sync |
-| **cleanup** | React cleanup | 2-3 times | Pause (not final) |
-| **dispose** | True unmount | Once | Final cleanup |
 
 ---
 
@@ -310,7 +319,7 @@ function App() {
 <div>Count: {rx(count)}</div>
 
 // Use useScope for component-scoped signals
-const { signal } = useScope(() => disposable({ signal: signal(0) }));
+const { count } = useScope("myComponent", () => ({ count: signal(0) }));
 
 // Wrap async values with wait() or task.from()
 rx(() => <div>{wait(asyncSignal()).name}</div>)
@@ -320,7 +329,7 @@ rx(() => <div>{wait(asyncSignal()).name}</div>)
 
 ```tsx
 // Don't create signals in render without useScope
-const signal = signal(0); // Memory leak!
+const count = signal(0); // Memory leak!
 
 // Don't read signals outside reactive context
 const value = count(); // Won't re-render

@@ -2034,6 +2034,18 @@ export interface Logic<T extends object> {
 }
 
 /**
+ * Extract the type of the logic from the Logic interface.
+ * @example
+ * ```ts
+ * type Counter = LogicType<typeof counter>;
+ * // = { count: Signal<number> }
+ * ```
+ */
+export type LogicType<TLogic extends Logic<any>> = TLogic extends Logic<infer T>
+  ? T
+  : never;
+
+/**
  * Extract only function properties from T and make them readonly.
  * Used by AbstractLogic to ensure only methods are exposed.
  *

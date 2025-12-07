@@ -110,7 +110,7 @@ describe("signal.refresh() and signal.stale()", () => {
       const s = signal(() => 42);
       s.dispose();
 
-      expect(() => s.refresh()).toThrow("Cannot refresh disposed signal");
+      expect(() => s.refresh()).toThrow(/Cannot refresh disposed signal/);
     });
 
     it("should notify listeners after refresh", async () => {
@@ -229,7 +229,7 @@ describe("signal.refresh() and signal.stale()", () => {
       const s = signal(() => 42);
       s.dispose();
 
-      expect(() => s.stale()).toThrow("Cannot mark disposed signal as stale");
+      expect(() => s.stale()).toThrow(/Cannot mark disposed signal as stale/);
     });
   });
 

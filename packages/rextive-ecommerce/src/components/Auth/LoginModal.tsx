@@ -1,27 +1,27 @@
-import { rx, useScope, disposable, task } from "rextive/react";
-import { signal } from "rextive";
+import { rx, task } from "rextive/react";
+import { logic, signal } from "rextive";
 import { authLogic } from "@/logic/authLogic";
 
-export function LoginModal() {
-  const { loginModalOpen, closeLoginModal, login, loginResult } = authLogic();
+export const loginLogic = logic("loginLogic", () => {
+  const { login } = authLogic();
+  const username = signal("emilys", { name: "loginModal.username" });
+  const password = signal("emilyspass", { name: "loginModal.password" });
 
-  const scope = useScope(() =>
-    disposable({
-      username: signal("emilys", { name: "loginModal.username" }),
-      password: signal("emilyspass", { name: "loginModal.password" }),
-    })
-  );
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await login({ username: scope.username(), password: scope.password() });
-      scope.username.reset();
-      scope.password.reset();
-    } catch {
-      // Error is handled by loginResult
-    }
+  return {
+    username,
+    password,
+    login() {
+      return login({
+        username: username(),
+        password: password(),
+      });
+    },
   };
+});
+
+export function LoginModal() {
+  const { loginModalOpen, closeLoginModal, loginResult } = authLogic();
+  const $login = loginLogic();
 
   return rx(() => {
     const open = loginModalOpen();
@@ -113,15 +113,21 @@ export function LoginModal() {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              $login.login();
+            }}
+            className="space-y-4"
+          >
             <div>
               <label className="block text-sm font-medium text-stone-700 dark:text-slate-300 mb-1.5">
                 Username
               </label>
               <input
                 type="text"
-                value={scope.username()}
-                onChange={(e) => scope.username.set(e.target.value)}
+                value={$login.username()}
+                onChange={(e) => $login.username.set(e.target.value)}
                 className="input"
                 placeholder="Enter your username"
                 disabled={loading}
@@ -134,8 +140,8 @@ export function LoginModal() {
               </label>
               <input
                 type="password"
-                value={scope.password()}
-                onChange={(e) => scope.password.set(e.target.value)}
+                value={$login.password()}
+                onChange={(e) => $login.password.set(e.target.value)}
                 className="input"
                 placeholder="Enter your password"
                 disabled={loading}

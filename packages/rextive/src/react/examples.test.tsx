@@ -102,7 +102,7 @@ describe("examples", () => {
 
     // Form component using useScope for automatic cleanup
     const Form = () => {
-      const { fields, errors } = useScope(createForm);
+      const { fields, errors } = useScope("form", createForm);
 
       return (
         <>
@@ -201,7 +201,7 @@ describe("examples", () => {
      * which is the Promise itself for async signals.
      */
     const ErrorDemo = () => {
-      const { maybeError } = useScope(createMaybeErrorSignal);
+      const { maybeError } = useScope("errorDemo", createMaybeErrorSignal);
 
       return rx(() => {
         const state = task.from(maybeError);
@@ -295,7 +295,7 @@ describe("examples", () => {
      * - Both methods properly track the signal for reactivity
      */
     const SyncErrorDemo = () => {
-      const { trigger, maybeError } = useScope(createSyncErrorSignal);
+      const { trigger, maybeError } = useScope("syncErrorDemo", createSyncErrorSignal);
 
       return rx(() => {
         const err = maybeError.error();

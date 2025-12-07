@@ -1,50 +1,69 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { logic } from "rextive";
-import { searchBarLogic } from "./SearchBar";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { SearchBar } from "./SearchBar";
 
 // Mock productsLogic
+const mockSetSearch = vi.fn();
 vi.mock("@/logic/productsLogic", () => ({
   productsLogic: vi.fn(() => ({
-    setSearch: vi.fn(),
+    setSearch: mockSetSearch,
   })),
 }));
 
-describe("searchBarLogic", () => {
+describe("SearchBar", () => {
   beforeEach(() => {
-    logic.clear();
+    mockSetSearch.mockClear();
   });
 
-  it("should initialize with empty input", () => {
-    const search = searchBarLogic.create();
-
-    expect(search.input()).toBe("");
+  afterEach(() => {
+    cleanup();
   });
 
-  it("should update input value", () => {
-    const search = searchBarLogic.create();
+  it("should render with empty input", () => {
+    render(<SearchBar />);
 
-    search.input.set("laptop");
-
-    expect(search.input()).toBe("laptop");
+    const input = screen.getByPlaceholderText("Search products...");
+    expect(input).toHaveValue("");
   });
 
-  it("should clear input", () => {
-    const search = searchBarLogic.create();
-    search.input.set("laptop");
+  it("should update input value on change", () => {
+    render(<SearchBar />);
 
-    search.clear();
+    const input = screen.getByPlaceholderText("Search products...");
+    fireEvent.change(input, { target: { value: "laptop" } });
 
-    expect(search.input()).toBe("");
+    expect(input).toHaveValue("laptop");
+    expect(mockSetSearch).toHaveBeenCalledWith("laptop");
   });
 
-  it("should allow multiple updates", () => {
-    const search = searchBarLogic.create();
+  it("should show clear button when input has value", () => {
+    render(<SearchBar />);
 
-    search.input.set("l");
-    search.input.set("la");
-    search.input.set("laptop");
+    const input = screen.getByPlaceholderText("Search products...");
+    fireEvent.change(input, { target: { value: "laptop" } });
 
-    expect(search.input()).toBe("laptop");
+    // Clear button should be visible
+    const clearButton = screen.getByRole("button");
+    expect(clearButton).toBeInTheDocument();
+  });
+
+  it("should clear input when clear button is clicked", () => {
+    render(<SearchBar />);
+
+    const input = screen.getByPlaceholderText("Search products...");
+    fireEvent.change(input, { target: { value: "laptop" } });
+
+    const clearButton = screen.getByRole("button");
+    fireEvent.click(clearButton);
+
+    expect(input).toHaveValue("");
+    expect(mockSetSearch).toHaveBeenLastCalledWith("");
+  });
+
+  it("should not show clear button when input is empty", () => {
+    render(<SearchBar />);
+
+    const clearButton = screen.queryByRole("button");
+    expect(clearButton).not.toBeInTheDocument();
   });
 });
-

@@ -630,6 +630,313 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
     });
   });
 
+  describe("raw provider", () => {
+    it("should pass value directly without wrapping in signal", () => {
+      type StoreType = { count: number; increment: () => void };
+
+      const [useStore, StoreProvider] = provider<StoreType>({
+        name: "Store",
+        raw: true,
+      });
+
+      const store: StoreType = {
+        count: 42,
+        increment: vi.fn(),
+      };
+
+      function Consumer() {
+        const s = useStore();
+        return (
+          <div>
+            <div data-testid="count">{s.count}</div>
+            <button onClick={s.increment}>+</button>
+          </div>
+        );
+      }
+
+      renderWithWrapper(
+        <StoreProvider value={store}>
+          <Consumer />
+        </StoreProvider>
+      );
+
+      expect(screen.getByTestId("count")).toHaveTextContent("42");
+
+      act(() => {
+        screen.getByRole("button").click();
+      });
+
+      expect(store.increment).toHaveBeenCalledTimes(1);
+    });
+
+    it("should work with logic instances", () => {
+      type LogicInstance = {
+        value: ReturnType<typeof signal<number>>;
+        double: () => number;
+      };
+
+      const [useLogic, LogicProvider] = provider<LogicInstance>({
+        name: "Logic",
+        raw: true,
+      });
+
+      function Consumer() {
+        const $logic = useLogic();
+        return (
+          <div>
+            <div data-testid="value">{rx($logic.value)}</div>
+            <div data-testid="double">{$logic.double()}</div>
+          </div>
+        );
+      }
+
+      const logicInstance: LogicInstance = {
+        value: signal(5),
+        double: function () {
+          return this.value() * 2;
+        },
+      };
+
+      renderWithWrapper(
+        <LogicProvider value={logicInstance}>
+          <Consumer />
+        </LogicProvider>
+      );
+
+      expect(screen.getByTestId("value")).toHaveTextContent("5");
+      expect(screen.getByTestId("double")).toHaveTextContent("10");
+    });
+
+    it("should throw error when hook used outside provider", () => {
+      const [useStore] = provider<{ data: string }>({
+        name: "Store",
+        raw: true,
+      });
+
+      function Consumer() {
+        const s = useStore();
+        return <div>{s.data}</div>;
+      }
+
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      expect(() => renderWithWrapper(<Consumer />)).toThrow(
+        "Store context not found. Make sure you're using the component within <StoreProvider>."
+      );
+
+      spy.mockRestore();
+    });
+  });
+
+  describe("simple provider (no factory)", () => {
+    it("should create a signal from value automatically", () => {
+      const [useTheme, ThemeProvider] = provider<"dark" | "light">({
+        name: "Theme",
+      });
+
+      function Consumer() {
+        const theme = useTheme();
+        return <div data-testid="theme">{rx(theme)}</div>;
+      }
+
+      renderWithWrapper(
+        <ThemeProvider value="dark">
+          <Consumer />
+        </ThemeProvider>
+      );
+
+      expect(screen.getByTestId("theme")).toHaveTextContent("dark");
+    });
+
+    it("should auto-update signal when value prop changes", async () => {
+      const [useCount, CountProvider] = provider<number>({
+        name: "Count",
+      });
+
+      function Consumer() {
+        const count = useCount();
+        return <div data-testid="count">{rx(count)}</div>;
+      }
+
+      function WrapperComponent() {
+        const [count, setCount] = useState(0);
+        return (
+          <CountProvider value={count}>
+            <Consumer />
+            <button onClick={() => setCount((c) => c + 1)}>Increment</button>
+          </CountProvider>
+        );
+      }
+
+      renderWithWrapper(<WrapperComponent />);
+
+      expect(screen.getByTestId("count")).toHaveTextContent("0");
+
+      act(() => {
+        screen.getByRole("button").click();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("count")).toHaveTextContent("1");
+      });
+    });
+
+    it("should allow setting value from consumer", async () => {
+      const [useTheme, ThemeProvider] = provider<"dark" | "light">({
+        name: "Theme",
+      });
+
+      function Consumer() {
+        const theme = useTheme();
+        return (
+          <div>
+            <div data-testid="theme">{rx(theme)}</div>
+            <button onClick={() => theme.set("light")}>Toggle</button>
+          </div>
+        );
+      }
+
+      renderWithWrapper(
+        <ThemeProvider value="dark">
+          <Consumer />
+        </ThemeProvider>
+      );
+
+      expect(screen.getByTestId("theme")).toHaveTextContent("dark");
+
+      act(() => {
+        screen.getByRole("button").click();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("theme")).toHaveTextContent("light");
+      });
+    });
+
+    it("should handle objects as value", () => {
+      const [useUser, UserProvider] = provider<{ name: string; age: number }>({
+        name: "User",
+      });
+
+      function Consumer() {
+        const user = useUser();
+        return (
+          <div>
+            <div data-testid="name">{rx(user, (u) => u.name)}</div>
+            <div data-testid="age">{rx(user, (u) => u.age)}</div>
+          </div>
+        );
+      }
+
+      renderWithWrapper(
+        <UserProvider value={{ name: "Alice", age: 30 }}>
+          <Consumer />
+        </UserProvider>
+      );
+
+      expect(screen.getByTestId("name")).toHaveTextContent("Alice");
+      expect(screen.getByTestId("age")).toHaveTextContent("30");
+    });
+
+    it("should handle arrays as value", () => {
+      const [useItems, ItemsProvider] = provider<string[]>({
+        name: "Items",
+      });
+
+      function Consumer() {
+        const items = useItems();
+        return rx(items, (list) => (
+          <ul>
+            {list.map((item, i) => (
+              <li key={i} data-testid={`item-${i}`}>
+                {item}
+              </li>
+            ))}
+          </ul>
+        ));
+      }
+
+      renderWithWrapper(
+        <ItemsProvider value={["Apple", "Banana"]}>
+          <Consumer />
+        </ItemsProvider>
+      );
+
+      expect(screen.getByTestId("item-0")).toHaveTextContent("Apple");
+      expect(screen.getByTestId("item-1")).toHaveTextContent("Banana");
+    });
+
+    it("should handle null/undefined in union types", () => {
+      const [useOptional, OptionalProvider] = provider<string | null>({
+        name: "Optional",
+      });
+
+      function Consumer() {
+        const value = useOptional();
+        return <div data-testid="value">{rx(value, (v) => v ?? "empty")}</div>;
+      }
+
+      renderWithWrapper(
+        <OptionalProvider value={null}>
+          <Consumer />
+        </OptionalProvider>
+      );
+
+      expect(screen.getByTestId("value")).toHaveTextContent("empty");
+    });
+
+    it("should throw error when hook used outside provider", () => {
+      const [useTheme] = provider<"dark" | "light">({
+        name: "Theme",
+      });
+
+      function Consumer() {
+        const theme = useTheme();
+        return <div>{rx(theme)}</div>;
+      }
+
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      expect(() => renderWithWrapper(<Consumer />)).toThrow(
+        "Theme context not found. Make sure you're using the component within <ThemeProvider>."
+      );
+
+      spy.mockRestore();
+    });
+
+    it("should support nested providers of same type", () => {
+      const [useTheme, ThemeProvider] = provider<"dark" | "light">({
+        name: "Theme",
+      });
+
+      function Inner() {
+        const theme = useTheme();
+        return <div data-testid="inner">{rx(theme)}</div>;
+      }
+
+      function Outer() {
+        const theme = useTheme();
+        return (
+          <div>
+            <div data-testid="outer">{rx(theme)}</div>
+            <ThemeProvider value="dark">
+              <Inner />
+            </ThemeProvider>
+          </div>
+        );
+      }
+
+      renderWithWrapper(
+        <ThemeProvider value="light">
+          <Outer />
+        </ThemeProvider>
+      );
+
+      expect(screen.getByTestId("outer")).toHaveTextContent("light");
+      expect(screen.getByTestId("inner")).toHaveTextContent("dark");
+    });
+  });
+
   describe("multiple signals in context", () => {
     it("should support multiple signals", () => {
       interface ThemeStore {

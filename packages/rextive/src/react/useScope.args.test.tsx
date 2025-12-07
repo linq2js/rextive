@@ -1,10 +1,15 @@
-import { describe, it, expect, vi } from "vitest";
+import React from "react";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { useScope } from "./useScope";
-import { signal } from "../index";
+import { useScope, __clearCache } from "./useScope";
+import { signal } from "../signal";
 
-describe("useScope with args overload", () => {
+describe("useScope with args", () => {
+  afterEach(() => {
+    __clearCache();
+  });
+
   describe("basic functionality", () => {
     it("should pass args to factory function", () => {
       const factory = vi.fn((a: number, b: string) => {
@@ -13,7 +18,7 @@ describe("useScope with args overload", () => {
       });
 
       function TestComponent() {
-        const scope = useScope(factory, [42, "test"]);
+        const scope = useScope("test", factory, [42, "test"]);
         return <div>{scope.count()}</div>;
       }
 
@@ -30,7 +35,7 @@ describe("useScope with args overload", () => {
       });
 
       function TestComponent({ userId }: { userId: number }) {
-        const scope = useScope(factory, [userId]);
+        const scope = useScope("user", factory, [userId]);
         return <div>{scope.data()}</div>;
       }
 
@@ -53,9 +58,19 @@ describe("useScope with args overload", () => {
         return { data };
       });
 
-      function TestComponent({ userId, count }: { userId: number; count: number }) {
-        const scope = useScope(factory, [userId]);
-        return <div>{scope.data()} - {count}</div>;
+      function TestComponent({
+        userId,
+        count,
+      }: {
+        userId: number;
+        count: number;
+      }) {
+        const scope = useScope("user", factory, [userId]);
+        return (
+          <div>
+            {scope.data()} - {count}
+          </div>
+        );
       }
 
       const { rerender } = render(<TestComponent userId={1} count={0} />);
@@ -70,13 +85,15 @@ describe("useScope with args overload", () => {
     });
 
     it("should support multiple args with different types", () => {
-      const factory = vi.fn((id: number, name: string, enabled: boolean, data: { x: number }) => {
-        const count = signal(id);
-        return { count, name, enabled, data };
-      });
+      const factory = vi.fn(
+        (id: number, name: string, enabled: boolean, data: { x: number }) => {
+          const count = signal(id);
+          return { count, name, enabled, data };
+        }
+      );
 
       function TestComponent() {
-        const scope = useScope(factory, [42, "test", true, { x: 10 }]);
+        const scope = useScope("multi", factory, [42, "test", true, { x: 10 }]);
         return <div>{scope.count()}</div>;
       }
 
@@ -86,129 +103,12 @@ describe("useScope with args overload", () => {
     });
   });
 
-  describe("with lifecycle options", () => {
-    it("should work with init callback", () => {
-      const init = vi.fn();
-
-      function TestComponent({ userId }: { userId: number }) {
-        const scope = useScope(
-          (userId) => {
-            const data = signal(userId);
-            return { data };
-          },
-          [userId],
-          { init }
-        );
-        return <div>{scope.data()}</div>;
-      }
-
-      render(<TestComponent userId={1} />);
-
-      // Scope is returned as-is (not wrapped with disposable())
-      // Disposal handles: signals created inside factory + scope's dispose method
-      expect(init).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.any(Function) })
-      );
-    });
-
-    it("should work with mount callback", async () => {
-      const mount = vi.fn();
-
-      function TestComponent({ userId }: { userId: number }) {
-        const scope = useScope(
-          (userId) => {
-            const data = signal(userId);
-            return { data };
-          },
-          [userId],
-          { mount }
-        );
-        return <div>{scope.data()}</div>;
-      }
-
-      render(<TestComponent userId={1} />);
-
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(mount).toHaveBeenCalled();
-    });
-
-    it("should work with update callback", async () => {
-      const update = vi.fn();
-
-      function TestComponent({ userId }: { userId: number }) {
-        const scope = useScope(
-          (userId) => {
-            const data = signal(userId);
-            return { data };
-          },
-          [userId],
-          { update }
-        );
-        return <div>{scope.data()}</div>;
-      }
-
-      render(<TestComponent userId={1} />);
-
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(update).toHaveBeenCalled();
-    });
-
-    it("should work with cleanup and dispose", async () => {
-      const cleanup = vi.fn();
-      const dispose = vi.fn();
-
-      function TestComponent({ userId }: { userId: number }) {
-        const scope = useScope(
-          (userId) => {
-            const data = signal(userId);
-            return { data };
-          },
-          [userId],
-          { cleanup, dispose }
-        );
-        return <div>{scope.data()}</div>;
-      }
-
-      const { unmount } = render(<TestComponent userId={1} />);
-
-      unmount();
-
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(cleanup).toHaveBeenCalled();
-      expect(dispose).toHaveBeenCalled();
-    });
-
-    it("should call dispose when args change", async () => {
-      const dispose = vi.fn();
-
-      function TestComponent({ userId }: { userId: number }) {
-        const scope = useScope(
-          (userId) => {
-            const data = signal(userId);
-            return { data };
-          },
-          [userId],
-          { dispose }
-        );
-        return <div>{scope.data()}</div>;
-      }
-
-      const { rerender } = render(<TestComponent userId={1} />);
-
-      // Change userId
-      rerender(<TestComponent userId={2} />);
-
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      // Old scope should be disposed
-      expect(dispose).toHaveBeenCalled();
-    });
-  });
-
   describe("type safety", () => {
     it("should enforce args match factory params", () => {
       function TestComponent() {
         // This should work
         const scope1 = useScope(
+          "correct",
           (a: number, b: string) => {
             const count = signal(a);
             return { count, label: b };
@@ -216,8 +116,9 @@ describe("useScope with args overload", () => {
           [42, "test"] // ✅ Correct types
         );
 
-        // @ts-expect-error - Wrong types
         const scope2 = useScope(
+          "wrong",
+          // @ts-expect-error - Wrong types
           (a: number, b: string) => {
             const count = signal(a);
             return { count, label: b };
@@ -233,23 +134,6 @@ describe("useScope with args overload", () => {
   });
 
   describe("edge cases", () => {
-    it("should work with empty args array", () => {
-      const factory = vi.fn(() => {
-        const count = signal(0);
-        return { count };
-      });
-
-      function TestComponent() {
-        const scope = useScope(factory, []);
-        return <div>{scope.count()}</div>;
-      }
-
-      render(<TestComponent />);
-
-      expect(factory).toHaveBeenCalledWith();
-      expect(factory).toHaveBeenCalledOnce();
-    });
-
     it("should work with single arg", () => {
       const factory = vi.fn((userId: number) => {
         const data = signal(userId);
@@ -257,7 +141,7 @@ describe("useScope with args overload", () => {
       });
 
       function TestComponent() {
-        const scope = useScope(factory, [42]);
+        const scope = useScope("single", factory, [42]);
         return <div>{scope.data()}</div>;
       }
 
@@ -286,7 +170,7 @@ describe("useScope with args overload", () => {
       };
 
       function TestComponent() {
-        const scope = useScope(factory, [config]);
+        const scope = useScope("config", factory, [config]);
         return <div>{scope.data().id}</div>;
       }
 
@@ -302,7 +186,7 @@ describe("useScope with args overload", () => {
       });
 
       function TestComponent({ config }: { config: { id: number } }) {
-        const scope = useScope(factory, [config]);
+        const scope = useScope("objRef", factory, [config]);
         return <div>{scope.data()}</div>;
       }
 
@@ -313,34 +197,31 @@ describe("useScope with args overload", () => {
       rerender(<TestComponent config={{ id: 1 }} />);
       expect(factory).toHaveBeenCalledTimes(2);
     });
-  });
 
-  describe("comparison with watch option", () => {
-    it("args mode is more type-safe than watch mode", () => {
-      function TestComponent({ userId, filter }: { userId: number; filter: string }) {
-        // ✅ Args mode: type-safe, args match factory params
-        const scope1 = useScope(
-          (userId, filter) => {
-            const data = signal(`${userId}-${filter}`);
-            return { data };
-          },
-          [userId, filter]
-        );
+    it("should use custom equals for object comparison", () => {
+      const factory = vi.fn((config: { id: number }) => {
+        const data = signal(config.id);
+        return { data };
+      });
 
-        // ❌ Watch mode: easy to forget to update watch when using new variables
-        const scope2 = useScope(
-          () => {
-            // Using userId and filter from closure
-            const data = signal(`${userId}-${filter}`);
-            return { data };
-          },
-          { watch: [userId, filter] } // Must remember to add to watch
-        );
-
-        return <div>{scope1.data()}</div>;
+      function TestComponent({ config }: { config: { id: number } }) {
+        const scope = useScope("customEquals", factory, [config], {
+          equals: (a, b) =>
+            (a as { id: number }).id === (b as { id: number }).id,
+        });
+        return <div>{scope.data()}</div>;
       }
 
-      render(<TestComponent userId={1} filter="test" />);
+      const { rerender } = render(<TestComponent config={{ id: 1 }} />);
+      expect(factory).toHaveBeenCalledTimes(1);
+
+      // New object reference but same id - should NOT recreate
+      rerender(<TestComponent config={{ id: 1 }} />);
+      expect(factory).toHaveBeenCalledTimes(1);
+
+      // Different id - should recreate
+      rerender(<TestComponent config={{ id: 2 }} />);
+      expect(factory).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -352,31 +233,41 @@ describe("useScope with args overload", () => {
         filter,
       }));
 
-      function TestComponent({ userId, filter }: { userId: number; filter: string }) {
+      function TestComponent({
+        userId,
+        filter,
+      }: {
+        userId: number;
+        filter: string;
+      }) {
         const scope = useScope(
+          "userData",
           (userId, filter) => {
             const userData = signal(fetchUser(userId, filter));
             return { userData };
           },
           [userId, filter]
         );
-        
+
         const user = scope.userData();
-        return <div>{user.name} - {user.filter}</div>;
+        return (
+          <div>
+            {user.name} - {user.filter}
+          </div>
+        );
       }
 
       const { rerender } = render(<TestComponent userId={1} filter="active" />);
-      
+
       expect(screen.getByText("User 1 - active")).toBeInTheDocument();
       expect(fetchUser).toHaveBeenCalledWith(1, "active");
 
       // Change filter
       rerender(<TestComponent userId={1} filter="inactive" />);
-      
+
       expect(screen.getByText("User 1 - inactive")).toBeInTheDocument();
       expect(fetchUser).toHaveBeenCalledWith(1, "inactive");
       expect(fetchUser).toHaveBeenCalledTimes(2);
     });
   });
 });
-

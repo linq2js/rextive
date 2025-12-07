@@ -1,4 +1,4 @@
-import { rx, useScope } from "rextive/react";
+import { rx } from "rextive/react";
 import { Header } from "./components/Layout/Header";
 import { ProductGrid } from "./components/Products/ProductGrid";
 import { ProductDetails } from "./components/Products/ProductDetails";
@@ -7,7 +7,6 @@ import { LoginModal } from "./components/Auth/LoginModal";
 import { CheckoutModal } from "./components/Checkout/CheckoutModal";
 import { AlertModal } from "./components/Common/AlertModal";
 import { routerLogic } from "./logic/routerLogic";
-import { productDetailsLogic } from "./logic/productDetailsLogic";
 
 function HomePage() {
   return (
@@ -91,35 +90,6 @@ function HomePage() {
   );
 }
 
-function ProductPage() {
-  const $router = routerLogic();
-  const $productDetails = productDetailsLogic();
-
-  // Load product on mount and when route changes
-  useScope({
-    init: () => {
-      // Load on initial mount
-      const route = $router.route();
-      if (route.page === "product") {
-        $productDetails.loadProduct(route.id);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-    },
-    cleanup: () => {
-      // Subscribe to route changes for subsequent navigations
-      return $router.route.on(() => {
-        const route = $router.route();
-        if (route.page === "product") {
-          $productDetails.loadProduct(route.id);
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }
-      });
-    },
-  });
-
-  return <ProductDetails />;
-}
-
 function Router() {
   const $router = routerLogic();
 
@@ -128,7 +98,7 @@ function Router() {
 
     switch (route.page) {
       case "product":
-        return <ProductPage />;
+        return <ProductDetails />;
       case "home":
       default:
         return <HomePage />;

@@ -38,13 +38,6 @@ export * from "../index";
 // Re-export React-specific types
 export type { RerenderOptions, RerenderFunction } from "./types";
 
-// Re-export lifecycle types for useScope
-export type {
-  LifecyclePhase,
-  LifecycleCallbacks as ComponentLifecycleCallbacks,
-  LifecycleCallbacks as ObjectLifecycleCallbacks,
-} from "./useLifecycle";
-
 // Re-export useScope options
 export type { UseScopeOptions } from "./useScope";
 

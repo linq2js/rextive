@@ -1,33 +1,30 @@
-import { rx, useScope, disposable } from "rextive/react";
-import { signal } from "rextive";
+import { memo } from "react";
+import { rx, useScope } from "rextive/react";
+import { logic, signal } from "rextive";
 import { productsLogic } from "@/logic/productsLogic";
 
-export function searchBarLogic() {
-  const products = productsLogic();
-  const inputValue = signal("", { name: "searchBar.inputValue" });
+export const searchBarLogic = logic("searchBarLogic", () => {
+  const input = signal("", { name: "searchBar.input" });
+  const $products = productsLogic();
 
-  const handleSearch = (value: string) => {
-    inputValue.set(value);
-    products.setSearch(value);
+  return {
+    input,
+    clear() {
+      input.set("");
+      $products.setSearch("");
+    },
+    search(value: string) {
+      input.set(value);
+      $products.setSearch(value);
+    },
   };
+});
 
-  const clearSearch = () => {
-    inputValue.set("");
-    products.setSearch("");
-  };
-
-  return { inputValue, handleSearch, clearSearch };
-}
-
-export function SearchBar() {
-  const scope = useScope(() =>
-    disposable({
-      ...searchBarLogic(),
-    })
-  );
+export const SearchBar = memo(() => {
+  const $searchBar = useScope("searchBar", searchBarLogic);
 
   return rx(() => {
-    const value = scope.inputValue();
+    const value = $searchBar.input();
 
     return (
       <div className="relative">
@@ -35,7 +32,7 @@ export function SearchBar() {
           type="text"
           placeholder="Search products..."
           value={value}
-          onChange={(e) => scope.handleSearch(e.target.value)}
+          onChange={(e) => $searchBar.search(e.target.value)}
           className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-stone-200 dark:border-slate-700 bg-stone-50 dark:bg-slate-800/50 text-stone-900 dark:text-slate-100 placeholder:text-stone-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all"
         />
         <svg
@@ -53,7 +50,7 @@ export function SearchBar() {
         </svg>
         {value && (
           <button
-            onClick={() => scope.clearSearch()}
+            onClick={$searchBar.clear}
             className="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 dark:text-slate-500 hover:text-stone-600 dark:hover:text-slate-300 transition-colors"
           >
             <svg
@@ -74,4 +71,4 @@ export function SearchBar() {
       </div>
     );
   });
-}
+});

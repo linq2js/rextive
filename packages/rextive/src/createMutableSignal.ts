@@ -28,6 +28,7 @@
  */
 
 import { Emitter, emitter } from "./utils/emitter";
+import { errors } from "./utils/errors";
 import { guardDisposed } from "./utils/guardDisposed";
 import {
   Mutable,
@@ -283,7 +284,7 @@ export function createMutableSignal(
   const recompute = (when: SignalErrorWhen) => {
     // Safety check - cannot recompute disposed signal
     if (disposed) {
-      throw new Error("Cannot recompute disposed signal");
+      throw errors.cannotRecompute(displayName);
     }
 
     // Increment recomputation count (unless it's the initial computation)
@@ -445,7 +446,7 @@ export function createMutableSignal(
    */
   const reset = guardDisposed(
     isDisposed,
-    "Cannot reset disposed signal",
+    () => errors.cannotReset(displayName),
     () => {
       const prevValue = current?.value;
       current = initialValue; // Restore initial value wrapper
@@ -478,7 +479,7 @@ export function createMutableSignal(
    */
   const set = guardDisposed(
     isDisposed,
-    "Cannot set value on disposed signal",
+    () => errors.cannotSet(displayName),
     (value: any) => {
       try {
         // Handle updater function vs direct value
@@ -630,7 +631,7 @@ export function createMutableSignal(
    */
   const refresh = guardDisposed(
     isDisposed,
-    "Cannot refresh disposed signal",
+    () => errors.cannotRefresh(displayName),
     () => {
       // Batch multiple refresh calls into a single recomputation
       if (refreshScheduled) return; // Already scheduled
@@ -660,7 +661,7 @@ export function createMutableSignal(
    */
   const stale = guardDisposed(
     isDisposed,
-    "Cannot mark disposed signal as stale",
+    () => errors.cannotStale(displayName),
     () => {
       // Mark signal as stale - will recompute on next access
       current = undefined;

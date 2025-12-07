@@ -960,16 +960,46 @@ function Component() {
 
 ---
 
-### 6. `useScope()` - Component Lifecycle
+### 6. `useScope()` - Scoped State Management
 
-#### Mode 1: Factory (Most Common)
+Create cached scope instances with automatic lifecycle management.
 
-**⭐ Auto-Dispose Feature**: Signals created inside the factory are **automatically disposed** when the component unmounts or deps change. No need for explicit `disposable()` wrapper!
+#### Basic Usage
+
+```tsx
+useScope(key, factory);
+useScope(key, factory, options);
+useScope(key, factory, args);
+useScope(key, factory, args, options);
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `key` | `unknown` | Unique identifier for the scope (same key = same instance) |
+| `factory` | `() => TScope` or `(...args) => TScope` | Factory function to create the scope |
+| `args` | `TArgs[]` | Optional arguments passed to factory (scope recreates when args change) |
+| `options` | `UseScopeOptions \| EqualsStrategy \| EqualsFn` | Optional equality comparison for args |
+
+#### Key Features
+
+- **Keyed caching**: Same key = same instance (handles React StrictMode double-renders)
+- **Args comparison**: Recreates scope when args change
+- **Auto-dispose**: Signals created inside factory are automatically disposed
+- **Logic support**: Automatically uses `logic.create()` for Logic factories
+
+#### ⭐ Auto-Dispose Feature
+
+Signals created inside the factory are **automatically disposed** when:
+- The component unmounts
+- The args change (scope recreated)
+- React StrictMode double-invokes (orphan signals cleaned up)
 
 ```tsx
 function TodoList() {
   // ✅ Signals are auto-disposed on unmount - no disposable() needed!
-  const scope = useScope(() => {
+  const scope = useScope("todoList", () => {
     const todos = signal([]);
     const filter = signal("all");
 
@@ -984,11 +1014,71 @@ function TodoList() {
 }
 ```
 
-**Note**: For additional cleanup beyond signals:
+#### With Args (Recreates When Args Change)
+
+```tsx
+function UserProfile({ userId }: { userId: string }) {
+  const scope = useScope("userProfile", (id) => {
+    const user = signal(async () => fetchUser(id));
+    return { user };
+  }, [userId]);
+
+  return <div>{rx(scope.user, u => u?.name)}</div>;
+}
+```
+
+#### Multiple Instances (User-Controlled Key)
+
+```tsx
+function Tab({ tabId }: { tabId: string }) {
+  // Each tab gets its own scope
+  const scope = useScope(`tab:${tabId}`, () => {
+    const content = signal("");
+    return { content };
+  });
+
+  return <div>{rx(scope.content)}</div>;
+}
+```
+
+#### With Logic
+
+```tsx
+const counterLogic = logic("counterLogic", () => {
+  const count = signal(0);
+  return { count, increment: () => count.set(c => c + 1) };
+});
+
+function Counter() {
+  // Automatically uses counterLogic.create()
+  const { count, increment } = useScope("counter", counterLogic);
+  return <button onClick={increment}>{rx(count)}</button>;
+}
+```
+
+#### Custom Equality for Args
+
+```tsx
+// Using options object
+useScope("filteredList", factory, [filters], {
+  equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
+});
+
+// Using equality strategy string
+useScope("data", factory, [obj], "shallow");
+useScope("data", factory, [obj], "deep");
+
+// Using custom function directly
+useScope("data", factory, [obj], (a, b) => a.id === b.id);
+```
+
+#### Additional Cleanup
+
+For cleanup beyond signals, add a `dispose` method:
 
 ```tsx
 // Simple case - just add dispose() method
-const scope = useScope(() => {
+const scope = useScope("myScope", () => {
   const todos = signal([]);
   const subscription = someExternalService.subscribe();
 
@@ -999,7 +1089,7 @@ const scope = useScope(() => {
 });
 
 // Multiple cleanup logic - use disposable() to combine them
-const scope = useScope(() => {
+const scope = useScope("myScope", () => {
   const todos = signal([]);
   const sub1 = service1.subscribe();
   const sub2 = service2.subscribe();
@@ -1009,43 +1099,6 @@ const scope = useScope(() => {
     todos,
     dispose: [sub1, sub2, () => clearInterval(timer)],
   });
-});
-```
-
----
-
-#### Mode 2: Lifecycle
-
-```tsx
-useScope({
-  init: () => console.log("Before first render"),
-  mount: () => console.log("After first paint"),
-  render: () => console.log("Every render"),
-  cleanup: () => console.log("React cleanup"),
-  dispose: () => console.log("True unmount"),
-});
-```
-
----
-
-#### Mode 3: Object Tracking
-
-```tsx
-useScope({
-  for: user,
-  init: (user) => analytics.track("session-start", user),
-  dispose: (user) => analytics.track("session-end", user),
-});
-```
-
----
-
-#### Options
-
-```tsx
-useScope(factory, {
-  watch: [dep1, dep2], // Recreate when deps change
-  update: [(scope) => scope.refresh(), dep], // Run effect on deps change
 });
 ```
 
@@ -1676,9 +1729,139 @@ const myLogic = logic("myLogic", () => {
 });
 ```
 
-#### Naming Conventions
+---
 
-**✅ Logic Name (first parameter):**
+## 🏷️ Naming Conventions
+
+This section covers naming conventions for all Rextive constructs.
+
+### Signal Naming
+
+#### Primitive/Simple Signals (No Postfix)
+
+For simple state values, use descriptive names without postfixes:
+
+```tsx
+// ✅ GOOD - Clear, simple names
+const count = signal(0);
+const filter = signal("all");
+const selectedId = signal<number | null>(null);
+
+// Boolean signals - use "is" prefix
+const isOpen = signal(false);
+const isLoading = signal(true);
+const hasError = signal(false);
+```
+
+#### Async Signals (No Postfix)
+
+Async signals that return Promises **do not need a postfix**. TypeScript guides consumers on how to access the value.
+
+```tsx
+// ✅ GOOD - No postfix for async signals
+const user = signal({ userId }, async ({ deps, abortSignal }) => {
+  return fetchUser(deps.userId, { signal: abortSignal });
+});
+
+const products = signal(async () => fetchProducts());
+
+// Consumer must use task.from() or wait()
+rx(() => {
+  const state = task.from(user()); // TypeScript shows it's a Promise
+  if (state.loading) return <Spinner />;
+  return <div>{state.value?.name}</div>;
+});
+```
+
+**Rationale:** Async signals may evolve (e.g., add task operator later) without breaking consumers. Let types guide usage instead of naming.
+
+#### Task Signals (`Task` Postfix)
+
+Signals wrapped with the `task()` operator **use `Task` postfix**. This indicates stale-while-revalidate behavior where `value` is always defined.
+
+```tsx
+// ✅ GOOD - Task postfix for task-wrapped signals
+const user = signal({ userId }, async ({ deps }) => fetchUser(deps.userId));
+const userTask = user.pipe(task({ id: 0, name: "Loading..." }));
+
+// Consumer gets TaskState directly (no task.from needed)
+rx(() => {
+  const { loading, error, value } = userTask(); // value is ALWAYS defined
+  return (
+    <div>
+      {loading && <Spinner />}
+      <span>{value.name}</span> {/* Safe - never undefined */}
+    </div>
+  );
+});
+```
+
+**Use Task when:**
+
+- You need stale-while-revalidate (show previous value during reload)
+- You want guaranteed non-undefined value
+
+**Use plain async when:**
+
+- You can accept `undefined` during loading/error states
+- You're using Suspense with `wait()`
+
+### Action Naming
+
+Actions created via `signal.action()` or `.tuple` follow these conventions:
+
+#### Dispatcher (Verb Name)
+
+Expose dispatchers with semantic verb names:
+
+```tsx
+const loginAction = signal.action<Credentials, User>(async (creds) => {
+  return authApi.login(creds);
+});
+
+// ✅ GOOD - Semantic verb names for dispatchers
+export const login = loginAction.dispatch;
+export const logout = logoutAction.dispatch;
+export const addToCart = cartAction.dispatch;
+export const refresh = refreshAction.dispatch;
+```
+
+#### Action Results (Only Expose When Needed)
+
+**Default:** Don't expose results - just use `await dispatch()`:
+
+```tsx
+// Most common pattern - no result signal needed
+const user = await $auth.login(credentials);
+```
+
+**When reactive result is needed:** Use `Result` + optional postfix:
+
+| Result Type  | Naming            | When to Use                              |
+| ------------ | ----------------- | ---------------------------------------- |
+| Sync result  | `loginResult`     | Reactive sync value                      |
+| Async result | `loginResult`     | Reactive async value (use `task.from()`) |
+| Task result  | `loginResultTask` | Stale-while-revalidate for result        |
+
+```tsx
+export const authLogic = logic("authLogic", () => {
+  const loginAction = signal.action<Credentials, User>(...);
+
+  return {
+    // Dispatcher - always expose
+    login: loginAction.dispatch,
+
+    // Result - only expose if multiple components need to react
+    loginResult: loginAction.result,
+    // OR for task pattern:
+    loginResultTask: loginAction.result.pipe(task(null)),
+  };
+});
+```
+
+### Logic Naming
+
+#### Logic Definition (`Logic` Postfix)
 
 Always use `Logic` postfix in the logic name string:
 
@@ -1693,7 +1876,7 @@ logic("auth", () => { ... });
 logic("cart", () => { ... });
 ```
 
-**✅ Variable/Export Name:**
+#### Variable/Export Name (`Logic` Postfix)
 
 Always use `Logic` postfix:
 
@@ -1706,7 +1889,7 @@ export const cartLogic = logic("cartLogic", () => { ... });
 export const auth = logic("authLogic", () => { ... });
 ```
 
-**✅ File Name:**
+#### File Name (`Logic` Postfix)
 
 Use `Logic` postfix in file names:
 
@@ -1721,7 +1904,7 @@ src/logic/auth.ts
 src/logic/cart.ts
 ```
 
-#### Consumer Convention: `$` Prefix
+### Consumer Convention: `$` Prefix
 
 When consuming logic instances, use `$` prefix to distinguish logic instances from local variables:
 
@@ -2012,7 +2195,7 @@ const result = count.pipe(
 
 ```tsx
 function SearchBox() {
-  const scope = useScope(() => {
+  const scope = useScope("searchBox", () => {
     const searchInput = signal("");
 
     const results = signal(
@@ -2031,7 +2214,7 @@ function SearchBox() {
       }
     );
 
-    return disposable({ searchInput, results });
+    return { searchInput, results };
   });
 
   return (
@@ -2194,14 +2377,14 @@ signal({ searchTerm }, async ({ deps, abortSignal }) => {
 
 ```tsx
 // ✅ GOOD - Signals auto-dispose on unmount (no wrapper needed!)
-useScope(() => {
+useScope("myComponent", () => {
   const count = signal(0);
   const doubled = count.to((x) => x * 2);
   return { count, doubled };
 });
 
 // ✅ Also GOOD - Add dispose() method for additional cleanup
-useScope(() => {
+useScope("myComponent", () => {
   const count = signal(0);
   const subscription = someService.subscribe();
   return {
@@ -2211,7 +2394,7 @@ useScope(() => {
 });
 
 // ✅ Use disposable() to combine multiple cleanup logic
-useScope(() =>
+useScope("myComponent", () =>
   disposable({
     count: signal(0),
     dispose: [sub1, sub2, () => clearInterval(timer)],
@@ -2292,7 +2475,7 @@ function Component() {
   const count = signal(0);
 
   // ✅ Good - signals are auto-disposed on unmount
-  const { count } = useScope(() => ({ count: signal(0) }));
+  const { count } = useScope("component", () => ({ count: signal(0) }));
 }
 ```
 
@@ -2371,7 +2554,7 @@ function Component() {
 
 - `rx()` - Reactive rendering (4 overloads)
 - `rx.use()` - Reactive hook ⭐
-- `useScope()` - Lifecycle & scoped state (3 overloads)
+- `useScope(key, factory, args?, options?)` - Scoped state with auto-dispose
 - `provider()` - Signal context ⭐
 
 ### Operators (`rextive/op`) ⭐
@@ -2512,6 +2695,20 @@ emit.signalError(signalRef, error);
 - Use `task.from()` for manual loading states
 - Use `abortSignal` for queries, not mutations
 - Import from `rextive/react` in React apps
+
+**Naming Conventions:**
+
+| Type               | Postfix      | Consumer Pattern                  | Example                        |
+| ------------------ | ------------ | --------------------------------- | ------------------------------ |
+| Primitive          | None         | `signal()`                        | `count`, `filter`, `isOpen`    |
+| Boolean            | `is` prefix  | `isOpen()`                        | `isLoading`, `hasError`        |
+| Async              | None         | `task.from(signal())` or `wait()` | `user`, `products`             |
+| Task               | `Task`       | `signal()` directly → `TaskState` | `userTask`, `productsTask`     |
+| Dispatcher         | Verb         | `login(payload)`                  | `login`, `logout`, `addToCart` |
+| Result (if needed) | `Result`     | `task.from(loginResult())`        | `loginResult`                  |
+| Result as Task     | `ResultTask` | `loginResultTask()`               | `loginResultTask`              |
+| Logic definition   | `Logic`      | -                                 | `authLogic`, `cartLogic`       |
+| Logic instance     | `$` prefix   | `$auth.user()`                    | `$auth`, `$cart`               |
 
 **Logic Conventions:**
 

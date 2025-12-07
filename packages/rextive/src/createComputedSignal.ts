@@ -1,4 +1,5 @@
 import { Emitter, emitter } from "./utils/emitter";
+import { errors } from "./utils/errors";
 import { guardDisposed } from "./utils/guardDisposed";
 import {
   Computed,
@@ -163,7 +164,7 @@ export function createComputedSignal(
 
   const recompute = (when: SignalErrorWhen) => {
     if (disposed) {
-      throw new Error("Cannot recompute disposed signal");
+      throw errors.cannotRecompute(displayName);
     }
 
     // Increment recomputation count (unless it's the initial computation)
@@ -293,7 +294,7 @@ export function createComputedSignal(
 
   const reset = guardDisposed(
     isDisposed,
-    "Cannot reset disposed signal",
+    () => errors.cannotReset(displayName),
     () => {
       current = undefined;
       hasComputed = false;
@@ -367,7 +368,7 @@ export function createComputedSignal(
 
   const refresh = guardDisposed(
     isDisposed,
-    "Cannot refresh disposed signal",
+    () => errors.cannotRefresh(displayName),
     () => {
       // Batch multiple refresh calls into a single recomputation
       if (refreshScheduled) return;
@@ -384,7 +385,7 @@ export function createComputedSignal(
 
   const stale = guardDisposed(
     isDisposed,
-    "Cannot mark disposed signal as stale",
+    () => errors.cannotStale(displayName),
     () => {
       // Mark signal as stale - will recompute on next access
       current = undefined;

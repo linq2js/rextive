@@ -74,6 +74,7 @@ export { wait, type Awaitable } from "./wait";
 export { awaited } from "./awaited";
 export { AbortedComputationError } from "./createSignalContext";
 export { FallbackError } from "./common";
+export { SignalDisposedError } from "./utils/errors";
 
 export { is } from "./is";
 

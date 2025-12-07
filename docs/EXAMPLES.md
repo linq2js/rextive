@@ -279,64 +279,60 @@ Demonstrates the `useScope()` pattern for creating component-local state that au
 
 ### What You'll Learn
 
-- Creating scoped state with `useScope()`
-- Using `disposable()` for automatic cleanup
+- Creating scoped state with `useScope(key, factory)`
+- Auto-dispose for signals created inside factory
 - Organizing related signals and actions together
 
 ### Code
 
 ```tsx
-import { signal, disposable, rx, useScope } from "rextive/react";
-
-// Factory function that creates all component state
-function createTodoListScope() {
-  // Mutable signals for state
-  const todos = signal([
-    { id: 1, text: "Learn Rextive", status: "done" },
-    { id: 2, text: "Build app", status: "active" },
-  ]);
-  const filter = signal("all");
-
-  // Computed signal with multiple dependencies
-  const filteredTodos = signal({ todos, filter }, ({ deps }) => {
-    if (deps.filter === "all") return deps.todos;
-    return deps.todos.filter((t) => t.status === deps.filter);
-  });
-
-  // Derived state from single signal (no deps needed)
-  const activeCount = todos.to(
-    (list) => list.filter((t) => t.status === "active").length
-  );
-
-  // Actions (plain functions that update signals)
-  const addTodo = (text) => {
-    todos.set((list) => [...list, { id: Date.now(), text, status: "active" }]);
-  };
-
-  const toggleTodo = (id) => {
-    todos.set((list) =>
-      list.map((t) =>
-        t.id === id
-          ? { ...t, status: t.status === "active" ? "done" : "active" }
-          : t
-      )
-    );
-  };
-
-  // disposable() collects all signals and adds .dispose() method
-  return disposable({
-    todos,
-    filter,
-    filteredTodos,
-    activeCount,
-    addTodo,
-    toggleTodo,
-  });
-}
+import { signal, rx, useScope } from "rextive/react";
 
 function TodoList() {
-  // useScope() calls factory once and auto-disposes on unmount
-  const scope = useScope(createTodoListScope);
+  // useScope() creates scope once and auto-disposes signals on unmount
+  const scope = useScope("todoList", () => {
+    // Mutable signals for state
+    const todos = signal([
+      { id: 1, text: "Learn Rextive", status: "done" },
+      { id: 2, text: "Build app", status: "active" },
+    ]);
+    const filter = signal("all");
+
+    // Computed signal with multiple dependencies
+    const filteredTodos = signal({ todos, filter }, ({ deps }) => {
+      if (deps.filter === "all") return deps.todos;
+      return deps.todos.filter((t) => t.status === deps.filter);
+    });
+
+    // Derived state from single signal
+    const activeCount = todos.to(
+      (list) => list.filter((t) => t.status === "active").length
+    );
+
+    // Actions (plain functions that update signals)
+    const addTodo = (text) => {
+      todos.set((list) => [...list, { id: Date.now(), text, status: "active" }]);
+    };
+
+    const toggleTodo = (id) => {
+      todos.set((list) =>
+        list.map((t) =>
+          t.id === id
+            ? { ...t, status: t.status === "active" ? "done" : "active" }
+            : t
+        )
+      );
+    };
+
+    return {
+      todos,
+      filter,
+      filteredTodos,
+      activeCount,
+      addTodo,
+      toggleTodo,
+    };
+  });
 
   return (
     <div>
@@ -364,11 +360,11 @@ function TodoList() {
 
 ### Key Points
 
-| Concept             | Description                                             |
-| ------------------- | ------------------------------------------------------- |
-| `useScope(factory)` | Calls factory once, disposes on unmount                 |
-| `disposable({...})` | Wraps object, adds `.dispose()` that cleans all signals |
-| Factory pattern     | Separates state creation from component for testability |
+| Concept                    | Description                                             |
+| -------------------------- | ------------------------------------------------------- |
+| `useScope(key, factory)`   | Creates scope once, auto-disposes signals on unmount    |
+| Auto-dispose               | Signals inside factory are automatically cleaned up     |
+| Factory pattern            | Separates state creation from component for testability |
 
 ---
 
@@ -379,62 +375,38 @@ Build a reusable query pattern similar to React Query or SWR.
 ### What You'll Learn
 
 - Creating reusable data fetching patterns
-- Using `useScope()` with the `update` option
+- Using `useScope()` with args for dependency-based recreation
 - Building query-like APIs
 
 ### Code
 
 ```tsx
-import { signal, disposable, rx, useScope, task } from "rextive/react";
-
-// Reusable query factory
-function createQuery(endpoint, options = {}) {
-  // Parameters signal - set to trigger fetch
-  const params = signal();
-
-  // Result signal - fetches when params change
-  const result = signal({ params }, async ({ deps, abortSignal }) => {
-    if (!deps.params) return null;
-
-    const res = await fetch(endpoint, {
-      method: options.method || "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(deps.params),
-      signal: abortSignal,
-    });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  });
-
-  // Query function - sets params and returns result promise
-  const query = (newParams) => {
-    params.set(newParams);
-    return result();
-  };
-
-  return {
-    params,
-    result,
-    query,
-    refetch: result.refresh, // Force re-fetch
-    dispose: disposable({ result, params }).dispose,
-  };
-}
+import { signal, rx, useScope, task } from "rextive/react";
 
 function UserProfile({ userId }) {
-  // Create scoped query instance
-  const userQuery = useScope(() => createQuery("/api/user"), {
-    // update: [callback, dependency] - runs callback when dependency changes
-    update: [(q) => q.query({ id: userId }), userId],
-  });
+  // Create scoped query instance - recreates when userId changes
+  const scope = useScope("userProfile", (id) => {
+    // Result signal - fetches user data
+    const result = signal(async ({ abortSignal }) => {
+      const res = await fetch(`/api/user/${id}`, {
+        signal: abortSignal,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    });
+
+    return {
+      result,
+      refetch: result.refresh,
+    };
+  }, [userId]);
 
   return (
     <div>
-      <button onClick={() => userQuery.refetch()}>Refresh</button>
+      <button onClick={() => scope.refetch()}>Refresh</button>
 
       {rx(() => {
-        const state = task.from(userQuery.result);
+        const state = task.from(scope.result());
 
         if (state.loading) return <div>Loading...</div>;
         if (state.error) return <div>Error: {state.error.message}</div>;
@@ -452,11 +424,11 @@ function UserProfile({ userId }) {
 
 ### Key Points
 
-| Concept                         | Description                                          |
-| ------------------------------- | ---------------------------------------------------- |
-| `useScope(factory, { update })` | Runs effect when dependencies change                 |
-| `result.refresh()`              | Forces immediate re-computation                      |
-| Query pattern                   | Separates triggering (params) from fetching (result) |
+| Concept                          | Description                                          |
+| -------------------------------- | ---------------------------------------------------- |
+| `useScope(key, factory, [args])` | Recreates scope when args change                     |
+| `result.refresh()`               | Forces immediate re-computation                      |
+| Args as dependencies             | userId change triggers scope recreation              |
 
 ---
 
@@ -475,51 +447,48 @@ Build a registration form with both synchronous and asynchronous validation.
 ```tsx
 import {
   signal,
-  disposable,
   rx,
   useScope,
   task,
   wait,
 } from "rextive/react";
 
-function createRegistrationFormScope() {
-  // Mock existing usernames (would be API call in real app)
-  const existingUsernames = ["admin", "testuser", "john123"];
-
-  // Form field signals
-  const fields = {
-    name: signal(""),
-    username: signal(""),
-  };
-
-  // Validation signals
-  const errors = {
-    // Sync validation - immediate feedback
-    name: fields.name.to((value) => {
-      if (value.length === 0) return "Name is required";
-      if (value.length < 2) return "Name must be at least 2 characters";
-      return undefined; // undefined = valid
-    }),
-
-    // Async validation - debounced check
-    username: fields.username.to(async (value, { safe }) => {
-      if (value.length === 0) return "Username is required";
-
-      // safe() throws if signal is disposed or re-computing
-      // This creates a 500ms debounce
-      await safe(wait.delay(500));
-
-      // Check availability (would be API call)
-      if (existingUsernames.includes(value)) return "Username already taken";
-      return undefined;
-    }),
-  };
-
-  return disposable({ fields, errors });
-}
-
 function RegistrationForm() {
-  const scope = useScope(createRegistrationFormScope);
+  const scope = useScope("registrationForm", () => {
+    // Mock existing usernames (would be API call in real app)
+    const existingUsernames = ["admin", "testuser", "john123"];
+
+    // Form field signals
+    const fields = {
+      name: signal(""),
+      username: signal(""),
+    };
+
+    // Validation signals
+    const errors = {
+      // Sync validation - immediate feedback
+      name: fields.name.to((value) => {
+        if (value.length === 0) return "Name is required";
+        if (value.length < 2) return "Name must be at least 2 characters";
+        return undefined; // undefined = valid
+      }),
+
+      // Async validation - debounced check
+      username: fields.username.to(async (value, { safe }) => {
+        if (value.length === 0) return "Username is required";
+
+        // safe() throws if signal is disposed or re-computing
+        // This creates a 500ms debounce
+        await safe(wait.delay(500));
+
+        // Check availability (would be API call)
+        if (existingUsernames.includes(value)) return "Username already taken";
+        return undefined;
+      }),
+    };
+
+    return { fields, errors };
+  });
 
   // Reusable field component
   const Field = ({ label, field, validation }) =>
@@ -588,7 +557,6 @@ Build a search box with debouncing and automatic cancellation of in-flight reque
 ```tsx
 import {
   signal,
-  disposable,
   rx,
   useScope,
   wait,
@@ -596,7 +564,7 @@ import {
 } from "rextive/react";
 
 function SearchBox() {
-  const scope = useScope(() => {
+  const scope = useScope("searchBox", () => {
     const searchInput = signal("");
 
     const results = signal(
@@ -619,7 +587,7 @@ function SearchBox() {
       }
     );
 
-    return disposable({ searchInput, results });
+    return { searchInput, results };
   });
 
   return (
@@ -906,7 +874,7 @@ const resilientData = signal(async ({ abortSignal, refresh }) => {
 
 ```tsx
 function StockTicker() {
-  const scope = useScope(() => {
+  const scope = useScope("stockTicker", () => {
     const symbol = signal("AAPL");
 
     // Poll stock price every 5 seconds
@@ -919,7 +887,7 @@ function StockTicker() {
       return res.json();
     });
 
-    return disposable({ symbol, price });
+    return { symbol, price };
   });
 
   return (
@@ -954,7 +922,7 @@ function StockTicker() {
 
 ```tsx
 function Dashboard() {
-  const scope = useScope(() => {
+  const scope = useScope("dashboard", () => {
     const isVisible = signal(true);
     const pollInterval = signal(30 * 1000);
 
@@ -978,15 +946,13 @@ function Dashboard() {
 
     document.addEventListener("visibilitychange", handleVisibility);
 
-    return disposable({
+    return {
       metrics,
       isVisible,
       pollInterval,
-      dispose: [
-        () =>
-          document.removeEventListener("visibilitychange", handleVisibility),
-      ],
-    });
+      dispose: () =>
+        document.removeEventListener("visibilitychange", handleVisibility),
+    };
   });
 
   return (

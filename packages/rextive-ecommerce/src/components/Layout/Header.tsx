@@ -3,6 +3,7 @@ import { SearchBar } from "./SearchBar";
 import { UserMenu } from "./UserMenu";
 import { CartButton } from "./CartButton";
 import { ThemeToggle } from "./ThemeToggle";
+import { EqualsFn, EqualsStrategy } from "rextive";
 
 export function Header() {
   return (
@@ -32,3 +33,15 @@ export function Header() {
     </header>
   );
 }
+
+export type UseScopeOptions = {
+  equals?: EqualsStrategy | EqualsFn<any>;
+};
+
+declare function useScope<TArgs extends any[], TScope>(
+  key: string,
+  factory: (...args: TArgs) => TScope,
+  ...extra: TArgs extends []
+    ? []
+    : [args: TArgs, options?: UseScopeOptions | EqualsStrategy | EqualsFn<any>]
+): TScope;

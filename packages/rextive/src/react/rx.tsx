@@ -161,14 +161,19 @@ export function rx<T>(fn: () => T): ReactNode;
  * ```
  */
 export function rx<
-  T extends keyof JSX.IntrinsicElements | React.ComponentType<any>
->(
-  component: T,
-  props: T extends keyof JSX.IntrinsicElements
-    ? JSX.IntrinsicElements[T]
-    : T extends React.ComponentType<infer P>
+  TComponents extends keyof JSX.IntrinsicElements | React.ComponentType<any>,
+  TProps extends TComponents extends keyof JSX.IntrinsicElements
+    ? JSX.IntrinsicElements[TComponents]
+    : TComponents extends React.ComponentType<infer P>
     ? P
     : {}
+>(
+  component: TComponents,
+  props: {
+    [K in keyof TProps]?:
+      | TProps[K]
+      | Signal<TProps[K] | PromiseLike<TProps[K]>>;
+  }
 ): ReactNode;
 
 // Implementation

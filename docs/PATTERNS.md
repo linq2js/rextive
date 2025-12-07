@@ -187,33 +187,40 @@ function maybeSet<T>(s: AnySignal<T>, value: T) {
 
 ---
 
-## Pattern 5: Fine-Grained Lifecycle Control
+## Pattern 5: Component-Scoped State with useScope
 
 ```tsx
-import { useScope } from "rextive/react";
+import { signal, useScope, rx } from "rextive/react";
 
-function Component() {
-  useScope({
-    init: () => console.log("Before first render"),
-    mount: () => console.log("After first paint"),
-    render: () => console.log("Every render"),
-    cleanup: () => console.log("React cleanup"),
-    dispose: () => console.log("True unmount (once)"),
+function Counter() {
+  const scope = useScope("counter", () => {
+    const count = signal(0);
+    const doubled = count.to((x) => x * 2);
+    
+    return {
+      count,
+      doubled,
+      increment: () => count.set((c) => c + 1),
+    };
   });
 
-  return <div>Hello</div>;
+  return (
+    <div>
+      <p>Count: {rx(scope.count)}</p>
+      <p>Doubled: {rx(scope.doubled)}</p>
+      <button onClick={scope.increment}>+1</button>
+    </div>
+  );
 }
 ```
 
-### Lifecycle Phases
+### Key Features
 
-| Phase | When | Use For |
-|-------|------|---------|
-| **init** | Before first render | Signal creation |
-| **mount** | After first paint | DOM measurements |
-| **render** | Every render | Tracking |
-| **cleanup** | React cleanup | Pause (not final) |
-| **dispose** | True unmount | Final cleanup |
+| Feature | Description |
+|---------|-------------|
+| **Keyed caching** | Same key = same instance (handles StrictMode) |
+| **Auto-dispose** | Signals inside factory are automatically disposed |
+| **Args support** | `useScope(key, factory, [args])` - recreates when args change |
 
 ---
 
@@ -311,10 +318,10 @@ isActive.set(true);
 Combine auto-polling with manual refresh:
 
 ```tsx
-import { useScope, rx } from "rextive/react";
+import { signal, useScope, rx, task } from "rextive/react";
 
 function Dashboard() {
-  const scope = useScope(() => {
+  const scope = useScope("dashboard", () => {
     const data = signal(async ({ abortSignal, refresh }) => {
       setTimeout(refresh, 60 * 1000); // Auto-refresh every minute
 

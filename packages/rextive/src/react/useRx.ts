@@ -1,52 +1,8 @@
-import { useEffect, useState, useRef } from "react";
-import { Hooks, withHooks } from "../hooks";
-import { AnySignal, Task } from "../types";
+import { useEffect, useState } from "react";
+import { withHooks } from "../hooks";
+import { AnySignal } from "../types";
 import { emitter } from "../utils/emitter";
-import { useSafeFactory } from "./useSafeFactory";
-
-/**
- * Internal controller for tracking signals accessed within useRx.
- *
- * Implements Hooks interface to integrate with the signal system's
- * automatic tracking mechanism. When signals are read via get(), they
- * call getHooks().onSignalAccess() which adds them to this controller.
- *
- * **Important**: Methods are defined as arrow function class properties
- * (not prototype methods) to ensure they work correctly when spread by
- * `withHooks`. Prototype methods are NOT copied during object spread.
- */
-class RxController implements Pick<Hooks, "onSignalAccess" | "onTaskAccess"> {
-  /** Set of signals accessed during the current render */
-  signals = new Set<AnySignal<any>>();
-
-  /** Rerender function to trigger component updates */
-  rerender: VoidFunction;
-
-  constructor(rerender: VoidFunction) {
-    this.rerender = rerender;
-  }
-
-  /**
-   * Track a signal for subscription.
-   * Called automatically by signals when read via get() during withHooks context.
-   */
-  onSignalAccess = (signal: AnySignal<any>) => {
-    this.signals.add(signal);
-  };
-
-  /**
-   * Track a task and trigger rerender when it resolves/rejects.
-   * Used for async signals to re-render when the promise settles.
-   */
-  onTaskAccess = (task: Task<any>) => {
-    if (task.status === "loading") {
-      task.promise.then(
-        () => this.rerender(),
-        () => this.rerender()
-      );
-    }
-  };
-}
+import { useScope } from "./useScope";
 
 /**
  * Hook for reactive rendering with automatic signal tracking.
@@ -112,48 +68,40 @@ class RxController implements Pick<Hooks, "onSignalAccess" | "onTaskAccess"> {
 export function useRx<T>(fn: () => T): T {
   // Rerender trigger - use useState for forcing re-renders
   const [, setRerenderState] = useState({});
-  const rerenderRef = useRef(() => setRerenderState({}));
-  rerenderRef.current = () => setRerenderState({});
-
-  // Use useSafeFactory for StrictMode-safe controller creation
-  const factory = useSafeFactory(
-    () => new RxController(rerenderRef.current),
-    [] // Empty deps - controller persists for component lifetime
-  );
-
-  const controller = factory.result;
-
-  // Update rerender function reference (in case it changed)
-  controller.rerender = rerenderRef.current;
-
-  // Clear tracked signals at start of each render
-  // This ensures we only subscribe to signals accessed in THIS render
-  controller.signals.clear();
-
-  // Set up subscriptions AFTER render completes
-  // useEffect runs synchronously after DOM mutations but before paint
-  useEffect(() => {
-    factory.commit();
-
-    // Create cleanup emitter to collect unsubscribe functions
-    const onCleanup = emitter();
-
-    // Subscribe to each tracked signal
-    // signal.on(rerender) returns an unsubscribe function
-    // onCleanup.on() stores it for cleanup
-    for (const signal of controller.signals) {
-      onCleanup.on(signal.on(controller.rerender));
-    }
-
-    // Cleanup: unsubscribe from all signals when component unmounts
-    // or when the effect re-runs (on each render)
-    return () => {
-      onCleanup.emitAndClear();
-      factory.scheduleDispose();
+  const scope = useScope(fn, () => {
+    const singals = new Set<AnySignal<any>>();
+    return {
+      singals,
+      dispose() {
+        singals.clear();
+      },
+      compute() {
+        return withHooks(
+          {
+            onSignalAccess(signal) {
+              singals.add(signal);
+            },
+          },
+          fn
+        );
+      },
     };
   });
 
-  // Run fn within hooks context
-  // Any signal.get() calls will trigger controller.onSignalAccess()
-  return withHooks(controller, fn);
+  useEffect(() => {
+    if (scope.singals.size === 0) return;
+
+    const onCleanup = emitter();
+    const handleChange = () => {
+      setRerenderState({});
+    };
+    for (const signal of scope.singals) {
+      onCleanup.on(signal.on(handleChange));
+    }
+    return () => {
+      onCleanup.emitAndClear();
+    };
+  });
+
+  return scope.compute();
 }

@@ -1921,11 +1921,11 @@ it("test", () => {
 `useScope` detects `Logic` types and creates component-scoped instances:
 
 ```ts
-import { useScope } from "rextive/react";
+import { useScope, rx } from "rextive/react";
 
 function TodoApp() {
   // Creates instance on mount, disposes on unmount
-  const store = useScope(todoStore);
+  const store = useScope("todoApp", todoStore);
 
   return (
     <div>
@@ -1952,7 +1952,7 @@ function GlobalCounter() {
 
 // Component-scoped - each component gets its own
 function LocalCounter() {
-  const { count, increment } = useScope(counter); // Fresh per component
+  const { count, increment } = useScope("localCounter", counter); // Fresh per component
   return <button onClick={increment}>{rx(count)}</button>;
 }
 ```
@@ -2031,7 +2031,7 @@ const instance = myLogic.create(); // Fresh instance (manual disposal)
 
 // ✅ In React - use useScope (auto-disposes on unmount)
 function MyComponent() {
-  const instance = useScope(myLogic);
+  const instance = useScope("myComponent", myLogic);
   // ...
 }
 ```
@@ -2463,3 +2463,11 @@ describe("CheckoutPage", () => {
 | `logic.clear()`          | Clear overrides + dispose tracked                           |
 
 **Key insight:** `logic()` transforms reactive code from hard-to-test global state into **testable, isolated units** with built-in dependency injection.
+
+---
+
+## Next Steps
+
+- **[Naming Conventions](./CONVENTIONS.md)** - Signal, action, and logic naming
+- **[Patterns](./PATTERNS.md)** - Advanced usage patterns
+- **[API Reference](./API_REFERENCE.md)** - Complete API documentation

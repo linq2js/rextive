@@ -1,11 +1,15 @@
 import { signal, logic, task } from "rextive";
 import { productsApi } from "@/api/client";
 import type { Product } from "@/api/types";
+import { routerLogic } from "./routerLogic";
 
 /**
  * Product details logic - manages fetching and displaying a single product.
  */
 export const productDetailsLogic = logic("productDetailsLogic", () => {
+  // Dependencies
+  const $router = routerLogic();
+
   // Current product ID being viewed
   const productId = signal<number | null>(null, {
     name: "productDetails.productId",
@@ -25,11 +29,6 @@ export const productDetailsLogic = logic("productDetailsLogic", () => {
   // Task wrapper for loading states
   const productTask = productAsync.pipe(task(null as Product | null));
 
-  // Selected image index for gallery
-  const selectedImageIndex = signal(0, {
-    name: "productDetails.selectedImageIndex",
-  });
-
   // Quantity selector
   const quantity = signal(1, { name: "productDetails.quantity" });
 
@@ -37,13 +36,8 @@ export const productDetailsLogic = logic("productDetailsLogic", () => {
   const loadProduct = (id: number) => {
     signal.batch(() => {
       productId.set(id);
-      selectedImageIndex.set(0);
       quantity.set(1);
     });
-  };
-
-  const selectImage = (index: number) => {
-    selectedImageIndex.set(index);
   };
 
   const setQuantity = (value: number) => {
@@ -58,21 +52,30 @@ export const productDetailsLogic = logic("productDetailsLogic", () => {
   const reset = () => {
     signal.batch(() => {
       productId.set(null);
-      selectedImageIndex.set(0);
       quantity.set(1);
     });
   };
+
+  // Effect: Load product when route changes to product page
+  signal(
+    { route: $router.route },
+    ({ deps }) => {
+      if (deps.route.page === "product") {
+        loadProduct(deps.route.id);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    },
+    { name: "productDetails.effect", lazy: false }
+  );
 
   return {
     // Signals
     productId,
     productAsync,
-    selectedImageIndex,
     quantity,
 
     // Actions
     loadProduct,
-    selectImage,
     setQuantity,
     incrementQuantity,
     decrementQuantity,

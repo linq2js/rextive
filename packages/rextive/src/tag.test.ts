@@ -622,7 +622,7 @@ describe("tag", () => {
         myTag.delete(sig);
 
         // Signal should be disposed - verify by trying to set (which throws)
-        expect(() => sig.set(2)).toThrow("Cannot set value on disposed signal");
+        expect(() => sig.set(2)).toThrow(/Cannot set value on disposed signal/);
         // Can still read last value
         expect(sig()).toBe(1);
       });
@@ -637,10 +637,10 @@ describe("tag", () => {
 
         // Both signals should be disposed - verify by trying to set
         expect(() => sig1.set(10)).toThrow(
-          "Cannot set value on disposed signal"
+          /Cannot set value on disposed signal/
         );
         expect(() => sig2.set(20)).toThrow(
-          "Cannot set value on disposed signal"
+          /Cannot set value on disposed signal/
         );
         // Can still read last values
         expect(sig1()).toBe(1);
@@ -673,7 +673,7 @@ describe("tag", () => {
 
         // Signal should be disposed and removed from both tags
         expect(() => sig.set(10)).toThrow(
-          "Cannot set value on disposed signal"
+          /Cannot set value on disposed signal/
         );
         expect(sig()).toBe(1); // Can still read
         expect(autoTag.has(sig)).toBe(false);
@@ -716,7 +716,7 @@ describe("tag", () => {
 
         // sig1 should be disposed
         expect(() => sig1.set(10)).toThrow(
-          "Cannot set value on disposed signal"
+          /Cannot set value on disposed signal/
         );
         expect(sig1()).toBe(1); // Can still read
 
@@ -1218,9 +1218,9 @@ describe("tag", () => {
         myTag.disposeAll();
 
         // All signals should be disposed
-        expect(() => a.set(100)).toThrow("Cannot set value on disposed signal");
-        expect(() => b.set(200)).toThrow("Cannot set value on disposed signal");
-        expect(() => c.set(300)).toThrow("Cannot set value on disposed signal");
+        expect(() => a.set(100)).toThrow(/Cannot set value on disposed signal/);
+        expect(() => b.set(200)).toThrow(/Cannot set value on disposed signal/);
+        expect(() => c.set(300)).toThrow(/Cannot set value on disposed signal/);
 
         // Tag should be empty (signals auto-remove on dispose)
         expect(myTag.size).toBe(0);

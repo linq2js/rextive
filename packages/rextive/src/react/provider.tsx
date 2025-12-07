@@ -1,61 +1,55 @@
-import { createContext, PropsWithChildren, useContext, useEffect } from "react";
-import { ExDisposable, Signal } from "../types";
+import {
+  createContext,
+  PropsWithChildren,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+} from "react";
+import { EqualsFn, ExDisposable, Mutable, Signal } from "../types";
 import { useScope } from "./useScope";
 import { is } from "../is";
+import { signal } from "../signal";
+import { EqualsStrategy, resolveEquals } from "../utils/resolveEquals";
+
+// ============================================================================
+// Types
+// ============================================================================
 
 /**
- * Options for configuring a provider's behavior.
+ * Options for simple provider (no factory).
  *
- * @template TContext - The type of the context object returned by create()
- * @template TValue - The type of the value prop passed to the Provider
+ * - **Signal mode** (default): Wraps value in a mutable signal
+ * - **Raw mode** (`raw: true`): Passes value directly
  */
-export type ProviderOptions<TContext, TValue> = {
-  /**
-   * Name used in error messages when the hook is used outside the provider.
-   * Example: "Theme" will show "Theme context not found..."
-   */
+export type ProviderOptions = {
+  /** Name for error messages (e.g., "Theme" → "Theme context not found...") */
   name: string;
 
   /**
-   * Factory function that creates the context object.
-   * Called once when the Provider component mounts.
-   *
-   * @param value - The initial value from props.value
-   * @returns An object containing your context (signals, methods, etc.)
-   *          Must be disposable for proper cleanup
-   *
-   * @example
-   * ```tsx
-   * create: (value) => {
-   *   const themeSignal = signal(value);
-   *   return disposable({ themeSignal });
-   * }
-   * ```
+   * Pass value directly without wrapping in a signal.
+   * Use for logic instances or objects that are already reactive.
+   * @default false
    */
-  create: (value: TValue) => ExDisposable & TContext;
-
-  /**
-   * Function called when props.value changes.
-   * Use this to update your context object with the new value.
-   *
-   * @param context - The context object created by create()
-   * @param value - The new value from props.value
-   *
-   * @example
-   * ```tsx
-   * update: (context, value) => {
-   *   context.themeSignal.set(value);
-   * }
-   * ```
-   */
-  update?: (context: NoInfer<TContext>, value: NoInfer<TValue>) => void;
+  raw?: boolean;
 };
 
 /**
- * Result tuple returned by the provider() function.
- * - [0]: useContext hook to access the context value
- * - [1]: Provider component to wrap the tree
+ * Options for factory provider.
+ * Creates a custom context object using a factory function.
  */
+export type ProviderOptionsWithFactory<TContext, TValue> = {
+  /** Name for error messages */
+  name: string;
+
+  /** Factory to create context object. Called once on mount. */
+  create: (value: TValue) => ExDisposable & TContext;
+
+  /** Called when props.value changes. Auto-updates if scope is mutable signal. */
+  update?: (context: NoInfer<TContext>, value: NoInfer<TValue>) => void;
+};
+
+/** Result: [useContext hook, Provider component] */
 export type ProviderResult<TContext, TValue> = [
   useContext: () => TContext extends Signal<any>
     ? TContext
@@ -63,123 +57,131 @@ export type ProviderResult<TContext, TValue> = [
   Provider: (props: PropsWithChildren<{ value: TValue }>) => JSX.Element
 ];
 
+// ============================================================================
+// provider() function
+// ============================================================================
+
 /**
- * Creates a type-safe React Context Provider with flexible context management.
+ * Creates a type-safe React Context Provider.
  *
- * This utility simplifies creating context providers by:
- * 1. Automatically managing context lifecycle with useScope
- * 2. Providing type-safe hooks with clear error messages
- * 3. Supporting any context shape (signals, methods, multiple signals, etc.)
- * 4. Handling cleanup automatically when the provider unmounts
+ * **Three Modes:**
+ * - **Signal** (default): `{ name }` → value wrapped in mutable signal
+ * - **Raw**: `{ name, raw: true }` → value passed directly (for logic instances)
+ * - **Factory**: `{ name, create }` → custom context via factory function
  *
- * @template TContext - The type of your context object (what useContext returns)
- * @template TValue - The type of the value prop passed to Provider
- *
- * @param options - Configuration object
- * @returns Tuple of [useContext hook, Provider component]
- *
- * @example Simple signal context
+ * @example Signal mode
  * ```tsx
- * const [useTheme, ThemeProvider] = provider<
- *   { theme: Signal<string> },
- *   string
- * >({
- *   name: "Theme",
- *   create: (value) => {
- *     const theme = signal(value);
- *     return disposable({ theme });
- *   },
- *   update: (context, value) => {
- *     context.theme.set(value);
- *   }
- * });
- *
- * // Usage
- * <ThemeProvider value="dark">
- *   {rx(useTheme().theme)}
- * </ThemeProvider>
+ * const [useTheme, ThemeProvider] = provider<"dark" | "light">({ name: "Theme" });
+ * <ThemeProvider value="dark"><App /></ThemeProvider>
+ * const theme = useTheme();  // Mutable<"dark" | "light">
  * ```
  *
- * @example Complex context with multiple signals and methods
+ * @example Raw mode
  * ```tsx
- * interface UserStore {
- *   user: Signal<User | null>;
- *   posts: Signal<Post[]>;
- *   login: (credentials: Credentials) => Promise<void>;
- *   logout: () => void;
- * }
+ * const [useStore, StoreProvider] = provider<StoreType>({ name: "Store", raw: true });
+ * <StoreProvider value={useScope("store", storeLogic)}><App /></StoreProvider>
+ * const $store = useStore();  // StoreType directly
+ * ```
  *
- * const [useUserStore, UserStoreProvider] = provider<UserStore, User | null>({
- *   name: "UserStore",
- *   create: (initialUser) => {
- *     const user = signal(initialUser);
- *     const posts = signal<Post[]>([]);
- *
- *     const login = async (credentials: Credentials) => {
- *       const userData = await api.login(credentials);
- *       user.set(userData);
- *     };
- *
- *     const logout = () => {
- *       user.set(null);
- *       posts.set([]);
- *     };
- *
- *     return disposable({ user, posts, login, logout });
- *   },
- *   update: (context, value) => {
- *     context.user.set(value);
- *   }
+ * @example Factory mode
+ * ```tsx
+ * const [useAuth, AuthProvider] = provider<AuthContext, User>({
+ *   name: "Auth",
+ *   create: (user) => ({ user: signal(user), logout: () => {} }),
  * });
  * ```
+ *
+ * @returns `[useContext, Provider]` tuple
  */
-export function provider<TContext, TValue>(
-  options: ProviderOptions<TContext, TValue>
+// Overload 1: Factory mode (with create function)
+export function provider<TContext, TValue = TContext>(
+  options: ProviderOptionsWithFactory<TContext, TValue>
+): ProviderResult<TContext, TValue>;
+
+// Overload 2: Signal mode (default) - wraps value in a mutable signal
+export function provider<TContext>(
+  options: ProviderOptions & {
+    raw?: false;
+    equals?: EqualsStrategy | EqualsFn<any>;
+  }
+): ProviderResult<Mutable<TContext>, TContext>;
+
+// Overload 3: Raw mode - passes value directly without wrapping
+export function provider<TContext>(
+  options: ProviderOptions & {
+    raw: true;
+    equals?: EqualsStrategy | EqualsFn<any>;
+  }
+): ProviderResult<TContext, TContext>;
+
+// Implementation
+export function provider<TContext, TValue = TContext>(
+  options:
+    | ProviderOptionsWithFactory<TContext, TValue>
+    | (ProviderOptions & {
+        raw?: boolean;
+        equals?: EqualsStrategy | EqualsFn<any>;
+      })
 ): ProviderResult<TContext, TValue> {
-  // Create the React Context with null as the default value
-  // This allows us to detect when the provider is missing
   const context = createContext<TContext | null>(null);
+  const raw = "raw" in options ? options.raw : false;
+  const equals =
+    ("equals" in options ? resolveEquals(options.equals) : undefined) ??
+    Object.is;
 
   return [
-    // Hook to access the context value
+    // useContext hook
     () => {
       const value = useContext(context);
-
-      // Throw a clear error if used outside the provider
       if (!value) {
         throw new Error(
           `${options.name} context not found. Make sure you're using the component within <${options.name}Provider>.`
         );
       }
-
-      return value as TContext extends Signal<any>
-        ? TContext
-        : Omit<TContext, "dispose">;
+      return value as any;
     },
 
     // Provider component
     (props: PropsWithChildren<{ value: TValue }>) => {
-      // Create the context scope using useScope
-      // This ensures proper lifecycle management and cleanup
-      const scope = useScope(() => {
-        // Call the create function with the initial value
-        return options.create(props.value);
+      const id = useId();
+      const hasCreate = "create" in options;
+
+      // Create scope for factory/signal modes (raw mode skips this)
+      const scope = useScope(`${options.name}:${id}`, (): any => {
+        if (raw) return undefined;
+        if (hasCreate) return options.create(props.value);
+        return signal(props.value);
       }) as TContext;
 
-      // Update the context when props.value changes
-      // Using useEffect ensures this happens synchronously before paint
-      useEffect(() => {
-        if (options.update) {
-          options.update(scope, props.value);
+      // Stable reference to prevent unnecessary re-renders
+      const providerRef = useRef<{ value: any }>();
+
+      if (raw) {
+        // Raw: update ref only when value actually changes (per equals)
+        if (
+          !providerRef.current ||
+          !equals(providerRef.current.value, props.value)
+        ) {
+          providerRef.current = { value: props.value };
         }
-        // auto update if the scope is a mutable signal
-        else if (is(scope, "mutable")) {
+      } else {
+        // Signal/Factory: always use scope (it's stable)
+        providerRef.current = { value: scope };
+      }
+
+      // Sync value prop changes to signal (signal/factory modes only)
+      const depValue = raw ? false : props.value;
+      useEffect(() => {
+        if (raw) return;
+        if (hasCreate && options.update) {
+          options.update(scope, props.value);
+        } else if (is(scope, "mutable")) {
           scope.set(props.value);
         }
-      }, [props.value, context]);
+      }, [depValue]);
 
       return (
-        <context.Provider value={scope as TContext}>
+        <context.Provider value={providerRef.current.value as any}>
           {props.children}
         </context.Provider>
       );

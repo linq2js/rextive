@@ -101,7 +101,7 @@ function Consumer() {
 The service pattern organizes related state, computed values, and actions into cohesive units. Services can be:
 
 - **Global singletons** - Shared across the entire app
-- **Scoped instances** - Created per component with `useScope()`
+- **Scoped instances** - Created per component with `useScope(key, factory)`
 
 This pattern is similar to Zustand stores but with automatic dependency tracking.
 
@@ -149,7 +149,7 @@ export const authService = createAuthService();
 // OPTION 2: Scoped instance - created per component
 // Automatically disposed when component unmounts
 function LoginPage() {
-  const auth = useScope(createAuthService);
+  const auth = useScope("loginPage", createAuthService);
   // auth is a fresh instance, disposed on unmount
 }
 ```

@@ -397,60 +397,58 @@ Reactive rendering:
 
 ### `useScope()`
 
-Component-scoped signals with three modes:
-
-**Factory Mode (most common):**
+Component-scoped signals with automatic lifecycle management.
 
 ```tsx
-// Basic factory
-const { count } = useScope(() => ({
-  count: signal(0),
-  dispose: [count],
-}));
-
-// With lifecycle callbacks
-useScope(() => createScope(), {
-  init: (scope) => {},      // Before commit
-  mount: (scope) => {},     // After mount (alias: ready)
-  update: (scope) => {},    // After every render
-  cleanup: (scope) => {},   // During cleanup
-  dispose: (scope) => {},   // Before disposal
-  watch: [dep1, dep2],      // Recreate when deps change
-});
-
-// Update with deps - only runs when deps change
-useScope(() => createQuery(), {
-  update: [(scope) => scope.refresh(), userId],
-});
-
-// With args (type-safe, args become watch deps)
-const { userData } = useScope(
-  (userId, filter) => createUserScope(userId, filter),
-  [userId, filter]
-);
+useScope(key, factory);
+useScope(key, factory, options);
+useScope(key, factory, args);
+useScope(key, factory, args, options);
 ```
 
-**Lifecycle Mode:**
+**Basic usage:**
 
 ```tsx
-const getPhase = useScope({
-  init: () => console.log("Before render"),
-  mount: () => console.log("After paint"),
-  render: () => console.log("Every render"),
-  update: () => console.log("After render"),
-  cleanup: () => console.log("React cleanup"),
-  dispose: () => console.log("True unmount"),
+// Create scoped signals (auto-disposed on unmount)
+const { count, increment } = useScope("counter", () => {
+  const count = signal(0);
+  return {
+    count,
+    increment: () => count.set((c) => c + 1),
+  };
 });
 ```
 
-**Object Tracking Mode:**
+**With args (recreates when args change):**
 
 ```tsx
-useScope({
-  for: user,
-  init: (user) => analytics.track("start", user),
-  dispose: (user) => analytics.track("end", user),
+const scope = useScope("userProfile", (id) => {
+  const user = signal(async () => fetchUser(id));
+  return { user };
+}, [userId]);
+```
+
+**Multiple instances (user-controlled key):**
+
+```tsx
+// Each tab gets its own scope
+const scope = useScope(`tab:${tabId}`, () => {
+  const content = signal("");
+  return { content };
 });
+```
+
+**Custom equality for args:**
+
+```tsx
+useScope("data", factory, [filters], "shallow");
+useScope("data", factory, [filters], (a, b) => a.id === b.id);
+```
+
+**With Logic:**
+
+```tsx
+const { count, increment } = useScope("counter", counterLogic);
 ```
 
 ### `provider()`

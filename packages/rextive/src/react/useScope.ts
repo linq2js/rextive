@@ -1,280 +1,217 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect } from "react";
+import { EqualsFn } from "../types";
+import { EqualsStrategy, resolveEquals } from "../utils/resolveEquals";
+import { scopeCache } from "./scopeCache";
 
-import {
-  useLifecycle,
-  LifecycleCallbacks,
-  LifecyclePhase,
-} from "./useLifecycle";
-import { useSafeFactory } from "./useSafeFactory";
-import { resolveLogicFactory } from "./resolveLogicFactory";
+// ============================================================================
+// Types
+// ============================================================================
+
 /**
- * Options for useScope hook (factory mode only)
+ * Options for useScope hook
  */
-export type UseScopeOptions<TScope = any> = {
+export type UseScopeOptions = {
   /**
-   * Called when scope is created (before first render commit)
-   */
-  init?: (scope: TScope) => void;
-  /**
-   * Called after scope is mounted/ready (after first commit)
-   * Alias: `ready`
-   */
-  mount?: (scope: TScope) => void;
-  /**
-   * Alias for `mount` - called after scope is mounted/ready
-   */
-  ready?: (scope: TScope) => void;
-  /**
-   * Called after render (after DOM updates) - use to update/sync scope state
-   * - Simple form: `(scope) => void` - runs after every render
-   * - With deps: `[(scope) => void, dep1, dep2]` - runs when deps change
-   */
-  update?: ((scope: TScope) => void) | [(scope: TScope) => void, ...any[]];
-  /**
-   * Called during cleanup phase (before dispose)
-   */
-  cleanup?: (scope: TScope) => void;
-  /**
-   * Called when scope is being disposed
-   */
-  dispose?: (scope: TScope) => void;
-  /**
-   * Watch these values - recreates scope when they change
-   * Similar to React useEffect deps array
+   * Custom equality function for comparing args.
+   * Default: Object.is (strict reference equality)
    *
    * @example
    * ```tsx
-   * useScope(() => ({ timer: signal(0) }), {
-   *   watch: [userId] // Recreate when userId changes
-   * })
+   * // Deep compare objects
+   * useScope("data", factory, [filters], {
+   *   equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
+   * });
    * ```
    */
-  watch?: unknown[];
+  equals?: EqualsStrategy | EqualsFn<any>;
 };
 
 /**
- * useScope - Unified hook for lifecycle management and scoped services
+ * Options can be:
+ * - UseScopeOptions object with equals property
+ * - EqualsStrategy string ("strict" | "shallow" | "deep")
+ * - EqualsFn custom function
+ */
+type OptionsOrEquals = UseScopeOptions | EqualsStrategy | EqualsFn<any>;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Parse options argument into an equals function.
+ */
+function parseEquals(options: OptionsOrEquals | undefined): EqualsFn<any> {
+  if (options === undefined) {
+    return Object.is;
+  }
+
+  // String strategy: "strict" | "shallow" | "deep"
+  if (typeof options === "string") {
+    return resolveEquals(options) ?? Object.is;
+  }
+
+  // Custom function
+  if (typeof options === "function") {
+    return options;
+  }
+
+  // Options object with equals property
+  if (typeof options === "object" && "equals" in options) {
+    return parseEquals(options.equals);
+  }
+
+  return Object.is;
+}
+
+/**
+ * @internal - Exposed for testing
+ */
+export function __clearCache() {
+  scopeCache.clear();
+}
+
+// ============================================================================
+// useScope Hook
+// ============================================================================
+
+/**
+ * useScope - Create a cached scope with automatic lifecycle management.
  *
- * **Three modes:**
+ * Uses a transient cache to handle React StrictMode double-invoke and
+ * share scope instances across renders with the same key.
  *
- * 1. **Component lifecycle**: Manage component lifecycle phases
- * 2. **Object lifecycle**: Track an object's lifecycle (recreate when object changes)
- * 3. **Factory mode**: Create scoped services with automatic cleanup
+ * ## Key Features
+ *
+ * - **Keyed caching**: Same key = same instance (across StrictMode double-renders)
+ * - **Args comparison**: Recreates scope when args change
+ * - **Auto-dispose**: Signals created inside factory are automatically disposed
+ * - **Logic support**: Automatically uses `logic.create()` for Logic factories
  *
  * ## ⭐ Auto-Dispose Feature
  *
- * **Signals created inside the factory are automatically disposed** when:
+ * Signals created inside the factory are automatically disposed when:
  * - The component unmounts
- * - The watch dependencies change (scope recreated)
+ * - The args change (scope recreated)
  * - React StrictMode double-invokes (orphan signals cleaned up)
  *
- * This means you don't need to use `disposable()` wrapper for basic signal cleanup!
- *
- * @example Mode 1: Component lifecycle
+ * @example Basic usage
  * ```tsx
- * const getPhase = useScope({
- *   init: () => console.log('Component initializing'),
- *   mount: () => console.log('Component mounted'),
- *   render: () => console.log('Component rendering'),
- *   update: () => console.log('After every render'),
- *   cleanup: () => console.log('Component cleaning up'),
- *   dispose: () => console.log('Component disposed'),
- * });
- *
- * console.log(getPhase()); // "render" | "mount" | "cleanup" | "disposed"
- * ```
- *
- * @example Mode 2: Object lifecycle
- * ```tsx
- * const user = { id: 1, name: 'John' };
- *
- * const getPhase = useScope({
- *   for: user, // Track this object
- *   init: (user) => console.log('User activated:', user),
- *   mount: (user) => startTracking(user),
- *   cleanup: (user) => pauseTracking(user),
- *   dispose: (user) => analytics.track('user-session-end', user),
- * });
- *
- * // When user reference changes, old user is disposed and new user is initialized
- * ```
- *
- * @example Mode 3: Factory mode - Signals auto-dispose on unmount
- * ```tsx
- * // ✅ Signals are auto-disposed - no wrapper needed!
- * const { count, doubled } = useScope(() => {
- *   const count = signal(0);
- *   const doubled = signal({ count }, ({ deps }) => deps.count * 2);
- *   return { count, doubled };
- * });
- * ```
- *
- * @example Factory mode with additional cleanup
- * ```tsx
- * // Simple case - just add dispose() method
- * const { count } = useScope(() => {
- *   const count = signal(0);
- *   const subscription = someService.subscribe();
- *
- *   return {
- *     count,
- *     dispose: () => subscription.unsubscribe(),
- *   };
- * });
- *
- * // Multiple cleanup logic - use disposable() to combine them
- * const { count } = useScope(() => {
- *   const count = signal(0);
- *   const sub1 = service1.subscribe();
- *   const sub2 = service2.subscribe();
- *
- *   return disposable({
- *     count,
- *     dispose: [sub1, sub2, () => clearInterval(timer)],
+ * function SearchBar() {
+ *   const scope = useScope("searchBar", () => {
+ *     const input = signal("");
+ *     const results = signal([]);
+ *     return { input, results };
  *   });
+ *
+ *   return <input value={rx(scope.input)} />;
+ * }
+ * ```
+ *
+ * @example With args (recreates when args change)
+ * ```tsx
+ * function UserProfile({ userId }: { userId: string }) {
+ *   const scope = useScope("userProfile", (id) => {
+ *     const user = signal(async () => fetchUser(id));
+ *     return { user };
+ *   }, [userId]);
+ *
+ *   return <div>{rx(scope.user, u => u?.name)}</div>;
+ * }
+ * ```
+ *
+ * @example Multiple instances (user-controlled key)
+ * ```tsx
+ * function Tab({ tabId }: { tabId: string }) {
+ *   // Each tab gets its own scope
+ *   const scope = useScope(`tab:${tabId}`, () => {
+ *     const content = signal("");
+ *     return { content };
+ *   });
+ *
+ *   return <div>{rx(scope.content)}</div>;
+ * }
+ * ```
+ *
+ * @example With Logic
+ * ```tsx
+ * const counterLogic = logic("counterLogic", () => {
+ *   const count = signal(0);
+ *   return { count, increment: () => count.set(c => c + 1) };
  * });
+ *
+ * function Counter() {
+ *   // Automatically uses counterLogic.create()
+ *   const { count, increment } = useScope("counter", counterLogic);
+ *   return <button onClick={increment}>{rx(count)}</button>;
+ * }
  * ```
  *
- * @example Factory mode with lifecycle callbacks
+ * @example Custom equality for args
  * ```tsx
- * const { size, ref } = useScope(
- *   () => {
- *     const size = signal({ width: 0, height: 0 });
- *     const ref = createRef<HTMLDivElement>();
- *     return { size, ref };
- *   },
- *   {
- *     ready: (scope) => console.log('Scope is ready'),
- *     update: (scope) => {
- *       // Sync DOM measurements after each render
- *       if (scope.ref.current) {
- *         const rect = scope.ref.current.getBoundingClientRect();
- *         scope.size.set({ width: rect.width, height: rect.height });
- *       }
- *     },
- *     // Or with deps - only run when specific values change
- *     // update: [(scope) => scope.refetch(), userId],
- *   }
- * );
+ * function FilteredList({ filters }: { filters: Filters }) {
+ *   const scope = useScope("filteredList", (f) => {
+ *     const items = signal([]);
+ *     return { items };
+ *   }, [filters], {
+ *     equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
+ *   });
+ * }
  * ```
  *
- * @example Factory mode with args (args become watch dependencies)
+ * @example Using equality strategy shorthand
  * ```tsx
- * // ✅ Type-safe: args match factory params, auto-recreates when args change
- * const { userData } = useScope(
- *   (userId, filter) => {
- *     const userData = signal(fetchUser(userId, filter));
- *     return { userData };
- *   },
- *   [userId, filter] // Args passed to factory & used as watch deps
- * );
+ * // Using string strategy
+ * useScope("data", factory, [obj], "shallow");
+ *
+ * // Using custom function directly
+ * useScope("data", factory, [obj], (a, b) => a.id === b.id);
  * ```
  */
 
-// Overload 1: Component lifecycle (no target object)
-export function useScope(
-  options: LifecycleCallbacks<void>
-): () => LifecyclePhase;
-
-// Overload 2: Object lifecycle (with target object)
-export function useScope<TTarget>(
-  options: { for: TTarget } & LifecycleCallbacks<TTarget>
-): () => LifecyclePhase;
-
-// Overload 3: Factory mode (create scoped services)
-// TScope is returned as-is. Disposal handles: signals created inside factory + scope's dispose method
-export function useScope<TScope extends Record<string, any>>(
-  create: () => TScope,
-  options?: UseScopeOptions<TScope>
+// Overload 2: With args
+export function useScope<TScope extends object, TArgs extends any[]>(
+  key: unknown,
+  factory: (...args: TArgs) => TScope,
+  args: NoInfer<TArgs>,
+  options?: OptionsOrEquals
 ): TScope;
 
-// Overload 4: Factory mode with args (args become watch dependencies)
-export function useScope<
-  TScope extends Record<string, any>,
-  TArgs extends any[]
->(
-  create: (...args: TArgs) => TScope,
-  args: TArgs,
-  options?: Omit<UseScopeOptions<TScope>, "watch">
+// Overload 1: No args
+export function useScope<TScope extends object>(
+  key: unknown,
+  factory: () => TScope,
+  options?: OptionsOrEquals
 ): TScope;
 
 // Implementation
-export function useScope<TScope extends Record<string, any>>(
-  createOrCallbacks: (() => TScope) | LifecycleCallbacks<any>,
-  argsOrOptions?: any[] | UseScopeOptions<TScope>,
-  optionsIfArgs?: Omit<UseScopeOptions<TScope>, "watch">
-): TScope | (() => LifecyclePhase) {
-  // Detect which mode based on first argument
-  const isLifecycleMode = typeof createOrCallbacks !== "function";
-
-  if (isLifecycleMode) {
-    // Mode 1 or 2: Lifecycle mode (component or object)
-    return useLifecycle(createOrCallbacks as LifecycleCallbacks<any>);
-  }
-
-  // Mode 3 or 4: Factory mode
-  // Detect if second arg is args array or options object
+export function useScope<TScope extends object, TArgs extends any[]>(
+  key: unknown,
+  factory: ((...args: TArgs) => TScope) | (() => TScope),
+  argsOrOptions?: TArgs | OptionsOrEquals,
+  maybeOptions?: OptionsOrEquals
+): TScope {
+  // Detect if third argument is args array or options
   const isArgsMode = Array.isArray(argsOrOptions);
-
-  // Resolve logic to factory if needed
-  const create = resolveLogicFactory(createOrCallbacks as any) as (
-    ...args: any[]
-  ) => TScope;
-  const args = isArgsMode ? argsOrOptions : undefined;
+  const args = isArgsMode ? (argsOrOptions as TArgs) : ([] as unknown as TArgs);
   const options = isArgsMode
-    ? optionsIfArgs
-    : (argsOrOptions as UseScopeOptions<TScope> | undefined);
+    ? maybeOptions
+    : (argsOrOptions as OptionsOrEquals);
 
-  const { init, update } = options || {};
-  const watch = (options as UseScopeOptions<TScope>)?.watch;
+  // Parse equals function from options
+  const equals = parseEquals(options);
 
-  // Parse update callback and deps
-  const updateCallback = Array.isArray(update) ? update[0] : update;
-  const updateDeps = Array.isArray(update) ? update.slice(1) : undefined;
+  // Get or create entry from cache
+  const entry = scopeCache.get(key, factory as any, args, equals);
 
-  // Recreate scope when watch dependencies change
-  // In args mode, args become the watch dependencies
-  const watchDeps = isArgsMode ? args || [] : watch || [];
+  // Lifecycle management via useLayoutEffect
+  // - On mount: commit entry (increment refs)
+  // - On key change: cleanup runs (uncommit old), setup runs (commit new)
+  // - On unmount: cleanup runs (uncommit)
+  useLayoutEffect(() => {
+    entry.commit();
+    return () => entry.uncommit();
+  }, [entry, key]);
 
-  // Keep options ref for callbacks (they may change between renders)
-  const optionsRef = useRef(options);
-  optionsRef.current = options;
-
-  // Use useSafeFactory for StrictMode-safe scope creation
-  // Orphan disposal and DevTools cleanup is handled internally
-  const controller = useSafeFactory(() => {
-    const scope = isArgsMode ? create(...(args || [])) : create();
-
-    init?.(scope);
-    return scope as TScope;
-  }, watchDeps);
-
-  const { result: scope } = controller;
-
-  // Commit on mount, schedule dispose on cleanup
-  useEffect(() => {
-    controller.commit();
-
-    // Call mount/ready callback after commit
-    const opts = optionsRef.current;
-    (opts?.mount || opts?.ready)?.(scope);
-
-    return () => {
-      // Call cleanup callback
-      optionsRef.current?.cleanup?.(scope);
-      // Call user's dispose callback
-      optionsRef.current?.dispose?.(scope);
-      // Schedule scope disposal (normal disposal - keeps signals in DevTools as "disposed")
-      controller.scheduleDispose();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [controller]);
-
-  // Call update callback after render (with optional deps)
-  useEffect(() => {
-    updateCallback?.(scope);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, updateDeps);
-
-  return scope;
+  return entry.scope as TScope;
 }

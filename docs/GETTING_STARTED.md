@@ -197,6 +197,7 @@ import { signal } from "npm:rextive";
 ## Next Steps
 
 - **[Core Concepts](./CORE_CONCEPTS.md)** - Learn the 4 fundamental patterns
+- **[Naming Conventions](./CONVENTIONS.md)** - Signal, action, and logic naming
 - **[Examples](./EXAMPLES.md)** - See 10 real-world examples
 - **[React Integration](./REACT.md)** - Deep dive into rx(), useScope(), etc.
 - **[API Reference](./API_REFERENCE.md)** - Complete API documentation

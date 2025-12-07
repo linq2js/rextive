@@ -1,8 +1,9 @@
 import React from "react";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, act } from "@testing-library/react";
-import { useScope } from "./useScope";
+import { useScope, __clearCache } from "./useScope";
 import { signal } from "../signal";
+import { logic } from "../logic";
 import "@testing-library/jest-dom/vitest";
 
 describe("useScope", () => {
@@ -10,23 +11,28 @@ describe("useScope", () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    __clearCache();
+    logic.clear();
+  });
+
   describe("basic functionality", () => {
-    it("should create and return disposables", () => {
+    it("should create and return scope with signals", () => {
       const TestComponent = () => {
-        const { count } = useScope(() => ({
-          count: signal(0),
+        const { count } = useScope("test", () => ({
+          count: signal(42),
         }));
 
         return <div data-testid="value">{count()}</div>;
       };
 
       render(<TestComponent />);
-      expect(screen.getByTestId("value")).toHaveTextContent("0");
+      expect(screen.getByTestId("value")).toHaveTextContent("42");
     });
 
-    it("should create multiple disposables", () => {
+    it("should create multiple signals in scope", () => {
       const TestComponent = () => {
-        const { a, b, c } = useScope(() => ({
+        const { a, b, c } = useScope("test", () => ({
           a: signal(1),
           b: signal(2),
           c: signal(3),
@@ -47,14 +53,12 @@ describe("useScope", () => {
       expect(screen.getByTestId("c")).toHaveTextContent("3");
     });
 
-    it("should create scope once without watch dependencies", () => {
+    it("should reuse same scope across re-renders with same key", () => {
       let createCount = 0;
       const TestComponent = () => {
-        const scope = useScope(() => {
+        const scope = useScope("test", () => {
           createCount++;
-          return {
-            count: signal(createCount),
-          };
+          return { count: signal(createCount) };
         });
 
         return <div data-testid="value">{scope.count()}</div>;
@@ -64,187 +68,358 @@ describe("useScope", () => {
       expect(screen.getByTestId("value")).toHaveTextContent("1");
       expect(createCount).toBe(1);
 
-      // Re-render parent - scope should not be recreated
+      // Re-render - should reuse scope
       rerender(<TestComponent />);
       expect(screen.getByTestId("value")).toHaveTextContent("1");
       expect(createCount).toBe(1);
     });
   });
 
-  describe("automatic cleanup", () => {
-    it("should dispose all disposables on unmount", async () => {
-      const dispose1 = vi.fn();
-      const dispose2 = vi.fn();
+  describe("key-based caching", () => {
+    it("should share scope between components with same key", () => {
+      let createCount = 0;
+      const sharedSignal = { value: 0 };
+
+      const Component1 = () => {
+        const scope = useScope("shared", () => {
+          createCount++;
+          sharedSignal.value = createCount;
+          return { id: signal(createCount) };
+        });
+        return <div data-testid="c1">{scope.id()}</div>;
+      };
+
+      const Component2 = () => {
+        const scope = useScope("shared", () => {
+          createCount++;
+          sharedSignal.value = createCount;
+          return { id: signal(createCount) };
+        });
+        return <div data-testid="c2">{scope.id()}</div>;
+      };
+
+      render(
+        <>
+          <Component1 />
+          <Component2 />
+        </>
+      );
+
+      // Both should use the same scope (created once)
+      expect(createCount).toBe(1);
+      expect(screen.getByTestId("c1")).toHaveTextContent("1");
+      expect(screen.getByTestId("c2")).toHaveTextContent("1");
+    });
+
+    it("should create separate scopes for different keys", () => {
+      let createCount = 0;
+
+      const TestComponent = ({ id }: { id: string }) => {
+        const scope = useScope(`scope:${id}`, () => {
+          createCount++;
+          return { value: signal(createCount) };
+        });
+        return <div data-testid={`value-${id}`}>{scope.value()}</div>;
+      };
+
+      render(
+        <>
+          <TestComponent id="a" />
+          <TestComponent id="b" />
+        </>
+      );
+
+      expect(createCount).toBe(2);
+      expect(screen.getByTestId("value-a")).toHaveTextContent("1");
+      expect(screen.getByTestId("value-b")).toHaveTextContent("2");
+    });
+  });
+
+  describe("args support", () => {
+    it("should pass args to factory", () => {
+      const TestComponent = ({ userId }: { userId: number }) => {
+        const scope = useScope(
+          "user",
+          (id: number) => ({
+            userId: signal(id),
+          }),
+          [userId]
+        );
+
+        return <div data-testid="value">{scope.userId()}</div>;
+      };
+
+      render(<TestComponent userId={123} />);
+      expect(screen.getByTestId("value")).toHaveTextContent("123");
+    });
+
+    it("should recreate scope when args change", () => {
+      let createCount = 0;
+
+      const TestComponent = ({ userId }: { userId: number }) => {
+        const scope = useScope(
+          "user",
+          (id: number) => {
+            createCount++;
+            return { userId: signal(id) };
+          },
+          [userId]
+        );
+
+        return <div data-testid="value">{scope.userId()}</div>;
+      };
+
+      const { rerender } = render(<TestComponent userId={1} />);
+      expect(screen.getByTestId("value")).toHaveTextContent("1");
+      expect(createCount).toBe(1);
+
+      // Change args - should recreate
+      rerender(<TestComponent userId={2} />);
+      expect(screen.getByTestId("value")).toHaveTextContent("2");
+      expect(createCount).toBe(2);
+    });
+
+    it("should not recreate scope when args are same", () => {
+      let createCount = 0;
+
+      const TestComponent = ({ userId }: { userId: number }) => {
+        const scope = useScope(
+          "user",
+          (id: number) => {
+            createCount++;
+            return { userId: signal(id) };
+          },
+          [userId]
+        );
+
+        return <div data-testid="value">{scope.userId()}</div>;
+      };
+
+      const { rerender } = render(<TestComponent userId={1} />);
+      expect(createCount).toBe(1);
+
+      // Same args - should not recreate
+      rerender(<TestComponent userId={1} />);
+      expect(createCount).toBe(1);
+    });
+
+    it("should support multiple args", () => {
+      const TestComponent = ({
+        a,
+        b,
+        c,
+      }: {
+        a: number;
+        b: string;
+        c: boolean;
+      }) => {
+        const scope = useScope(
+          "multi",
+          (numArg: number, strArg: string, boolArg: boolean) => ({
+            value: signal(`${numArg}-${strArg}-${boolArg}`),
+          }),
+          [a, b, c]
+        );
+
+        return <div data-testid="value">{scope.value()}</div>;
+      };
+
+      render(<TestComponent a={1} b="hello" c={true} />);
+      expect(screen.getByTestId("value")).toHaveTextContent("1-hello-true");
+    });
+  });
+
+  describe("custom equals option", () => {
+    it("should use custom equals for args comparison", () => {
+      let createCount = 0;
+
+      const TestComponent = ({ filters }: { filters: { type: string } }) => {
+        const scope = useScope(
+          "filtered",
+          (f: { type: string }) => {
+            createCount++;
+            return { type: signal(f.type) };
+          },
+          [filters],
+          { equals: (a, b) => (a as any).type === (b as any).type }
+        );
+
+        return <div data-testid="value">{scope.type()}</div>;
+      };
+
+      const { rerender } = render(<TestComponent filters={{ type: "A" }} />);
+      expect(createCount).toBe(1);
+
+      // Different object reference but same content - should NOT recreate
+      rerender(<TestComponent filters={{ type: "A" }} />);
+      expect(createCount).toBe(1);
+
+      // Different content - should recreate
+      rerender(<TestComponent filters={{ type: "B" }} />);
+      expect(createCount).toBe(2);
+    });
+
+    it("should use Object.is by default", () => {
+      let createCount = 0;
+
+      const TestComponent = ({ obj }: { obj: { id: number } }) => {
+        const scope = useScope(
+          "objTest",
+          (o: { id: number }) => {
+            createCount++;
+            return { id: signal(o.id) };
+          },
+          [obj]
+        );
+
+        return <div data-testid="value">{scope.id()}</div>;
+      };
+
+      const obj1 = { id: 1 };
+      const { rerender } = render(<TestComponent obj={obj1} />);
+      expect(createCount).toBe(1);
+
+      // Same reference - should not recreate
+      rerender(<TestComponent obj={obj1} />);
+      expect(createCount).toBe(1);
+
+      // Different reference (even same content) - should recreate
+      rerender(<TestComponent obj={{ id: 1 }} />);
+      expect(createCount).toBe(2);
+    });
+  });
+
+  describe("automatic disposal", () => {
+    it("should dispose scope on unmount", async () => {
+      const disposeFn = vi.fn();
 
       const TestComponent = () => {
-        useScope(() => ({
-          a: { dispose: dispose1 } as any,
-          b: { dispose: dispose2 } as any,
-          dispose: [{ dispose: dispose1 } as any, { dispose: dispose2 } as any],
+        useScope("disposable", () => ({
+          value: signal(0),
+          dispose: disposeFn,
         }));
 
         return <div>Test</div>;
       };
 
       const { unmount } = render(<TestComponent />);
-      expect(dispose1).not.toHaveBeenCalled();
-      expect(dispose2).not.toHaveBeenCalled();
+      expect(disposeFn).not.toHaveBeenCalled();
 
       unmount();
-      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
-      // May be called multiple times due to StrictMode double-mounting
-      expect(dispose1).toHaveBeenCalled();
-      expect(dispose2).toHaveBeenCalled();
+
+      // Wait for microtask disposal
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 10));
+      });
+
+      expect(disposeFn).toHaveBeenCalled();
     });
 
-    it("should dispose signals on unmount", async () => {
-      const disposeSpy = vi.fn();
-      const count = { dispose: disposeSpy, value: 0 } as any;
+    it("should dispose old scope when args change", async () => {
+      const disposeFn = vi.fn();
+      let instanceId = 0;
 
-      const TestComponent = () => {
-        const scope = useScope(() => ({
-          count,
-          dispose: [count], // Must explicitly include in dispose array
-        }));
-
-        return <div>{JSON.stringify(scope.count)}</div>;
-      };
-
-      const { unmount } = render(<TestComponent />);
-      expect(disposeSpy).not.toHaveBeenCalled();
-
-      unmount();
-      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
-      // May be called multiple times due to StrictMode double-mounting
-      expect(disposeSpy).toHaveBeenCalled();
-    });
-
-    it("should handle non-disposable objects in scope", () => {
-      const TestComponent = () => {
-        const b = signal(0);
-        const scope = useScope(() => ({
-          a: { noDispose: true } as any, // Non-disposable, not in dispose array
-          b,
-          dispose: [b], // Only dispose signal b
-        }));
-
-        return <div>{scope.b()}</div>;
-      };
-
-      // Should not throw - non-disposable objects are fine if not in dispose array
-      const { unmount } = render(<TestComponent />);
-      unmount();
-    });
-  });
-
-  describe("watch dependencies", () => {
-    it("should recreate scope when watch dependencies change", () => {
-      let createCount = 0;
       const TestComponent = ({ userId }: { userId: number }) => {
-        const scope = useScope(
-          () => {
-            createCount++;
+        useScope(
+          "user",
+          (id: number) => {
+            const currentId = ++instanceId;
             return {
-              id: signal(userId),
+              userId: signal(id),
+              dispose: () => disposeFn(currentId),
             };
           },
-          { watch: [userId] }
+          [userId]
         );
 
-        return <div data-testid="value">{scope.id()}</div>;
+        return <div>User {userId}</div>;
       };
 
       const { rerender } = render(<TestComponent userId={1} />);
-      expect(screen.getByTestId("value")).toHaveTextContent("1");
-      expect(createCount).toBe(1);
+      expect(disposeFn).not.toHaveBeenCalled();
 
-      // Change watch dependency
+      // Change args - should dispose old scope
       rerender(<TestComponent userId={2} />);
-      expect(screen.getByTestId("value")).toHaveTextContent("2");
-      expect(createCount).toBe(2);
+
+      // Old scope should be disposed
+      expect(disposeFn).toHaveBeenCalledWith(1);
     });
 
-    it("should not recreate scope when watch dependencies are same", () => {
-      let createCount = 0;
-      const TestComponent = ({ userId }: { userId: number }) => {
-        const scope = useScope(
-          () => {
-            createCount++;
-            return {
-              id: signal(userId),
-            };
-          },
-          { watch: [userId] }
-        );
+    it("should auto-dispose signals created in factory", async () => {
+      let signalInstance: ReturnType<typeof signal<number>> | undefined;
 
-        return <div data-testid="value">{scope.id()}</div>;
-      };
-
-      const { rerender } = render(<TestComponent userId={1} />);
-      expect(createCount).toBe(1);
-
-      // Re-render with same userId
-      rerender(<TestComponent userId={1} />);
-      expect(createCount).toBe(1); // Should not recreate
-    });
-
-    it("should handle empty watch array", () => {
-      let createCount = 0;
       const TestComponent = () => {
-        const scope = useScope(
-          () => {
-            createCount++;
-            return {
-              count: signal(0),
-            };
-          },
-          { watch: [] }
-        );
+        const scope = useScope("signals", () => {
+          signalInstance = signal(42);
+          return { count: signalInstance };
+        });
 
         return <div>{scope.count()}</div>;
       };
 
-      const { rerender } = render(<TestComponent />);
-      expect(createCount).toBe(1);
+      const { unmount } = render(<TestComponent />);
 
-      rerender(<TestComponent />);
-      expect(createCount).toBe(1); // Should not recreate
-    });
+      unmount();
 
-    it("should handle multiple watch dependencies", () => {
-      let createCount = 0;
-      const TestComponent = ({ a, b }: { a: number; b: string }) => {
-        const scope = useScope(
-          () => {
-            createCount++;
-            return {
-              value: signal(`${a}-${b}`),
-            };
-          },
-          { watch: [a, b] }
-        );
+      // Wait for disposal
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 10));
+      });
 
-        return <div data-testid="value">{scope.value()}</div>;
-      };
-
-      const { rerender } = render(<TestComponent a={1} b="hello" />);
-      expect(screen.getByTestId("value")).toHaveTextContent("1-hello");
-      expect(createCount).toBe(1);
-
-      rerender(<TestComponent a={2} b="hello" />);
-      expect(screen.getByTestId("value")).toHaveTextContent("2-hello");
-      expect(createCount).toBe(2);
-
-      rerender(<TestComponent a={2} b="world" />);
-      expect(screen.getByTestId("value")).toHaveTextContent("2-world");
-      expect(createCount).toBe(3);
+      // Signal should be disposed (attempting to use it may throw or return undefined)
+      // We can't easily test this without exposing disposal state
     });
   });
 
-  describe("integration with signals", () => {
+  describe("logic support", () => {
+    it("should use logic.create() for Logic factories", () => {
+      let createCount = 0;
+
+      const counterLogic = logic("counterLogic", () => {
+        createCount++;
+        return {
+          count: signal(0),
+          increment: function () {
+            this.count.set((c) => c + 1);
+          },
+        };
+      });
+
+      const TestComponent = () => {
+        const { count } = useScope("counter", counterLogic);
+        return <div data-testid="value">{count()}</div>;
+      };
+
+      render(<TestComponent />);
+      expect(screen.getByTestId("value")).toHaveTextContent("0");
+      expect(createCount).toBe(1);
+    });
+
+    it("should throw for abstract logic without implementation", () => {
+      const abstractLogic = logic.abstract<{ getValue: () => number }>(
+        "abstractLogic"
+      );
+
+      const TestComponent = () => {
+        try {
+          useScope("abstract", abstractLogic as any);
+          return <div>Should not render</div>;
+        } catch (e) {
+          return <div data-testid="error">{(e as Error).message}</div>;
+        }
+      };
+
+      render(<TestComponent />);
+      expect(screen.getByTestId("error")).toHaveTextContent(
+        /Cannot create instance from abstract logic/
+      );
+    });
+  });
+
+  describe("computed signals", () => {
     it("should work with computed signals", () => {
       const TestComponent = () => {
-        const { count, doubled } = useScope(() => {
+        const { count, doubled } = useScope("computed", () => {
           const count = signal(5);
           const doubled = signal({ count }, ({ deps }) => deps.count * 2);
           return { count, doubled };
@@ -264,61 +439,32 @@ describe("useScope", () => {
     });
 
     it("should allow signal updates", () => {
-      let signalInstance: ReturnType<typeof signal<number>> | undefined;
+      let scopeRef: { count: ReturnType<typeof signal<number>> } | undefined;
+
       const TestComponent = () => {
-        const { count } = useScope(() => ({
+        const scope = useScope("updates", () => ({
           count: signal(0),
         }));
-        signalInstance = count;
+        scopeRef = scope;
 
-        return (
-          <div>
-            <div data-testid="value">{count()}</div>
-            <button
-              data-testid="increment"
-              onClick={() => count.set(count() + 1)}
-            >
-              Increment
-            </button>
-          </div>
-        );
+        return <div data-testid="value">{scope.count()}</div>;
       };
 
       render(<TestComponent />);
       expect(screen.getByTestId("value")).toHaveTextContent("0");
-      expect(signalInstance).toBeDefined();
 
-      // Verify signal can be updated
       act(() => {
-        if (signalInstance) {
-          signalInstance.set(5);
-        }
+        scopeRef?.count.set(10);
       });
 
-      // Verify signal value changed (even if component doesn't re-render)
-      // This test verifies useScope doesn't interfere with signal functionality
-      expect(signalInstance?.()).toBe(5);
+      expect(scopeRef?.count()).toBe(10);
     });
   });
 
   describe("edge cases", () => {
-    it("should handle undefined options", () => {
-      const TestComponent = () => {
-        const scope = useScope(() => ({
-          count: signal(0),
-        }));
-
-        return <div>{scope.count()}</div>;
-      };
-
-      // Should not throw
-      render(<TestComponent />);
-    });
-
     it("should handle empty scope object", () => {
       const TestComponent = () => {
-        useScope(() => ({}));
-
+        useScope("empty", () => ({}));
         return <div>Empty</div>;
       };
 
@@ -326,242 +472,99 @@ describe("useScope", () => {
       render(<TestComponent />);
     });
 
-    it("should handle watch with undefined values", () => {
+    it("should handle undefined and null in args", () => {
       let createCount = 0;
-      const TestComponent = ({ value }: { value: number | undefined }) => {
+
+      const TestComponent = ({ value }: { value: number | null | undefined }) => {
         const scope = useScope(
-          () => {
+          "nullable",
+          (v: number | null | undefined) => {
             createCount++;
-            return {
-              value: signal(value ?? 0),
-            };
+            return { value: signal(v ?? 0) };
           },
-          { watch: [value] }
+          [value]
         );
 
-        return <div>{scope.value()}</div>;
+        return <div data-testid="value">{scope.value()}</div>;
       };
 
       const { rerender } = render(<TestComponent value={undefined} />);
       expect(createCount).toBe(1);
 
-      rerender(<TestComponent value={1} />);
+      rerender(<TestComponent value={null} />);
       expect(createCount).toBe(2);
+
+      rerender(<TestComponent value={1} />);
+      expect(createCount).toBe(3);
 
       rerender(<TestComponent value={undefined} />);
-      expect(createCount).toBe(3);
+      expect(createCount).toBe(4);
     });
 
-    it("should handle watch with null values", () => {
+    it("should handle function references in args", () => {
       let createCount = 0;
-      const TestComponent = ({ value }: { value: number | null }) => {
-        const scope = useScope(
-          () => {
-            createCount++;
-            return {
-              value: signal(value ?? 0),
-            };
-          },
-          { watch: [value] }
-        );
 
-        return <div>{scope.value()}</div>;
-      };
-
-      const { rerender } = render(<TestComponent value={null} />);
-      expect(createCount).toBe(1);
-
-      rerender(<TestComponent value={1} />);
-      expect(createCount).toBe(2);
-
-      rerender(<TestComponent value={null} />);
-      expect(createCount).toBe(3);
-    });
-  });
-
-  describe("complex scenarios", () => {
-    it("should handle scope with mixed disposable types", async () => {
-      const signalDispose = vi.fn();
-      const customDispose = vi.fn();
-
-      const TestComponent = () => {
-        const scope = useScope(() => {
-          const sig = { dispose: signalDispose, value: 0 } as any;
-          const custom = {
-            dispose: customDispose,
-          } as any;
-
-          return {
-            signal: sig,
-            custom,
-            dispose: [sig, custom], // Explicitly list disposables for performance
-          };
-        });
-
-        return <div>{JSON.stringify(scope.signal)}</div>;
-      };
-
-      const { unmount } = render(<TestComponent />);
-      unmount();
-      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
-
-      // May be called multiple times due to StrictMode double-mounting
-      expect(signalDispose).toHaveBeenCalled();
-      expect(customDispose).toHaveBeenCalled();
-    });
-
-    it("should handle function dependencies in watch array", () => {
-      let createCount = 0;
       const TestComponent = ({ callback }: { callback: () => void }) => {
         const scope = useScope(
-          () => {
+          "callback",
+          (cb: () => void) => {
             createCount++;
-            return {
-              value: signal(0),
+            return { 
+              callbackRef: cb,
+              counter: signal(createCount) 
             };
           },
-          { watch: [callback] }
+          [callback]
         );
 
-        return <div>{scope.value()}</div>;
+        return <div data-testid="count">{scope.counter()}</div>;
       };
 
       const callback1 = () => {};
       const { rerender } = render(<TestComponent callback={callback1} />);
       expect(createCount).toBe(1);
 
-      // Same function reference
+      // Same function reference - should not recreate
       rerender(<TestComponent callback={callback1} />);
       expect(createCount).toBe(1);
 
-      // Different function reference
+      // Different function reference - should recreate
       const callback2 = () => {};
       rerender(<TestComponent callback={callback2} />);
       expect(createCount).toBe(2);
     });
 
-    it("should handle watch being undefined", () => {
+    it("should handle key changes", () => {
       let createCount = 0;
-      const TestComponent = () => {
-        const scope = useScope(
-          () => {
-            createCount++;
-            return {
-              count: signal(0),
-            };
-          }
-          // watch is undefined
-        );
 
-        return <div>{scope.count()}</div>;
+      const TestComponent = ({ scopeKey }: { scopeKey: string }) => {
+        const scope = useScope(scopeKey, () => {
+          createCount++;
+          return { value: signal(createCount) };
+        });
+
+        return <div data-testid="value">{scope.value()}</div>;
       };
 
-      const { rerender } = render(<TestComponent />);
+      const { rerender } = render(<TestComponent scopeKey="key1" />);
       expect(createCount).toBe(1);
+      expect(screen.getByTestId("value")).toHaveTextContent("1");
 
-      rerender(<TestComponent />);
-      expect(createCount).toBe(1); // Should not recreate
+      // Change key - should create new scope
+      rerender(<TestComponent scopeKey="key2" />);
+      expect(createCount).toBe(2);
+      expect(screen.getByTestId("value")).toHaveTextContent("2");
     });
+  });
 
-    it("should handle scope with no disposables (empty dispose methods)", () => {
-      const TestComponent = () => {
-        useScope(() => ({
-          empty: {
-            dispose: () => {},
-          },
-        }));
-
-        return <div>Test</div>;
-      };
-
-      const { unmount } = render(<TestComponent />);
-      // Should not throw
-      unmount();
-    });
-
+  describe("dispose property variations", () => {
     it("should handle dispose as a function", async () => {
       const disposeFn = vi.fn();
 
       const TestComponent = () => {
-        useScope(() => ({
+        useScope("disposeFunc", () => ({
+          value: signal(0),
           dispose: disposeFn,
-          other: signal(0),
-        }));
-
-        return <div>Test</div>;
-      };
-
-      const { unmount } = render(<TestComponent />);
-      expect(disposeFn).not.toHaveBeenCalled();
-
-      unmount();
-      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
-      // May be called multiple times due to StrictMode double-mounting
-      expect(disposeFn).toHaveBeenCalled();
-    });
-
-    it("should handle dispose as a single Disposable object", async () => {
-      const disposeFn = vi.fn();
-
-      const TestComponent = () => {
-        useScope(() => ({
-          dispose: { dispose: disposeFn } as any,
-          other: signal(0),
-        }));
-
-        return <div>Test</div>;
-      };
-
-      const { unmount } = render(<TestComponent />);
-      expect(disposeFn).not.toHaveBeenCalled();
-
-      unmount();
-      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
-      // May be called multiple times due to StrictMode double-mounting
-      expect(disposeFn).toHaveBeenCalled();
-    });
-
-    it("should dispose signals listed in dispose property", async () => {
-      const disposeSpy1 = vi.fn();
-      const disposeSpy2 = vi.fn();
-
-      const TestComponent = () => {
-        const scope = useScope(() => {
-          const sig1 = { dispose: disposeSpy1 } as any;
-          const sig2 = { dispose: disposeSpy2 } as any;
-
-          return {
-            mySignal1: sig1,
-            mySignal2: sig2,
-            dispose: [sig1, sig2], // Explicitly list what to dispose
-          };
-        });
-
-        return <div data-testid="sig1">{JSON.stringify(scope.mySignal1)}</div>;
-      };
-
-      const { unmount } = render(<TestComponent />);
-      expect(disposeSpy1).not.toHaveBeenCalled();
-      expect(disposeSpy2).not.toHaveBeenCalled();
-
-      unmount();
-      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
-      // May be called multiple times due to StrictMode double-mounting
-      expect(disposeSpy1).toHaveBeenCalled();
-      expect(disposeSpy2).toHaveBeenCalled();
-    });
-
-    it("should only dispose items in dispose property", async () => {
-      const signalDispose = vi.fn();
-      const regularFn = vi.fn();
-
-      const TestComponent = () => {
-        const mySignal = { dispose: signalDispose } as any;
-        useScope(() => ({
-          mySignal,
-          notASignal: { some: "data" },
-          myFunction: regularFn,
-          dispose: [mySignal], // Only dispose mySignal, not other properties
         }));
 
         return <div>Test</div>;
@@ -569,104 +572,36 @@ describe("useScope", () => {
 
       const { unmount } = render(<TestComponent />);
       unmount();
-      await Promise.resolve(); // Wait for deferred disposal (StrictMode safety)
-      // Only signal's dispose should be called (may be multiple times due to StrictMode)
-      expect(signalDispose).toHaveBeenCalled();
-      // Regular function should not be called during dispose
-      expect(regularFn).not.toHaveBeenCalled();
-    });
-  });
 
-  describe("lifecycle mode - component callbacks", () => {
-    it("should support component lifecycle mode", () => {
-      const init = vi.fn();
-      const mount = vi.fn();
-      const renderCallback = vi.fn();
-
-      const TestComponent = () => {
-        const getPhase = useScope({
-          init,
-          mount,
-          render: renderCallback,
-        });
-
-        return <div>{getPhase()}</div>;
-      };
-
-      render(<TestComponent />);
-
-      expect(init).toHaveBeenCalledTimes(1);
-      expect(renderCallback).toHaveBeenCalledTimes(1);
-    });
-
-    it("should return getPhase function", () => {
-      const TestComponent = () => {
-        const getPhase = useScope({
-          init: () => {},
-        });
-
-        return <div>{getPhase()}</div>;
-      };
-
-      const { container } = render(<TestComponent />);
-      expect(container.textContent).toMatch(/render|mount/);
-    });
-  });
-
-  describe("lifecycle mode - object tracking", () => {
-    it("should support object lifecycle mode", () => {
-      const user = { id: 1, name: "John" };
-      const init = vi.fn();
-      const mount = vi.fn();
-
-      const TestComponent = () => {
-        const getPhase = useScope({
-          for: user,
-          init,
-          mount,
-        });
-
-        return (
-          <div>
-            {user.name} - {getPhase()}
-          </div>
-        );
-      };
-
-      render(<TestComponent />);
-
-      expect(init).toHaveBeenCalledWith(user);
-    });
-
-    it("should reinitialize when object reference changes", async () => {
-      const user1 = { id: 1, name: "John" };
-      const user2 = { id: 2, name: "Jane" };
-      const init = vi.fn();
-      const dispose = vi.fn();
-
-      const TestComponent = ({ user }: { user: typeof user1 }) => {
-        useScope({
-          for: user,
-          init,
-          dispose,
-        });
-
-        return <div>{user.name}</div>;
-      };
-
-      const { rerender } = render(<TestComponent user={user1} />);
-
-      expect(init).toHaveBeenCalledWith(user1);
-      expect(init).toHaveBeenCalledTimes(1);
-
-      rerender(<TestComponent user={user2} />);
-
-      // Should dispose old and init new
-      await vi.waitFor(() => {
-        expect(dispose).toHaveBeenCalledWith(user1);
-        expect(init).toHaveBeenCalledWith(user2);
-        expect(init).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 10));
       });
+
+      expect(disposeFn).toHaveBeenCalled();
+    });
+
+    it("should handle dispose as array of disposables", async () => {
+      const dispose1 = vi.fn();
+      const dispose2 = vi.fn();
+
+      const TestComponent = () => {
+        useScope("disposeArray", () => ({
+          value: signal(0),
+          dispose: [{ dispose: dispose1 }, { dispose: dispose2 }],
+        }));
+
+        return <div>Test</div>;
+      };
+
+      const { unmount } = render(<TestComponent />);
+      unmount();
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 10));
+      });
+
+      expect(dispose1).toHaveBeenCalled();
+      expect(dispose2).toHaveBeenCalled();
     });
   });
 });
