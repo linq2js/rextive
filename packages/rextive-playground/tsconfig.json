@@ -20,12 +20,18 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
 
-    /* Paths */
+    /* Paths - map rextive imports to source files for type checking */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "rextive": ["../rextive/src/index.ts"],
+      "rextive/react": ["../rextive/src/react/index.ts"],
+      "rextive/op": ["../rextive/src/op/index.ts"],
+      "rextive/devtools": ["../rextive/src/devtools/index.ts"],
+      "rextive/devtools-panel": ["../rextive/src/devtools-panel/index.ts"],
+      "rextive/plugins": ["../rextive/src/plugins/index.ts"]
     },
-    "types": ["vite/client"]
+    "types": ["vite/client", "node"]
   },
   "include": ["src"]
 }
