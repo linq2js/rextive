@@ -1,7 +1,10 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useEffect, useRef } from "react";
 import { AnyFunc, EqualsFn, EqualsStrategy } from "../types";
 import { resolveEquals } from "../utils/resolveEquals";
 import { scopeCache } from "./scopeCache";
+
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 // ============================================================================
 // Types
@@ -218,7 +221,7 @@ export function __clearCache() {
  * }), [userId]);
  * ```
  */
-export function useScope<TScope extends object | void, TArgs extends any[]>(
+export function useScope<TScope, TArgs extends any[]>(
   factory: (...deps: TArgs) => TScope,
   ...extra: [] extends TArgs
     ? [deps?: unknown[]]
@@ -249,7 +252,7 @@ export function useScope<TScope extends object | void, TArgs extends any[]>(
  * const { content } = useScope(`tab:${tabId}`, tabLogic);
  * ```
  */
-export function useScope<TScope extends object | void, TArgs extends any[]>(
+export function useScope<TScope, TArgs extends any[]>(
   key: unknown,
   factory: (...deps: TArgs) => TScope,
   ...extra: [] extends TArgs
@@ -307,13 +310,16 @@ export function useScope(...args: any[]): any {
   // Get or create entry from cache
   const entry = scopeCache.get(key, factory as any, deps, equals);
 
-  // Lifecycle management via useLayoutEffect
+  // Lifecycle management via useIsomorphicLayoutEffect
   // - On mount: commit entry (increment refs)
-  // - On key change: cleanup runs (uncommit old), setup runs (commit new)
+  // - On key/entry change: cleanup runs (uncommit old), setup runs (commit new)
   // - On unmount: cleanup runs (uncommit)
-  useLayoutEffect(() => {
+  //
+  // Note: No need to manually dispose old entries - uncommit() handles ref counting
+  // and schedules disposal via microtask when refs reach 0.
+  useIsomorphicLayoutEffect(() => {
     entry.commit();
-    return () => entry.uncommit();
+    return entry.uncommit;
   }, [entry, key]);
 
   return entry.scope;

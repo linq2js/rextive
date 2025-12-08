@@ -35,7 +35,7 @@ import { stableEquals } from "../utils/stableEquals";
  * - No commit (error thrown)
  * - Microtask: refs=0, entry disposed ✅
  */
-class ScopeEntry {
+export class ScopeEntry {
   /** Number of components currently using this entry */
   refs = 0;
 
@@ -78,22 +78,22 @@ class ScopeEntry {
    * Called from useLayoutEffect to mark entry as committed.
    * Increments reference count to prevent disposal.
    */
-  commit() {
+  commit = () => {
     if (this.disposed) return;
     this.refs++;
-  }
+  };
 
   /**
    * Called from useLayoutEffect cleanup when component unmounts
    * or key changes. Decrements refs and schedules disposal if refs=0.
    */
-  uncommit() {
+  uncommit = () => {
     if (this.disposed) return;
     this.refs--;
     if (this.refs === 0) {
       this.disposeIfUnused();
     }
-  }
+  };
 
   /**
    * Dispose the entry and all tracked signals.

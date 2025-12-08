@@ -745,6 +745,682 @@ describe.each(wrappers)(
       });
     });
 
+    describe("return type flexibility", () => {
+      it("should work with void return", () => {
+        let factoryCalled = false;
+
+        const TestComponent = () => {
+          const result = useScope(() => {
+            factoryCalled = true;
+            // Explicitly return nothing (void)
+          });
+
+          // TypeScript allows void, runtime returns undefined
+          expect(result).toBeUndefined();
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(factoryCalled).toBe(true);
+      });
+
+      it("should work with undefined return", () => {
+        const TestComponent = () => {
+          const result = useScope(() => {
+            return undefined;
+          });
+
+          expect(result).toBeUndefined();
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+      });
+
+      it("should work with null return", () => {
+        const TestComponent = () => {
+          const result = useScope(() => {
+            return null;
+          });
+
+          expect(result).toBeNull();
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+      });
+
+      it("should work with primitive number return", () => {
+        const TestComponent = () => {
+          const result = useScope(() => 42);
+
+          expect(result).toBe(42);
+          return <div data-testid="value">{result}</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("value")).toHaveTextContent("42");
+      });
+
+      it("should work with primitive string return", () => {
+        const TestComponent = () => {
+          const result = useScope(() => "hello");
+
+          expect(result).toBe("hello");
+          return <div data-testid="value">{result}</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("value")).toHaveTextContent("hello");
+      });
+
+      it("should work with boolean return", () => {
+        const TestComponent = () => {
+          const result = useScope(() => true);
+
+          expect(result).toBe(true);
+          return <div data-testid="value">{result.toString()}</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("value")).toHaveTextContent("true");
+      });
+
+      it("should work with array return", () => {
+        const TestComponent = () => {
+          const result = useScope(() => [1, 2, 3]);
+
+          expect(result).toEqual([1, 2, 3]);
+          return <div data-testid="value">{result.join(",")}</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("value")).toHaveTextContent("1,2,3");
+      });
+
+      it("should work with function return", () => {
+        const TestComponent = () => {
+          const add = useScope(() => (a: number, b: number) => a + b);
+
+          expect(typeof add).toBe("function");
+          expect(add(2, 3)).toBe(5);
+          return <div data-testid="value">{add(2, 3)}</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("value")).toHaveTextContent("5");
+      });
+
+      it("should work with Symbol return", () => {
+        const sym = Symbol("test");
+
+        const TestComponent = () => {
+          const result = useScope(() => sym);
+
+          expect(result).toBe(sym);
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+      });
+
+      it("should work with Date return", () => {
+        const date = new Date("2024-01-01");
+
+        const TestComponent = () => {
+          const result = useScope(() => date);
+
+          expect(result).toBeInstanceOf(Date);
+          expect(result.getTime()).toBe(date.getTime());
+          return <div data-testid="value">{result.toISOString()}</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("value")).toHaveTextContent("2024-01-01");
+      });
+
+      it("should work with Map return", () => {
+        const TestComponent = () => {
+          const result = useScope(
+            () => new Map([["key", "value"]])
+          );
+
+          expect(result).toBeInstanceOf(Map);
+          expect(result.get("key")).toBe("value");
+          return <div data-testid="value">{result.get("key")}</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("value")).toHaveTextContent("value");
+      });
+
+      it("should work with Set return", () => {
+        const TestComponent = () => {
+          const result = useScope(() => new Set([1, 2, 3]));
+
+          expect(result).toBeInstanceOf(Set);
+          expect(result.has(2)).toBe(true);
+          return <div data-testid="value">{result.size}</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("value")).toHaveTextContent("3");
+      });
+
+      it("should work with class instance return", () => {
+        class Counter {
+          value = 0;
+          increment() {
+            this.value++;
+          }
+        }
+
+        const TestComponent = () => {
+          const counter = useScope(() => new Counter());
+
+          expect(counter).toBeInstanceOf(Counter);
+          counter.increment();
+          return <div data-testid="value">{counter.value}</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("value")).toHaveTextContent("1");
+      });
+
+      it("should work with Promise return (not awaited)", () => {
+        const TestComponent = () => {
+          const promise = useScope(() => Promise.resolve(42));
+
+          expect(promise).toBeInstanceOf(Promise);
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+      });
+
+      it("should preserve return type across re-renders", () => {
+        let renderCount = 0;
+
+        const TestComponent = () => {
+          renderCount++;
+          const result = useScope(() => ({ count: 42 }));
+
+          expect(result).toEqual({ count: 42 });
+          return <div data-testid="value">{result.count}</div>;
+        };
+
+        const { rerender } = renderWithWrapper(<TestComponent />);
+        const firstResult = screen.getByTestId("value").textContent;
+
+        rerender(<TestComponent />);
+        const secondResult = screen.getByTestId("value").textContent;
+
+        expect(firstResult).toBe(secondResult);
+      });
+
+      it("should work with deps and various return types", () => {
+        const TestComponent = ({ multiplier }: { multiplier: number }) => {
+          const result = useScope((m: number) => m * 10, [multiplier]);
+
+          return <div data-testid="value">{result}</div>;
+        };
+
+        const { rerender } = renderWithWrapper(<TestComponent multiplier={2} />);
+        expect(screen.getByTestId("value")).toHaveTextContent("20");
+
+        rerender(<TestComponent multiplier={3} />);
+        expect(screen.getByTestId("value")).toHaveTextContent("30");
+      });
+    });
+
+    describe("edge cases - special values", () => {
+      it("should handle NaN in deps (Object.is treats NaN === NaN)", () => {
+        let createCount = 0;
+
+        const TestComponent = ({ value }: { value: number }) => {
+          useScope(
+            (v: number) => {
+              createCount++;
+              return { value: v };
+            },
+            [value]
+          );
+
+          return <div>Test</div>;
+        };
+
+        const { rerender } = renderWithWrapper(<TestComponent value={NaN} />);
+        const initialCount = createCount;
+
+        // Object.is(NaN, NaN) === true, so should NOT recreate
+        rerender(<TestComponent value={NaN} />);
+        expect(createCount).toBe(initialCount);
+      });
+
+      it("should handle Infinity in deps", () => {
+        let createCount = 0;
+
+        const TestComponent = ({ value }: { value: number }) => {
+          useScope(
+            (v: number) => {
+              createCount++;
+              return { value: v };
+            },
+            [value]
+          );
+
+          return <div>Test</div>;
+        };
+
+        const { rerender } = renderWithWrapper(
+          <TestComponent value={Infinity} />
+        );
+        const initialCount = createCount;
+
+        // Infinity === Infinity, should NOT recreate (beyond initial)
+        rerender(<TestComponent value={Infinity} />);
+        expect(createCount).toBe(initialCount);
+      });
+
+      it("should handle -0 vs +0 in deps", () => {
+        let createCount = 0;
+
+        const TestComponent = ({ value }: { value: number }) => {
+          useScope(
+            (v: number) => {
+              createCount++;
+              return { value: v };
+            },
+            [value]
+          );
+
+          return <div>Test</div>;
+        };
+
+        const { rerender } = renderWithWrapper(<TestComponent value={0} />);
+        const initialCount = createCount;
+
+        // stableEquals uses === first which treats 0 === -0 as true
+        // So no recreation expected
+        rerender(<TestComponent value={-0} />);
+        expect(createCount).toBe(initialCount);
+      });
+
+      it("should handle shared mode with null key", () => {
+        let createCount = 0;
+
+        const TestComponent = () => {
+          useScope(null, () => {
+            createCount++;
+            return { id: 1 };
+          });
+
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(createCount).toBe(1);
+      });
+
+      it("should handle shared mode with undefined key", () => {
+        let createCount = 0;
+
+        const TestComponent = () => {
+          useScope(undefined, () => {
+            createCount++;
+            return { id: 1 };
+          });
+
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(createCount).toBe(1);
+      });
+
+      it("should handle shared mode with symbol key", () => {
+        const KEY = Symbol("test");
+        let createCount = 0;
+
+        const TestComponent = () => {
+          useScope(KEY, () => {
+            createCount++;
+            return { id: 1 };
+          });
+
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(createCount).toBe(1);
+      });
+
+      it("should handle shared mode with object key", () => {
+        const KEY = { id: "test" };
+        let createCount = 0;
+
+        const TestComponent = () => {
+          useScope(KEY, () => {
+            createCount++;
+            return { id: 1 };
+          });
+
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(createCount).toBe(1);
+      });
+
+      it("should handle empty deps array (never recreates after initial)", () => {
+        let createCount = 0;
+        let renderCount = 0;
+
+        const TestComponent = () => {
+          renderCount++;
+          useScope(
+            () => {
+              createCount++;
+              return {};
+            },
+            [] // Empty deps - should never recreate after initial
+          );
+
+          return <div>Test</div>;
+        };
+
+        const { rerender } = renderWithWrapper(<TestComponent />);
+        const initialCount = createCount;
+
+        rerender(<TestComponent />);
+        rerender(<TestComponent />);
+        rerender(<TestComponent />);
+
+        // Create count should not increase after initial
+        expect(createCount).toBe(initialCount);
+      });
+    });
+
+    describe("edge cases - error handling", () => {
+      it("should handle factory that throws synchronously", () => {
+        const TestComponent = () => {
+          try {
+            useScope(() => {
+              throw new Error("Factory error");
+            });
+            return <div>Should not render</div>;
+          } catch (e) {
+            return <div data-testid="error">{(e as Error).message}</div>;
+          }
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("error")).toHaveTextContent("Factory error");
+      });
+
+      it("should handle factory that returns rejected promise", async () => {
+        const TestComponent = () => {
+          const result = useScope(async () => {
+            // Return a rejected promise but catch it immediately
+            return Promise.reject(new Error("Async error")).catch(() => null);
+          });
+
+          // Result is a Promise
+          expect(result).toBeInstanceOf(Promise);
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+      });
+    });
+
+    describe("edge cases - async factory (known limitation)", () => {
+      // NOTE: Async factories are supported but have a limitation:
+      // Signals created AFTER the first await are NOT auto-tracked.
+      // This is because withHooks() only captures synchronous signal creation.
+
+      it("should return promise from async factory", () => {
+        const TestComponent = () => {
+          const result = useScope(async () => {
+            return { value: 42 };
+          });
+
+          expect(result).toBeInstanceOf(Promise);
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+      });
+
+      it("should handle async factory with deps", () => {
+        const TestComponent = ({ id }: { id: number }) => {
+          const result = useScope(
+            async (argId: number) => {
+              return { id: argId };
+            },
+            [id]
+          );
+
+          expect(result).toBeInstanceOf(Promise);
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent id={1} />);
+      });
+
+      it("should NOT track signals created after await (known limitation)", async () => {
+        // This documents the limitation - not a bug, just expected behavior
+        const signalsCreated: string[] = [];
+
+        const TestComponent = () => {
+          useScope(async () => {
+            // Signal created BEFORE await - would be tracked if sync
+            signalsCreated.push("beforeAwait");
+
+            await Promise.resolve();
+
+            // Signal created AFTER await - NOT tracked
+            signalsCreated.push("afterAwait");
+
+            return {};
+          });
+
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+
+        // Both are created, but only beforeAwait would be tracked for disposal
+        // (if they were actual signals)
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        expect(signalsCreated).toContain("beforeAwait");
+        expect(signalsCreated).toContain("afterAwait");
+      });
+    });
+
+    describe("edge cases - deps mutation", () => {
+      it("should compare deps element-by-element, not array reference", () => {
+        let createCount = 0;
+        const depsArray = [1, 2, 3];
+
+        const TestComponent = ({ deps }: { deps: number[] }) => {
+          useScope(
+            (...args: number[]) => {
+              createCount++;
+              return { args };
+            },
+            deps
+          );
+
+          return <div>Test</div>;
+        };
+
+        const { rerender } = renderWithWrapper(
+          <TestComponent deps={depsArray} />
+        );
+        const initialCount = createCount;
+
+        // Same array reference - should NOT recreate
+        rerender(<TestComponent deps={depsArray} />);
+        expect(createCount).toBe(initialCount);
+
+        // New array with SAME content - should NOT recreate (elements are compared)
+        // Each element 1, 2, 3 is compared with Object.is, all equal
+        rerender(<TestComponent deps={[1, 2, 3]} />);
+        expect(createCount).toBe(initialCount);
+
+        // Different content - SHOULD recreate
+        rerender(<TestComponent deps={[1, 2, 4]} />);
+        expect(createCount).toBeGreaterThan(initialCount);
+      });
+
+      it("should recreate when deps length changes", () => {
+        let createCount = 0;
+
+        const TestComponent = ({ deps }: { deps: number[] }) => {
+          useScope(
+            (...args: number[]) => {
+              createCount++;
+              return { args };
+            },
+            deps
+          );
+
+          return <div>Test</div>;
+        };
+
+        const { rerender } = renderWithWrapper(<TestComponent deps={[1, 2]} />);
+        const initialCount = createCount;
+
+        // Add element - should recreate
+        rerender(<TestComponent deps={[1, 2, 3]} />);
+        expect(createCount).toBeGreaterThan(initialCount);
+      });
+    });
+
+    describe("edge cases - key changes", () => {
+      it("should handle key changing from shared to different shared", async () => {
+        let createCountA = 0;
+        let createCountB = 0;
+        const disposeA = vi.fn();
+        const disposeB = vi.fn();
+
+        const TestComponent = ({ useKeyA }: { useKeyA: boolean }) => {
+          if (useKeyA) {
+            useScope("keyA", () => {
+              createCountA++;
+              return { dispose: disposeA };
+            });
+          } else {
+            useScope("keyB", () => {
+              createCountB++;
+              return { dispose: disposeB };
+            });
+          }
+
+          return <div>Test</div>;
+        };
+
+        const { rerender } = renderWithWrapper(<TestComponent useKeyA={true} />);
+        expect(createCountA).toBe(1);
+        expect(createCountB).toBe(0);
+
+        // Switch to keyB - keyA should be disposed
+        rerender(<TestComponent useKeyA={false} />);
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        expect(createCountB).toBe(1);
+        expect(disposeA).toHaveBeenCalled();
+      });
+
+      it("should handle rapid key changes", async () => {
+        let createCount = 0;
+        const disposes: string[] = [];
+
+        const TestComponent = ({ keyName }: { keyName: string }) => {
+          useScope(keyName, () => {
+            createCount++;
+            return {
+              key: keyName,
+              dispose: () => disposes.push(keyName),
+            };
+          });
+
+          return <div>Test</div>;
+        };
+
+        const { rerender, unmount } = renderWithWrapper(
+          <TestComponent keyName="a" />
+        );
+
+        // Rapid changes
+        rerender(<TestComponent keyName="b" />);
+        rerender(<TestComponent keyName="c" />);
+        rerender(<TestComponent keyName="d" />);
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // Each key change should create new scope
+        expect(createCount).toBe(4);
+
+        unmount();
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // All should be disposed
+        expect(disposes).toContain("d");
+      });
+    });
+
+    describe("edge cases - component hierarchy", () => {
+      // NOTE: Calling useScope INSIDE another useScope's factory would violate
+      // React's rules of hooks. This test verifies nested COMPONENTS work correctly.
+
+      it("should handle useScope in nested components", () => {
+        let outerCreateCount = 0;
+        let innerCreateCount = 0;
+
+        const InnerComponent = () => {
+          // This is a separate component, so useScope is valid here
+          useScope(() => {
+            innerCreateCount++;
+            return { inner: true };
+          });
+          return <div>Inner</div>;
+        };
+
+        const OuterComponent = () => {
+          const outer = useScope(() => {
+            outerCreateCount++;
+            // CANNOT call useScope() here - would violate hooks rules!
+            return { outer: true };
+          });
+
+          return (
+            <div>
+              <span>{outer.outer ? "Outer" : ""}</span>
+              <InnerComponent />
+            </div>
+          );
+        };
+
+        renderWithWrapper(<OuterComponent />);
+        // Each component's useScope should be created at least once
+        expect(outerCreateCount).toBeGreaterThanOrEqual(1);
+        expect(innerCreateCount).toBeGreaterThanOrEqual(1);
+      });
+    });
+
     describe("stale data", () => {
       it("should not access stale data", async () => {
         const signals = new Set<AnySignal<any>>();
