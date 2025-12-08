@@ -964,112 +964,117 @@ function Component() {
 
 Create cached scope instances with automatic lifecycle management.
 
-#### Basic Usage
+#### Two Modes
+
+**🔒 Local Mode** (Recommended for most cases)
+Each component instance gets its **own private scope**.
 
 ```tsx
-useScope(key, factory);
-useScope(key, factory, options);
-useScope(key, factory, args);
-useScope(key, factory, args, options);
+useScope(factory)                    // No deps
+useScope(factory, [deps])            // With deps
+useScope(factory, [deps], options)   // With custom equality
 ```
 
-**Parameters:**
+**🔗 Shared Mode**
+Multiple components **share the same scope** via a key.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `key` | `unknown` | Unique identifier for the scope (same key = same instance) |
-| `factory` | `() => TScope` or `(...args) => TScope` | Factory function to create the scope |
-| `args` | `TArgs[]` | Optional arguments passed to factory (scope recreates when args change) |
-| `options` | `UseScopeOptions \| EqualsStrategy \| EqualsFn` | Optional equality comparison for args |
+```tsx
+useScope(key, factory)                    // No deps
+useScope(key, factory, [deps])            // With deps
+useScope(key, factory, [deps], options)   // With custom equality
+```
 
 #### Key Features
 
-- **Keyed caching**: Same key = same instance (handles React StrictMode double-renders)
-- **Args comparison**: Recreates scope when args change
-- **Auto-dispose**: Signals created inside factory are automatically disposed
-- **Logic support**: Automatically uses `logic.create()` for Logic factories
+- **Auto-dispose**: Signals are automatically disposed on unmount
+- **Deps comparison**: Recreates scope when deps change
+- **Stable functions**: Functions/Dates in deps are auto-stabilized (no recreation)
+- **StrictMode safe**: Handles React double-invoke correctly
+- **Logic support**: Works with `logic()` factories
 
 #### ⭐ Auto-Dispose Feature
 
 Signals created inside the factory are **automatically disposed** when:
 - The component unmounts
-- The args change (scope recreated)
+- The deps change (scope recreated)
 - React StrictMode double-invokes (orphan signals cleaned up)
 
+#### Local Mode Examples
+
 ```tsx
-function TodoList() {
-  // ✅ Signals are auto-disposed on unmount - no disposable() needed!
-  const scope = useScope("todoList", () => {
-    const todos = signal([]);
-    const filter = signal("all");
+// Basic - most common pattern
+function SearchBar() {
+  const { input, results } = useScope(() => ({
+    input: signal(""),
+    results: signal([]),
+  }));
 
-    return {
-      todos,
-      filter,
-      addTodo: (text) => todos.set((prev) => [...prev, text]),
-    };
-  });
-
-  return <div>{rx(scope.todos, (t) => t.length)} todos</div>;
+  return <input value={rx(input)} />;
 }
-```
 
-#### With Args (Recreates When Args Change)
-
-```tsx
+// With deps - passed to factory
 function UserProfile({ userId }: { userId: string }) {
-  const scope = useScope("userProfile", (id) => {
-    const user = signal(async () => fetchUser(id));
-    return { user };
-  }, [userId]);
+  const { user } = useScope((id) => ({
+    user: signal(async () => fetchUser(id)),
+  }), [userId]);
 
-  return <div>{rx(scope.user, u => u?.name)}</div>;
+  return <div>{rx(user, u => u?.name)}</div>;
 }
-```
 
-#### Multiple Instances (User-Controlled Key)
-
-```tsx
-function Tab({ tabId }: { tabId: string }) {
-  // Each tab gets its own scope
-  const scope = useScope(`tab:${tabId}`, () => {
-    const content = signal("");
-    return { content };
-  });
-
-  return <div>{rx(scope.content)}</div>;
-}
-```
-
-#### With Logic
-
-```tsx
-const counterLogic = logic("counterLogic", () => {
-  const count = signal(0);
-  return { count, increment: () => count.set(c => c + 1) };
-});
-
+// With Logic
 function Counter() {
-  // Automatically uses counterLogic.create()
-  const { count, increment } = useScope("counter", counterLogic);
+  const { count, increment } = useScope(counterLogic);
   return <button onClick={increment}>{rx(count)}</button>;
 }
 ```
 
-#### Custom Equality for Args
+#### Shared Mode Examples
 
 ```tsx
+// Multiple components share the same state
+function Header() {
+  return (
+    <>
+      <SearchBar />       {/* Uses shared scope */}
+      <MobileSearchBar /> {/* Same scope! */}
+    </>
+  );
+}
+
+function SearchBar() {
+  const { input } = useScope("searchBar", searchBarLogic);
+  return <input value={rx(input)} />;
+}
+
+function MobileSearchBar() {
+  const { input } = useScope("searchBar", searchBarLogic);
+  return <input value={rx(input)} />;  // Same state as SearchBar!
+}
+
+// Dynamic keys for multiple instances
+function Tab({ tabId }: { tabId: string }) {
+  // Each unique tabId gets its own scope
+  const { content } = useScope(`tab:${tabId}`, () => ({
+    content: signal(""),
+  }));
+
+  return <div>{rx(content)}</div>;
+}
+```
+
+#### Custom Equality for Deps
+
+```tsx
+// Using equality strategy string
+useScope((filters) => ({ ... }), [filters], "shallow");
+
+// Using custom function
+useScope((obj) => ({ ... }), [obj], (a, b) => a.id === b.id);
+
 // Using options object
-useScope("filteredList", factory, [filters], {
+useScope((filters) => ({ ... }), [filters], {
   equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
 });
-
-// Using equality strategy string
-useScope("data", factory, [obj], "shallow");
-useScope("data", factory, [obj], "deep");
-
-// Using custom function directly
-useScope("data", factory, [obj], (a, b) => a.id === b.id);
 ```
 
 #### Additional Cleanup
@@ -1078,7 +1083,7 @@ For cleanup beyond signals, add a `dispose` method:
 
 ```tsx
 // Simple case - just add dispose() method
-const scope = useScope("myScope", () => {
+const scope = useScope(() => {
   const todos = signal([]);
   const subscription = someExternalService.subscribe();
 
@@ -1089,17 +1094,12 @@ const scope = useScope("myScope", () => {
 });
 
 // Multiple cleanup logic - use disposable() to combine them
-const scope = useScope("myScope", () => {
-  const todos = signal([]);
-  const sub1 = service1.subscribe();
-  const sub2 = service2.subscribe();
-  const timer = setInterval(() => {}, 1000);
-
-  return disposable({
-    todos,
+const scope = useScope(() =>
+  disposable({
+    todos: signal([]),
     dispose: [sub1, sub2, () => clearInterval(timer)],
-  });
-});
+  })
+);
 ```
 
 ---
@@ -1213,7 +1213,7 @@ const [useProduct, ProductProvider] = provider<ProductInstance>({
 
 // Parent
 function ProductPage() {
-  const $product = useScope("product", productLogic);
+  const $product = useScope(productLogic);
   return (
     <ProductProvider value={$product}>
       <ProductContent />
@@ -2319,7 +2319,7 @@ const result = count.pipe(
 
 ```tsx
 function SearchBox() {
-  const scope = useScope("searchBox", () => {
+  const scope = useScope(() => {
     const searchInput = signal("");
 
     const results = signal(
@@ -2500,15 +2500,15 @@ signal({ searchTerm }, async ({ deps, abortSignal }) => {
 3. **Signals in `useScope`/`rx.use` are auto-disposed**
 
 ```tsx
-// ✅ GOOD - Signals auto-dispose on unmount (no wrapper needed!)
-useScope("myComponent", () => {
+// ✅ GOOD - Local mode (most common)
+useScope(() => {
   const count = signal(0);
   const doubled = count.to((x) => x * 2);
   return { count, doubled };
 });
 
 // ✅ Also GOOD - Add dispose() method for additional cleanup
-useScope("myComponent", () => {
+useScope(() => {
   const count = signal(0);
   const subscription = someService.subscribe();
   return {
@@ -2518,7 +2518,7 @@ useScope("myComponent", () => {
 });
 
 // ✅ Use disposable() to combine multiple cleanup logic
-useScope("myComponent", () =>
+useScope(() =>
   disposable({
     count: signal(0),
     dispose: [sub1, sub2, () => clearInterval(timer)],
@@ -2598,8 +2598,8 @@ function Component() {
   // ❌ Bad - memory leak
   const count = signal(0);
 
-  // ✅ Good - signals are auto-disposed on unmount
-  const { count } = useScope("component", () => ({ count: signal(0) }));
+  // ✅ Good - signals are auto-disposed on unmount (local mode)
+  const { count } = useScope(() => ({ count: signal(0) }));
 }
 ```
 
@@ -2678,7 +2678,8 @@ function Component() {
 
 - `rx()` - Reactive rendering (4 overloads)
 - `rx.use()` - Reactive hook ⭐
-- `useScope(key, factory, args?, options?)` - Scoped state with auto-dispose
+- `useScope(factory, deps?, options?)` - Local mode (private per-component)
+- `useScope(key, factory, deps?, options?)` - Shared mode (keyed, shared across components)
 - `useStable<T>()` - Dynamic stable value getter for callbacks/objects ⭐
 - `provider()` - Signal context ⭐
 

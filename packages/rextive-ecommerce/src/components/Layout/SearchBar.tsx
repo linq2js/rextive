@@ -3,7 +3,7 @@ import { rx, useScope } from "rextive/react";
 import { searchBarLogic } from "@/logic/searchBarLogic";
 
 export const SearchBar = memo(function SearchBar() {
-  const $searchBar = useScope("searchBar", searchBarLogic);
+  const $searchBar = useScope(searchBarLogic);
 
   return rx(() => {
     const value = $searchBar.input();

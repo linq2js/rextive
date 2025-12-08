@@ -1,5 +1,6 @@
 import type { EqualsFn } from "../types";
-import { EqualsStrategy, resolveEquals } from "./resolveEquals";
+import { EqualsStrategy } from "../types";
+import { resolveEquals } from "./resolveEquals";
 
 /**
  * Creates an equality function for arrays that compares items element-by-element.

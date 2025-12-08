@@ -9,7 +9,7 @@ export function BasicFields() {
   const { formData } = useFormContext();
 
   // Create focused signals for each field (managed by useScope for cleanup)
-  const { title, status } = useScope("basicFields", () => ({
+  const { title, status } = useScope(() => ({
     title: formData.pipe(focus("title")),
     status: formData.pipe(focus("status")),
   }));

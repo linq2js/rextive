@@ -12,7 +12,7 @@ export function TagsEditor() {
   const [newTag, setNewTag] = useState("");
 
   // Focus on tags array - must be in useScope to avoid signal leak on re-render
-  const scope = useScope("tagsEditor", () =>
+  const scope = useScope(() =>
     disposable({
       tags: formData.pipe(focus("tags")),
     })

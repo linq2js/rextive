@@ -45,8 +45,8 @@
  */
 
 import { useState } from "react";
-import { EqualsFn } from "../types";
-import { EqualsStrategy, resolveEquals } from "../utils/resolveEquals";
+import { EqualsFn, EqualsStrategy } from "../types";
+import { stableEquals } from "../utils/stableEquals";
 
 /**
  * Type for the stable getter function returned by useStable.
@@ -138,12 +138,10 @@ export function useStable<
 class StableController<TStable extends Record<string, unknown>> {
   /**
    * Cache for stable values, keyed by string key.
-   * Functions are stored as { fn: latestFn, stable: stableWrapper }
+   * For functions, stores the StateFunction wrapper from stableEquals.
+   * For other values, stores the cached value for equality comparison.
    */
-  private cache = new Map<
-    string,
-    { value: unknown; stableWrapper?: (...args: unknown[]) => unknown }
-  >();
+  private cache = new Map<string, unknown>();
 
   /**
    * The stable getter function exposed to consumers.
@@ -185,6 +183,11 @@ class StableController<TStable extends Record<string, unknown>> {
 
   /**
    * Get or create a stable reference for a value.
+   *
+   * Uses stableEquals to:
+   * - Wrap functions in stable references that delegate to latest implementation
+   * - Compare non-functions with the provided equality strategy
+   * - Return cached values when equal to avoid unnecessary reference changes
    */
   private getStableValue(
     key: string,
@@ -192,37 +195,10 @@ class StableController<TStable extends Record<string, unknown>> {
     equals?: EqualsStrategy | EqualsFn<unknown>
   ): unknown {
     const cached = this.cache.get(key);
+    const [, stableValue] = stableEquals(cached, current, equals);
 
-    // Functions: Return stable wrapper that delegates to latest implementation
-    if (typeof current === "function") {
-      if (cached?.stableWrapper) {
-        // Update the cached function reference for the stable wrapper to call
-        cached.value = current;
-        return cached.stableWrapper;
-      }
-
-      // Create new stable wrapper
-      const entry = {
-        value: current,
-        stableWrapper: (...args: unknown[]) => {
-          // Always call the LATEST function
-          return (entry.value as Function)(...args);
-        },
-      };
-      this.cache.set(key, entry);
-      return entry.stableWrapper;
-    }
-
-    // Non-functions: Compare with equality and return cached if equal
-    if (cached && !cached.stableWrapper) {
-      const equalsFn = resolveEquals(equals) ?? Object.is;
-      if (equalsFn(cached.value, current)) {
-        return cached.value;
-      }
-    }
-
-    // Cache and return new value
-    this.cache.set(key, { value: current });
-    return current;
+    // Update cache with stable value (for functions, this is the StateFunction wrapper)
+    this.cache.set(key, stableValue);
+    return stableValue;
   }
 }

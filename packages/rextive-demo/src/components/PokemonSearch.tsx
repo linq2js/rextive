@@ -99,7 +99,6 @@ function createPokemonSearch() {
  */
 export function PokemonSearch() {
   const { pokemonName, notifier, pokemonProfile } = useScope(
-    "pokemonSearch",
     createPokemonSearch
   );
 

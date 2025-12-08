@@ -1,11 +1,6 @@
 import deepEquals from "lodash/isEqual";
 import { shallowEquals } from "./shallowEquals";
-import type { EqualsFn } from "../types";
-
-/**
- * Built-in equality strategies
- */
-export type EqualsStrategy = "strict" | "shallow" | "deep";
+import type { EqualsFn, EqualsStrategy } from "../types";
 
 /**
  * Equals option that can be a strategy string or a custom function

@@ -98,7 +98,11 @@ describe("ScopeCache", () => {
     });
 
     it("should handle multiple args", () => {
-      const factory = vi.fn((a: number, b: string, c: boolean) => ({ a, b, c }));
+      const factory = vi.fn((a: number, b: string, c: boolean) => ({
+        a,
+        b,
+        c,
+      }));
 
       cache.get("test", factory, [1, "a", true], Object.is);
       cache.get("test", factory, [1, "a", true], Object.is);
@@ -115,6 +119,102 @@ describe("ScopeCache", () => {
       cache.get("test", factory, [1, 2, 3], Object.is);
 
       expect(factory).toHaveBeenCalledTimes(2);
+    });
+
+    it("should maintain stable reference for function args", () => {
+      // Simulates React re-renders where inline callbacks change reference each render
+      const factory = vi.fn((onClick: () => void) => ({ onClick }));
+
+      // First render: create entry with callback v1
+      const onClick1 = () => console.log("v1");
+      const entry1 = cache.get("test", factory, [onClick1], Object.is);
+      expect(factory).toHaveBeenCalledTimes(1);
+
+      // Second render: new callback reference (same behavior, different ref)
+      const onClick2 = () => console.log("v2");
+      const entry2 = cache.get("test", factory, [onClick2], Object.is);
+
+      // Should NOT recreate - stableEquals wraps function in stable reference
+      expect(factory).toHaveBeenCalledTimes(1);
+      expect(entry1).toBe(entry2);
+
+      // The stable function should delegate to the latest implementation
+      // entry1.scope.onClick is a StateFunction that now points to onClick2
+    });
+
+    it("should maintain stable function across multiple re-renders", () => {
+      const factory = vi.fn((handler: (x: number) => number) => ({ handler }));
+
+      // Render 1
+      const entry1 = cache.get(
+        "test",
+        factory,
+        [(x: number) => x * 2],
+        Object.is
+      );
+      expect(factory).toHaveBeenCalledTimes(1);
+
+      // Get the stable handler reference
+      const stableHandler = entry1.scope.handler;
+
+      // Render 2, 3, 4 with new function references each time
+      cache.get("test", factory, [(x: number) => x * 3], Object.is);
+      cache.get("test", factory, [(x: number) => x * 4], Object.is);
+      const entry4 = cache.get(
+        "test",
+        factory,
+        [(x: number) => x * 5],
+        Object.is
+      );
+
+      // Should never recreate
+      expect(factory).toHaveBeenCalledTimes(1);
+      expect(entry1).toBe(entry4);
+
+      // Handler reference should be stable
+      expect(entry4.scope.handler).toBe(stableHandler);
+
+      // But should call latest implementation
+      expect(stableHandler(10)).toBe(50); // 10 * 5
+    });
+
+    it("should handle mixed args with functions and primitives", () => {
+      const factory = vi.fn(
+        (id: number, onClick: () => void, name: string) => ({
+          id,
+          onClick,
+          name,
+        })
+      );
+
+      // First call
+      const entry1 = cache.get(
+        "test",
+        factory,
+        [1, () => {}, "Alice"],
+        Object.is
+      );
+      expect(factory).toHaveBeenCalledTimes(1);
+
+      // Same id and name, new function reference - should reuse
+      const entry2 = cache.get(
+        "test",
+        factory,
+        [1, () => {}, "Alice"],
+        Object.is
+      );
+      expect(factory).toHaveBeenCalledTimes(1);
+      expect(entry1).toBe(entry2);
+
+      // Different id - should recreate even though function changed too
+      const entry3 = cache.get(
+        "test",
+        factory,
+        [2, () => {}, "Alice"],
+        Object.is
+      );
+      expect(factory).toHaveBeenCalledTimes(2);
+      expect(entry1).not.toBe(entry3);
     });
   });
 
@@ -169,7 +269,12 @@ describe("ScopeCache", () => {
   describe("disposal", () => {
     it("should call scope dispose on entry disposal", () => {
       const disposeFn = vi.fn();
-      const entry = cache.get("test", () => ({ dispose: disposeFn }), [], Object.is);
+      const entry = cache.get(
+        "test",
+        () => ({ dispose: disposeFn }),
+        [],
+        Object.is
+      );
 
       entry.dispose();
 
@@ -179,7 +284,12 @@ describe("ScopeCache", () => {
 
     it("should only dispose once", () => {
       const disposeFn = vi.fn();
-      const entry = cache.get("test", () => ({ dispose: disposeFn }), [], Object.is);
+      const entry = cache.get(
+        "test",
+        () => ({ dispose: disposeFn }),
+        [],
+        Object.is
+      );
 
       entry.dispose();
       entry.dispose();
@@ -215,7 +325,12 @@ describe("ScopeCache", () => {
 
     it("should schedule disposal via microtask when refs=0", async () => {
       const disposeFn = vi.fn();
-      const entry = cache.get("test", () => ({ dispose: disposeFn }), [], Object.is);
+      const entry = cache.get(
+        "test",
+        () => ({ dispose: disposeFn }),
+        [],
+        Object.is
+      );
 
       // disposeIfUnused was called in get(), disposal is scheduled
       expect(entry.disposed).toBe(false);
@@ -229,7 +344,12 @@ describe("ScopeCache", () => {
 
     it("should NOT dispose if committed before microtask", async () => {
       const disposeFn = vi.fn();
-      const entry = cache.get("test", () => ({ dispose: disposeFn }), [], Object.is);
+      const entry = cache.get(
+        "test",
+        () => ({ dispose: disposeFn }),
+        [],
+        Object.is
+      );
 
       // Simulate useLayoutEffect commit (sync, before microtask)
       entry.commit();
@@ -244,7 +364,12 @@ describe("ScopeCache", () => {
 
     it("should dispose on uncommit when refs reaches 0", async () => {
       const disposeFn = vi.fn();
-      const entry = cache.get("test", () => ({ dispose: disposeFn }), [], Object.is);
+      const entry = cache.get(
+        "test",
+        () => ({ dispose: disposeFn }),
+        [],
+        Object.is
+      );
 
       // Commit to prevent initial disposal
       entry.commit();
@@ -265,12 +390,22 @@ describe("ScopeCache", () => {
       const disposeFn1 = vi.fn();
       const disposeFn2 = vi.fn();
 
-      const entry1 = cache.get("test", () => ({ dispose: disposeFn1 }), [1], Object.is);
+      const entry1 = cache.get(
+        "test",
+        () => ({ dispose: disposeFn1 }),
+        [1],
+        Object.is
+      );
       entry1.commit();
       await Promise.resolve();
 
       // Change args - should dispose old entry
-      const entry2 = cache.get("test", () => ({ dispose: disposeFn2 }), [2], Object.is);
+      const entry2 = cache.get(
+        "test",
+        () => ({ dispose: disposeFn2 }),
+        [2],
+        Object.is
+      );
 
       expect(disposeFn1).toHaveBeenCalled();
       expect(entry1.disposed).toBe(true);
@@ -291,7 +426,9 @@ describe("ScopeCache", () => {
     });
 
     it("should throw for abstract Logic without implementation", () => {
-      const abstractLogic = logic.abstract<{ getValue: () => number }>("abstractLogic");
+      const abstractLogic = logic.abstract<{ getValue: () => number }>(
+        "abstractLogic"
+      );
 
       expect(() => {
         cache.get("test", abstractLogic as any, [], Object.is);
@@ -349,8 +486,18 @@ describe("ScopeCache", () => {
       const disposeFn1 = vi.fn();
       const disposeFn2 = vi.fn();
 
-      const entry1 = cache.get("key1", () => ({ dispose: disposeFn1 }), [], Object.is);
-      const entry2 = cache.get("key2", () => ({ dispose: disposeFn2 }), [], Object.is);
+      const entry1 = cache.get(
+        "key1",
+        () => ({ dispose: disposeFn1 }),
+        [],
+        Object.is
+      );
+      const entry2 = cache.get(
+        "key2",
+        () => ({ dispose: disposeFn2 }),
+        [],
+        Object.is
+      );
 
       entry1.commit();
       entry2.commit();
@@ -418,7 +565,12 @@ describe("ScopeCache", () => {
 
     it("should dispose if never committed (error/suspense)", async () => {
       const disposeFn = vi.fn();
-      const entry = cache.get("test", () => ({ dispose: disposeFn }), [], Object.is);
+      const entry = cache.get(
+        "test",
+        () => ({ dispose: disposeFn }),
+        [],
+        Object.is
+      );
 
       // Never call commit (simulates error during render or suspense)
 
@@ -430,4 +582,3 @@ describe("ScopeCache", () => {
     });
   });
 });
-

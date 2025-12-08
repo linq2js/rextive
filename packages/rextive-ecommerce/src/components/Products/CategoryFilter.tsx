@@ -41,10 +41,7 @@ export const CategoryFilter = memo(function CategoryFilter() {
   const { category, categoriesTask, setCategory } = productsLogic();
 
   // Local state for expanded view
-  const { isExpanded, toggleExpanded } = useScope(
-    "categoryFilter",
-    categoryFilterLogic
-  );
+  const { isExpanded, toggleExpanded } = useScope(categoryFilterLogic);
 
   return (
     <div className="flex flex-wrap gap-2">

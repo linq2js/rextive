@@ -10,7 +10,8 @@ import { EqualsFn, Mutable, Signal } from "../types";
 import { useScope } from "./useScope";
 import { is } from "../is";
 import { signal } from "../signal";
-import { EqualsStrategy, resolveEquals } from "../utils/resolveEquals";
+import { resolveEquals } from "../utils/resolveEquals";
+import { EqualsStrategy } from "../types";
 
 // ============================================================================
 // Types

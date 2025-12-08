@@ -1706,6 +1706,12 @@ export type WithUse<T> = T & {
 export type PredefinedEquals = "strict" | "shallow" | "deep";
 
 /**
+ * Alias for PredefinedEquals - used in equals options throughout the library.
+ * Prefer using this type when accepting equality strategy from users.
+ */
+export type EqualsStrategy = PredefinedEquals;
+
+/**
  * Context for computed signal computation functions (with dependencies)
  */
 export type ComputedSignalContext<TDependencies extends SignalMap = {}> =

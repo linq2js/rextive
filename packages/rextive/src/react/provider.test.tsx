@@ -9,23 +9,7 @@ import { signal } from "../signal";
 import { disposable } from "../disposable";
 import "@testing-library/jest-dom";
 import { Mutable } from "../types";
-
-// Test wrapper types
-type WrapperMode = "normal" | "strict";
-
-const wrappers: {
-  mode: WrapperMode;
-  Wrapper: React.FC<{ children: React.ReactNode }>;
-}[] = [
-  {
-    mode: "normal",
-    Wrapper: ({ children }) => <>{children}</>,
-  },
-  {
-    mode: "strict",
-    Wrapper: ({ children }) => <StrictMode>{children}</StrictMode>,
-  },
-];
+import { wrappers } from "../test/strictModeTests";
 
 // Run all tests in both normal and StrictMode
 describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {

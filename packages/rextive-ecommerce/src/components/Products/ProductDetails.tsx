@@ -19,7 +19,7 @@ type ProductDetailsInstance = LogicType<typeof productDetailsLogic>;
  *
  * Usage:
  * ```tsx
- * const $details = useScope("productDetails", productDetailsLogic);
+ * const $details = useScope(productDetailsLogic);
  *
  * <ProductDetailsProvider value={$details}>
  *   <ChildComponent />
@@ -176,10 +176,7 @@ const ProductImageGallery = memo(function ProductImageGallery({
 }: {
   product: Product;
 }) {
-  const $imageGallery = useScope(
-    "productImageGallery",
-    productImageGalleryLogic
-  );
+  const $imageGallery = useScope(productImageGalleryLogic);
 
   return rx(() => {
     const selectedIndex = $imageGallery.selectedImageIndex();
@@ -533,7 +530,7 @@ const ProductContent = memo(function ProductContent({
  */
 export const ProductDetails = memo(function ProductDetails() {
   const $router = routerLogic();
-  const $details = useScope("productDetails", productDetailsLogic);
+  const $details = useScope(productDetailsLogic);
 
   return (
     <ProductDetailsProvider value={$details}>

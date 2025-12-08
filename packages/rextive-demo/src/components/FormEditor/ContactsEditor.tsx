@@ -14,7 +14,7 @@ const generateId = () =>
 export function ContactsEditor() {
   const { formData } = useFormContext();
 
-  const scope = useScope("contactsEditor", () => {
+  const scope = useScope(() => {
     const contacts = formData.pipe(focus("contacts"));
     return {
       contacts,
@@ -69,7 +69,7 @@ function ContactItem({ index, onRemove }: ContactItemProps) {
   const { formData } = useFormContext();
 
   // Array item components must watch by index to recreate scope when indices shift
-  const scope = useScope(`contactItem:${index}`, () => {
+  const scope = useScope(() => {
     const firstName = formData.pipe(focus(`contacts.${index}.firstName`));
     const lastName = formData.pipe(focus(`contacts.${index}.lastName`));
     const email = formData.pipe(focus(`contacts.${index}.email`));
@@ -96,7 +96,7 @@ function ContactItem({ index, onRemove }: ContactItemProps) {
       removeAddress: (addrIndex: number) =>
         addresses.set((prev) => prev.filter((_, i) => i !== addrIndex)),
     };
-  });
+  }, [index]);
 
   return (
     <div className="contact-item">
@@ -211,7 +211,7 @@ function AddressItem({
   const { formData } = useFormContext();
 
   // Array item components must watch by index to recreate scope when indices shift
-  const scope = useScope(`addressItem:${contactIndex}:${addressIndex}`, () => {
+  const scope = useScope(() => {
     const basePath = `contacts.${contactIndex}.addresses.${addressIndex}`;
     return {
       street: formData.pipe(focus(`${basePath}.street` as any)),
@@ -225,7 +225,7 @@ function AddressItem({
         focus(`${basePath}.isPrimary` as any, () => false)
       ),
     };
-  });
+  }, [contactIndex, addressIndex]);
 
   return (
     <div className="address-item">

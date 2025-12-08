@@ -4,7 +4,7 @@ import { resolveLogicFactory } from "./resolveLogicFactory";
 import { emitter } from "../utils/emitter";
 import { emit, withHooks } from "../hooks";
 import { dev } from "../utils/dev";
-
+import { stableEquals } from "../utils/stableEquals";
 /**
  * A cache entry that manages the lifecycle of a scope instance.
  *
@@ -185,13 +185,49 @@ export class ScopeCache {
     let entry = this.scopes.get(key);
 
     // Check if existing entry's args differ - need to recreate
-    if (entry && !argsEqual(entry.args, args, equals)) {
-      entry.dispose();
-      this.scopes.delete(key);
-      entry = undefined;
+    if (entry) {
+      // Quick check: different args length means definitely changed
+      if (entry.args.length !== args.length) {
+        entry.dispose();
+        this.scopes.delete(key);
+        entry = undefined;
+      } else {
+        // Compare args and collect stable values
+        let changed = false;
+        const normalizedArgs: unknown[] = [];
+
+        for (let i = 0; i < args.length; i++) {
+          const [isEqual, stableValue] = stableEquals(
+            entry.args[i],
+            args[i],
+            equals
+          );
+          normalizedArgs.push(stableValue);
+          if (!isEqual) {
+            changed = true;
+          }
+        }
+
+        if (!changed) {
+          // Args are equal - reuse existing entry
+          return entry;
+        }
+
+        // Args changed - dispose old and recreate with normalized args
+        entry.dispose();
+        this.scopes.delete(key);
+        entry = undefined;
+        args = normalizedArgs; // Use stable values for the new entry
+      }
     }
 
     if (!entry) {
+      // Normalize args on first call - wraps functions in stable references
+      const normalizedArgs = args.map((arg) => {
+        const [, stableValue] = stableEquals(undefined, arg, equals);
+        return stableValue;
+      });
+
       // Resolve Logic to factory if needed (detects Logic and calls .create())
       const realFactory = resolveLogicFactory(factory) as AnyFunc;
 
@@ -210,11 +246,12 @@ export class ScopeCache {
             hooks?.onSignalCreate?.(signal, deps, disposalHandled);
           },
         }),
-        () => realFactory(...args)
+        () => realFactory(...normalizedArgs)
       );
 
       // Create entry and schedule disposal check
-      entry = new ScopeEntry(key, scope, args, () => {
+      // Store normalized args so subsequent stableEquals can update functions
+      entry = new ScopeEntry(key, scope, normalizedArgs, () => {
         if (!entry) return;
         onDispose.emitAndClear();
         if (this.scopes.get(key) === entry) {
@@ -239,18 +276,6 @@ export class ScopeCache {
     }
     this.scopes.clear();
   }
-}
-
-/**
- * Compare two argument arrays using a custom equality function.
- */
-function argsEqual(
-  a: unknown[],
-  b: unknown[],
-  equals: (a: unknown, b: unknown) => boolean
-): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((val, i) => equals(val, b[i]));
 }
 
 export const scopeCache = new ScopeCache();

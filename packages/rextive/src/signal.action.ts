@@ -10,7 +10,8 @@ import {
 } from "./types";
 import { isPromiseLike } from "./utils/isPromiseLike";
 import { operatorId } from "./utils/nameGenerator";
-import { EqualsStrategy, resolveEquals } from "./utils/resolveEquals";
+import { resolveEquals } from "./utils/resolveEquals";
+import { EqualsStrategy } from "./types";
 
 // ============================================================================
 // Types
