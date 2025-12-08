@@ -157,7 +157,7 @@ function setAtPath<T extends object, P extends Path<T>>(
 export function focus<
   T extends object,
   P extends Path<T>,
-  F extends NonNullable<PathValue<T, P>>
+  F extends NonNullable<PathValue<T, P>>,
 >(
   path: P,
   fallback: FocusFallback<F>,
@@ -236,7 +236,10 @@ export function focus<T extends object, P extends Path<T>>(
 
       // Use lodash get - returns undefined for invalid paths (doesn't throw)
       // Use peek() to avoid triggering render tracking
-      const value = get(sourceRef.peek(), path as string) as V | null | undefined;
+      const value = get(sourceRef.peek(), path as string) as
+        | V
+        | null
+        | undefined;
 
       // If value is nullish and we have fallback, use memoized fallback
       if ((value === null || value === undefined) && getFallbackValue) {
@@ -375,18 +378,55 @@ export function focus<T extends object, P extends Path<T>>(
  * Unlike focus(), lens() doesn't create a reactive signal - just on-demand read/write.
  *
  * @template T - The value type
+ * @template TSet - The input type for setter (defaults to T)
  */
-export type Lens<T> = [
+export type Lens<T, TSet = T> = [
   /** Get the current value */
-  () => T,
-  /** Set a new value (supports updater function) */
-  (value: T | ((prev: T) => T)) => void
-];
+  get: () => T,
+  /** Set a new value */
+  set: (value: TSet) => void,
+] & {
+  /**
+   * Transform the lens with custom get/set mappers.
+   *
+   * @example Full transform (getter and setter)
+   * ```ts
+   * const [getPrice, setPrice] = focus.lens(state, "price").map({
+   *   get: (cents) => (cents / 100).toFixed(2),  // Display as dollars
+   *   set: (dollars) => Math.round(parseFloat(dollars) * 100),  // Store as cents
+   * });
+   * ```
+   *
+   * @example Setter-only transform (most common for input handling)
+   * ```ts
+   * const [getValue, setValue] = focus.lens(state, "name").map(
+   *   (e: ChangeEvent<HTMLInputElement>) => e.currentTarget.value
+   * );
+   * <input value={getValue()} onChange={setValue} />
+   * ```
+   */
+  map<TNewGet = T, TNewSet = T>(options: {
+    get?: (value: T) => TNewGet;
+    set?: (input: TNewSet) => T;
+  }): Lens<TNewGet, TNewSet>;
+
+  /**
+   * Shorthand: transform setter only (most common case).
+   * Useful for extracting values from events or other wrappers.
+   *
+   * @example
+   * ```ts
+   * const [getValue, onChange] = focus.lens(state, "email").map(inputValue);
+   * <input value={getValue()} onChange={onChange} />
+   * ```
+   */
+  map<TNewSet>(setTransform: (input: TNewSet) => T): Lens<T, TNewSet>;
+};
 
 /**
  * Type guard to check if a value is a Lens tuple
  */
-function isLens<T>(value: unknown): value is Lens<T> {
+function isLens<T>(value: unknown): value is Lens<T, unknown> {
   return (
     Array.isArray(value) &&
     value.length === 2 &&
@@ -420,22 +460,26 @@ function isLens<T>(value: unknown): value is Lens<T> {
  * ```
  */
 
-// Overload 1: From Mutable signal
+// Overload 1: From Mutable signal or Lens
 export function lens<T extends object, P extends Path<T>>(
-  source: Mutable<T> | Lens<T>,
+  source: Mutable<T> | Lens<T, unknown>,
   path: P
 ): Lens<PathValue<T, P>>;
 
-// Overload 2: From another Lens
+// Overload 2: With fallback
 export function lens<
   T extends object,
   P extends Path<T>,
-  F extends NonNullable<PathValue<T, P>>
->(source: Lens<T> | Mutable<T>, path: P, fallback: FocusFallback<F>): Lens<F>;
+  F extends NonNullable<PathValue<T, P>>,
+>(
+  source: Lens<T, unknown> | Mutable<T>,
+  path: P,
+  fallback: FocusFallback<F>
+): Lens<F>;
 
 // Implementation
 export function lens<T extends object, P extends Path<T>>(
-  source: Mutable<T> | Lens<T>,
+  source: Mutable<T> | Lens<T, unknown>,
   path: P,
   fallback?: () => PathValue<T, P>
 ): Lens<PathValue<T, P>> {
@@ -459,23 +503,57 @@ export function lens<T extends object, P extends Path<T>>(
     return value as V;
   };
 
-  const setter = (valueOrUpdater: V | ((prev: V) => V)): void => {
-    const currentValue = getter();
-    const newValue =
-      typeof valueOrUpdater === "function"
-        ? (valueOrUpdater as (prev: V) => V)(currentValue)
-        : valueOrUpdater;
-
+  const setter = (value: V): void => {
     if (isSourceLens) {
-      // Update through parent lens
-      source[1]((root: T) => setAtPath(root, path, newValue));
+      // Update through parent lens - need to get root and set path
+      const rootGetter = source[0] as () => T;
+      const rootSetter = source[1] as (value: T) => void;
+      rootSetter(setAtPath(rootGetter(), path, value));
     } else {
       // Update signal directly
-      (source as Mutable<T>).set((root: T) => setAtPath(root, path, newValue));
+      (source as Mutable<T>).set((root: T) => setAtPath(root, path, value));
     }
   };
 
-  return [getter, setter];
+  return createLens(getter, setter);
+}
+
+/**
+ * Create a Lens tuple with the map method attached.
+ */
+function createLens<T, TSet = T>(
+  getter: () => T,
+  setter: (value: TSet) => void
+): Lens<T, TSet> {
+  const result = [getter, setter] as Lens<T, TSet>;
+
+  // Add map method
+  result.map = (<TNewGet = T, TNewSet = T>(
+    optionsOrSetFn:
+      | { get?: (value: T) => TNewGet; set?: (input: TNewSet) => T }
+      | ((input: TNewSet) => T)
+  ): Lens<TNewGet, TNewSet> => {
+    // Shorthand: setter-only transform
+    if (typeof optionsOrSetFn === "function") {
+      const setTransform = optionsOrSetFn as (input: TNewSet) => T;
+      return createLens(getter as unknown as () => TNewGet, (input: TNewSet) =>
+        setter(setTransform(input) as unknown as TSet)
+      );
+    }
+
+    // Full transform with options
+    const options = optionsOrSetFn;
+    const newGetter = options.get
+      ? () => options.get!(getter())
+      : (getter as unknown as () => TNewGet);
+    const newSetter = options.set
+      ? (input: TNewSet) => setter(options.set!(input) as unknown as TSet)
+      : (setter as unknown as (value: TNewSet) => void);
+
+    return createLens(newGetter, newSetter);
+  }) as Lens<T, TSet>["map"];
+
+  return result;
 }
 
 // Declare the static lens property on focus function

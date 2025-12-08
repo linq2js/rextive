@@ -65,6 +65,145 @@ Persist multiple signals with centralized load/save operations.
 - Waits for load before subscribing (prevents saving initial values)
 - Calling site handles debouncing (e.g., with lodash)
 
+## Logic Export Patterns
+
+When creating logic modules, choose the appropriate export pattern based on consumer needs:
+
+### Pattern A: Export Signal Only (Consumer Controls Read/Write)
+
+Export the state signal and let consumers decide how to access fields. Consumers can use `focus.lens()` inside `rx()` for fine-grained reactivity on large states.
+
+```tsx
+// Logic: expose state signal
+function formLogic() {
+  const state = signal({
+    username: "",
+    password: "",
+    error: "",
+  });
+
+  async function submit() {
+    // ...
+  }
+
+  return {
+    state,  // Consumer controls read/write
+    submit,
+  };
+}
+
+// Component: use lens inside rx() for fine-grained updates
+function LoginForm() {
+  const $form = useScope(formLogic);
+
+  return (
+    <form onSubmit={$form.submit}>
+      {rx(() => {
+        // Create lens inside rx() - cheap, disposed per render
+        const [get, set] = focus.lens($form.state, "username").map(inputValue);
+        return <input value={get()} onChange={set} />;
+      })}
+      
+      {rx(() => {
+        const [get, set] = focus.lens($form.state, "password").map(inputValue);
+        return <input type="password" value={get()} onChange={set} />;
+      })}
+    </form>
+  );
+}
+```
+
+**When to use:**
+- Consumer needs full control over read/write
+- State is complex and benefits from `focus.lens()` for partial updates
+- Simple API surface (just expose state)
+
+### Pattern B: Export Getters/Setters Only (Controlled Access)
+
+Export separate getter and setter functions when you want controlled access. This is easier to mock in tests.
+
+```tsx
+// Logic: expose controlled getters/setters
+function userLogic() {
+  const state = signal({
+    name: "",
+    email: "",
+  });
+
+  return {
+    // Controlled read
+    getName: () => state().name,
+    getEmail: () => state().email,
+    
+    // Controlled write
+    setName: (v: string) => state.set((s) => ({ ...s, name: v })),
+    setEmail: (v: string) => state.set((s) => ({ ...s, email: v })),
+    
+    // Derived read-only
+    getDisplayName: () => state().name || state().email,
+  };
+}
+
+// Component: use getters/setters directly
+function UserProfile() {
+  const $user = useScope(userLogic);
+
+  return rx(() => (
+    <div>
+      <h2>{$user.getDisplayName()}</h2>
+      <input 
+        value={$user.getName()} 
+        onChange={(e) => $user.setName(e.currentTarget.value)} 
+      />
+    </div>
+  ));
+}
+
+// Test: easy to mock
+const mockUser = {
+  getName: vi.fn(() => "Test User"),
+  setName: vi.fn(),
+  getEmail: vi.fn(() => "test@example.com"),
+  setEmail: vi.fn(),
+  getDisplayName: vi.fn(() => "Test User"),
+};
+```
+
+**When to use:**
+- Logic needs to validate/transform on read or write
+- Better testability with mockable functions
+- Want to hide internal state structure
+
+### ❌ Don't Export Lens Tuples
+
+```tsx
+// ❌ Bad: Lens tuples are hard to mock
+function formLogic() {
+  const state = signal({ username: "" });
+  
+  return {
+    username: focus.lens(state, "username"),  // Hard to mock!
+  };
+}
+
+// ✅ Good: Export signal (Pattern A)
+return { state };
+
+// ✅ Good: Export getters/setters (Pattern B)
+return {
+  getUsername: () => state().username,
+  setUsername: (v: string) => state.set((s) => ({ ...s, username: v })),
+};
+```
+
+### Summary
+
+| Pattern | Export | Consumer | Testability | Use Case |
+|---------|--------|----------|-------------|----------|
+| **A: Signal** | `state` signal | Uses `focus.lens()` | Mock signal | Full control, large states |
+| **B: Getters/Setters** | `getFoo`, `setFoo` | Calls functions | Mock functions | Controlled access, easy mocking |
+| **❌ Lens** | Lens tuples | Destructure | Hard to mock | **Don't use** |
+
 ## Common Patterns
 
 ### Pattern 1: Component-Scoped Signals

@@ -6,7 +6,8 @@
     "build": "pnpm --filter rextive build",
     "test": "pnpm --filter rextive test",
     "dev:demo": "concurrently -k -n rextive,demo -c cyan,green \"pnpm --filter rextive watch\" \"pnpm --filter rextive-demo dev\"",
-    "dev:ecom": "concurrently -k -n rextive,ecommerce -c cyan,magenta \"pnpm --filter rextive watch\" \"pnpm --filter rextive-ecommerce dev\""
+    "dev:ecom": "concurrently -k -n rextive,ecommerce -c cyan,magenta \"pnpm --filter rextive watch\" \"pnpm --filter rextive-ecommerce dev\"",
+    "dev:game": "concurrently -k -n rextive,playground -c cyan,yellow \"pnpm --filter rextive watch\" \"pnpm --filter rextive-playground dev\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

@@ -662,6 +662,189 @@ describe("UserMenu", () => {
 });
 ```
 
+### Logic Export Patterns
+
+Choose the appropriate export pattern based on consumer needs:
+
+#### Pattern A: Export Signal Only (Consumer Controls Read/Write)
+
+Export the state signal and let consumers decide how to access fields. Consumers can use `focus.lens()` inside `rx()` for fine-grained reactivity on large states.
+
+```tsx
+// Logic: expose state signal
+function formLogic() {
+  const state = signal({
+    username: "",
+    password: "",
+    error: "",
+  });
+
+  async function submit() { /* ... */ }
+
+  return {
+    state,  // Consumer controls read/write
+    submit,
+  };
+}
+
+// Component: use lens inside rx() for fine-grained updates
+function LoginForm() {
+  const $form = useScope(formLogic);
+
+  return (
+    <form onSubmit={$form.submit}>
+      {rx(() => {
+        // Create lens inside rx() - cheap, disposed per render
+        const [get, set] = focus.lens($form.state, "username").map(inputValue);
+        return <input value={get()} onChange={set} />;
+      })}
+    </form>
+  );
+}
+```
+
+**When to use:**
+- Consumer needs full control over read/write
+- State is complex and benefits from `focus.lens()` for partial updates
+- Simple API surface (just expose state)
+
+#### Pattern B: Export Getters/Setters Only (Controlled Access)
+
+Export separate getter and setter functions when you want controlled access. This is easier to mock in tests.
+
+```tsx
+// Logic: expose controlled getters/setters
+function userLogic() {
+  const state = signal({ name: "", email: "" });
+
+  return {
+    // Controlled read
+    getName: () => state().name,
+    getEmail: () => state().email,
+    
+    // Controlled write
+    setName: (v: string) => state.set((s) => ({ ...s, name: v })),
+    setEmail: (v: string) => state.set((s) => ({ ...s, email: v })),
+    
+    // Derived read-only
+    getDisplayName: () => state().name || state().email,
+  };
+}
+
+// Test: easy to mock
+const mockUser = {
+  getName: vi.fn(() => "Test User"),
+  setName: vi.fn(),
+  getEmail: vi.fn(() => "test@example.com"),
+  setEmail: vi.fn(),
+  getDisplayName: vi.fn(() => "Test User"),
+};
+```
+
+**When to use:**
+- Logic needs to validate/transform on read or write
+- Better testability with mockable functions
+- Want to hide internal state structure
+
+#### ❌ Don't Export Lens Tuples
+
+```tsx
+// ❌ Bad: Lens tuples are hard to mock
+function formLogic() {
+  const state = signal({ username: "" });
+  return {
+    username: focus.lens(state, "username"),  // Hard to mock!
+  };
+}
+
+// ✅ Good: Export signal (Pattern A)
+return { state };
+
+// ✅ Good: Export getters/setters (Pattern B)
+return {
+  getUsername: () => state().username,
+  setUsername: (v: string) => state.set((s) => ({ ...s, username: v })),
+};
+```
+
+#### Summary Table
+
+| Pattern | Export | Consumer | Testability | Use Case |
+|---------|--------|----------|-------------|----------|
+| **A: Signal** | `state` signal | Uses `focus.lens()` | Mock signal | Full control, large states |
+| **B: Getters/Setters** | `getFoo`, `setFoo` | Calls functions | Mock functions | Controlled access, easy mocking |
+| **❌ Lens** | Lens tuples | Destructure | Hard to mock | **Don't use** |
+
+### Async Action State Pattern
+
+Use `{action}State` naming for signals that track async action state:
+
+```tsx
+const loginState = useScope(() => signal<Promise<void>>());
+const submitState = useScope(() => signal<Promise<Result>>());
+```
+
+#### Pattern A: Logic-Level State (Shared)
+
+When multiple components need to react to the same action:
+
+```tsx
+// Logic exposes action state
+export const authLogic = logic("authLogic", () => {
+  const loginState = signal<Promise<void>>();
+  
+  async function login(credentials: Credentials) {
+    const promise = authApi.login(credentials);
+    loginState.set(promise);
+    return promise;
+  }
+
+  return { loginState, login };
+});
+
+// Multiple consumers can track loginState
+function LoginForm() {
+  const $auth = authLogic();
+  return rx(() => {
+    const state = task.from($auth.loginState());
+    return <button disabled={state?.loading}>Login</button>;
+  });
+}
+```
+
+#### Pattern B: Component-Level State (Local)
+
+When only one component handles the action:
+
+```tsx
+// Logic exposes action only
+function formLogic() {
+  return { submit: async (data) => api.submit(data) };
+}
+
+// Component creates local state
+function ContactForm() {
+  const $form = useScope(formLogic);
+  const submitState = useScope(() => signal<Promise<void>>());
+
+  return rx(() => {
+    const state = task.from(submitState());
+    return (
+      <form onSubmit={() => submitState.set($form.submit(data))}>
+        <button disabled={state?.loading}>
+          {state?.loading ? "Sending..." : "Send"}
+        </button>
+      </form>
+    );
+  });
+}
+```
+
+| Aspect | Logic-Level | Component-Level |
+|--------|-------------|-----------------|
+| Sharing | ✅ Multiple consumers | ❌ Single component |
+| Use case | Global actions | UI-specific actions |
+
 ---
 
 ## 🔌 Plugins & Extensions

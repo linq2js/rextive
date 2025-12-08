@@ -227,7 +227,7 @@ export function useScope<TScope, TArgs extends any[]>(
     ? [deps?: unknown[]]
     : [
         deps: [...args: TArgs, ...customDeps: unknown[]],
-        options?: OptionsOrEquals
+        options?: OptionsOrEquals,
       ]
 ): TScope;
 
@@ -259,7 +259,7 @@ export function useScope<TScope, TArgs extends any[]>(
     ? [deps?: unknown[]]
     : [
         deps: [...args: TArgs, ...customDeps: unknown[]],
-        options?: OptionsOrEquals
+        options?: OptionsOrEquals,
       ]
 ): TScope;
 

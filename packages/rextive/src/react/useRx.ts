@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { withHooks } from "../hooks";
+import { emit, withHooks } from "../hooks";
 import { AnySignal } from "../types";
 import { emitter } from "../utils/emitter";
 import { useScope } from "./useScope";
@@ -69,19 +69,32 @@ export function useRx<T>(fn: () => T): T {
   // Rerender trigger - use useState for forcing re-renders
   const [, setRerenderState] = useState({});
   const scope = useScope(fn, () => {
-    const singals = new Set<AnySignal<any>>();
+    const reactiveSignals = new Set<AnySignal<any>>();
+    const onCleanup = emitter();
+
     return {
-      singals,
+      reactiveSignals,
       dispose() {
-        singals.clear();
+        reactiveSignals.clear();
+        emit.forgetDisposedSignals(onCleanup.emitAndClear);
       },
       compute() {
+        reactiveSignals.clear();
+        // dispose all signals created in fn
+        onCleanup.emitAndClear();
         return withHooks(
-          {
-            onSignalAccess(signal) {
-              singals.add(signal);
+          (prev) => ({
+            onSignalCreate(signal, deps, disposalHandled) {
+              if (!disposalHandled) {
+                disposalHandled = true;
+                onCleanup.on(signal.dispose);
+              }
+              prev?.onSignalCreate?.(signal, deps, disposalHandled);
             },
-          },
+            onSignalAccess(signal) {
+              reactiveSignals.add(signal);
+            },
+          }),
           fn
         );
       },
@@ -89,10 +102,10 @@ export function useRx<T>(fn: () => T): T {
   });
 
   useEffect(() => {
-    if (scope.singals.size === 0) return;
+    if (scope.reactiveSignals.size === 0) return;
 
     const onCleanup = emitter();
-    for (const signal of scope.singals) {
+    for (const signal of scope.reactiveSignals) {
       onCleanup.on(
         signal.on(() => {
           setRerenderState({

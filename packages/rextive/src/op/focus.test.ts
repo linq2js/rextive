@@ -777,3 +777,167 @@ describe("focus operator", () => {
     });
   });
 });
+
+describe("focus.lens", () => {
+  describe("basic functionality", () => {
+    it("should read value at path", () => {
+      const form = signal({ user: { name: "Alice", age: 30 } });
+      const [getName] = focus.lens(form, "user.name");
+
+      expect(getName()).toBe("Alice");
+    });
+
+    it("should write value at path", () => {
+      const form = signal({ user: { name: "Alice", age: 30 } });
+      const [getName, setName] = focus.lens(form, "user.name");
+
+      setName("Bob");
+
+      expect(getName()).toBe("Bob");
+      expect(form().user.name).toBe("Bob");
+      expect(form().user.age).toBe(30); // Other properties unchanged
+    });
+
+    it("should work with array indices", () => {
+      const list = signal({ items: ["a", "b", "c"] });
+      const [getFirst, setFirst] = focus.lens(list, "items.0");
+
+      expect(getFirst()).toBe("a");
+
+      setFirst("x");
+      expect(getFirst()).toBe("x");
+      expect(list().items).toEqual(["x", "b", "c"]);
+    });
+
+    it("should use fallback for undefined values", () => {
+      const form = signal<{ nickname?: string }>({});
+      const [getNickname, setNickname] = focus.lens(
+        form,
+        "nickname",
+        () => "Anonymous"
+      );
+
+      expect(getNickname()).toBe("Anonymous");
+
+      setNickname("Alice");
+      expect(getNickname()).toBe("Alice");
+    });
+  });
+
+  describe("lens from lens (composable)", () => {
+    it("should create lens from another lens", () => {
+      const form = signal({
+        contacts: [{ firstName: "John", lastName: "Doe" }],
+      });
+
+      const contactsLens = focus.lens(form, "contacts");
+      const firstContactLens = focus.lens(contactsLens, "0");
+      const [getFirstName, setFirstName] = focus.lens(
+        firstContactLens,
+        "firstName"
+      );
+
+      expect(getFirstName()).toBe("John");
+
+      setFirstName("Jane");
+      expect(getFirstName()).toBe("Jane");
+      expect(form().contacts[0].firstName).toBe("Jane");
+    });
+  });
+
+  describe("map method", () => {
+    it("should transform setter with function shorthand", () => {
+      const form = signal({ email: "" });
+      const [getEmail, setEmail] = focus
+        .lens(form, "email")
+        .map((e: { currentTarget: { value: string } }) => e.currentTarget.value);
+
+      // Simulate input event
+      const mockEvent = { currentTarget: { value: "test@example.com" } };
+      setEmail(mockEvent);
+
+      expect(getEmail()).toBe("test@example.com");
+      expect(form().email).toBe("test@example.com");
+    });
+
+    it("should transform both getter and setter with options", () => {
+      // Store price in cents, display as dollars
+      const product = signal({ price: 1999 }); // $19.99
+
+      const [getPrice, setPrice] = focus.lens(product, "price").map({
+        get: (cents) => (cents / 100).toFixed(2),
+        set: (dollars: string) => Math.round(parseFloat(dollars) * 100),
+      });
+
+      expect(getPrice()).toBe("19.99");
+
+      setPrice("25.50");
+      expect(getPrice()).toBe("25.50");
+      expect(product().price).toBe(2550);
+    });
+
+    it("should transform only getter when set is not provided", () => {
+      const data = signal({ count: 5 });
+
+      const [getDoubled, setCount] = focus.lens(data, "count").map({
+        get: (n) => n * 2,
+      });
+
+      expect(getDoubled()).toBe(10);
+
+      setCount(3);
+      expect(getDoubled()).toBe(6);
+      expect(data().count).toBe(3);
+    });
+
+    it("should transform only setter when get is not provided", () => {
+      const form = signal({ active: false });
+
+      const [getActive, setActive] = focus.lens(form, "active").map({
+        set: (e: { currentTarget: { checked: boolean } }) =>
+          e.currentTarget.checked,
+      });
+
+      expect(getActive()).toBe(false);
+
+      setActive({ currentTarget: { checked: true } });
+      expect(getActive()).toBe(true);
+      expect(form().active).toBe(true);
+    });
+
+    it("should chain multiple map calls", () => {
+      const form = signal({ value: "hello" });
+
+      const [getValue, setValue] = focus
+        .lens(form, "value")
+        .map({
+          get: (s) => s.toUpperCase(),
+        })
+        .map({
+          set: (s: string) => s.toLowerCase(),
+        });
+
+      expect(getValue()).toBe("HELLO");
+
+      setValue("WORLD");
+      expect(form().value).toBe("world");
+      expect(getValue()).toBe("WORLD");
+    });
+
+    it("should work with numeric input transformation", () => {
+      const settings = signal({ volume: 50 });
+
+      const [getVolume, setVolume] = focus
+        .lens(settings, "volume")
+        .map((e: { currentTarget: { value: string } }) =>
+          parseInt(e.currentTarget.value, 10)
+        );
+
+      expect(getVolume()).toBe(50);
+
+      setVolume({ currentTarget: { value: "75" } });
+      expect(getVolume()).toBe(75);
+      expect(settings().volume).toBe(75);
+    });
+  });
+});

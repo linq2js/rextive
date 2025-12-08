@@ -44,3 +44,16 @@ export { useScope } from "./useScope";
 export * from "./provider";
 export { useStable } from "./useStable";
 export type { StableGet } from "./useStable";
+
+// Export input helpers for use with focus.lens().map()
+export {
+  inputValue,
+  inputChecked,
+  inputNumber,
+  inputInt,
+  inputFloat,
+  selectValue,
+  textareaValue,
+  inputFiles,
+  inputFile,
+} from "./inputHelpers";
