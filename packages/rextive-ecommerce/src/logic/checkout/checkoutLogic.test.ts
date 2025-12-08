@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { logic, signal } from "rextive";
+import { logic } from "rextive";
 import { checkoutLogic } from "./checkoutLogic";
-import { shippingLogic } from "./shippingLogic";
-import { paymentLogic } from "./paymentLogic";
-import { orderLogic } from "./orderLogic";
 
 // Mock child logics
 const mockShipping = {

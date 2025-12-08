@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@/test/utils";
-import { signal } from "rextive";
+import { signal, task } from "rextive";
 import { mockLogic } from "rextive/test";
 import { CategoryFilter } from "./CategoryFilter";
 import { productsLogic } from "@/logic/productsLogic";
+import type { Category } from "@/api/types";
 
-const mockCategories = [
+const mockCategories: Category[] = [
   { slug: "smartphones", name: "Smartphones", url: "/category/smartphones" },
   { slug: "laptops", name: "Laptops", url: "/category/laptops" },
   { slug: "fragrances", name: "Fragrances", url: "/category/fragrances" },
@@ -15,13 +16,11 @@ describe("CategoryFilter", () => {
   const $products = mockLogic(productsLogic);
 
   beforeEach(() => {
+    // Use a signal that directly returns the success task state
+    const categoriesTaskSignal = signal(task.success(mockCategories));
     $products.default({
       category: signal<string | null>(null),
-      categoriesTask: signal({
-        loading: false,
-        error: undefined,
-        value: mockCategories,
-      }),
+      categoriesTask: categoriesTaskSignal,
       setCategory: vi.fn(),
     });
   });
@@ -78,13 +77,14 @@ describe("CategoryFilter", () => {
   });
 
   it("should show loading skeletons when loading", () => {
+    // Create a loading task state with the value fallback (matching how task operator works)
+    const loadingTask = task.loading(new Promise<Category[]>(() => {}));
+    // Add the fallback value like the task operator does
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const loadingTaskSignal = signal({ ...loadingTask, value: [] as Category[] }) as any;
     $products.provide({
       category: signal(null),
-      categoriesTask: signal({
-        loading: true,
-        error: undefined,
-        value: [],
-      }),
+      categoriesTask: loadingTaskSignal,
     });
 
     render(<CategoryFilter />);

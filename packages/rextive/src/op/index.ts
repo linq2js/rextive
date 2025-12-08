@@ -83,6 +83,3 @@ export type { CountOptions } from "./count";
 // Distinct operators
 export { distinct } from "./distinct";
 export type { DistinctOptions } from "./distinct";
-
-// Reactive trigger operators
-export { refreshOn, staleOn, resetOn, type NotifierFilter } from "./on";

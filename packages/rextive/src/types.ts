@@ -113,10 +113,10 @@ export type Operator<TSource, TResult> = (source: TSource) => TResult;
  */
 export type PipeResult<
   TOperators extends readonly Operator<any, any>[],
-  TResult
+  TResult,
 > = TOperators extends [
   infer First extends Operator<any, any>,
-  ...infer Rest extends Operator<any, any>[]
+  ...infer Rest extends Operator<any, any>[],
 ]
   ? PipeResult<Rest, ReturnType<First>>
   : TResult;
@@ -126,10 +126,10 @@ export type PipeResult<
  */
 export type ToChainResult<
   TSelectors extends ReadonlyArray<(value: any) => any>,
-  TResult = never
+  TResult = never,
 > = TSelectors extends [
   infer First extends (value: any) => any,
-  ...infer Rest extends ReadonlyArray<(value: any) => any>
+  ...infer Rest extends ReadonlyArray<(value: any) => any>,
 ]
   ? ToChainResult<Rest, ReturnType<First>>
   : TResult;
@@ -773,27 +773,27 @@ type PathImplObject<T> = {
   [K in keyof T & string]: IsAny<T[K]> extends true
     ? K
     : NonNullable<T[K]> extends Primitive
-    ? K
-    : NonNullable<T[K]> extends readonly any[]
-    ? K | `${K}.${Path<NonNullable<T[K]>>}`
-    : NonNullable<T[K]> extends object
-    ? K | `${K}.${Path<NonNullable<T[K]>>}`
-    : K;
+      ? K
+      : NonNullable<T[K]> extends readonly any[]
+        ? K | `${K}.${Path<NonNullable<T[K]>>}`
+        : NonNullable<T[K]> extends object
+          ? K | `${K}.${Path<NonNullable<T[K]>>}`
+          : K;
 }[keyof T & string];
 
 type PathImplArray<
   T extends readonly any[],
-  K extends string
+  K extends string,
 > = T extends readonly (infer V)[]
   ? IsAny<V> extends true
     ? K
     : NonNullable<V> extends Primitive
-    ? K
-    : NonNullable<V> extends readonly any[]
-    ? K | `${K}.${Path<NonNullable<V>>}`
-    : NonNullable<V> extends object
-    ? K | `${K}.${Path<NonNullable<V>>}`
-    : K
+      ? K
+      : NonNullable<V> extends readonly any[]
+        ? K | `${K}.${Path<NonNullable<V>>}`
+        : NonNullable<V> extends object
+          ? K | `${K}.${Path<NonNullable<V>>}`
+          : K
   : K;
 
 /**
@@ -815,30 +815,30 @@ type PathImplArray<
  */
 export type PathValue<
   T,
-  P extends Path<T>
+  P extends Path<T>,
 > = P extends `${infer K}.${infer Rest}`
   ? K extends keyof T
     ? NonNullable<T[K]> extends never
       ? Extract<T[K], null | undefined>
       : Rest extends Path<NonNullable<T[K]>>
-      ? PathValue<NonNullable<T[K]>, Rest> | Extract<T[K], null | undefined>
-      : never
+        ? PathValue<NonNullable<T[K]>, Rest> | Extract<T[K], null | undefined>
+        : never
     : K extends `${ArrayKey}`
-    ? T extends readonly (infer V)[]
-      ? NonNullable<V> extends never
-        ? Extract<V, null | undefined>
-        : Rest extends Path<NonNullable<V>>
-        ? PathValue<NonNullable<V>, Rest> | Extract<V, null | undefined>
+      ? T extends readonly (infer V)[]
+        ? NonNullable<V> extends never
+          ? Extract<V, null | undefined>
+          : Rest extends Path<NonNullable<V>>
+            ? PathValue<NonNullable<V>, Rest> | Extract<V, null | undefined>
+            : never
         : never
       : never
-    : never
   : P extends keyof T
-  ? T[P]
-  : P extends `${ArrayKey}`
-  ? T extends readonly (infer V)[]
-    ? V
-    : never
-  : never;
+    ? T[P]
+    : P extends `${ArrayKey}`
+      ? T extends readonly (infer V)[]
+        ? V
+        : never
+      : never;
 
 /**
  * Type-safe setter function signature for nested paths.
@@ -1007,11 +1007,12 @@ export type When<TValue, TInit, TKind extends SignalKind> = {
   ): SignalOf<TValue, TKind, TInit>;
 };
 
-export type NonNullSignal<S> = S extends Computed<infer T>
-  ? Computed<T, any>
-  : S extends Mutable<infer T, any>
-  ? Mutable<T>
-  : S;
+export type NonNullSignal<S> =
+  S extends Computed<infer T>
+    ? Computed<T, any>
+    : S extends Mutable<infer T, any>
+      ? Mutable<T>
+      : S;
 
 export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
   /**
@@ -1082,7 +1083,7 @@ export type Mutable<TValue, TInit = TValue> = Signal<TValue, TInit> & {
    */
   readonly tuple: readonly [
     signal: Mutable<TValue, TInit>,
-    set: (value: TValue) => void
+    set: (value: TValue) => void,
   ];
 
   pipe: Pipe<"mutable", TValue>;
@@ -1179,14 +1180,14 @@ export type SignalKind = "mutable" | "computed" | "any";
 export type SignalOf<
   TValue,
   K extends SignalKind,
-  TInit = TValue
+  TInit = TValue,
 > = K extends "any"
   ? AnySignal<TValue, TInit>
   : K extends "mutable"
-  ? Mutable<TValue, TInit>
-  : K extends "computed"
-  ? Computed<TValue, TInit>
-  : Signal<TValue, TInit>;
+    ? Mutable<TValue, TInit>
+    : K extends "computed"
+      ? Computed<TValue, TInit>
+      : Signal<TValue, TInit>;
 
 /**
  * Plugin function type for extending signal behavior.
@@ -1286,7 +1287,7 @@ export type GroupPlugin<
   TSignals extends Record<string, AnySignal<any>> = Record<
     string,
     AnySignal<any>
-  >
+  >,
 > = (signals: TSignals) => VoidFunction | void;
 
 /**
@@ -1725,7 +1726,7 @@ export type ComputedSignalContext<TDependencies extends SignalMap = {}> =
 
 export type SignalExtraOptions<
   TValue,
-  TKind extends SignalKind = SignalKind
+  TKind extends SignalKind = SignalKind,
 > = {
   /**
    * Plugins to extend this signal's behavior.
@@ -1808,10 +1809,10 @@ export type UseList<TValue, TKind extends SignalKind> = ReadonlyArray<
   [TKind] extends ["mutable"]
     ? Plugin<TValue, "mutable" | "any"> | Tag<TValue, "mutable" | "any">
     : [TKind] extends ["computed"]
-    ? Plugin<TValue, "computed" | "any"> | Tag<TValue, "computed" | "any">
-    : // TKind is SignalKind (union of both) - accept general plugins/tags only
-      | Plugin<TValue, "any" | "mutable" | "computed">
-        | Tag<TValue, "any" | "mutable" | "computed">
+      ? Plugin<TValue, "computed" | "any"> | Tag<TValue, "computed" | "any">
+      : // TKind is SignalKind (union of both) - accept general plugins/tags only
+          | Plugin<TValue, "any" | "mutable" | "computed">
+          | Tag<TValue, "any" | "mutable" | "computed">
 >;
 
 export type SignalNameOptions = {
@@ -1897,27 +1898,28 @@ export type SignalOptions<T> = SignalNameOptions & {
 
 export type ResolveValueType = "awaited" | "task" | "value";
 
-export type ResolveAwaitable<T> = T extends Signal<infer TValue>
-  ? ResolveAwaitable<TValue>
-  : T extends Task<any>
-  ? Awaited<T["promise"]>
-  : Awaited<T>;
+export type ResolveAwaitable<T> =
+  T extends Signal<infer TValue>
+    ? ResolveAwaitable<TValue>
+    : T extends Task<any>
+      ? Awaited<T["promise"]>
+      : Awaited<T>;
 
 /**
  * Resolve signal values based on access type
  */
 export type ResolvedValueMap<
   TMap extends SignalMap,
-  TType extends ResolveValueType
+  TType extends ResolveValueType,
 > = {
   readonly [K in keyof TMap]: TMap[K] extends () => infer T
     ? TType extends "awaited"
       ? Awaited<T>
       : TType extends "task"
-      ? Task<Awaited<T>>
-      : TType extends "value"
-      ? T
-      : never
+        ? Task<Awaited<T>>
+        : TType extends "value"
+          ? T
+          : never
     : never;
 };
 
@@ -1955,15 +1957,14 @@ export type Instance<T> = T & { dispose(): void };
  * });
  * ```
  */
-export type TestInstance<TLogic extends Logic<any>> = TLogic extends Logic<
-  infer T
->
-  ? {
-      [key in keyof T]: T[key] extends Signal<infer TValue, infer TInit>
-        ? Signal<TValue, TInit>
-        : T[key];
-    }
-  : never;
+export type TestInstance<TLogic extends Logic<any>> =
+  TLogic extends Logic<infer T>
+    ? {
+        [key in keyof T]: T[key] extends Signal<infer TValue, infer TInit>
+          ? Signal<TValue, TInit>
+          : T[key];
+      }
+    : never;
 
 /**
  * Infer the instance type from a logic.
@@ -2047,11 +2048,8 @@ export interface Logic<T extends object> {
  * // = { count: Signal<number> }
  * ```
  */
-export type InferLogic<TLogic extends Logic<any>> = TLogic extends Logic<
-  infer T
->
-  ? T
-  : never;
+export type InferLogic<TLogic extends Logic<any>> =
+  TLogic extends Logic<infer T> ? T : never;
 
 /**
  * Extract only function properties from T and make them readonly.

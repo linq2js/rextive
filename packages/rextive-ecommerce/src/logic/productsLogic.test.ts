@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { logic } from "rextive";
 import { productsLogic } from "./productsLogic";
 import { productsApi } from "@/api/client";
+import type { Product, ProductsResponse, Category } from "@/api/types";
 
 // Mock productsApi
 vi.mock("@/api/client", () => ({
@@ -16,17 +17,51 @@ vi.mock("@/api/client", () => ({
 // Mock scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();
 
-const mockProducts = {
+const createMockProduct = (id: number, title: string, price: number): Product => ({
+  id,
+  title,
+  description: `Description for ${title}`,
+  price,
+  discountPercentage: 10,
+  rating: 4.5,
+  stock: 100,
+  brand: "Test Brand",
+  category: "electronics",
+  thumbnail: `thumb${id}.jpg`,
+  images: [`img${id}.jpg`],
+  tags: ["test"],
+  sku: `SKU-${id}`,
+  weight: 1,
+  dimensions: { width: 10, height: 10, depth: 10 },
+  warrantyInformation: "1 year",
+  shippingInformation: "Ships in 3-5 days",
+  availabilityStatus: "In Stock",
+  reviews: [],
+  returnPolicy: "30 days",
+  minimumOrderQuantity: 1,
+  meta: {
+    createdAt: "2024-01-01",
+    updatedAt: "2024-01-01",
+    barcode: `BAR-${id}`,
+    qrCode: `qr${id}.png`,
+  },
+});
+
+const mockProducts: ProductsResponse = {
   products: [
-    { id: 1, title: "Product 1", price: 10 },
-    { id: 2, title: "Product 2", price: 20 },
+    createMockProduct(1, "Product 1", 10),
+    createMockProduct(2, "Product 2", 20),
   ],
   total: 50,
   skip: 0,
   limit: 12,
 };
 
-const mockCategories = ["electronics", "clothing", "home"];
+const mockCategories: Category[] = [
+  { slug: "electronics", name: "Electronics", url: "/electronics" },
+  { slug: "clothing", name: "Clothing", url: "/clothing" },
+  { slug: "home", name: "Home", url: "/home" },
+];
 
 describe("productsLogic", () => {
   beforeEach(() => {

@@ -18,6 +18,7 @@ export const CartDrawer = memo(function CartDrawer() {
         {/* Backdrop */}
         {open && (
           <div
+            aria-hidden="true"
             className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm z-50 animate-fade-in"
             onClick={() => closeDrawer()}
           />
@@ -25,6 +26,7 @@ export const CartDrawer = memo(function CartDrawer() {
 
         {/* Drawer */}
         <aside
+          aria-label="Shopping Cart"
           className={`fixed top-0 right-0 h-full w-full sm:w-96 bg-white dark:bg-slate-900 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-out border-l border-stone-200 dark:border-slate-800 ${
             open ? "translate-x-0" : "translate-x-full"
           }`}

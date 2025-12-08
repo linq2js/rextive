@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { logic } from "rextive";
 import { productDetailsLogic } from "./productDetailsLogic";
 import { productsApi } from "@/api/client";
+import type { Product } from "@/api/types";
 
 // Mock productsApi
 vi.mock("@/api/client", () => ({
@@ -10,12 +11,34 @@ vi.mock("@/api/client", () => ({
   },
 }));
 
-const mockProduct = {
+const mockProduct: Product = {
   id: 1,
   title: "Test Product",
+  description: "A test product",
   price: 99.99,
+  discountPercentage: 10,
+  rating: 4.5,
   stock: 10,
+  brand: "Test Brand",
+  category: "electronics",
+  thumbnail: "thumb.jpg",
   images: ["img1.jpg", "img2.jpg", "img3.jpg"],
+  tags: ["test"],
+  sku: "TEST-001",
+  weight: 1,
+  dimensions: { width: 10, height: 10, depth: 10 },
+  warrantyInformation: "1 year",
+  shippingInformation: "Ships in 3-5 days",
+  availabilityStatus: "In Stock",
+  reviews: [],
+  returnPolicy: "30 days",
+  minimumOrderQuantity: 1,
+  meta: {
+    createdAt: "2024-01-01",
+    updatedAt: "2024-01-01",
+    barcode: "123456",
+    qrCode: "qr.png",
+  },
 };
 
 describe("productDetailsLogic", () => {
@@ -29,28 +52,17 @@ describe("productDetailsLogic", () => {
     const details = productDetailsLogic.create();
 
     expect(details.productId()).toBeNull();
-    expect(details.selectedImageIndex()).toBe(0);
     expect(details.quantity()).toBe(1);
   });
 
-  it("should load product and reset state", () => {
+  it("should load product and reset quantity", () => {
     const details = productDetailsLogic.create();
-    details.selectImage(2);
     details.setQuantity(5);
 
     details.loadProduct(42);
 
     expect(details.productId()).toBe(42);
-    expect(details.selectedImageIndex()).toBe(0);
     expect(details.quantity()).toBe(1);
-  });
-
-  it("should select image index", () => {
-    const details = productDetailsLogic.create();
-
-    details.selectImage(2);
-
-    expect(details.selectedImageIndex()).toBe(2);
   });
 
   it("should set quantity within bounds", () => {
@@ -87,13 +99,11 @@ describe("productDetailsLogic", () => {
   it("should reset all state", () => {
     const details = productDetailsLogic.create();
     details.loadProduct(42);
-    details.selectImage(2);
     details.setQuantity(5);
 
     details.reset();
 
     expect(details.productId()).toBeNull();
-    expect(details.selectedImageIndex()).toBe(0);
     expect(details.quantity()).toBe(1);
   });
 });

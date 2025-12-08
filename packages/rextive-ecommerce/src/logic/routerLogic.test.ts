@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { logic } from "rextive";
-import { routerLogic, type Route } from "./routerLogic";
+import { routerLogic } from "./routerLogic";
 
 describe("routerLogic", () => {
   const originalLocation = window.location;

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { logic, signal } from "rextive";
 import { shippingLogic } from "./shippingLogic";
-import { authLogic } from "../authLogic";
 import { DEFAULT_SHIPPING_INFO } from "./types";
 
 // Mock authLogic

@@ -838,9 +838,6 @@ import {
   max,
   count,
   distinct,
-  refreshOn,
-  staleOn,
-  resetOn,
 } from "rextive/op";
 ```
 
@@ -956,34 +953,6 @@ min(); // Minimum value
 max(); // Maximum value
 count(); // Count emissions
 distinct(); // Remove duplicates
-```
-
----
-
-### Reactive Trigger Operators
-
-#### `refreshOn(notifier, filter?)`
-
-Trigger immediate recomputation:
-
-```tsx
-const userData = asyncSignal.pipe(refreshOn(refreshTrigger));
-```
-
-#### `staleOn(notifier, filter?)`
-
-Mark for lazy recomputation:
-
-```tsx
-const userData = asyncSignal.pipe(staleOn(invalidateCache));
-```
-
-#### `resetOn(notifier, filter?)`
-
-Reset mutable signal to initial value:
-
-```tsx
-const formData = signal({ name: "" }).pipe(resetOn(clearTrigger));
 ```
 
 ---

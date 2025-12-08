@@ -2308,13 +2308,13 @@ function pluginTests() {
 
   void signal(0, { use: [computedTag] });
 
-  void testAssign1,
+  (void testAssign1,
     testAssign2,
     testAssign3,
     testAssign4,
     testAssign5,
     testAssign6,
-    testAssign7;
+    testAssign7);
 
   // -----------------------------------------------------------------------------
   // Test 2: Signal use constraints (signal-to-tag compatibility)
@@ -2329,12 +2329,8 @@ function pluginTests() {
   //
   // Direct type test shows correct behavior:
   type MutableUseElement = UseList<number, "mutable">[number];
-  type CanAssignComputedToMutable = Tag<
-    number,
-    "computed"
-  > extends MutableUseElement
-    ? "WRONG"
-    : "CORRECT";
+  type CanAssignComputedToMutable =
+    Tag<number, "computed"> extends MutableUseElement ? "WRONG" : "CORRECT";
   const directTest: CanAssignComputedToMutable = "CORRECT" as any; // Type test passes ✓
   void directTest;
 
@@ -2371,8 +2367,8 @@ function pluginTests() {
 
   // Recommendation: Use general tags (no kind parameter) unless you have a strong
   // semantic reason to restrict, and be careful with cross-kind usage.
-  void testMutableSig1, testMutableSig2, testMutableSig3;
-  void testComputedSig1, testComputedSig2, testComputedSig3;
+  (void testMutableSig1, testMutableSig2, testMutableSig3);
+  (void testComputedSig1, testComputedSig2, testComputedSig3);
 }
 
 // =============================================================================
@@ -2395,7 +2391,7 @@ function anySignalTests() {
   const mutableAsAny: AnySignal<number> = count; // ✅ OK
   const computedAsAny: AnySignal<number> = doubled; // ✅ OK
 
-  void mutableAsAny, computedAsAny;
+  (void mutableAsAny, computedAsAny);
 
   // -----------------------------------------------------------------------------
   // Test 2: Generic function with AnySignal has access to common methods
@@ -2535,7 +2531,7 @@ function persistorTests() {
       // Optional access
       const count: number | undefined = args.values.count;
       const name: string | undefined = args.values.name;
-      void count, name;
+      (void count, name);
     } else {
       // Overwrite mode - full values
       expectType<"overwrite">(args.type);
@@ -2544,7 +2540,7 @@ function persistorTests() {
       // Required access
       const count: number = args.values.count;
       const name: string = args.values.name;
-      void count, name;
+      (void count, name);
     }
   }
   void testSaveArgs;
@@ -2647,7 +2643,7 @@ function persistorTests() {
   const anySig2 = signal("str", { use: [flexiblePersist("str")] });
   const anySig3 = signal({ complex: true }, { use: [flexiblePersist("obj")] });
 
-  void anySig1, anySig2, anySig3;
+  (void anySig1, anySig2, anySig3);
 
   // Cleanup
   countSig.dispose();
@@ -2818,7 +2814,7 @@ function pathTypeTests() {
   type MatrixCellType = PathValue<NestedArray, "matrix.0.row.0">;
   expectType<MatrixCellType>(0 as number);
 
-  void validPaths,
+  (void validPaths,
     name,
     age,
     city,
@@ -2826,7 +2822,7 @@ function pathTypeTests() {
     tags,
     arrayPaths,
     tuplePaths,
-    matrixPaths;
+    matrixPaths);
 }
 
 // ============================================================================
@@ -2990,7 +2986,7 @@ function focusOperatorTests() {
   const doubled = signal({ count }, ({ deps }) => deps.count * 2);
   expectType<() => boolean>(doubled.disposed);
 
-  void userName,
+  (void userName,
     userAge,
     displayName,
     theme,
@@ -3006,7 +3002,7 @@ function focusOperatorTests() {
     streetWithFallback,
     name1,
     name2,
-    nicknameAllOptions;
+    nicknameAllOptions);
 }
 
 // =============================================================================
@@ -3049,13 +3045,13 @@ function signalFromTests() {
   const fromComputed = signal.from({ original: numSig, doubled: computed });
   expectType<Computed<{ original: number; doubled: number }>>(fromComputed);
 
-  void combined1,
+  (void combined1,
     combined2,
     emptyRecord,
     emptyTuple,
     single1,
     single2,
-    fromComputed;
+    fromComputed);
 }
 
 // =============================================================================
@@ -3395,7 +3391,7 @@ function signalWhenTests() {
   // Cleanup - suppress unused variable warnings
   // -----------------------------------------------------------------------------
 
-  void afterReset,
+  (void afterReset,
     afterRefresh,
     afterMultiNotifier,
     afterMixedNotifiers,
@@ -3419,7 +3415,7 @@ function signalWhenTests() {
     computedReadonly,
     result,
     withComputedNotifier,
-    withEmptyArray;
+    withEmptyArray);
 }
 
 // =============================================================================
@@ -3437,7 +3433,7 @@ function operatorOptionsTests() {
 
   const nameOpts: OperatorNameOptions = { name: "custom" };
   const emptyOpts: OperatorNameOptions = {};
-  void nameOpts, emptyOpts;
+  (void nameOpts, emptyOpts);
 
   // -----------------------------------------------------------------------------
   // Test 2: skip operators with options - verify options are accepted
@@ -3673,13 +3669,17 @@ function operatorOptionsTests() {
     name: "distinctOpts",
   };
 
-  void justName, takeWhileAllOpts, countAllOpts, minMaxAllOpts, distinctAllOpts;
+  (void justName,
+    takeWhileAllOpts,
+    countAllOpts,
+    minMaxAllOpts,
+    distinctAllOpts);
 
   // -----------------------------------------------------------------------------
   // Cleanup - suppress unused variable warnings
   // -----------------------------------------------------------------------------
 
-  void skipped,
+  (void skipped,
     skippedWhile,
     skippedLast,
     skippedUntil,
@@ -3705,7 +3705,7 @@ function operatorOptionsTests() {
     chained,
     debounced,
     throttled,
-    delayed;
+    delayed);
 }
 
 // =============================================================================
@@ -3733,7 +3733,7 @@ function signalActionTests() {
     expectType<() => boolean>(ctx.aborted);
     expectType<(fn: VoidFunction) => void>(ctx.onCleanup);
   }
-  void testContext, ctx1, ctx2;
+  (void testContext, ctx1, ctx2);
 
   // -----------------------------------------------------------------------------
   // Test 2: Lazy mode (default) - payload and result can be undefined
@@ -3888,7 +3888,7 @@ function signalActionTests() {
   // Cleanup
   // -----------------------------------------------------------------------------
 
-  void lazyAction,
+  (void lazyAction,
     eagerAction,
     asyncLazyAction,
     asyncEagerAction,
@@ -3899,7 +3899,7 @@ function signalActionTests() {
     lazyMode,
     eagerMode,
     numSig,
-    strSig;
+    strSig);
 }
 
 export {

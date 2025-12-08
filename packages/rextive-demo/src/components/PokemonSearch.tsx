@@ -1,5 +1,5 @@
 import { signal, wait, task, rx, useScope } from "rextive/react";
-import { debounce, refreshOn, to } from "rextive/op";
+import { debounce, to } from "rextive/op";
 import { Button } from "./Button";
 
 /**
@@ -37,6 +37,7 @@ function createPokemonSearch() {
   // Input signal for pokemon name
   const pokemonName = signal("", { name: "pokemonName" });
   const notifier = signal<"refresh">();
+
   const pokemonProfile = pokemonName
     // Debounce the input
     .pipe(
@@ -75,7 +76,7 @@ function createPokemonSearch() {
         const data: PokemonData = await res.json();
         return { name: data.name, data };
       }),
-      refreshOn(notifier),
+      ({ when }) => when(notifier, "refresh"),
       // Transform to task for loading/error/success states
       // Pass DEFAULT_PROFILE as the initial value before first computation
       task(DEFAULT_PROFILE, { name: "pokemonProfile" })
@@ -98,9 +99,8 @@ function createPokemonSearch() {
  * - Async signal with abortSignal for cancellation
  */
 export function PokemonSearch() {
-  const { pokemonName, notifier, pokemonProfile } = useScope(
-    createPokemonSearch
-  );
+  const { pokemonName, notifier, pokemonProfile } =
+    useScope(createPokemonSearch);
 
   return (
     <div className="pokemon-search">

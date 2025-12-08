@@ -122,32 +122,32 @@ describe("signal() - Notifier Pattern (Empty Signal)", () => {
     });
   });
 
-  describe("integration with operators", () => {
-    it("should work with refreshOn operator", async () => {
-      const { refreshOn } = await import("./op/on");
-
-      const refreshTrigger = signal<void>();
+  describe("integration with .when()", () => {
+    it("should work with .when() for refresh pattern", async () => {
+      const refreshTrigger = signal<"refresh">();
       let computeCount = 0;
 
-      const data = signal({ dep: signal(0) }, () => {
-        computeCount++;
-        return computeCount;
-      });
-
-      data.pipe(refreshOn(refreshTrigger));
+      const data = signal(
+        { dep: signal(0) },
+        ({ when }) => {
+          when(refreshTrigger, "refresh");
+          computeCount++;
+          return computeCount;
+        }
+      );
 
       // Initial compute
       data();
       expect(computeCount).toBe(1);
 
       // Trigger refresh
-      refreshTrigger.set(undefined as void);
+      refreshTrigger.set("refresh");
       await Promise.resolve();
       data();
       expect(computeCount).toBe(2);
 
-      // Trigger again (same value - void)
-      refreshTrigger.set(undefined as void);
+      // Trigger again (same value - still triggers because it's a notifier)
+      refreshTrigger.set("refresh");
       await Promise.resolve();
       data();
       expect(computeCount).toBe(3);
@@ -155,30 +155,30 @@ describe("signal() - Notifier Pattern (Empty Signal)", () => {
       data.dispose();
     });
 
-    it("should work with staleOn operator", async () => {
-      const { staleOn } = await import("./op/on");
-
-      const invalidate = signal<void>();
+    it("should work with .when() for stale pattern", async () => {
+      const invalidate = signal<"invalidate">();
       let computeCount = 0;
 
-      const data = signal({ dep: signal(0) }, () => {
-        computeCount++;
-        return computeCount;
-      });
-
-      data.pipe(staleOn(invalidate));
+      const data = signal(
+        { dep: signal(0) },
+        ({ when }) => {
+          when(invalidate, "stale");
+          computeCount++;
+          return computeCount;
+        }
+      );
 
       // Initial compute
       data();
       expect(computeCount).toBe(1);
 
       // Mark stale
-      invalidate.set(undefined as void);
+      invalidate.set("invalidate");
       data();
       expect(computeCount).toBe(2);
 
-      // Mark stale again (same value - void)
-      invalidate.set(undefined as void);
+      // Mark stale again (same value - still triggers because it's a notifier)
+      invalidate.set("invalidate");
       data();
       expect(computeCount).toBe(3);
 
