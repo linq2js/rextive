@@ -970,18 +970,18 @@ Create cached scope instances with automatic lifecycle management.
 Each component instance gets its **own private scope**.
 
 ```tsx
-useScope(factory)                    // No deps
-useScope(factory, [deps])            // With deps
-useScope(factory, [deps], options)   // With custom equality
+useScope(factory); // No deps
+useScope(factory, [deps]); // With deps
+useScope(factory, [deps], options); // With custom equality
 ```
 
 **🔗 Shared Mode**
 Multiple components **share the same scope** via a key.
 
 ```tsx
-useScope(key, factory)                    // No deps
-useScope(key, factory, [deps])            // With deps
-useScope(key, factory, [deps], options)   // With custom equality
+useScope(key, factory); // No deps
+useScope(key, factory, [deps]); // With deps
+useScope(key, factory, [deps], options); // With custom equality
 ```
 
 #### Key Features
@@ -995,6 +995,7 @@ useScope(key, factory, [deps], options)   // With custom equality
 #### ⭐ Auto-Dispose Feature
 
 Signals created inside the factory are **automatically disposed** when:
+
 - The component unmounts
 - The deps change (scope recreated)
 - React StrictMode double-invokes (orphan signals cleaned up)
@@ -1014,11 +1015,14 @@ function SearchBar() {
 
 // With deps - passed to factory
 function UserProfile({ userId }: { userId: string }) {
-  const { user } = useScope((id) => ({
-    user: signal(async () => fetchUser(id)),
-  }), [userId]);
+  const { user } = useScope(
+    (id) => ({
+      user: signal(async () => fetchUser(id)),
+    }),
+    [userId]
+  );
 
-  return <div>{rx(user, u => u?.name)}</div>;
+  return <div>{rx(user, (u) => u?.name)}</div>;
 }
 
 // With Logic
@@ -1035,7 +1039,7 @@ function Counter() {
 function Header() {
   return (
     <>
-      <SearchBar />       {/* Uses shared scope */}
+      <SearchBar /> {/* Uses shared scope */}
       <MobileSearchBar /> {/* Same scope! */}
     </>
   );
@@ -1048,7 +1052,7 @@ function SearchBar() {
 
 function MobileSearchBar() {
   const { input } = useScope("searchBar", searchBarLogic);
-  return <input value={rx(input)} />;  // Same state as SearchBar!
+  return <input value={rx(input)} />; // Same state as SearchBar!
 }
 
 // Dynamic keys for multiple instances
@@ -1111,7 +1115,7 @@ Returns a function for creating stable references to values across renders. Solv
 #### Basic Usage
 
 ```tsx
-import { useStable } from 'rextive/react';
+import { useStable } from "rextive/react";
 
 // Create a typed stable getter
 const stable = useStable<{
@@ -1132,11 +1136,11 @@ const handlers = stable({
 
 #### Key Behaviors
 
-| Input Type | Behavior |
-|------------|----------|
-| **Functions** | Wrapped in stable reference that delegates to latest implementation |
-| **Objects/Arrays** | Cached if equal (based on equality strategy) |
-| **Primitives** | Returned directly |
+| Input Type         | Behavior                                                            |
+| ------------------ | ------------------------------------------------------------------- |
+| **Functions**      | Wrapped in stable reference that delegates to latest implementation |
+| **Objects/Arrays** | Cached if equal (based on equality strategy)                        |
+| **Primitives**     | Returned directly                                                   |
 
 #### Equality Strategies
 
@@ -1186,15 +1190,17 @@ Wraps value in a mutable signal:
 
 ```tsx
 const [useTheme, ThemeProvider] = provider<"dark" | "light">({
-  name: "Theme"
+  name: "Theme",
 });
 
-<ThemeProvider value="dark"><App /></ThemeProvider>
+<ThemeProvider value="dark">
+  <App />
+</ThemeProvider>;
 
 // Consumer - returns Mutable<"dark" | "light">
 const theme = useTheme();
-rx(theme);           // Renders: "dark"
-theme.set("light");  // Update from anywhere
+rx(theme); // Renders: "dark"
+theme.set("light"); // Update from anywhere
 ```
 
 #### Mode 2: Raw Mode
@@ -1202,13 +1208,13 @@ theme.set("light");  // Update from anywhere
 Passes value directly. Perfect for logic instances:
 
 ```tsx
-import { LogicType, useScope } from "rextive/react";
+import { InferLogic, useScope } from "rextive/react";
 
-type ProductInstance = LogicType<typeof productLogic>;
+type ProductInstance = InferLogic<typeof productLogic>;
 
 const [useProduct, ProductProvider] = provider<ProductInstance>({
   name: "Product",
-  raw: true  // Pass value directly
+  raw: true, // Pass value directly
 });
 
 // Parent
@@ -1246,13 +1252,13 @@ const [useAuth, AuthProvider] = provider<AuthContext, User | null>({
 
 #### Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `name` | `string` | Name for error messages |
-| `raw` | `boolean` | Pass value directly (default: `false`) |
-| `equals` | `EqualsFn` | Custom equality for raw mode |
-| `create` | `(value) => T` | Factory function (factory mode) |
-| `update` | `(ctx, value) => void` | Called on value change (factory mode) |
+| Option   | Type                   | Description                            |
+| -------- | ---------------------- | -------------------------------------- |
+| `name`   | `string`               | Name for error messages                |
+| `raw`    | `boolean`              | Pass value directly (default: `false`) |
+| `equals` | `EqualsFn`             | Custom equality for raw mode           |
+| `create` | `(value) => T`         | Factory function (factory mode)        |
+| `update` | `(ctx, value) => void` | Called on value change (factory mode)  |
 
 ---
 

@@ -12,7 +12,9 @@ The core function for reactive rendering in React.
 
 ```tsx
 const count = signal(42);
-{rx(count)} // Renders: 42
+{
+  rx(count);
+} // Renders: 42
 ```
 
 ### Overload 2: Signal with Selector
@@ -21,16 +23,22 @@ const count = signal(42);
 const user = signal({ name: "Alice", age: 30 });
 
 // Property access
-{rx(user, "name")} // Renders: "Alice"
+{
+  rx(user, "name");
+} // Renders: "Alice"
 
 // Selector function
-{rx(user, (u) => u.age + 5)} // Renders: 35
+{
+  rx(user, (u) => u.age + 5);
+} // Renders: 35
 ```
 
 ### Overload 3: Reactive Function
 
 ```tsx
-{rx(() => <div>Count: {count()}</div>)}
+{
+  rx(() => <div>Count: {count()}</div>);
+}
 ```
 
 Auto-tracks any signals accessed inside the function.
@@ -38,8 +46,12 @@ Auto-tracks any signals accessed inside the function.
 ### Overload 4: Component with Reactive Props
 
 ```tsx
-{rx(Component, { prop1: signal1, prop2: "static" })}
-{rx("div", { children: count, className: "counter" })}
+{
+  rx(Component, { prop1: signal1, prop2: "static" });
+}
+{
+  rx("div", { children: count, className: "counter" });
+}
 ```
 
 ### ⚠️ Important Rules
@@ -48,11 +60,15 @@ Auto-tracks any signals accessed inside the function.
 
 ```tsx
 // ❌ WRONG - Won't be reactive
-<input value={rx(signal)} />
+<input value={rx(signal)} />;
 
 // ✅ CORRECT - Use one of these
-{rx(() => <input value={signal()} />)}
-{rx("input", { value: signal })}
+{
+  rx(() => <input value={signal()} />);
+}
+{
+  rx("input", { value: signal });
+}
 ```
 
 ### Async Signal Handling
@@ -60,21 +76,25 @@ Auto-tracks any signals accessed inside the function.
 **With Suspense (`wait()`):**
 
 ```tsx
-{rx(() => {
-  const data = wait(userData()); // Throws for Suspense
-  return <div>{data.name}</div>;
-})}
+{
+  rx(() => {
+    const data = wait(userData()); // Throws for Suspense
+    return <div>{data.name}</div>;
+  });
+}
 ```
 
 **With manual loading states (`task.from()`):**
 
 ```tsx
-{rx(() => {
-  const state = task.from(userData());
-  if (state.loading) return <Spinner />;
-  if (state.error) return <Error error={state.error} />;
-  return <div>{state.value.name}</div>;
-})}
+{
+  rx(() => {
+    const state = task.from(userData());
+    if (state.loading) return <Spinner />;
+    if (state.error) return <Error error={state.error} />;
+    return <div>{state.value.name}</div>;
+  });
+}
 ```
 
 ---
@@ -112,12 +132,12 @@ useScope(key, factory, args);
 useScope(key, factory, args, options);
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `key` | `unknown` | Unique identifier for the scope |
-| `factory` | `() => TScope` | Factory function to create the scope |
-| `args` | `TArgs[]` | Arguments passed to factory (scope recreates when changed) |
-| `options` | `UseScopeOptions` | Custom equality for args comparison |
+| Parameter | Type              | Description                                                |
+| --------- | ----------------- | ---------------------------------------------------------- |
+| `key`     | `unknown`         | Unique identifier for the scope                            |
+| `factory` | `() => TScope`    | Factory function to create the scope                       |
+| `args`    | `TArgs[]`         | Arguments passed to factory (scope recreates when changed) |
+| `options` | `UseScopeOptions` | Custom equality for args comparison                        |
 
 ### Basic Example
 
@@ -126,11 +146,11 @@ function TodoList() {
   const scope = useScope("todoList", () => {
     const todos = signal([]);
     const filter = signal("all");
-    
+
     return {
       todos,
       filter,
-      addTodo: (text) => todos.set(prev => [...prev, text]),
+      addTodo: (text) => todos.set((prev) => [...prev, text]),
     };
   });
 
@@ -147,12 +167,16 @@ function TodoList() {
 
 ```tsx
 function UserProfile({ userId }: { userId: string }) {
-  const scope = useScope("userProfile", (id) => {
-    const user = signal(async () => fetchUser(id));
-    return { user };
-  }, [userId]);
+  const scope = useScope(
+    "userProfile",
+    (id) => {
+      const user = signal(async () => fetchUser(id));
+      return { user };
+    },
+    [userId]
+  );
 
-  return <div>{rx(scope.user, u => u?.name)}</div>;
+  return <div>{rx(scope.user, (u) => u?.name)}</div>;
 }
 ```
 
@@ -175,7 +199,7 @@ function Tab({ tabId }: { tabId: string }) {
 ```tsx
 const counterLogic = logic("counterLogic", () => {
   const count = signal(0);
-  return { count, increment: () => count.set(c => c + 1) };
+  return { count, increment: () => count.set((c) => c + 1) };
 });
 
 function Counter() {
@@ -190,7 +214,7 @@ function Counter() {
 ```tsx
 // Options object
 useScope("data", factory, [filters], {
-  equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
+  equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
 });
 
 // Strategy shorthand
@@ -203,12 +227,12 @@ useScope("data", factory, [obj], (a, b) => a.id === b.id);
 
 ### Key Features
 
-| Feature | Description |
-|---------|-------------|
-| **Keyed caching** | Same key = same instance (handles StrictMode) |
-| **Args comparison** | Recreates scope when args change |
-| **Auto-dispose** | Signals inside factory are automatically disposed |
-| **Logic support** | Automatically uses `logic.create()` for Logic factories |
+| Feature             | Description                                             |
+| ------------------- | ------------------------------------------------------- |
+| **Keyed caching**   | Same key = same instance (handles StrictMode)           |
+| **Args comparison** | Recreates scope when args change                        |
+| **Auto-dispose**    | Signals inside factory are automatically disposed       |
+| **Logic support**   | Automatically uses `logic.create()` for Logic factories |
 
 ### Additional Cleanup
 
@@ -217,7 +241,7 @@ useScope("data", factory, [obj], (a, b) => a.id === b.id);
 const scope = useScope("myScope", () => {
   const data = signal([]);
   const subscription = service.subscribe();
-  
+
   return {
     data,
     dispose: () => subscription.unsubscribe(),
@@ -237,11 +261,13 @@ Wraps value in a mutable signal. Perfect for reactive primitives:
 
 ```tsx
 const [useTheme, ThemeProvider] = provider<"dark" | "light">({
-  name: "Theme"
+  name: "Theme",
 });
 
 // Provider
-<ThemeProvider value="dark"><App /></ThemeProvider>
+<ThemeProvider value="dark">
+  <App />
+</ThemeProvider>;
 
 // Consumer - returns Mutable<"dark" | "light">
 function ChildComponent() {
@@ -256,14 +282,14 @@ function ChildComponent() {
 Passes value directly without wrapping. Perfect for logic instances:
 
 ```tsx
-import { LogicType, useScope } from "rextive/react";
+import { InferLogic, useScope } from "rextive/react";
 import { productLogic } from "./logic/productLogic";
 
-type ProductInstance = LogicType<typeof productLogic>;
+type ProductInstance = InferLogic<typeof productLogic>;
 
 const [useProduct, ProductProvider] = provider<ProductInstance>({
   name: "Product",
-  raw: true  // Pass value directly
+  raw: true, // Pass value directly
 });
 
 // Parent - create scope and provide
@@ -278,7 +304,7 @@ function ProductPage() {
 
 // Child - access logic instance directly
 function ProductContent() {
-  const $product = useProduct();  // LogicType directly
+  const $product = useProduct(); // InferLogic directly
   return <div>Qty: {rx($product.quantity)}</div>;
 }
 ```
@@ -303,12 +329,12 @@ const [useSession, SessionProvider] = provider({
 
 ### Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `name` | `string` | Name for error messages |
-| `raw` | `boolean` | Pass value directly (default: `false`) |
-| `equals` | `EqualsFn` | Custom equality for raw mode value comparison |
-| `create` | `(value) => T` | Factory for factory mode |
+| Option   | Type                   | Description                                   |
+| -------- | ---------------------- | --------------------------------------------- |
+| `name`   | `string`               | Name for error messages                       |
+| `raw`    | `boolean`              | Pass value directly (default: `false`)        |
+| `equals` | `EqualsFn`             | Custom equality for raw mode value comparison |
+| `create` | `(value) => T`         | Factory for factory mode                      |
 | `update` | `(ctx, value) => void` | Called when value prop changes (factory mode) |
 
 ### Benefits
@@ -350,13 +376,13 @@ function App() {
 
 ```tsx
 // Use rx() for reactive parts
-<div>Count: {rx(count)}</div>
+<div>Count: {rx(count)}</div>;
 
 // Use useScope for component-scoped signals
 const { count } = useScope("myComponent", () => ({ count: signal(0) }));
 
 // Wrap async values with wait() or task.from()
-rx(() => <div>{wait(asyncSignal()).name}</div>)
+rx(() => <div>{wait(asyncSignal()).name}</div>);
 ```
 
 ### ❌ Don't
@@ -369,7 +395,7 @@ const count = signal(0); // Memory leak!
 const value = count(); // Won't re-render
 
 // Don't use rx() in attributes
-<input value={rx(signal)} /> // Won't work
+<input value={rx(signal)} />; // Won't work
 ```
 
 ---
@@ -378,5 +404,3 @@ const value = count(); // Won't re-render
 
 - **[Examples](./EXAMPLES.md)** - Real-world examples
 - **[API Reference](./API_REFERENCE.md)** - Complete API documentation
-
-

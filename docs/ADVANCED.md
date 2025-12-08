@@ -33,12 +33,14 @@ Wraps value in a mutable signal - simplest for reactive primitives:
 const [useTheme, ThemeProvider] = provider<"dark" | "light">({ name: "Theme" });
 
 // Provider
-<ThemeProvider value="dark"><App /></ThemeProvider>
+<ThemeProvider value="dark">
+  <App />
+</ThemeProvider>;
 
 // Consumer
-const theme = useTheme();  // Mutable<"dark" | "light">
-rx(theme);                 // Reactive render
-theme.set("light");        // Update from anywhere
+const theme = useTheme(); // Mutable<"dark" | "light">
+rx(theme); // Reactive render
+theme.set("light"); // Update from anywhere
 ```
 
 #### Raw Mode
@@ -46,14 +48,14 @@ theme.set("light");        // Update from anywhere
 Passes value directly - perfect for logic instances:
 
 ```tsx
-import { LogicType, useScope } from "rextive/react";
+import { InferLogic, useScope } from "rextive/react";
 import { productLogic } from "./logic/productLogic";
 
-type ProductInstance = LogicType<typeof productLogic>;
+type ProductInstance = InferLogic<typeof productLogic>;
 
 const [useProduct, ProductProvider] = provider<ProductInstance>({
   name: "Product",
-  raw: true  // Pass value directly, no signal wrapping
+  raw: true, // Pass value directly, no signal wrapping
 });
 
 // Parent creates scope and provides it
@@ -68,7 +70,7 @@ function ProductPage() {
 
 // Children access the logic instance directly
 function ProductContent() {
-  const $product = useProduct();  // LogicType directly
+  const $product = useProduct(); // InferLogic directly
   return <div>{rx($product.quantity)}</div>;
 }
 ```
@@ -101,7 +103,9 @@ function Header() {
   const { theme, toggle } = useTheme();
   return (
     <header>
-      {rx(() => <span>Theme: {theme()}</span>)}
+      {rx(() => (
+        <span>Theme: {theme()}</span>
+      ))}
       <button onClick={toggle}>Toggle</button>
     </header>
   );

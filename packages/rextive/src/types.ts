@@ -2043,11 +2043,13 @@ export interface Logic<T extends object> {
  * Extract the type of the logic from the Logic interface.
  * @example
  * ```ts
- * type Counter = LogicType<typeof counter>;
+ * type Counter = InferLogic<typeof counter>;
  * // = { count: Signal<number> }
  * ```
  */
-export type LogicType<TLogic extends Logic<any>> = TLogic extends Logic<infer T>
+export type InferLogic<TLogic extends Logic<any>> = TLogic extends Logic<
+  infer T
+>
   ? T
   : never;
 

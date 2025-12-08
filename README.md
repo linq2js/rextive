@@ -99,7 +99,7 @@ const Counter = <h1 onClick={increment}>{rx(count)}</h1>;
 | **`.to()`**          | Transform values with chained selectors          |
 | **`.pipe()`**        | Compose operators for complex data flows         |
 | **`wait()`**         | Suspense-ready async handling                    |
-| **`loadable()`**     | Manual loading/error/success states              |
+| **`task.from()`**    | Manual loading/error/success states              |
 | **`signal.trace()`** | Error debugging across signal chains             |
 | **DevTools**         | Visual debugging panel                           |
 

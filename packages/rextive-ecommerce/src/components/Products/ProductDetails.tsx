@@ -5,13 +5,13 @@ import { productImageGalleryLogic } from "@/logic/productImageGalleryLogic";
 import { routerLogic } from "@/logic/routerLogic";
 import { cartLogic } from "@/logic/cartLogic";
 import type { Product } from "@/api/types";
-import type { LogicType } from "rextive";
+import type { InferLogic } from "rextive";
 
 // ============================================================================
 // Product Details Provider
 // ============================================================================
 
-type ProductDetailsInstance = LogicType<typeof productDetailsLogic>;
+type ProductDetailsInstance = InferLogic<typeof productDetailsLogic>;
 
 /**
  * Provider for productDetailsLogic instance.
