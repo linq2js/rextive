@@ -2,13 +2,28 @@
 alwaysApply: true
 ---
 
-# Rextive Framework Rules - Complete Guide
+# Rextive Framework Rules
 
-This comprehensive guide covers every aspect of the Rextive reactive state management library.
+A signal-based reactive state management library with explicit dependencies.
+
+## Table of Contents
+
+1. [Core Philosophy](#-core-philosophy)
+2. [Package Structure](#-package-structure)
+3. [Quick Reference](#-quick-reference)
+4. [Signal API](#-signal-api)
+5. [React Integration](#-react-integration)
+6. [Operators](#-operators)
+7. [Async Utilities](#-async-utilities)
+8. [Logic System](#-logic-system)
+9. [Plugins & Extensions](#-plugins--extensions)
+10. [Naming Conventions](#-naming-conventions)
+11. [Critical Rules](#-critical-rules)
+12. [Internal Architecture](#-internal-architecture)
+
+---
 
 ## 🎯 Core Philosophy
-
-Rextive is a **signal-based reactive state management** library with **explicit dependencies**:
 
 - **One unified primitive**: `signal()` for all reactive needs (state, computed, async)
 - **Explicit dependencies**: Dependencies are always declared, never auto-tracked
@@ -27,924 +42,290 @@ rextive/op        Operators (to, filter, scan, debounce, throttle, etc.)
 rextive/immer     Immer integration for immutable updates
 rextive/cache     Data caching with strategies
 rextive/plugins   Plugins (persistor)
-rextive/devtools  DevTools panel
+rextive/devtools  DevTools integration
 rextive/test      Testing utilities (mockLogic)
 ```
 
 ---
 
-## 📦 API Deep Dive
+## 📋 Quick Reference
 
-### 1. `signal()` - Complete Overload Reference
+### Signal Creation Patterns
 
-The `signal()` function has **6 overloads** - 3 for mutable signals, 3 for computed signals.
+```tsx
+// Mutable signals
+const count = signal(0);                    // Simple value
+const user = signal({ name: "John" });      // Object
+const items = signal<Item[]>([]);           // Typed array
+const selected = signal<User>();            // Empty (notifier pattern)
 
-#### Overload 1: Empty Signal (Notifier Pattern)
+// Computed signals (explicit deps)
+const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+const fullName = signal({ firstName, lastName }, ({ deps }) => 
+  `${deps.firstName} ${deps.lastName}`
+);
+
+// Single dependency transform (shorthand)
+const doubled = count.to(x => x * 2);
+
+// Async computed
+const userData = signal({ userId }, async ({ deps, abortSignal }) => {
+  const res = await fetch(`/api/users/${deps.userId}`, { signal: abortSignal });
+  return res.json();
+});
+```
+
+### React Patterns
+
+```tsx
+// Reactive rendering
+{rx(count)}                              // Direct value
+{rx(user, "name")}                       // Property access
+{rx(user, u => u.age + 5)}               // Selector
+{rx(() => <div>{count()}</div>)}         // Reactive function
+{rx("div", { children: count })}         // Component form
+
+// Scoped state (auto-disposed)
+const { input, results } = useScope(() => ({
+  input: signal(""),
+  results: signal([]),
+}));
+
+// Async state
+rx(() => {
+  const state = task.from(userData());
+  if (state.loading) return <Spinner />;
+  if (state.error) return <Error error={state.error} />;
+  return <div>{state.value.name}</div>;
+});
+```
+
+### Key Methods
+
+| Method | Description |
+|--------|-------------|
+| `signal()` / `.get()` | Read value (triggers tracking in rx) |
+| `.peek()` | Read without tracking |
+| `.set(value)` | Update value (mutable only) |
+| `.reset()` | Reset to initial (mutable only) |
+| `.on(fn)` | Subscribe to changes |
+| `.to(fn)` | Transform (creates computed) |
+| `.pipe(...ops)` | Chain operators |
+| `.dispose()` | Clean up signal |
+| `.refresh()` | Force recomputation |
+| `.stale()` | Mark for lazy recomputation |
+| `.when(notifier, action)` | React to other signals |
+
+---
+
+## 📦 Signal API
+
+### 1. Creating Signals
+
+#### Empty Signal (Notifier Pattern)
 
 ```tsx
 const user = signal<User>();
 ```
 
-**When to use:**
+- Returns `User | undefined` on read
+- `.set()` requires `User` (not undefined)
+- **Always triggers** on set, even with same value
 
-- Optional values that start undefined
-- Lazy initialization patterns
-- Signals that receive values later
-- **Action/event dispatching** (notifier pattern)
-
-**Type behavior:**
-
-- `user.get()` returns `User | undefined`
-- `user.set()` requires `User` (not undefined)
-- `user.set(undefined)` is a **type error**
-
-**⭐ Notifier Behavior:**
-
-Empty signals act as **notifiers** - they trigger subscribers on every `.set()` call, even with the same value:
-
-| Property      | Value                           |
-| ------------- | ------------------------------- |
-| Initial value | `undefined`                     |
-| Equality      | Always different (`NOT_EQUALS`) |
-| Name          | Auto-generated `#notifier-xxx`  |
-
-```tsx
-const notifier = signal<"action1" | "action2">();
-
-notifier.on(() => {
-  console.log("triggered:", notifier());
-});
-
-notifier.set("action1"); // ✅ Triggers (1st time)
-notifier.set("action1"); // ✅ Triggers again (same value!)
-```
-
-**Example - Action Dispatching:**
-
-```tsx
-type Action =
-  | { type: "login"; username: string; password: string }
-  | { type: "logout" };
-
-const action = signal<Action>();
-
-action.on(() => {
-  const a = action();
-  if (a?.type === "login") handleLogin(a.username, a.password);
-  if (a?.type === "logout") handleLogout();
-});
-
-action.set({ type: "login", username: "admin", password: "secret" });
-action.set({ type: "logout" });
-```
-
-**Example - Event Bus:**
-
-```tsx
-const onClick = signal<MouseEvent>();
-const onKeyPress = signal<KeyboardEvent>();
-
-onClick.on(() => console.log("clicked!", onClick()));
-
-// Works great with refreshOn/staleOn operators
-const data = asyncSignal.pipe(refreshOn(onClick));
-```
-
-**Example - Optional/Lazy Value:**
-
-```tsx
-const selectedUser = signal<User>();
-
-// Later...
-selectedUser.set({ id: 1, name: "Alice" }); // ✅
-// selectedUser.set(undefined); // ❌ Type error
-
-// Reading
-const current = selectedUser(); // User | undefined
-if (current) {
-  console.log(current.name); // Safe
-}
-```
-
----
-
-#### Overload 2a: Mutable Signal with Initial Value
+#### Mutable Signal with Value
 
 ```tsx
 const count = signal(0);
-const user = signal({ name: "Alice" });
-```
-
-**When to use:**
-
-- Simple state management
-- Values that have clear initial state
-- Most common use case
-
-**Features:**
-
-- Type is inferred from initial value
-- Uses strict equality (Object.is) by default
-- Can pass lazy initializer function
-
-**Lazy initialization:**
-
-```tsx
-// Expensive computation only runs once when signal is created
-const data = signal(() => {
-  console.log("Computing initial value...");
-  return expensiveComputation();
+const user = signal({ name: "John" }, "shallow");  // Equality shortcut
+const data = signal(complexObj, { 
+  equals: "deep",
+  name: "appData",
+  onChange: (v) => console.log(v)
 });
 ```
 
----
+**Equality strategies:** `"strict"` (default), `"shallow"`, `"deep"`
 
-#### Overload 2b: Mutable Signal with Equality String Shortcut
-
-```tsx
-const user = signal({ name: "John" }, "shallow");
-const data = signal(complexObj, "deep");
-const count = signal(0, "strict");
-```
-
-**When to use:**
-
-- Objects/arrays that change by reference
-- Need custom comparison without full options object
-- Performance optimization for large data structures
-
-**Equality strategies:**
-
-- `"strict"` - Object.is (default) - compares references
-- `"shallow"` - Compares object keys/array elements one level deep
-- `"deep"` - Deep comparison using lodash isEqual
-
-**⚠️ Important:** Custom equality functions NOT allowed as second arg (use options form)
-
-**Examples:**
+#### Computed Signal
 
 ```tsx
-// Shallow: Prevents re-render if object content is same
-const user = signal({ name: "John", age: 30 }, "shallow");
-user.set({ name: "John", age: 30 }); // No update - same content
-user.set({ name: "Jane", age: 25 }); // Updates - different content
-
-// Deep: For nested objects
-const config = signal({ theme: { color: "blue" } }, "deep");
-config.set({ theme: { color: "blue" } }); // No update - deeply equal
-
-// For custom equality, use options form:
-const value = signal(0, {
-  equals: (a, b) => Math.abs(a - b) < 0.01, // Threshold comparison
-});
-```
-
----
-
-#### Overload 2c: Mutable Signal with Options
-
-```tsx
-const count = signal(0, {
-  equals: (a, b) => a === b,
-  name: "counter",
-  onChange: (value) => console.log("Changed:", value),
-  onError: (error) => console.error("Error:", error),
-  fallback: (error) => 0,
-  lazy: false,
-});
-```
-
-**When to use:**
-
-- Need multiple configuration options
-- Custom equality function
-- Side effects on change
-- Error handling
-- Debugging with names
-
-**All options:**
-
-```tsx
-interface SignalOptions<T> {
-  // Equality comparison
-  equals?: "strict" | "shallow" | "deep" | ((a: T, b: T) => boolean);
-
-  // Debugging
-  name?: string; // For dev tools and debugging
-
-  // Error handling
-  fallback?: (error: unknown) => T; // Return fallback value on error
-  onError?: (error: unknown) => void; // Handle errors
-
-  // Side effects
-  onChange?: (value: T) => void; // Called after value changes
-
-  // Performance
-  lazy?: boolean; // Delay computation until first access (default: true)
-
-  // Advanced
-  use?: readonly (Tag<T> | Plugin<T>)[]; // For plugins/extensions
-}
-```
-
-**Advanced example:**
-
-```tsx
-const apiData = signal<Data[]>([], {
-  name: "apiData",
-  equals: "deep", // Deep compare arrays
-  onChange: (data) => {
-    // Side effect: persist to cache
-    localStorage.setItem("cache", JSON.stringify(data));
-  },
-  onError: (error) => {
-    // Log errors
-    analytics.track("data-fetch-error", { error });
-  },
-  fallback: (error) => {
-    // Return cached data on error
-    const cached = localStorage.getItem("cache");
-    return cached ? JSON.parse(cached) : [];
-  },
-});
-```
-
----
-
-#### Overload 3a: Computed Signal (Basic)
-
-```tsx
-const count = signal(0);
 const doubled = signal({ count }, ({ deps }) => deps.count * 2);
+
+// With options
+const result = signal({ a, b }, ({ deps }) => deps.a + deps.b, {
+  name: "result",
+  equals: "shallow",
+  lazy: false,  // Compute immediately
+});
 ```
 
-**When to use:**
-
-- Derive state from other signals
-- Automatic recalculation when dependencies change
-- Most common computed pattern
-
-**Key rules:**
-
-- ✅ Always declare dependencies explicitly in first argument
-- ✅ Access dependencies via `deps` parameter
-- ❌ Never try to auto-track: `signal(() => count() * 2)` won't work
-
-**Multiple dependencies:**
+#### Async Computed
 
 ```tsx
-const firstName = signal("John");
-const lastName = signal("Doe");
-const email = signal("john@example.com");
-
-const fullName = signal(
-  { firstName, lastName },
-  ({ deps }) => `${deps.firstName} ${deps.lastName}`
-);
-
-const userProfile = signal({ firstName, lastName, email }, ({ deps }) => ({
-  name: `${deps.firstName} ${deps.lastName}`,
-  email: deps.email,
-  initials: deps.firstName[0] + deps.lastName[0],
-}));
-```
-
-**Async computed:**
-
-```tsx
-const userId = signal(1);
 const userData = signal({ userId }, async ({ deps, abortSignal }) => {
-  const res = await fetch(`/users/${deps.userId}`, {
-    signal: abortSignal, // Auto-cancels when userId changes
-  });
+  const res = await fetch(`/users/${deps.userId}`, { signal: abortSignal });
   return res.json();
 });
 ```
 
----
-
-#### Overload 3b: Computed Signal with Equality Shortcut
+### 2. Signal Options
 
 ```tsx
-const fullName = signal(
-  { firstName, lastName },
-  ({ deps }) => ({ full: `${deps.firstName} ${deps.lastName}` }),
-  "shallow"
-);
-```
-
-**When to use:**
-
-- Computed signals that return objects/arrays
-- Need custom equality without full options
-- Performance optimization
-
-**⚠️ Important:** Custom equality functions NOT allowed as third arg (use options form)
-
----
-
-#### Overload 3c: Computed Signal with Options
-
-```tsx
-const doubled = signal({ count }, ({ deps }) => deps.count * 2, {
-  name: "doubled",
-  equals: (a, b) => a === b,
-  fallback: (error) => 0,
-  onChange: (value) => console.log("Computed:", value),
-  lazy: false, // Compute immediately
-});
-```
-
----
-
-### 2. Signal Instance Methods
-
-All signals have these properties and methods:
-
-#### `.uid` - Unique Identifier ⭐ NEW
-
-Every signal has a unique ID that is auto-generated and immutable:
-
-```tsx
-const count = signal(0);
-console.log(count.uid); // "sig-1"
-
-const doubled = signal({ count }, ({ deps }) => deps.count * 2);
-console.log(doubled.uid); // "sig-2"
-
-// Use as React key
-signals.map((s) => <div key={s.uid}>{s.displayName}</div>);
-```
-
-**Key characteristics:**
-
-- Auto-generated on signal creation
-- Immutable - never changes for the lifetime of the signal
-- Unique across all signals in the application
-- Format: `"sig-{n}"` (e.g., "sig-1", "sig-42")
-
----
-
-#### `.get()` or `signal()` - Read Value
-
-```tsx
-const value = count.get();
-const value = count(); // Shorthand
-```
-
-**⚠️ Important:** Reading a signal DOES NOT subscribe to changes!
-
-```tsx
-// This won't re-run when count changes:
-const doubled = count() * 2; // ❌ Static snapshot
-
-// Use computed signal instead:
-const doubled = signal({ count }, ({ deps }) => deps.count * 2); // ✅
-```
-
----
-
-#### `.peek()` - Read Value Without Tracking ⭐ NEW
-
-Read the current value **without** triggering reactive tracking:
-
-```tsx
-const value = count.peek();
-```
-
-**When to use:**
-
-- In event handlers where you don't want to create dependencies
-- Logging/debugging without affecting reactivity
-- Internal reads in computed signals that shouldn't trigger updates
-- Any place where you need the value but don't want reactive subscription
-
-**Examples:**
-
-```tsx
-// In a tracking context, peek() won't create dependencies
-rx(() => {
-  // This WILL create a dependency (triggers re-render when count changes)
-  console.log("Count:", count());
-
-  // This WON'T create a dependency (no re-render when user changes)
-  console.log("User (peeked):", user.peek());
-});
-
-// Useful in event handlers
-const handleClick = () => {
-  const currentCount = count.peek(); // Read without tracking
-  console.log("Current count:", currentCount);
-};
-
-// Internal reads in operators/plugins
-const operator = (source) => {
-  // Use peek() to avoid creating unwanted dependencies
-  const initialValue = source.peek();
-  // ...
-};
-```
-
-**Key differences from `.get()`:**
-
-- `.get()` / `signal()` - triggers `onSignalAccess` in render hooks (creates dependencies)
-- `.peek()` - never triggers tracking (safe for internal use)
-
----
-
-#### `.set(value)` - Update Value (Mutable Only)
-
-```tsx
-// Direct value
-count.set(5);
-
-// Updater function
-count.set((prev) => prev + 1);
-```
-
----
-
-#### `.reset()` - Reset to Initial Value (Mutable Only)
-
-```tsx
-const count = signal(0);
-count.set(10);
-count.reset(); // Back to 0
-```
-
----
-
-#### `.on(callback)` - Subscribe to Changes
-
-```tsx
-const unsubscribe = count.on(() => {
-  console.log("Count changed to:", count());
-});
-
-// Later: cleanup
-unsubscribe();
-```
-
----
-
-#### `.to(selector, equals?)` - Transform Signal Value ⭐ NEW
-
-The `.to()` method is the **recommended way** to transform a single signal:
-
-```tsx
-const count = signal(5);
-const doubled = count.to((x) => x * 2); // Creates computed signal
-const formatted = count.to((x) => `Count: ${x}`);
-```
-
-**With equality:**
-
-```tsx
-const userName = user.to((u) => u.name, "shallow");
-const userData = user.to((u) => u.data, "deep");
-```
-
-**Shorthand for:**
-
-```tsx
-const doubled = signal({ count }, ({ deps }) => deps.count * 2);
-```
-
----
-
-#### `.pipe(...operators)` - Chain Operators ⭐ NEW
-
-```tsx
-import { to, filter, scan } from "rextive/op";
-
-const result = count.pipe(
-  filter((x) => x > 0),
-  to((x) => x * 2),
-  scan((acc, x) => acc + x, 0)
-);
-```
-
----
-
-#### `.refresh()` - Force Immediate Recomputation ⭐ NEW
-
-```tsx
-userData.refresh(); // Triggers recomputation now
-```
-
----
-
-#### `.stale()` - Mark for Lazy Recomputation ⭐ NEW
-
-```tsx
-userData.stale(); // Will recompute on next access
-```
-
----
-
-#### `.error()` / `.tryGet()` - Safe Error Access ⭐ NEW
-
-For **synchronous errors** during signal computation:
-
-```tsx
-const error = signal.error(); // Get sync error without throwing
-const value = signal.tryGet(); // Get value or undefined (never throws)
-```
-
-**⚠️ For async signals**: Use `task.from()` to access error states:
-
-```tsx
-// Async signal returns a Promise
-const asyncData = signal(async () => fetchData());
-
-// Access async state via task.from()
-const promise = asyncData();
-const state = task.from(promise);
-// state.loading, state.error, state.value
-
-// In React with rx()
-{
-  rx(() => {
-    const state = task.from(asyncData());
-    if (state.loading) return <Spinner />;
-    if (state.error) return <Error error={state.error} />;
-    return <div>{state.value}</div>;
-  });
+interface SignalOptions<T> {
+  equals?: "strict" | "shallow" | "deep" | ((a: T, b: T) => boolean);
+  name?: string;
+  fallback?: (error: unknown) => T;
+  onError?: (error: unknown) => void;
+  onChange?: (value: T) => void;
+  lazy?: boolean;
+  use?: readonly (Tag<T> | Plugin<T>)[];
 }
 ```
 
----
-
-#### `.pause()` / `.resume()` / `.paused()` - Control Computed (Computed Only)
+### 3. Instance Properties & Methods
 
 ```tsx
-const computed = signal({ count }, ({ deps }) => deps.count * 2);
+// Properties
+signal.uid          // Unique ID (auto-generated, immutable)
+signal.displayName  // Debug name
 
-computed.pause(); // Stop recomputing
-count.set(10); // computed doesn't update
+// Reading
+signal()            // Read value (triggers tracking)
+signal.get()        // Same as signal()
+signal.peek()       // Read without tracking
+signal.tryGet()     // Get value or undefined (never throws)
+signal.error()      // Get sync error without throwing
 
-computed.paused(); // true
+// Writing (mutable only)
+signal.set(value)   // Update value
+signal.set(prev => prev + 1)  // Update with function
+signal.reset()      // Reset to initial value
 
-computed.resume(); // Resume recomputing (recalculates now)
+// Subscribing
+const unsub = signal.on(() => console.log(signal()))
+
+// Transforming
+const doubled = signal.to(x => x * 2, "shallow");
+const result = signal.pipe(filter(x => x > 0), to(x => x * 2));
+
+// Control (computed only)
+signal.refresh()    // Force immediate recomputation
+signal.stale()      // Mark for lazy recomputation
+signal.pause()      // Stop recomputing
+signal.resume()     // Resume recomputing
+signal.paused()     // Check if paused
+
+// Cleanup
+signal.dispose()    // Clean up signal
 ```
 
----
-
-#### `.dispose()` - Clean Up Signal
+### 4. Computed Context
 
 ```tsx
-count.dispose();
-```
-
-**⚠️ Critical:** Always dispose signals you create to prevent memory leaks!
-
----
-
-#### `.when()` - React to Other Signals ⭐ NEW
-
-React to changes in other signals by triggering actions.
-
-**Overload 1: Action String (for both Mutable and Computed)**
-
-```tsx
-const refreshTrigger = signal(0);
-const userData = signal({ name: "John" });
-
-// Refresh when trigger changes
-userData.when(refreshTrigger, "refresh");
-
-// Reset when trigger changes (mutable only)
-userData.when(refreshTrigger, "reset");
-
-// With filter - only trigger when condition is met
-// Filter receives (notifier, self)
-userData.when(refreshTrigger, "refresh", (notifier, self) => notifier() > 5);
-```
-
-**Overload 2: Action Callback (for both Mutable and Computed)**
-
-```tsx
-const increment = signal(0);
-const counter = signal(0);
-
-// Action callback receives (notifier, self) and returns void
-// Use self.set() to update the value
-counter.when(increment, (notifier, self) => {
-  self.set((prev) => prev + notifier());
+signal({ userId }, async (context) => {
+  context.deps           // Dependency values
+  context.abortSignal    // AbortSignal for cancellation
+  context.nth            // Computation number (0, 1, 2...)
+  
+  context.safe(fn)       // Execute safely (throws if aborted)
+  context.safe(promise)  // Safe promise (never resolves if aborted)
+  context.aborted()      // Check if aborted
+  context.onCleanup(fn)  // Register cleanup callback
+  context.use(fn, args)  // Reuse logic with context
+  context.refresh()      // Schedule recomputation
+  context.stale()        // Mark stale
 });
 ```
 
-**For Computed Signals:**
+### 5. Static Methods
 
 ```tsx
-const refreshTrigger = signal(0);
-const fetchedData = signal({ userId }, async ({ deps }) =>
-  fetchUser(deps.userId)
-);
-
-// Action string: "refresh" or "stale"
-fetchedData.when(refreshTrigger, "refresh");
-fetchedData.when(refreshTrigger, "stale");
-
-// Action callback: use self.refresh() or self.stale()
-fetchedData.when(refreshTrigger, (notifier, self) => {
-  if (notifier() > 0) {
-    self.refresh();
-  }
-});
-
-// Note: "reset" is NOT supported for computed signals
-```
-
-**Multiple Notifiers:**
-
-```tsx
-const trigger1 = signal(0);
-const trigger2 = signal(0);
-
-// React to any of multiple signals
-userData.when([trigger1, trigger2], "refresh");
-
-// Filter receives (notifier, self) - notifier is the one that triggered
-userData.when([trigger1, trigger2], "refresh", (notifier, self) => {
-  return notifier() > 0;
-});
-
-// Action callback receives (notifier, self)
-userData.when([trigger1, trigger2], (notifier, self) => {
-  console.log("Triggered by:", notifier());
-  self.refresh();
-});
-```
-
-**Chaining:**
-
-```tsx
-// .when() returns this for chaining
-userData.when(refreshTrigger, "refresh").when(resetTrigger, "reset");
-```
-
-**Action Dispatch Pattern with `.tuple`:**
-
-```tsx
-type TodoAction = { type: "add"; text: string } | { type: "edit"; id: number };
-
-// Use .tuple to get [signal, setter] for semantic naming
-const [todoAction, dispatch] = signal<TodoAction>().tuple;
-
-// React to actions
-todoList.when(todoAction, (action) => {
-  const a = action();
-  if (a?.type === "add") addTodo(a.text);
-  if (a?.type === "edit") editTodo(a.id);
-});
-
-// Dispatch actions
-dispatch({ type: "add", text: "Buy milk" });
-dispatch({ type: "edit", id: 1 });
-```
-
-**Cleanup:**
-
-Subscriptions created by `.when()` are automatically cleaned up when the signal is disposed.
-
-**⚠️ Error Handling:**
-
-```tsx
-// Filter errors - action is NOT executed, error routed to signal's onError
-userData.when(trigger, "refresh", (notifier, self) => {
-  if (notifier() < 0) throw new Error("Invalid"); // Action skipped, onError called
-  return true;
-});
-
-// Action callback errors - routed through signal's error handling
-counter.when(increment, (notifier, self) => {
-  if (notifier() < 0) throw new Error("Negative not allowed");
-  self.set((prev) => prev + notifier());
-});
-```
-
-**⚠️ Common Pitfalls:**
-
-```tsx
-// ❌ BAD - Circular dependency
-const a = signal(0);
-const b = signal(0);
-a.when(b, (notifier, self) => self.set(notifier())); // a depends on b
-b.when(a, (notifier, self) => self.set(notifier())); // b depends on a - INFINITE LOOP!
-
-// ❌ BAD - "reset" on computed signals (TypeScript error)
-computed.when(trigger, "reset"); // Use "refresh" or "stale" instead
-```
-
----
-
-### 3. Compute Function Context
-
-For computed signals, the compute function receives a context object:
-
-```tsx
-signal({ userId, filter }, (context) => {
-  context.deps; // Dependency values
-  context.abortSignal; // AbortSignal for cancellation
-});
-```
-
-#### Context Methods ⭐ NEW
-
-```tsx
-signal(async (context) => {
-  // Safe execution (throws if aborted)
-  const data = context.safe(() => processData());
-
-  // Safe promise (never resolves if aborted)
-  await context.safe(wait.delay(300));
-
-  // Register cleanup
-  context.onCleanup(() => cleanup());
-
-  // Check if aborted
-  if (context.aborted()) return null;
-
-  // Reuse logic with context
-  const result = await context.use(fetchUser, options);
-
-  // Trigger recomputation (polling)
-  setTimeout(() => context.refresh(), 1000);
-
-  // Mark stale (TTL cache)
-  setTimeout(() => context.stale(), 5 * 60 * 1000);
-});
-```
-
----
-
-### 4. Static Methods
-
-#### `signal.batch(fn)` - Batch Multiple Updates
-
-```tsx
+// Batch updates (single notification)
 signal.batch(() => {
   firstName.set("Jane");
   lastName.set("Smith");
-  email.set("jane@example.com");
 });
-// Only ONE notification!
-```
 
----
-
-#### `signal.on(signals, callback)` - Subscribe to Multiple Signals
-
-```tsx
+// Subscribe to multiple signals
 const control = signal.on([count, name], (trigger) => {
   console.log("Changed:", trigger());
 });
+control.pause();
+control.resume();
+control.dispose();
 
-control.pause(); // Pause
-control.resume(); // Resume
-control.dispose(); // Cleanup
-```
-
----
-
-#### `signal.tag()` - Create a Tag for Grouping
-
-```tsx
+// Create tag for grouping
 const formTag = signal.tag();
-
 const name = signal("", { use: [formTag] });
-const email = signal("", { use: [formTag] });
+formTag.forEach(s => s.reset());
 
-formTag.forEach((s) => s.reset()); // Reset all
-formTag.map((s) => s.get()); // Collect values
-formTag.size; // Count
+// Combine signals
+const user = signal.from({ name, age });  // Record
+const coords = signal.from([x, y]);       // Tuple
+
+// Error tracing
+const traces = signal.trace(error);
+```
+
+### 6. `.when()` - Reactive Triggers
+
+```tsx
+// Action string
+userData.when(refreshTrigger, "refresh");  // Force recomputation
+userData.when(resetTrigger, "reset");      // Reset (mutable only)
+userData.when(cacheInvalidate, "stale");   // Mark stale
+
+// With filter
+userData.when(trigger, "refresh", (notifier, self) => notifier() > 5);
+
+// Action callback
+counter.when(increment, (notifier, self) => {
+  self.set(prev => prev + notifier());
+});
+
+// Multiple notifiers
+userData.when([trigger1, trigger2], "refresh");
+
+// Chaining
+userData.when(refreshTrigger, "refresh").when(resetTrigger, "reset");
 ```
 
 ---
 
-#### `signal.from(signals)` - Combine Signals
+## ⚛️ React Integration
+
+### `rx()` - Reactive Rendering
 
 ```tsx
-// Record form
-const user = signal.from({ name, age });
-console.log(user()); // { name: "...", age: ... }
-
-// Tuple form
-const coords = signal.from([x, y]);
-console.log(coords()); // [10, 20]
-```
-
----
-
-#### `signal.trace(error)` - Get Error Trace ⭐ NEW
-
-```tsx
-try {
-  dashboard();
-} catch (error) {
-  const traces = signal.trace(error);
-  // [{ signal: "db", when: "compute:initial", async: true }, ...]
-
-  const errorPath = traces.map((t) => t.signal).join(" → ");
-  console.log("Error path:", errorPath);
-}
-```
-
----
-
-### 5. `rx()` - React Integration
-
-The `rx()` function has **4 overloads** for reactive rendering in React.
-
-#### Overload 1: Single Signal
-
-```tsx
-const count = signal(42);
-{
-  rx(count);
-} // Renders: 42
-```
-
----
-
-#### Overload 2: Single Signal with Property/Selector
-
-```tsx
-const user = signal({ name: "Alice", age: 30 });
+// Direct signal value
+{rx(count)}                    // Renders: 42
 
 // Property access
-{
-  rx(user, "name");
-} // Renders: "Alice"
+{rx(user, "name")}             // Renders: "Alice"
 
 // Selector function
-{
-  rx(user, (u) => u.age + 5);
-} // Renders: 35
+{rx(user, u => u.age + 5)}     // Renders: 35
+
+// Reactive function (auto-tracking)
+{rx(() => <div>Count: {count()}</div>)}
+
+// Component with reactive props
+{rx(Component, { prop1: signal1, prop2: "static" })}
+{rx("div", { children: count, className: "counter" })}
 ```
 
----
-
-#### Overload 3: Reactive Function (Auto-Tracking)
+**⚠️ Never use rx() in attributes!**
 
 ```tsx
-{
-  rx(() => <div>Count: {count()}</div>);
-}
-```
-
-**How it works:**
-
-- Signals accessed inside the function are automatically tracked
-- Re-renders when any tracked signal changes
-
----
-
-#### Overload 4: Component with Reactive Props
-
-```tsx
-{
-  rx(Component, { prop1: signal1, prop2: "static" });
-}
-{
-  rx("div", { children: count, className: "counter" });
-}
-```
-
----
-
-#### ⚠️ Important `rx()` Warnings
-
-**❌ NEVER use `rx()` directly in element attributes!**
-
-```tsx
-// ❌ WRONG - Won't be reactive!
+// ❌ WRONG
 <input value={rx(signal)} />
-<div className={rx(theme)} />
+
+// ✅ CORRECT
+{rx(() => <input value={signal()} />)}
+{rx("input", { value: signal })}
 ```
 
-**✅ CORRECT - Use one of these instead:**
-
-```tsx
-// Option 1: Wrap entire element with rx(fn)
-{
-  rx(() => <input value={signal()} />);
-}
-
-// Option 2: Use component form rx(Component, props)
-{
-  rx("input", { value: signal });
-}
-```
-
----
-
-#### `rx.use()` - Reactive Hook ⭐ NEW
-
-Low-level hook for automatic signal tracking.
-
-**⭐ Auto-Dispose Feature**: Like `useScope()`, signals created inside `rx.use()` are **automatically disposed** on unmount.
+### `rx.use()` - Reactive Hook
 
 ```tsx
 function Component() {
@@ -953,613 +334,339 @@ function Component() {
     const postList = wait(posts());
     return { userData, postList };
   });
-
   return <div>{value.userData.name}</div>;
 }
 ```
 
----
+### `useScope()` - Scoped State Management
 
-### 6. `useScope()` - Scoped State Management
-
-Create cached scope instances with automatic lifecycle management.
-
-#### Two Modes
-
-**🔒 Local Mode** (Recommended for most cases)
-Each component instance gets its **own private scope**.
+**Local Mode** (each component gets own scope):
 
 ```tsx
-useScope(factory); // No deps
-useScope(factory, [deps]); // With deps
-useScope(factory, [deps], options); // With custom equality
-```
+// Basic
+const { count, doubled } = useScope(() => ({
+  count: signal(0),
+  doubled: count.to(x => x * 2),
+}));
 
-**🔗 Shared Mode**
-Multiple components **share the same scope** via a key.
-
-```tsx
-useScope(key, factory); // No deps
-useScope(key, factory, [deps]); // With deps
-useScope(key, factory, [deps], options); // With custom equality
-```
-
-#### Key Features
-
-- **Auto-dispose**: Signals are automatically disposed on unmount
-- **Deps comparison**: Recreates scope when deps change
-- **Stable functions**: Functions/Dates in deps are auto-stabilized (no recreation)
-- **StrictMode safe**: Handles React double-invoke correctly
-- **Logic support**: Works with `logic()` factories
-
-#### ⭐ Auto-Dispose Feature
-
-Signals created inside the factory are **automatically disposed** when:
-
-- The component unmounts
-- The deps change (scope recreated)
-- React StrictMode double-invokes (orphan signals cleaned up)
-
-#### Local Mode Examples
-
-```tsx
-// Basic - most common pattern
-function SearchBar() {
-  const { input, results } = useScope(() => ({
-    input: signal(""),
-    results: signal([]),
-  }));
-
-  return <input value={rx(input)} />;
-}
-
-// With deps - passed to factory
-function UserProfile({ userId }: { userId: string }) {
-  const { user } = useScope(
-    (id) => ({
-      user: signal(async () => fetchUser(id)),
-    }),
-    [userId]
-  );
-
-  return <div>{rx(user, (u) => u?.name)}</div>;
-}
-
-// With Logic
-function Counter() {
-  const { count, increment } = useScope(counterLogic);
-  return <button onClick={increment}>{rx(count)}</button>;
-}
-```
-
-#### Shared Mode Examples
-
-```tsx
-// Multiple components share the same state
-function Header() {
-  return (
-    <>
-      <SearchBar /> {/* Uses shared scope */}
-      <MobileSearchBar /> {/* Same scope! */}
-    </>
-  );
-}
-
-function SearchBar() {
-  const { input } = useScope("searchBar", searchBarLogic);
-  return <input value={rx(input)} />;
-}
-
-function MobileSearchBar() {
-  const { input } = useScope("searchBar", searchBarLogic);
-  return <input value={rx(input)} />; // Same state as SearchBar!
-}
-
-// Dynamic keys for multiple instances
-function Tab({ tabId }: { tabId: string }) {
-  // Each unique tabId gets its own scope
-  const { content } = useScope(`tab:${tabId}`, () => ({
-    content: signal(""),
-  }));
-
-  return <div>{rx(content)}</div>;
-}
-```
-
-#### Custom Equality for Deps
-
-```tsx
-// Using equality strategy string
-useScope((filters) => ({ ... }), [filters], "shallow");
-
-// Using custom function
-useScope((obj) => ({ ... }), [obj], (a, b) => a.id === b.id);
-
-// Using options object
-useScope((filters) => ({ ... }), [filters], {
-  equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
-});
-```
-
-#### Additional Cleanup
-
-For cleanup beyond signals, add a `dispose` method:
-
-```tsx
-// Simple case - just add dispose() method
-const scope = useScope(() => {
-  const todos = signal([]);
-  const subscription = someExternalService.subscribe();
-
-  return {
-    todos,
-    dispose: () => subscription.unsubscribe(),
-  };
-});
-
-// Multiple cleanup logic - use disposable() to combine them
-const scope = useScope(() =>
-  disposable({
-    todos: signal([]),
-    dispose: [sub1, sub2, () => clearInterval(timer)],
-  })
+// With deps
+const { user } = useScope(
+  (id) => ({ user: signal(async () => fetchUser(id)) }),
+  [userId]
 );
+
+// With logic
+const { count, increment } = useScope(counterLogic);
 ```
 
----
-
-### 7. `useStable()` - Dynamic Stable Getter ⭐ NEW
-
-Returns a function for creating stable references to values across renders. Solves the common React problem where inline objects/functions cause unnecessary re-renders.
-
-#### Basic Usage
+**Shared Mode** (multiple components share scope):
 
 ```tsx
-import { useStable } from "rextive/react";
+const { input } = useScope("searchBar", searchBarLogic);
+const { content } = useScope(`tab:${tabId}`, () => ({
+  content: signal(""),
+}));
+```
 
-// Create a typed stable getter
+**Features:**
+- Auto-dispose on unmount
+- Deps comparison (recreates scope when deps change)
+- StrictMode safe
+- Logic support
+
+### `useStable()` - Stable References
+
+```tsx
 const stable = useStable<{
   onClick: () => void;
   config: { theme: string };
 }>();
 
-// Single key-value: stable(key, value, equals?)
+// Single key-value
 const onClick = stable("onClick", () => handleClick());
 const config = stable("config", { theme: "dark" }, "shallow");
 
-// Partial object: stable(partial, equals?)
+// Partial object
 const handlers = stable({
   onSubmit: () => submitForm(),
   onCancel: () => cancelForm(),
 });
 ```
 
-#### Key Behaviors
-
-| Input Type         | Behavior                                                            |
-| ------------------ | ------------------------------------------------------------------- |
-| **Functions**      | Wrapped in stable reference that delegates to latest implementation |
-| **Objects/Arrays** | Cached if equal (based on equality strategy)                        |
-| **Primitives**     | Returned directly                                                   |
-
-#### Equality Strategies
+### `provider()` - Signal Context
 
 ```tsx
-// Default: Object.is (reference equality)
-stable("config", { theme: "dark" });
+// Signal mode (default)
+const [useTheme, ThemeProvider] = provider<"dark" | "light">({ name: "Theme" });
 
-// Shallow: Compare object keys/array elements
-stable("config", { theme: "dark" }, "shallow");
-
-// Deep: Deep comparison
-stable("config", { nested: { value: 1 } }, "deep");
-
-// Custom function
-stable("items", items, (a, b) => a.length === b.length);
-```
-
-#### Use Cases
-
-```tsx
-// 1. Stable callbacks for memoized children
-const onClick = stable("onClick", () => doSomething(latestState));
-return <MemoizedChild onClick={onClick} />;
-
-// 2. Stable objects for effect dependencies
-const config = stable("config", { endpoint, headers }, "shallow");
-useEffect(() => {
-  fetchData(config);
-}, [config]); // Won't re-run if config is shallowly equal
-
-// 3. Multiple handlers at once
-const { onSubmit, onCancel } = stable({
-  onSubmit: () => submit(),
-  onCancel: () => cancel(),
-});
-```
-
----
-
-### 8. `provider()` - Signal Context ⭐ NEW
-
-Create type-safe React Context with three modes.
-
-#### Mode 1: Signal Mode (default)
-
-Wraps value in a mutable signal:
-
-```tsx
-const [useTheme, ThemeProvider] = provider<"dark" | "light">({
-  name: "Theme",
+// Raw mode (for logic instances)
+const [useProduct, ProductProvider] = provider<ProductInstance>({ 
+  name: "Product", 
+  raw: true 
 });
 
-<ThemeProvider value="dark">
-  <App />
-</ThemeProvider>;
-
-// Consumer - returns Mutable<"dark" | "light">
-const theme = useTheme();
-rx(theme); // Renders: "dark"
-theme.set("light"); // Update from anywhere
-```
-
-#### Mode 2: Raw Mode
-
-Passes value directly. Perfect for logic instances:
-
-```tsx
-import { InferLogic, useScope } from "rextive/react";
-
-type ProductInstance = InferLogic<typeof productLogic>;
-
-const [useProduct, ProductProvider] = provider<ProductInstance>({
-  name: "Product",
-  raw: true, // Pass value directly
-});
-
-// Parent
-function ProductPage() {
-  const $product = useScope(productLogic);
-  return (
-    <ProductProvider value={$product}>
-      <ProductContent />
-    </ProductProvider>
-  );
-}
-
-// Child - access logic directly
-function ProductContent() {
-  const $product = useProduct();
-  return <div>{rx($product.quantity)}</div>;
-}
-```
-
-#### Mode 3: Factory Mode
-
-For complex contexts with custom initialization:
-
-```tsx
+// Factory mode
 const [useAuth, AuthProvider] = provider<AuthContext, User | null>({
   name: "Auth",
-  create: (initialUser) => {
-    const user = signal(initialUser);
-    const login = async (creds) => { ... };
-    return { user, login };
-  },
+  create: (user) => ({ user: signal(user), login: async () => {} }),
   update: (ctx, value) => ctx.user.set(value)
 });
 ```
 
-#### Options
-
-| Option   | Type                   | Description                            |
-| -------- | ---------------------- | -------------------------------------- |
-| `name`   | `string`               | Name for error messages                |
-| `raw`    | `boolean`              | Pass value directly (default: `false`) |
-| `equals` | `EqualsFn`             | Custom equality for raw mode           |
-| `create` | `(value) => T`         | Factory function (factory mode)        |
-| `update` | `(ctx, value) => void` | Called on value change (factory mode)  |
-
 ---
 
-### 9. Async Utilities
+## 🔧 Operators
 
-#### `wait()` / `wait.all()` - Wait for All
+Import from `rextive/op`:
 
 ```tsx
-// Suspense mode (throws for Suspense)
-const value = wait(promise);
-const [a, b] = wait([p1, p2]);
-const { user, posts } = wait({ user: p1, posts: p2 });
-
-// Promise mode
-await wait(promise, (value) => processValue(value));
+import { to, filter, scan, focus, debounce, throttle, task } from "rextive/op";
 ```
 
-#### `wait.any()` - First to Resolve
+### Transform Operators
 
 ```tsx
-const [value, key] = wait.any({ fast, slow });
-```
+// to() - Transform values
+const doubled = count.pipe(to(x => x * 2));
 
-#### `wait.race()` - First to Settle
+// filter() - Filter values
+const positiveOnly = count.pipe(filter(x => x > 0));
 
-```tsx
-const [value, key] = wait.race({ p1, p2 });
-```
-
-#### `wait.settled()` - All Settled (Never Throws)
-
-```tsx
-const results = wait.settled([p1, p2, p3]);
-```
-
-#### `wait.timeout()` - With Timeout
-
-```tsx
-const data = await wait.timeout(fetchData(), 5000);
-```
-
-#### `wait.delay()` - Simple Delay
-
-```tsx
-await wait.delay(1000);
-```
-
----
-
-### 10. `task.from()` - Async State Access
-
-Async signals return Promises. Use `task.from()` to access loading/error/success states:
-
-```tsx
-const promise = asyncSignal();
-const state = task.from(promise);
-
-state.status; // "loading" | "success" | "error"
-state.loading; // boolean
-state.value; // resolved value
-state.error; // error if rejected
-```
-
-**React usage:**
-
-```tsx
-{
-  rx(() => {
-    const state = task.from(userData());
-    if (state.loading) return <Spinner />;
-    if (state.error) return <Error error={state.error} />;
-    return <div>{state.value.name}</div>;
-  });
-}
-```
-
-**Key points:**
-
-- Async signals return the **Promise itself** as their value
-- Subscribers are **notified when the Promise settles** (resolve or reject)
-- Use `task.from()` to check the Promise's current state
-- The `onError` callback is for **sync errors only** (during computation)
-
----
-
-### 11. Operators (`rextive/op`) ⭐ NEW
-
-```tsx
-import { to, filter, scan, focus, debounce, throttle, pace } from "rextive/op";
-```
-
-#### `to()` - Transform Values
-
-```tsx
-const doubled = count.pipe(to((x) => x * 2));
-```
-
-#### `filter()` - Filter Values
-
-```tsx
-const positiveOnly = count.pipe(filter((x) => x > 0));
-```
-
-#### `scan()` - Accumulate Values
-
-```tsx
+// scan() - Accumulate values
 const total = count.pipe(scan((acc, curr) => acc + curr, 0));
+
+// distinct() - Filter duplicates
+const unique = count.pipe(distinct());           // Consecutive mode
+const allUnique = count.pipe(distinct({ mode: "all" }));
 ```
 
-#### `focus()` - Bidirectional Lens for Nested Properties
-
-Create a bidirectional mutable signal for a nested property path:
+### Focus Operator (Bidirectional Lens)
 
 ```tsx
-// Basic usage with dot-notation
-const form = signal({ user: { name: "Alice" } });
+// Basic path access
 const userName = form.pipe(focus("user.name"));
-console.log(userName()); // "Alice"
-userName.set("Bob"); // Updates source immutably
+userName.set("Bob");  // Updates source immutably
 
-// With fallback (for optional properties)
-type User = { name: string; nickname?: string };
-const user = signal<User>({ name: "Alice" });
-
-// Without fallback - type is string | undefined
-const nickname = user.pipe(focus("nickname"));
-
-// With fallback - type is string (guaranteed non-nullable)
-const nicknameDefault = user.pipe(focus("nickname", () => "Guest"));
-console.log(nicknameDefault()); // "Guest"
+// With fallback
+const nickname = user.pipe(focus("nickname", () => "Guest"));
 
 // With options
-const price = form.pipe(
-  focus("price", {
-    get: (v) => v * 1.1, // Transform on read
-    set: (v) => v / 1.1, // Transform on write
-    equals: "shallow",
-  })
-);
+const price = form.pipe(focus("price", {
+  get: v => v * 1.1,    // Transform on read
+  set: v => v / 1.1,    // Transform on write
+}));
 
-// Fallback + options
-const theme = user.pipe(
-  focus("settings.theme", () => "light", { name: "userTheme" })
-);
+// Lightweight lens (no signal created)
+const [getName, setName] = focus.lens(form, "user.name");
 ```
 
-**Overloads:**
-
-- `focus(path, options?)` → `Mutable<PathValue<T, P>>` (may include undefined)
-- `focus(path, fallback, options?)` → `Mutable<F>` (F = fallback return type, non-nullable)
-
-**Fallback behaviors:**
-
-- Called only for `null` or `undefined` values
-- **Memoized** - factory called only once
-- `0`, `""`, `false` are NOT nullish (no fallback used)
-
-#### `debounce()` - Debounce Updates
+### Timing Operators
 
 ```tsx
+// debounce() - Wait for pause in changes
 const debouncedSearch = searchInput.pipe(debounce(300));
-```
 
-#### `throttle()` - Throttle Updates
-
-```tsx
+// throttle() - Limit update frequency
 const throttledPosition = mousePosition.pipe(throttle(100));
+
+// pace() - Rate limit updates
+const pacedData = fastData.pipe(pace(1000));
+
+// delay() - Delay emissions
+const delayed = source.pipe(delay(500));
 ```
 
-#### `pace()` - Rate Limit Updates
+### Flow Control Operators
 
 ```tsx
-const pacedData = fastData.pipe(pace(1000));
+// take() - Take first N emissions
+const first3 = source.pipe(take(3));
+
+// takeWhile() - Take while predicate is true
+const whilePositive = source.pipe(takeWhile(x => x > 0));
+
+// takeUntil() - Take until notifier emits
+const untilClick = source.pipe(takeUntil(clickSignal));
+
+// skip() - Skip first N emissions
+const afterFirst3 = source.pipe(skip(3));
+
+// skipWhile() - Skip while predicate is true
+const afterNegatives = source.pipe(skipWhile(x => x < 0));
+
+// skipUntil() - Skip until notifier emits
+const afterStart = source.pipe(skipUntil(startSignal));
 ```
 
-#### `task()` - Async State with Stale-While-Revalidate ⭐ NEW
+### Math Operators
 
-Creates a task signal that ensures `value` is always defined (never undefined):
+```tsx
+// min() / max() - Track minimum/maximum
+const minimum = source.pipe(min());
+const maximum = source.pipe(max());
+
+// count() - Count emissions
+const emissions = source.pipe(count());
+```
+
+### Reactive Trigger Operators
+
+```tsx
+// refreshOn() - Trigger immediate recomputation
+const userData = asyncSignal.pipe(refreshOn(refreshTrigger));
+
+// staleOn() - Mark for lazy recomputation
+const cachedData = asyncSignal.pipe(staleOn(cacheInvalidate));
+
+// resetOn() - Reset mutable signal to initial value
+const formData = signal({ name: "" }).pipe(resetOn(clearTrigger));
+```
+
+### Task Operator (Stale-While-Revalidate)
 
 ```tsx
 import { task } from "rextive/op";
 
 const userProfile = signal(async () => fetchUser());
 const userTask = userProfile.pipe(task({ name: "Guest" }));
+
+// value is ALWAYS defined
+rx(() => {
+  const { loading, error, value } = userTask();
+  return (
+    <div>
+      {loading && <Spinner />}
+      <h2>{value.name}</h2>  {/* Safe - never undefined */}
+    </div>
+  );
+});
 ```
-
-**Stale-while-revalidate pattern:**
-
-- **First load**: Uses `initial` value while loading
-- **Loading after success**: Shows previous successful value (stale data)
-- **Success**: Shows current value (fresh data)
-
-```tsx
-const DEFAULT_USER = { id: 0, name: "Loading..." };
-
-const userProfileTask = userProfileAsync.pipe(task(DEFAULT_USER));
-
-function UserProfile() {
-  return rx(() => {
-    const { loading, error, value } = userProfileTask();
-    // ✅ value is ALWAYS defined - never undefined!
-    return (
-      <div>
-        {loading && <Spinner />}
-        <h2>{value.name}</h2>
-        {error && <ErrorToast error={error} />}
-      </div>
-    );
-  });
-}
-```
-
-**With options:**
-
-```tsx
-const userTask = userProfile.pipe(task(DEFAULT_USER, { name: "userTask" }));
-```
-
-#### `refreshOn()` - Trigger Immediate Recomputation
-
-Triggers `.refresh()` on a computed signal when notifier(s) change:
-
-```tsx
-import { refreshOn } from "rextive/op";
-
-const refreshTrigger = signal(0);
-const userData = asyncSignal.pipe(refreshOn(refreshTrigger));
-
-// Click to refresh immediately
-<button onClick={() => refreshTrigger.set((v) => v + 1)}>Refresh</button>;
-```
-
-**With filter:**
-
-```tsx
-const networkStatus = signal<"online" | "offline">("online");
-
-// Only refresh when coming back online
-const data = asyncSignal.pipe(
-  refreshOn(networkStatus, (status) => status() === "online")
-);
-```
-
-#### `staleOn()` - Mark for Lazy Recomputation
-
-Marks a computed signal as stale when notifier(s) change (recomputes on next access):
-
-```tsx
-import { staleOn } from "rextive/op";
-
-const cacheInvalidate = signal(0);
-const userData = asyncSignal.pipe(staleOn(cacheInvalidate));
-
-// Mark data as stale (won't refetch until accessed)
-cacheInvalidate.set((v) => v + 1);
-```
-
-**Use `staleOn` vs `refreshOn`:**
-
-- `refreshOn` - Immediate recomputation (use for active data)
-- `staleOn` - Lazy recomputation (use for cached/background data)
-
-#### `resetOn()` - Reset Mutable Signal to Initial Value
-
-Triggers `.reset()` on a mutable signal when notifier(s) change:
-
-```tsx
-import { resetOn } from "rextive/op";
-
-const clearTrigger = signal<void>();
-const formData = signal({ name: "", email: "" }).pipe(resetOn(clearTrigger));
-
-// Reset form after submission
-<button
-  onClick={() => {
-    submitForm(formData());
-    clearTrigger.set(undefined as void);
-  }}
->
-  Submit & Clear
-</button>;
-```
-
-**With filter:**
-
-```tsx
-const routeChange = signal<string>("/home");
-
-// Reset filters when navigating away from /products
-const productFilters = signal({ category: "all", sort: "name" }).pipe(
-  resetOn(routeChange, (route) => !route().startsWith("/products"))
-);
-```
-
-**Note:** Only works with **mutable signals** (not computed).
 
 ---
 
-### 12. Plugins (`rextive/plugins`) ⭐ NEW
+## ⏳ Async Utilities
 
-#### `persistor` - Auto-Persistence
+### `task.from()` - Access Async State
+
+```tsx
+const promise = asyncSignal();
+const state = task.from(promise);
+
+state.status  // "loading" | "success" | "error"
+state.loading // boolean
+state.value   // resolved value
+state.error   // error if rejected
+```
+
+### `task` Factory Methods
+
+```tsx
+task.loading(promise)    // Create loading state
+task.success(value)      // Create success state
+task.error(error)        // Create error state
+```
+
+### `wait()` - Suspense Integration
+
+```tsx
+// Single value
+const value = wait(promise);
+
+// Multiple (parallel)
+const [a, b] = wait([p1, p2]);
+const { user, posts } = wait({ user: p1, posts: p2 });
+
+// First to resolve
+const [value, key] = wait.any({ fast, slow });
+
+// First to settle
+const [value, key] = wait.race({ p1, p2 });
+
+// All settled (never throws)
+const results = wait.settled([p1, p2, p3]);
+
+// With timeout
+const data = await wait.timeout(fetchData(), 5000);
+
+// Delay
+await wait.delay(1000);
+```
+
+---
+
+## 🧠 Logic System
+
+### Creating Logic
+
+```tsx
+export const counterLogic = logic("counterLogic", () => {
+  // 1. DEPENDENCIES
+  const $auth = authLogic();
+  
+  // 2. STATE
+  const count = signal(0, { name: "counter.count" });
+  const doubled = count.to(x => x * 2);
+  
+  // 3. SIDE EFFECTS
+  $auth.user.on(() => {
+    if (!$auth.user()) count.reset();
+  });
+  
+  // 4. METHODS
+  const increment = () => count.set(x => x + 1);
+  const decrement = () => count.set(x => x - 1);
+  
+  // 5. RETURN
+  return {
+    count,
+    doubled,
+    increment,
+    decrement,
+  };
+});
+```
+
+### Using Logic
+
+```tsx
+// In React components
+const $counter = counterLogic();
+const { count, increment } = useScope(counterLogic);
+
+// As singleton
+const $auth = authLogic();  // Same instance everywhere
+```
+
+### Testing Logic
+
+```tsx
+import { mockLogic } from "rextive/test";
+
+describe("UserMenu", () => {
+  const $auth = mockLogic(authLogic);
+  
+  beforeEach(() => {
+    $auth.default({
+      user: signal(null),
+      logout: vi.fn(),
+    });
+  });
+  
+  afterEach(() => $auth.clear());
+  
+  it("should show Sign In when not authenticated", () => {
+    $auth.provide({ user: signal(null) });
+    render(<UserMenu />);
+    expect(screen.getByText("Sign In")).toBeInTheDocument();
+  });
+});
+```
+
+---
+
+## 🔌 Plugins & Extensions
+
+### Persistor Plugin
 
 ```tsx
 import { persistor } from "rextive/plugins";
@@ -1568,71 +675,33 @@ const persist = persistor<{ theme: string; fontSize: number }>({
   load: () => JSON.parse(localStorage.getItem("settings") || "{}"),
   save: (args) => {
     const existing = JSON.parse(localStorage.getItem("settings") || "{}");
-    localStorage.setItem(
-      "settings",
-      JSON.stringify({ ...existing, ...args.values })
-    );
+    localStorage.setItem("settings", JSON.stringify({ ...existing, ...args.values }));
   },
 });
 
 const theme = signal("dark", { use: [persist("theme")] });
 ```
 
----
-
-### 13. Immer Integration (`rextive/immer`) ⭐ NEW
+### Immer Integration
 
 ```tsx
 import { produce } from "rextive/immer";
 
 const state = signal({ count: 0, user: { name: "John" } });
 
-// Write "mutations" that are actually immutable
-state.set(
-  produce((draft) => {
-    draft.count++;
-    draft.user.name = "Jane";
-  })
-);
+state.set(produce((draft) => {
+  draft.count++;
+  draft.user.name = "Jane";
+}));
 ```
 
----
-
-### 14. Cache (`rextive/cache`) ⭐ NEW
-
-```tsx
-import { cache, staleOn, evictOn, lru } from "rextive/cache";
-
-const getUser = cache("users", async (userId: string) => {
-  const res = await fetch(`/api/users/${userId}`);
-  return res.json();
-});
-
-// Access cached data
-const { value, unref } = getUser("123");
-const user = await value;
-
-// Release reference when done
-unref();
-
-// Cache methods
-getUser.stale("123"); // Mark stale
-getUser.refresh("123"); // Force re-fetch
-getUser.delete("123"); // Remove
-getUser.clear(); // Clear all
-```
-
----
-
-### 15. DevTools (`rextive/devtools`) ⭐ NEW
+### DevTools
 
 ```tsx
 import { enableDevTools, DevToolsPanel } from "rextive/devtools";
 
-// Enable devtools
 enableDevTools();
 
-// Add panel to your app
 function App() {
   return (
     <div>
@@ -1645,1215 +714,301 @@ function App() {
 
 ---
 
-### 16. Utilities
-
-#### `disposable(obj)` - Create Disposable ⭐ NEW
-
-```tsx
-const scope = disposable({
-  count: signal(0),
-  doubled: count.to((x) => x * 2),
-});
-// Automatically adds dispose array
-```
-
-#### `awaited(...selectors)` - Transform Async Values ⭐ NEW
-
-```tsx
-const titles = todoList.to(
-  awaited(
-    (todos) => todos.filter((t) => !t.done),
-    (todos) => todos.map((t) => t.title)
-  )
-);
-```
-
-#### `emitter()` - Event Emitter
-
-```tsx
-const events = emitter<string>();
-events.on((value) => console.log(value));
-events.emit("hello");
-events.dispose();
-```
-
----
-
-### 17. `logic()` - Reusable Logic Units
-
-Create reusable, testable logic units that encapsulate signals and actions:
-
-```tsx
-import { logic, signal } from "rextive";
-
-export const counterLogic = logic("counterLogic", () => {
-  const count = signal(0, { name: "counter.count" });
-  const doubled = count.to((x) => x * 2, { name: "counter.doubled" });
-
-  const increment = () => count.set((x) => x + 1);
-  const decrement = () => count.set((x) => x - 1);
-  const reset = () => count.reset();
-
-  return {
-    count,
-    doubled,
-    increment,
-    decrement,
-    reset,
-  };
-});
-```
-
-#### Logic Structure
-
-A well-organized logic follows this structure:
-
-```ts
-export const myLogic = logic("myLogic", () => {
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 1. DEPENDENCIES - Import other logics (at factory level!)
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const $auth = authLogic(); // Shared singleton
-  const $config = configLogic(); // Shared singleton
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 2. STATE - Signals and computed values
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const items = signal<Item[]>([], { name: "myLogic.items" });
-  const filter = signal("all", { name: "myLogic.filter" });
-
-  // Computed signals
-  const filtered = signal(
-    { items, filter },
-    ({ deps }) => deps.items.filter(/* ... */),
-    { name: "myLogic.filtered" }
-  );
-  const count = items.to((list) => list.length, { name: "myLogic.count" });
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 3. SIDE EFFECTS - Subscriptions, timers, external resources
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const socket = new WebSocket($config.wsUrl);
-  const interval = setInterval(() => refresh(), 60000);
-
-  // Signal subscriptions
-  $auth.user.on(() => {
-    if (!$auth.user()) items.reset();
-  });
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 4. METHODS - Actions and business logic
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const add = (item: Item) => {
-    items.set((prev) => [...prev, item]);
-  };
-
-  const remove = (id: string) => {
-    items.set((prev) => prev.filter((i) => i.id !== id));
-  };
-
-  const refresh = async () => {
-    const data = await fetch("/api/items");
-    items.set(await data.json());
-  };
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 5. RETURN - Public API + cleanup
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  return {
-    // State (read-only or mutable as needed)
-    items,
-    filter,
-    filtered,
-    count,
-
-    // Methods
-    add,
-    remove,
-    refresh,
-
-    // Cleanup (optional - for external resources)
-    dispose: () => {
-      socket.close();
-      clearInterval(interval);
-      // Note: Signals are auto-disposed, no need to dispose them manually
-    },
-  };
-});
-```
-
-**Section Breakdown:**
-
-| Section          | Purpose              | Guidelines                                             |
-| ---------------- | -------------------- | ------------------------------------------------------ |
-| **Dependencies** | Import other logics  | Always at factory level, not inside methods            |
-| **State**        | Signals & computed   | Name signals for debugging: `{ name: "logic.signal" }` |
-| **Side Effects** | External resources   | WebSockets, timers, event listeners, subscriptions     |
-| **Methods**      | Business logic       | Keep pure when possible, use signals for state         |
-| **Return**       | Public API + cleanup | Include `dispose()` if you have side effects           |
-
-**⚠️ Common Mistakes:**
-
-```ts
-// ❌ BAD: Getting logic inside a method (stale reference risk)
-const myLogic = logic("myLogic", () => {
-  const doSomething = () => {
-    const $auth = authLogic(); // ❌ Called on every invocation
-    return $auth.user();
-  };
-  return { doSomething };
-});
-
-// ✅ GOOD: Get logic at factory level
-const myLogic = logic("myLogic", () => {
-  const $auth = authLogic(); // ✅ Called once during initialization
-
-  const doSomething = () => {
-    return $auth.user(); // Uses captured reference
-  };
-  return { doSomething };
-});
-```
-
-```ts
-// ❌ BAD: Forgetting to clean up external resources
-const myLogic = logic("myLogic", () => {
-  const socket = new WebSocket("wss://...");
-  // No dispose! Memory leak when instance is disposed
-  return {
-    /* ... */
-  };
-});
-
-// ✅ GOOD: Clean up external resources
-const myLogic = logic("myLogic", () => {
-  const socket = new WebSocket("wss://...");
-  return {
-    /* ... */
-    dispose: () => socket.close(),
-  };
-});
-```
-
-```ts
-// ❌ BAD: Disposing shared logics
-const myLogic = logic("myLogic", () => {
-  const $auth = authLogic(); // Singleton - shared!
-  return {
-    dispose: () => {
-      $auth.dispose(); // ❌ Don't dispose shared logics!
-    },
-  };
-});
-
-// ✅ GOOD: Only dispose what you own
-const myLogic = logic("myLogic", () => {
-  const $auth = authLogic(); // Shared - DON'T dispose
-  const tabs = [tabLogic.create()]; // Owned - MUST dispose
-
-  return {
-    dispose: () => {
-      tabs.forEach((t) => t.dispose()); // ✅ Dispose owned only
-    },
-  };
-});
-```
-
----
-
 ## 🏷️ Naming Conventions
-
-This section covers naming conventions for all Rextive constructs.
 
 ### Signal Naming
 
-#### Primitive/Simple Signals (No Postfix)
-
-For simple state values, use descriptive names without postfixes:
-
-```tsx
-// ✅ GOOD - Clear, simple names
-const count = signal(0);
-const filter = signal("all");
-const selectedId = signal<number | null>(null);
-
-// Boolean signals - use "is" prefix
-const isOpen = signal(false);
-const isLoading = signal(true);
-const hasError = signal(false);
-```
-
-#### Async Signals (No Postfix)
-
-Async signals that return Promises **do not need a postfix**. TypeScript guides consumers on how to access the value.
-
-```tsx
-// ✅ GOOD - No postfix for async signals
-const user = signal({ userId }, async ({ deps, abortSignal }) => {
-  return fetchUser(deps.userId, { signal: abortSignal });
-});
-
-const products = signal(async () => fetchProducts());
-
-// Consumer must use task.from() or wait()
-rx(() => {
-  const state = task.from(user()); // TypeScript shows it's a Promise
-  if (state.loading) return <Spinner />;
-  return <div>{state.value?.name}</div>;
-});
-```
-
-**Rationale:** Async signals may evolve (e.g., add task operator later) without breaking consumers. Let types guide usage instead of naming.
-
-#### Task Signals (`Task` Postfix)
-
-Signals wrapped with the `task()` operator **use `Task` postfix**. This indicates stale-while-revalidate behavior where `value` is always defined.
-
-```tsx
-// ✅ GOOD - Task postfix for task-wrapped signals
-const user = signal({ userId }, async ({ deps }) => fetchUser(deps.userId));
-const userTask = user.pipe(task({ id: 0, name: "Loading..." }));
-
-// Consumer gets TaskState directly (no task.from needed)
-rx(() => {
-  const { loading, error, value } = userTask(); // value is ALWAYS defined
-  return (
-    <div>
-      {loading && <Spinner />}
-      <span>{value.name}</span> {/* Safe - never undefined */}
-    </div>
-  );
-});
-```
-
-**Use Task when:**
-
-- You need stale-while-revalidate (show previous value during reload)
-- You want guaranteed non-undefined value
-
-**Use plain async when:**
-
-- You can accept `undefined` during loading/error states
-- You're using Suspense with `wait()`
-
-### Action Naming
-
-Actions created via `signal.action()` or `.tuple` follow these conventions:
-
-#### Dispatcher (Verb Name)
-
-Expose dispatchers with semantic verb names:
-
-```tsx
-const loginAction = signal.action<Credentials, User>(async (creds) => {
-  return authApi.login(creds);
-});
-
-// ✅ GOOD - Semantic verb names for dispatchers
-export const login = loginAction.dispatch;
-export const logout = logoutAction.dispatch;
-export const addToCart = cartAction.dispatch;
-export const refresh = refreshAction.dispatch;
-```
-
-#### Action Results (Only Expose When Needed)
-
-**Default:** Don't expose results - just use `await dispatch()`:
-
-```tsx
-// Most common pattern - no result signal needed
-const user = await $auth.login(credentials);
-```
-
-**When reactive result is needed:** Use `Result` + optional postfix:
-
-| Result Type  | Naming            | When to Use                              |
-| ------------ | ----------------- | ---------------------------------------- |
-| Sync result  | `loginResult`     | Reactive sync value                      |
-| Async result | `loginResult`     | Reactive async value (use `task.from()`) |
-| Task result  | `loginResultTask` | Stale-while-revalidate for result        |
-
-```tsx
-export const authLogic = logic("authLogic", () => {
-  const loginAction = signal.action<Credentials, User>(...);
-
-  return {
-    // Dispatcher - always expose
-    login: loginAction.dispatch,
-
-    // Result - only expose if multiple components need to react
-    loginResult: loginAction.result,
-    // OR for task pattern:
-    loginResultTask: loginAction.result.pipe(task(null)),
-  };
-});
-```
+| Type | Postfix | Example |
+|------|---------|---------|
+| Primitive | None | `count`, `filter`, `selectedId` |
+| Boolean | `is`/`has` prefix | `isOpen`, `isLoading`, `hasError` |
+| Async | None | `user`, `products` |
+| Task-wrapped | `Task` | `userTask`, `productsTask` |
 
 ### Logic Naming
 
-#### Logic Definition (`Logic` Postfix)
-
-Always use `Logic` postfix in the logic name string:
-
 ```tsx
-// ✅ GOOD
-logic("authLogic", () => { ... });
-logic("cartLogic", () => { ... });
-logic("checkout.shippingLogic", () => { ... });
-
-// ❌ BAD
-logic("auth", () => { ... });
-logic("cart", () => { ... });
-```
-
-#### Variable/Export Name (`Logic` Postfix)
-
-Always use `Logic` postfix:
-
-```tsx
-// ✅ GOOD
+// Definition: Logic postfix
 export const authLogic = logic("authLogic", () => { ... });
-export const cartLogic = logic("cartLogic", () => { ... });
 
-// ❌ BAD
-export const auth = logic("authLogic", () => { ... });
+// File: Logic postfix
+// src/logic/authLogic.ts
+
+// Consumer: $ prefix
+const $auth = authLogic();
+const $cart = cartLogic();
+
+// Destructuring: no prefix
+const { user, logout } = authLogic();
 ```
 
-#### File Name (`Logic` Postfix)
-
-Use `Logic` postfix in file names:
-
-```
-✅ GOOD
-src/logic/authLogic.ts
-src/logic/cartLogic.ts
-src/logic/checkout/shippingLogic.ts
-
-❌ BAD
-src/logic/auth.ts
-src/logic/cart.ts
-```
-
-### Consumer Convention: `$` Prefix
-
-When consuming logic instances, use `$` prefix to distinguish logic instances from local variables:
+### Action Naming
 
 ```tsx
-// ✅ GOOD - Clear distinction
-export function UserMenu() {
-  const $auth = authLogic();
-  const $cart = cartLogic();
-
-  return rx(() => {
-    const user = $auth.user();
-    const itemCount = $cart.itemCount();
-    return (
-      <div>
-        {user?.name} ({itemCount})
-      </div>
-    );
-  });
-}
-
-// ❌ BAD - Ambiguous naming
-export function UserMenu() {
-  const auth = authLogic(); // Easy to confuse with local 'auth' object
-  const cart = cartLogic();
-
-  return rx(() => {
-    const user = auth.user();
-    return <div>{user?.name}</div>;
-  });
-}
-```
-
-**When to use `$` prefix:**
-
-- ✅ When storing the full logic instance: `const $auth = authLogic();`
-- ❌ NOT when destructuring: `const { user, logout } = authLogic();` (destructured values are not logic instances)
-
-**Mixed usage:**
-
-```tsx
-// ✅ GOOD - $prefix for full instance, no prefix for destructured
-export function OrderReview() {
-  const $shipping = shippingLogic();
-  const $payment = paymentLogic();
-  const $order = orderLogic();
-  const { goToStep, prevStep } = checkoutLogic(); // Destructured actions
-
-  return rx(() => {
-    const info = $shipping.info();
-    const method = $payment.method();
-    const total = $order.total();
-    // ...
-  });
-}
-```
-
-#### Logic Within Logic
-
-When consuming logic from another logic, use the same `$` prefix convention:
-
-```tsx
-export const checkoutLogic = logic("checkoutLogic", () => {
-  // Get child logics with $ prefix
-  const $shipping = shippingLogic();
-  const $payment = paymentLogic();
-  const $order = orderLogic();
-
-  const open = () => {
-    $shipping.prefillFromUser();
-    $order.reset();
-    // ...
-  };
-
-  const placeOrder = async () => {
-    await $order.placeOrder();
-    // ...
-  };
-
-  return {
-    open,
-    placeOrder,
-    // ...
-  };
-});
-```
-
-#### Splitting Logic by Concern
-
-For complex features, split logic into focused units:
-
-```
-src/logic/checkout/
-├── types.ts           # Shared types and constants
-├── shippingLogic.ts   # Shipping form state & validation
-├── paymentLogic.ts    # Payment method selection
-├── orderLogic.ts      # Order totals & placement
-├── checkoutLogic.ts   # Flow coordinator
-└── index.ts           # Barrel exports
-```
-
-**Coordinator pattern:**
-
-```tsx
-// checkoutLogic.ts - coordinates child logics
-export const checkoutLogic = logic("checkoutLogic", () => {
-  const $shipping = shippingLogic();
-  const $payment = paymentLogic();
-  const $order = orderLogic();
-
-  // Only exposes flow control, not child state
-  return {
-    isOpen,
-    currentStep,
-    open,
-    close,
-    nextStep,
-    prevStep,
-    placeOrder,
-    reset,
-  };
-});
-```
-
-**Components access step logics directly:**
-
-```tsx
-// ShippingForm.tsx - uses shippingLogic directly
-export function ShippingForm() {
-  const $shipping = shippingLogic();
-  const { nextStep } = checkoutLogic(); // Only navigation from coordinator
-
-  return rx(() => {
-    const info = $shipping.info();
-    const isValid = $shipping.isValid();
-    // ...
-  });
-}
-```
-
-#### Testing Logic
-
-**Option 1: Using `mockLogic` (Recommended for React Components)**
-
-```tsx
-import { signal } from "rextive";
-import { mockLogic } from "rextive/test";
-import { vi } from "vitest";
-
-describe("UserMenu", () => {
-  const $auth = mockLogic(authLogic);
-
-  beforeEach(() => {
-    $auth.default({
-      user: signal(null),
-      isRestoring: signal(false),
-      logout: vi.fn(),
-      openLoginModal: vi.fn(),
-    });
-  });
-
-  afterEach(() => {
-    $auth.clear();
-  });
-
-  it("should show Sign In when not authenticated", () => {
-    $auth.provide({ user: signal(null) });
-    render(<UserMenu />);
-    expect(screen.getByText("Sign In")).toBeInTheDocument();
-  });
-
-  it("should call logout when clicked", () => {
-    const mock = $auth.provide({
-      user: signal({ id: 1, name: "John" }),
-      logout: vi.fn(),
-    });
-    render(<UserMenu />);
-    fireEvent.click(screen.getByTitle("Logout"));
-    expect(mock.logout).toHaveBeenCalledTimes(1);
-  });
-});
-```
-
-**`mockLogic` API:**
-
-| Method               | Description                                       |
-| -------------------- | ------------------------------------------------- |
-| `.default(partial)`  | Set default mock values (merged with overrides)   |
-| `.provide(partial?)` | Apply mock to logic registry, returns merged mock |
-| `.clear()`           | Clear defaults, overrides, and logic registry     |
-
-**Option 2: Using `logic.provide()` (For Logic Unit Tests)**
-
-```tsx
-import { logic, signal } from "rextive";
-import { vi } from "vitest";
-
-describe("userStore", () => {
-  afterEach(() => {
-    logic.clear();
-  });
-
-  it("should fetch user with overridden API", async () => {
-    logic.provide(apiClient, () => ({
-      get: vi.fn().mockResolvedValue({ id: 1, name: "John" }),
-      post: vi.fn(),
-    }));
-
-    const store = logic.create(userStore);
-    await store.fetchUser("1");
-
-    expect(store.user()).toEqual({ id: 1, name: "John" });
-  });
-});
-```
-
-**When to Use Each:**
-
-| Scenario                     | Recommended                             |
-| ---------------------------- | --------------------------------------- |
-| Testing React components     | `mockLogic()` from `rextive/test`       |
-| Testing logic units directly | `logic.provide()` + `logic.create()`    |
-| Library/SDK testing          | `logic.provide()` with partial override |
-
----
-
-## 🎨 Advanced Patterns
-
-### Pattern 1: Single Dependency - Transform with `.to()`
-
-When you need to **transform one signal** into another:
-
-```tsx
-const count = signal(0);
-
-// Transform it with .to()
-const doubled = count.to((x) => x * 2);
-const formatted = count.to((x) => `Count: ${x}`);
-```
-
----
-
-### Pattern 2: Multiple Dependencies - Combine Signals
-
-When you need to **combine multiple signals**:
-
-```tsx
-const firstName = signal("John");
-const lastName = signal("Doe");
-
-const fullName = signal(
-  { firstName, lastName },
-  ({ deps }) => `${deps.firstName} ${deps.lastName}`
-);
-```
-
----
-
-### Pattern 3: Async with Dependencies
-
-```tsx
-const userId = signal(1);
-
-const user = signal({ userId }, async ({ deps, abortSignal }) => {
-  const response = await fetch(`/api/users/${deps.userId}`, {
-    signal: abortSignal, // Automatically cancels previous request
-  });
-  return response.json();
-});
-```
-
----
-
-### Pattern 4: Chain Multiple Operators
-
-```tsx
-import { to, filter, scan } from "rextive/op";
-
-const result = count.pipe(
-  filter((x) => x > 0),
-  to((x) => x * 2),
-  scan((acc, x) => acc + x, 0)
-);
-```
-
----
-
-### Pattern 5: Debounced Search
-
-```tsx
-function SearchBox() {
-  const scope = useScope(() => {
-    const searchInput = signal("");
-
-    const results = signal(
-      { searchInput },
-      async ({ deps, abortSignal, safe }) => {
-        const query = deps.searchInput.trim();
-        if (!query || query.length < 2) return [];
-
-        // Debounce: wait 300ms
-        await safe(wait.delay(300));
-
-        const res = await fetch(`/api/search?q=${query}`, {
-          signal: abortSignal,
-        });
-        return res.json();
-      }
-    );
-
-    return { searchInput, results };
-  });
-
-  return (
-    <div>
-      <input onChange={(e) => scope.searchInput.set(e.target.value)} />
-      {rx(() => {
-        const state = task.from(scope.results());
-        if (state.loading) return <div>Searching...</div>;
-        return (
-          <ul>
-            {state.value.map((item) => (
-              <li key={item.id}>{item.name}</li>
-            ))}
-          </ul>
-        );
-      })}
-    </div>
-  );
-}
-```
-
----
-
-### Pattern 6: Batch Updates
-
-```tsx
-signal.batch(() => {
-  firstName.set("Jane");
-  lastName.set("Smith");
-  email.set("jane@example.com");
-});
-// Only ONE notification!
-```
-
----
-
-### Pattern 7: Group Signals with Tags
-
-```tsx
-const formTag = signal.tag();
-
-const name = signal("", { use: [formTag] });
-const email = signal("", { use: [formTag] });
-const message = signal("", { use: [formTag] });
-
-// Reset all form fields at once
-formTag.forEach((s) => s.reset());
-```
-
----
-
-### Pattern 8: Notifier / Action Dispatcher
-
-Use `signal<T>()` (empty signal) as an action dispatcher or event bus:
-
-```tsx
-// Action dispatcher pattern
-type Action =
-  | { type: "login"; username: string; password: string }
-  | { type: "logout" }
-  | { type: "refresh" };
-
-const action = signal<Action>();
-
-// Subscribe to actions
-action.on(() => {
-  const a = action();
-  switch (a?.type) {
-    case "login":
-      handleLogin(a.username, a.password);
-      break;
-    case "logout":
-      handleLogout();
-      break;
-    case "refresh":
-      refreshData();
-      break;
-  }
-});
-
-// Dispatch actions - triggers even with same value!
-action.set({ type: "refresh" });
-action.set({ type: "refresh" }); // Triggers again!
-```
-
-**Using `.tuple` for cleaner action dispatch:**
-
-```tsx
-type TodoAction = { type: "add"; text: string } | { type: "edit"; id: number };
-
-// .tuple gives [signal, setter] with semantic naming
-const [todoAction, dispatch] = signal<TodoAction>().tuple;
-
-// React using .when()
-todoList.when(todoAction, (action) => {
-  const a = action();
-  if (a.type === "add") addTodo(a.text);
-  if (a.type === "edit") editTodo(a.id);
-});
-
-// Dispatch with semantic setter
-dispatch({ type: "add", text: "Buy milk" });
-```
-
-**Key difference from regular signals:**
-
-```tsx
-// Regular signal - same value = NO trigger
-const count = signal(0);
-count.set(1); // triggers
-count.set(1); // NO trigger (same value)
-
-// Empty signal (notifier) - always triggers
-const notifier = signal<number>();
-notifier.set(1); // triggers
-notifier.set(1); // triggers again!
-```
-
-**Works great with `refreshOn`/`staleOn`:**
-
-```tsx
-const refreshTrigger = signal<void>();
-const invalidateCache = signal<void>();
-
-const userData = asyncSignal.pipe(
-  refreshOn(refreshTrigger), // Manual refresh
-  staleOn(invalidateCache) // Cache invalidation
-);
-
-// Trigger refresh
-refreshTrigger.set(undefined as void);
+// Dispatcher: verb name
+export const login = loginAction.dispatch;
+export const addToCart = cartAction.dispatch;
+
+// Result (if needed): Result postfix
+export const loginResult = loginAction.result;
+export const loginResultTask = loginAction.result.pipe(task(null));
 ```
 
 ---
 
 ## 🚨 Critical Rules
 
-### ✅ Always Do These
+### ✅ Always Do
 
 1. **Declare dependencies explicitly**
-
-```tsx
-// ✅ GOOD
-signal({ a, b }, ({ deps }) => deps.a + deps.b);
-
-// ❌ BAD - won't work!
-signal(() => a() + b());
-```
+   ```tsx
+   // ✅ GOOD
+   signal({ a, b }, ({ deps }) => deps.a + deps.b);
+   
+   // ❌ BAD - won't work!
+   signal(() => a() + b());
+   ```
 
 2. **Use `abortSignal` for queries**
+   ```tsx
+   signal({ searchTerm }, async ({ deps, abortSignal }) => {
+     return fetch(`/search?q=${deps.searchTerm}`, { signal: abortSignal });
+   });
+   ```
 
-```tsx
-// ✅ GOOD - Cancels previous request
-signal({ searchTerm }, async ({ deps, abortSignal }) => {
-  return fetch(`/search?q=${deps.searchTerm}`, { signal: abortSignal });
-});
-```
+3. **Use `useScope` for signals in components**
+   ```tsx
+   const { count } = useScope(() => ({ count: signal(0) }));
+   ```
 
-3. **Signals in `useScope`/`rx.use` are auto-disposed**
+4. **Use `.to()` for single transforms**
+   ```tsx
+   const doubled = count.to(x => x * 2);
+   ```
 
-```tsx
-// ✅ GOOD - Local mode (most common)
-useScope(() => {
-  const count = signal(0);
-  const doubled = count.to((x) => x * 2);
-  return { count, doubled };
-});
+5. **Use `Logic` postfix and `$` prefix**
+   ```tsx
+   export const authLogic = logic("authLogic", () => { ... });
+   const $auth = authLogic();
+   ```
 
-// ✅ Also GOOD - Add dispose() method for additional cleanup
-useScope(() => {
-  const count = signal(0);
-  const subscription = someService.subscribe();
-  return {
-    count,
-    dispose: () => subscription.unsubscribe(),
-  };
-});
-
-// ✅ Use disposable() to combine multiple cleanup logic
-useScope(() =>
-  disposable({
-    count: signal(0),
-    dispose: [sub1, sub2, () => clearInterval(timer)],
-  })
-);
-```
-
-4. **Use `.to()` for single-signal transforms**
-
-```tsx
-// ✅ GOOD - cleaner
-const doubled = count.to((x) => x * 2);
-
-// ✅ Also valid but verbose
-const doubled = signal({ count }, ({ deps }) => deps.count * 2);
-```
-
-5. **Use `Logic` postfix for logic names**
-
-```tsx
-// ✅ GOOD
-export const authLogic = logic("authLogic", () => { ... });
-
-// ❌ BAD
-export const auth = logic("auth", () => { ... });
-```
-
-6. **Use `$` prefix for logic instances**
-
-```tsx
-// ✅ GOOD
-const $auth = authLogic();
-const $cart = cartLogic();
-
-// ❌ BAD
-const auth = authLogic();
-const cart = cartLogic();
-```
-
-### ❌ Never Do These
+### ❌ Never Do
 
 1. **Never try auto-tracking**
-
-```tsx
-// ❌ Won't work
-const doubled = signal(() => count() * 2);
-```
+   ```tsx
+   // ❌ Won't work
+   const doubled = signal(() => count() * 2);
+   ```
 
 2. **Never pass Promises directly**
-
-```tsx
-// ❌ Wrong
-const data = signal(Promise.resolve(42));
-
-// ✅ Correct
-const data = signal(async () => 42);
-```
+   ```tsx
+   // ❌ Wrong
+   const data = signal(Promise.resolve(42));
+   
+   // ✅ Correct
+   const data = signal(async () => 42);
+   ```
 
 3. **Never use `abortSignal` for mutations**
-
-```tsx
-// ❌ Bad - mutations should complete
-signal({ payload }, async ({ deps, abortSignal }) => {
-  return fetch("/api", { method: "POST", signal: abortSignal });
-});
-
-// ✅ Good
-signal({ payload }, async ({ deps }) => {
-  return fetch("/api", { method: "POST" });
-});
-```
+   ```tsx
+   // ❌ Bad - mutations should complete
+   signal({ payload }, async ({ deps, abortSignal }) => {
+     return fetch("/api", { method: "POST", signal: abortSignal });
+   });
+   ```
 
 4. **Never create signals in render without useScope**
+   ```tsx
+   function Component() {
+     // ❌ Bad - memory leak
+     const count = signal(0);
+     
+     // ✅ Good
+     const { count } = useScope(() => ({ count: signal(0) }));
+   }
+   ```
+
+5. **Never use `rx()` in attributes**
+   ```tsx
+   // ❌ Bad
+   <input value={rx(signal)} />
+   
+   // ✅ Good
+   {rx(() => <input value={signal()} />)}
+   ```
+
+---
+
+## 🔧 Internal Architecture
+
+### Unified Hooks System (`src/hooks.ts`)
+
+The hooks system provides centralized integration for:
+- Render-time tracking (scoped via `withHooks`)
+- DevTools/monitoring (global via `setHooks`)
 
 ```tsx
-function Component() {
-  // ❌ Bad - memory leak
-  const count = signal(0);
+import { getHooks, setHooks, withHooks, resetHooks, emit } from "./hooks";
+```
 
-  // ✅ Good - signals are auto-disposed on unmount (local mode)
-  const { count } = useScope(() => ({ count: signal(0) }));
+#### Hooks Interface
+
+```tsx
+interface Hooks {
+  // Render-time tracking (scoped via withHooks)
+  onSignalAccess: (signal: AnySignal<any>) => void;
+  onTaskAccess: (task: Task<any>) => void;
+  
+  // Lifecycle monitoring (global via setHooks)
+  onSignalCreate?: (signal: AnySignal<any>, deps?: SignalMap, disposalHandled?: boolean) => void;
+  onSignalChange?: (signal: AnySignal<any>, value: unknown) => void;
+  onSignalError?: (signal: AnySignal<any>, error: unknown) => void;
+  onSignalDispose?: (signal: AnySignal<any>) => void;
+  onSignalRename?: (signal: AnySignal<any>) => void;
+  onForgetSignals?: (signals: AnySignal<any>[]) => void;
+  onTagCreate?: (tag: Tag<any, any>) => void;
+  onTagAdd?: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
+  onTagRemove?: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
+  
+  // Utility
+  hasDevTools: () => boolean;
 }
 ```
 
-5. **Never use `rx()` in attributes**
+#### Hook Functions
 
 ```tsx
-// ❌ Bad
-<input value={rx(signal)} />;
+// Get current hooks
+const hooks = getHooks();
 
-// ✅ Good
-{
-  rx(() => <input value={signal()} />);
-}
-{
-  rx("input", { value: signal });
-}
+// Set/merge global hooks
+setHooks({ onSignalCreate: (signal) => console.log(signal) });
+setHooks((current) => ({ ...current, onSignalChange: () => {} }));
+
+// Temporarily override hooks
+withHooks({ onSignalAccess: (s) => tracked.add(s) }, () => {
+  return renderFn();
+});
+
+// Reset to defaults
+resetHooks();
+```
+
+#### Emit Helpers
+
+```tsx
+emit.signalCreate(signal, deps);
+emit.signalChange(signal, value);
+emit.signalError(signal, error);
+emit.signalDispose(signal);
+emit.signalRename(signal);
+emit.tagCreate(tag);
+emit.tagAdd(tag, signal);
+emit.tagRemove(tag, signal);
+
+// For StrictMode orphan cleanup
+emit.forgetDisposedSignals(() => {
+  tryDispose(orphanedScope);
+});
+```
+
+#### Legacy Exports (Deprecated)
+
+```tsx
+// Use getHooks() instead
+getRenderHooks()
+
+// Use withHooks() instead
+withRenderHooks(hooks, fn)
+
+// Use setHooks() or resetHooks() instead
+setDevToolsHooks(hooks)
+
+// Use getHooks().hasDevTools() instead
+hasDevTools()
+```
+
+### Type Guards
+
+```tsx
+import { is } from "rextive";
+
+is(value)              // Any Signal
+is(value, "mutable")   // Mutable signal
+is(value, "computed")  // Computed signal
+is(value, "task")      // Task
+is(value, "tag")       // Tag
+is(value, "accessor")  // Accessor (function with on)
+is(value, "observable") // Observable (object with on)
 ```
 
 ---
 
 ## 📚 Complete API Reference
 
-### Signal Methods
-
-- `signal()` - Empty signal
-- `signal(value)` - With initial value
-- `signal(value, equals)` - With equality strategy
-- `signal(value, options)` - With full options
-- `signal(deps, compute)` - Computed signal
-- `signal(deps, compute, equals)` - Computed with equality
-- `signal(deps, compute, options)` - Computed with options
-- `.uid` - Unique ID (auto-generated, immutable) ⭐
-- `.displayName` - Debug name for devtools
-- `.set(value)` - Update (mutable only)
-- `.get()` or `()` - Read value (triggers tracking)
-- `.peek()` - Read value without tracking ⭐
-- `.on(listener)` - Subscribe
-- `.dispose()` - Cleanup
-- `.reset()` - Reset to initial (mutable only)
-- `.to(fn, equals?)` - Transform (creates computed) ⭐
-- `.pipe(...operators)` - Chain operators ⭐
-- `.refresh()` - Force recomputation ⭐
-- `.stale()` - Mark stale ⭐
-- `.error()` - Get error safely ⭐
-- `.tryGet()` - Get value safely ⭐
-- `.pause()` / `.resume()` / `.paused()` - Control (computed only)
-- `.when(notifier, action, filter?)` - React to other signals with action string ⭐
-- `.when(notifier, callback)` - React to other signals with action callback `(notifier, self) => void` ⭐
-- `.tuple` - Get `[signal, setter]` tuple for semantic naming
-
-### Static Methods
-
-- `signal.batch(fn)` - Batch updates
-- `signal.on(signals, callback)` - Subscribe to multiple
-- `signal.tag()` - Create tag for grouping
-- `signal.from(signals)` - Combine signals
-- `signal.trace(error)` - Error tracing ⭐
-
-### Wait Methods
-
-- `wait()` / `wait.all()` - Wait for all
-- `wait.any()` - First to resolve
-- `wait.race()` - First to settle
-- `wait.settled()` - All settled (never throws)
-- `wait.timeout()` - With timeout
-- `wait.delay()` - Simple delay
-
-### Task Methods
-
-- `task.from(promise)` - Get loading/error/success state from Promise
-- `task.loading()` - Create loading state
-- `task.success(value)` - Create success state
-- `task.error(error)` - Create error state
-
-### React Hooks
-
-- `rx()` - Reactive rendering (4 overloads)
-- `rx.use()` - Reactive hook ⭐
-- `useScope(factory, deps?, options?)` - Local mode (private per-component)
-- `useScope(key, factory, deps?, options?)` - Shared mode (keyed, shared across components)
-- `useStable<T>()` - Dynamic stable value getter for callbacks/objects ⭐
-- `provider()` - Signal context ⭐
-
-### Operators (`rextive/op`) ⭐
-
-- `to(fn, equals?)` - Transform
-- `filter(predicate)` - Filter
-- `scan(fn, initial)` - Accumulate
-- `focus(path, options?)` - Bidirectional lens (returns Mutable)
-- `focus(path, fallback, options?)` - With fallback (non-nullable)
-- `debounce(ms)` - Debounce
-- `throttle(ms)` - Throttle
-- `pace(ms)` - Rate limit
-- `task(initial, options?)` - Async state with stale-while-revalidate
-- `refreshOn(notifier, filter?)` - Trigger immediate recomputation
-- `staleOn(notifier, filter?)` - Mark for lazy recomputation
-- `resetOn(notifier, filter?)` - Reset mutable signal to initial value
-
-### Plugins (`rextive/plugins`) ⭐
-
-- `persistor(options)` - Auto-persistence
-
-### Type Guards
-
-- `is(value)` - Check if value is any Signal
-- `is(value, "mutable")` - Check if mutable signal
-- `is(value, "computed")` - Check if computed signal
-- `is(value, "task")` - Check if Task
-- `is(value, "tag")` - Check if Tag
-- `is(value, "accessor")` - Check if Accessor (function with on)
-- `is(value, "observable")` - Check if Observable (object with on)
-
-### Utilities
-
-- `disposable(obj)` - Create disposable ⭐
-- `awaited(...selectors)` - Transform async ⭐
-- `emitter()` - Event emitter
-
----
-
-## 🔧 Internal Architecture
-
-### Hooks System (`src/hooks.ts`)
-
-The hooks system provides centralized integration points for render tracking and devtools.
-
-#### Render Hooks (for `rx()` auto-tracking)
+### Core Exports (`rextive`)
 
 ```tsx
-import { RenderHooks, getRenderHooks, withRenderHooks } from "./hooks";
-
-// RenderHooks interface
-interface RenderHooks {
-  onSignalAccess: (signal: AnySignal<any>) => void;
-  onTaskAccess: (task: Task<any>) => void;
-}
-
-// Get current render hooks
-const hooks = getRenderHooks();
-
-// Execute with custom render hooks (used by rx())
-withRenderHooks(
-  {
-    onSignalAccess: (signal) => accessedSignals.add(signal),
-  },
-  () => {
-    return renderFn();
-  }
-);
+signal, $                    // Signal creation
+task                         // Task utilities
+wait, awaited                // Async utilities
+logic                        // Logic system
+emitter                      // Event emitter
+disposable, wrapDispose      // Disposal utilities
+is                           // Type guards
+compose, dev, producer       // Utilities
+validate                     // Validation helpers
 ```
 
-#### DevTools Hooks (for monitoring)
+### React Exports (`rextive/react`)
 
 ```tsx
-import { DevToolsHooks, setDevToolsHooks, hasDevTools, emit } from "./hooks";
-
-// DevToolsHooks interface
-interface DevToolsHooks {
-  onSignalCreate: (signal: SignalRef) => void;
-  onSignalChange: (signal: SignalRef, value: unknown) => void;
-  onSignalError: (signal: SignalRef, error: unknown) => void;
-  onSignalDispose: (signal: SignalRef) => void;
-  onSignalRename: (signal: SignalRef) => void;
-  onTagCreate: (tag: TagRef) => void;
-  onTagAdd: (tag: TagRef, signal: AnySignal<any>) => void;
-  onTagRemove: (tag: TagRef, signal: AnySignal<any>) => void;
-}
-
-// Register devtools hooks (called by enableDevTools)
-setDevToolsHooks({
-  onSignalCreate: (signal) => {
-    /* track */
-  },
-  onSignalChange: (signal, value) => {
-    /* log */
-  },
-});
-
-// Emit events from core code
-emit.signalCreate(signalRef);
-emit.signalChange(signalRef, newValue);
-emit.signalError(signalRef, error);
+// Re-exports all from rextive, plus:
+rx                           // Reactive rendering
+useScope                     // Scoped state
+useStable                    // Stable references
+provider                     // Context creation
 ```
 
-#### Migration from `contextDispatcher.ts`
+### Operator Exports (`rextive/op`)
 
-| Old (Removed)                     | New                           |
-| --------------------------------- | ----------------------------- |
-| `contextDispatcher.ts`            | `hooks.ts`                    |
-| `ContextDispatcher`               | `RenderHooks`                 |
-| `getCurrent()`                    | `getRenderHooks()`            |
-| `withDispatcher()`                | `withRenderHooks()`           |
-| `trackSignal()`                   | `onSignalAccess()`            |
-| `trackTask()`                     | `onTaskAccess()`              |
-| `globalThis.__REXTIVE_DEVTOOLS__` | `setDevToolsHooks()` + `emit` |
+```tsx
+// Transform
+to, filter, scan, focus, lens
 
----
+// Timing
+debounce, throttle, pace, delay
 
-## Summary
+// Flow control
+take, takeWhile, takeLast, takeUntil
+skip, skipWhile, skipLast, skipUntil
 
-**Core Principles:**
+// Math
+min, max, count, distinct
 
-1. ✅ **Explicit dependencies** - Always declare what signals depend on
-2. ✅ **Lazy tracking** - Only subscribe to what you access
-3. ✅ **Use `.to()` for single transforms** - Cleaner than computed signals
-4. ✅ **Use `disposable()` for cleanup** - Automatic disposal
-5. ✅ **Unified API** - One `signal()` function for everything
-6. ❌ **No auto-tracking** - Dependencies must be explicit
-7. ❌ **No magic** - Clear, predictable behavior
+// Reactive triggers
+refreshOn, staleOn, resetOn
 
-**Remember:**
+// Async
+task (operator version)
+```
 
-- Use `.to()` for single-signal transforms
-- Use `signal({ deps }, compute)` for multi-signal
-- Signals in `useScope()`/`rx.use()` are auto-disposed on unmount
-- Add `dispose()` method for single cleanup, use `disposable()` to combine multiple
-- Use `rx()` for reactive rendering
-- Use `wait()` for Suspense-based async handling
-- Use `task.from()` for manual loading states
-- Use `abortSignal` for queries, not mutations
-- Import from `rextive/react` in React apps
+### Plugin Exports
 
-**Naming Conventions:**
+```tsx
+// rextive/plugins
+persistor
 
-| Type               | Postfix      | Consumer Pattern                  | Example                        |
-| ------------------ | ------------ | --------------------------------- | ------------------------------ |
-| Primitive          | None         | `signal()`                        | `count`, `filter`, `isOpen`    |
-| Boolean            | `is` prefix  | `isOpen()`                        | `isLoading`, `hasError`        |
-| Async              | None         | `task.from(signal())` or `wait()` | `user`, `products`             |
-| Task               | `Task`       | `signal()` directly → `TaskState` | `userTask`, `productsTask`     |
-| Dispatcher         | Verb         | `login(payload)`                  | `login`, `logout`, `addToCart` |
-| Result (if needed) | `Result`     | `task.from(loginResult())`        | `loginResult`                  |
-| Result as Task     | `ResultTask` | `loginResultTask()`               | `loginResultTask`              |
-| Logic definition   | `Logic`      | -                                 | `authLogic`, `cartLogic`       |
-| Logic instance     | `$` prefix   | `$auth.user()`                    | `$auth`, `$cart`               |
+// rextive/immer
+produce
 
-**Logic Conventions:**
+// rextive/devtools
+enableDevTools, disableDevTools, DevToolsPanel
+getSignals, getTags, getStats, onDevToolsEvent
 
-- Always use `Logic` postfix: `authLogic`, `cartLogic`, `checkoutLogic`
-- Logic file names: `authLogic.ts`, `cartLogic.ts`
-- Use `$` prefix when consuming: `const $auth = authLogic()`
-- No `$` prefix when destructuring: `const { user, logout } = authLogic()`
-- Split complex logic by concern (e.g., `checkout/shippingLogic.ts`, `checkout/paymentLogic.ts`)
-- Follow Logic Structure: Dependencies → State → Side Effects → Methods → Return
+// rextive/test
+mockLogic
 
-**Testing Conventions:**
-
-- Use `mockLogic()` from `rextive/test` for React component testing
-- Use `logic.provide()` + `logic.create()` for logic unit tests
-- Always call `logic.clear()` or `$mock.clear()` in `afterEach`
-- Get dependencies at factory level, not inside methods
+// rextive/cache
+cache, staleOn, evictOn, lru
+```

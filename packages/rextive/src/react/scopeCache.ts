@@ -17,7 +17,7 @@ import { stableEquals } from "../utils/stableEquals";
  * ## Lifecycle
  *
  * 1. Entry is created with refs=0
- * 2. `disposeIfUnused()` schedules a microtask to check refs
+ * 2. `scheduleDisposal()` schedules a microtask to check refs
  * 3. `commit()` is called from useLayoutEffect, incrementing refs
  * 4. Microtask runs - if refs > 0, entry survives
  * 5. On unmount, `uncommit()` decrements refs and schedules disposal if refs=0
@@ -61,15 +61,16 @@ export class ScopeEntry {
    * - Runs AFTER useLayoutEffect (which is sync during commit)
    * - Allows commit() to be called before disposal check
    */
-  disposeIfUnused = () => {
+  scheduleDisposal = () => {
     Promise.resolve().then(this.tryDispose);
   };
 
   /**
    * Dispose if no active references.
-   * Called by microtask after disposeIfUnused().
+   * Called by microtask after scheduleDisposal().
    */
   tryDispose = () => {
+    // there are still refs, so we don't dispose
     if (this.refs) return;
     this.dispose();
   };
@@ -91,7 +92,7 @@ export class ScopeEntry {
     if (this.disposed) return;
     this.refs--;
     if (this.refs === 0) {
-      this.disposeIfUnused();
+      this.scheduleDisposal();
     }
   };
 
@@ -253,13 +254,13 @@ export class ScopeCache {
       // Store normalized args so subsequent stableEquals can update functions
       entry = new ScopeEntry(key, scope, normalizedArgs, () => {
         if (!entry) return;
-        onDispose.emitAndClear();
         if (this.scopes.get(key) === entry) {
           this.scopes.delete(key);
           entry = undefined;
         }
+        onDispose.emitAndClear();
       });
-      entry.disposeIfUnused();
+      entry.scheduleDisposal();
       this.scopes.set(key, entry);
     }
 

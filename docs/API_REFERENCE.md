@@ -1,17 +1,38 @@
 # API Reference
 
-Complete API documentation for Rextive.
+Complete API documentation for Rextive, organized by package exports.
 
 ---
 
-## `signal()`
+## Table of Contents
+
+- [Core (`rextive`)](#core-rextive)
+- [React (`rextive/react`)](#react-rextivereact)
+- [Operators (`rextive/op`)](#operators-rextiveop)
+- [Cache (`rextive/cache`)](#cache-rextivecache)
+- [Plugins (`rextive/plugins`)](#plugins-rextiveplugins)
+- [Immer (`rextive/immer`)](#immer-rextiveimmer)
+- [DevTools (`rextive/devtools`)](#devtools-rextivedevtools)
+- [Test (`rextive/test`)](#test-rextivetest)
+
+---
+
+## Core (`rextive`)
+
+The core package provides the fundamental reactive primitives.
+
+```ts
+import { signal, is, task, wait, logic, disposable, emitter } from "rextive";
+```
+
+### `signal()`
 
 The core primitive for creating reactive state.
 
-### Mutable Signals
+#### Mutable Signals
 
 ```tsx
-// Empty signal (undefined)
+// Empty signal (undefined initial value, notifier pattern)
 const user = signal<User>();
 
 // With initial value
@@ -33,7 +54,7 @@ const config = signal(initialValue, {
 });
 ```
 
-### Computed Signals
+#### Computed Signals
 
 ```tsx
 // Basic computed
@@ -53,35 +74,40 @@ const userData = signal({ userId }, async ({ deps, abortSignal }) => {
 });
 ```
 
-### Equality Options
+#### Equality Options
 
-| Option | Description | Use For |
-|--------|-------------|---------|
-| `"strict"` (default) | Reference equality (`Object.is`) | Primitives |
-| `"shallow"` | One level deep comparison | Simple objects |
-| `"deep"` | Recursive comparison | Nested objects |
-| Custom function | `(a, b) => boolean` | Custom logic |
+| Option               | Description                      | Use For        |
+| -------------------- | -------------------------------- | -------------- |
+| `"strict"` (default) | Reference equality (`Object.is`) | Primitives     |
+| `"shallow"`          | One level deep comparison        | Simple objects |
+| `"deep"`             | Recursive comparison             | Nested objects |
+| Custom function      | `(a, b) => boolean`              | Custom logic   |
 
 ---
 
-## Signal Instance Methods
+### Signal Instance Properties
 
-### `.uid`
+#### `.uid`
 
-Every signal has a unique, auto-generated, immutable identifier:
+Auto-generated, immutable unique identifier:
 
 ```tsx
 const count = signal(0);
 console.log(count.uid); // "sig-1"
 
-const doubled = signal({ count }, ({ deps }) => deps.count * 2);
-console.log(doubled.uid); // "sig-2"
-
 // Perfect for React keys
-signals.map(s => <div key={s.uid}>{s.displayName}</div>)
+signals.map((s) => <div key={s.uid}>{s.displayName}</div>);
 ```
 
-### `.get()` / `signal()`
+#### `.displayName`
+
+Debug name for devtools (auto-generated or user-provided via `name` option).
+
+---
+
+### Signal Instance Methods
+
+#### `.get()` / `signal()`
 
 Read the current value (triggers reactive tracking):
 
@@ -90,7 +116,7 @@ const value = count.get();
 const value = count(); // Shorthand
 ```
 
-### `.peek()`
+#### `.peek()`
 
 Read the current value **without** triggering reactive tracking:
 
@@ -98,26 +124,9 @@ Read the current value **without** triggering reactive tracking:
 const value = count.peek();
 ```
 
-Use `peek()` when you need to read a value but don't want to create a reactive dependency - for example, in event handlers, logging, or when accessing values inside a computed signal that shouldn't trigger recomputation when that value changes.
+Use `peek()` when you need to read a value but don't want to create a reactive dependency.
 
-```tsx
-// In a tracking context, peek() won't create dependencies
-rx(() => {
-  // This WILL create a dependency (triggers re-render when count changes)
-  console.log("Count:", count());
-  
-  // This WON'T create a dependency (no re-render when user changes)
-  console.log("User (peeked):", user.peek());
-});
-
-// Useful in event handlers to avoid unexpected re-renders
-const handleClick = () => {
-  const currentCount = count.peek(); // Read without tracking
-  console.log("Current count:", currentCount);
-};
-```
-
-### `.set(value)` / `.set(fn)`
+#### `.set(value)` / `.set(fn)`
 
 Update value (mutable signals only):
 
@@ -126,7 +135,7 @@ count.set(5);
 count.set((prev) => prev + 1);
 ```
 
-### `.reset()`
+#### `.reset()`
 
 Reset to initial value (mutable signals only):
 
@@ -134,7 +143,7 @@ Reset to initial value (mutable signals only):
 count.reset();
 ```
 
-### `.on(callback)`
+#### `.on(callback)`
 
 Subscribe to changes:
 
@@ -147,16 +156,16 @@ const unsubscribe = count.on(() => {
 unsubscribe();
 ```
 
-### `.to(selector, equals?)`
+#### `.to(selector, options?)`
 
-Transform signal value:
+Transform signal value (creates computed signal):
 
 ```tsx
 const doubled = count.to((x) => x * 2);
 const userName = user.to((u) => u.name, "shallow");
 ```
 
-### `.pipe(...operators)`
+#### `.pipe(...operators)`
 
 Chain operators:
 
@@ -170,7 +179,7 @@ const result = count.pipe(
 );
 ```
 
-### `.refresh()`
+#### `.refresh()`
 
 Force immediate recomputation:
 
@@ -178,7 +187,7 @@ Force immediate recomputation:
 userData.refresh();
 ```
 
-### `.stale()`
+#### `.stale()`
 
 Mark for lazy recomputation:
 
@@ -186,17 +195,44 @@ Mark for lazy recomputation:
 userData.stale(); // Will recompute on next access
 ```
 
-### `.pause()` / `.resume()` / `.paused()`
+#### `.when(notifier, action, filter?)`
+
+React to changes in other signals:
+
+```tsx
+// With action string
+userData.when(refreshTrigger, "refresh");
+userData.when(resetTrigger, "reset");
+userData.when(invalidateTrigger, "stale");
+
+// With filter
+userData.when(trigger, "refresh", (notifier, self) => notifier() > 5);
+
+// With callback
+counter.when(increment, (notifier, self) => {
+  self.set((prev) => prev + notifier());
+});
+```
+
+#### `.tuple`
+
+Get `[signal, setter]` tuple (mutable signals only):
+
+```tsx
+const [count, setCount] = signal(0).tuple;
+```
+
+#### `.pause()` / `.resume()` / `.paused()`
 
 Control computed signals:
 
 ```tsx
-computed.pause();    // Stop recomputing
-computed.resume();   // Resume
-computed.paused();   // Check status
+computed.pause(); // Stop recomputing
+computed.resume(); // Resume
+computed.paused(); // Check status
 ```
 
-### `.dispose()`
+#### `.dispose()`
 
 Cleanup signal:
 
@@ -204,52 +240,67 @@ Cleanup signal:
 signal.dispose();
 ```
 
-### `.error()` / `.tryGet()`
+#### `.disposed()`
+
+Check if signal has been disposed:
+
+```tsx
+if (signal.disposed()) {
+  console.log("Signal is disposed");
+}
+```
+
+#### `.error()` / `.tryGet()`
 
 Safe error access:
 
 ```tsx
-const error = signal.error();    // Get error without throwing
-const value = signal.tryGet();   // Get value or undefined
+const error = signal.error(); // Get error without throwing
+const value = signal.tryGet(); // Get value or undefined
+```
+
+#### `.hydrate(value)`
+
+Hydrate with initial data (e.g., from SSR):
+
+```tsx
+const status = signal.hydrate(serverData); // "success" | "skipped"
 ```
 
 ---
 
-## Compute Function Context
+### Compute Function Context
 
 For computed signals, the compute function receives a context object:
 
-### Properties
-
 ```tsx
 signal({ userId, filter }, (context) => {
-  context.deps        // Dependency values
-  context.abortSignal // AbortSignal for cancellation
+  context.deps; // Dependency values
+  context.abortSignal; // AbortSignal for cancellation
+  context.nth; // Computation count (0, 1, 2, ...)
+  context.aborted(); // Check if aborted
 });
 ```
 
-### Methods
+#### Context Methods
 
 ```tsx
 signal(async (context) => {
   // Safe execution (throws if aborted)
   const data = context.safe(() => processData());
-  
+
   // Safe promise (never resolves if aborted)
   await context.safe(wait.delay(300));
-  
+
   // Register cleanup
   context.onCleanup(() => cleanup());
-  
-  // Check if aborted
-  if (context.aborted()) return null;
-  
+
   // Reuse logic with context
   const result = await context.use(fetchUser, options);
-  
+
   // Trigger recomputation (polling)
   setTimeout(() => context.refresh(), 1000);
-  
+
   // Mark stale (TTL cache)
   setTimeout(() => context.stale(), 5 * 60 * 1000);
 });
@@ -257,9 +308,9 @@ signal(async (context) => {
 
 ---
 
-## Static Methods
+### Static Methods
 
-### `signal.batch(fn)`
+#### `signal.batch(fn)`
 
 Batch multiple updates:
 
@@ -272,7 +323,7 @@ signal.batch(() => {
 // Only ONE notification
 ```
 
-### `signal.on(signals, callback)`
+#### `signal.on(signals, callback)`
 
 Subscribe to multiple signals:
 
@@ -281,14 +332,14 @@ const control = signal.on([count, name], (trigger) => {
   console.log("Changed:", trigger());
 });
 
-control.pause();   // Pause
-control.resume();  // Resume
+control.pause(); // Pause
+control.resume(); // Resume
 control.dispose(); // Cleanup
 ```
 
-### `signal.tag()`
+#### `signal.tag()`
 
-Create a tag for grouping:
+Create a tag for grouping signals:
 
 ```tsx
 const formTag = signal.tag();
@@ -297,38 +348,17 @@ const name = signal("", { use: [formTag] });
 const email = signal("", { use: [formTag] });
 
 formTag.forEach((s) => s.reset()); // Reset all
-formTag.map((s) => s.get());       // Collect values
-formTag.size;                       // Count
+formTag.map((s) => s.get()); // Collect values
+formTag.size; // Count
+
+// Batch operations
+formTag.refreshAll(); // Force recomputation on all
+formTag.resetAll(); // Reset all mutable signals
+formTag.staleAll(); // Mark all computed as stale
+formTag.disposeAll(); // Dispose all (destructive!)
 ```
 
-#### Tag Batch Methods
-
-Perform operations on all signals in a tag:
-
-```tsx
-const dataTag = signal.tag();
-
-// Force recomputation on all signals
-dataTag.refreshAll();
-
-// Reset all mutable signals to initial values
-dataTag.resetAll();
-
-// Mark all computed signals as stale (lazy recompute)
-dataTag.staleAll();
-
-// Dispose all signals (destructive!)
-dataTag.disposeAll();
-```
-
-| Method | Description | Affects |
-|--------|-------------|---------|
-| `refreshAll()` | Force immediate recomputation | All signals |
-| `resetAll()` | Reset to initial values | Mutable signals only |
-| `staleAll()` | Mark for lazy recompute | Computed signals only |
-| `disposeAll()` | Dispose all signals | All signals |
-
-### `signal.from(signals)`
+#### `signal.from(signals)`
 
 Combine signals:
 
@@ -342,7 +372,23 @@ const coords = signal.from([x, y]);
 console.log(coords()); // [10, 20]
 ```
 
-### `signal.trace(error)`
+#### `signal.action(compute, options?)`
+
+Create an action (async operation with result signal):
+
+```tsx
+const loginAction = signal.action<Credentials, User>(async (creds) => {
+  return authApi.login(creds);
+});
+
+// Dispatch and await result
+const user = await loginAction.dispatch(credentials);
+
+// Or access result signal reactively
+const state = task.from(loginAction.result());
+```
+
+#### `signal.trace(error)`
 
 Get error trace through signal chain:
 
@@ -351,139 +397,86 @@ try {
   dashboard();
 } catch (error) {
   const traces = signal.trace(error);
-  // [{ signal: "db", when: "compute:initial" }, ...]
+  // [{ signal: "db", when: "compute:initial", async: true }, ...]
 }
 ```
 
+#### `signal.use(signals, ...plugins)`
+
+Apply plugins to multiple signals:
+
+```tsx
+signal.use({ count, name }, logger, persist);
+```
+
+---
+
 ### `is(value, kind?)`
 
-Unified type guard for signals, tasks, tags, accessors, and observables:
+Unified type guard:
 
 ```tsx
 import { is } from "rextive";
 
-is(maybeSignal);           // Is any signal?
-is(sig, "mutable");        // Is mutable signal?
-is(sig, "computed");       // Is computed signal?
-is(value, "task");         // Is a Task?
-is(value, "tag");          // Is a Tag?
-is(value, "accessor");     // Is an Accessor (function with on)?
-is(value, "observable");   // Is an Observable (object with on)?
+is(maybeSignal); // Is any signal?
+is(sig, "mutable"); // Is mutable signal?
+is(sig, "computed"); // Is computed signal?
+is(value, "task"); // Is a Task?
+is(value, "tag"); // Is a Tag?
+is(value, "accessor"); // Is an Accessor?
+is(value, "observable"); // Is an Observable?
 ```
 
 ---
 
-## React Integration
+### `task`
 
-### `rx()`
+Async state utilities.
 
-Reactive rendering:
+#### `task.from(promise)`
+
+Access loading/error/success state from a Promise:
 
 ```tsx
-// Single signal
-{rx(count)}
+const state = task.from(promise);
 
-// With selector
-{rx(user, "name")}
-{rx(user, u => u.name)}
-
-// Reactive function
-{rx(() => <div>{count()}</div>)}
-
-// Component form
-{rx(Component, { prop: signal })}
-{rx("div", { children: count })}
+state.status; // "loading" | "success" | "error"
+state.loading; // boolean
+state.value; // resolved value
+state.error; // error if rejected
 ```
 
-### `useScope()`
+#### `task.loading(promise)`
 
-Component-scoped signals with automatic lifecycle management.
+Create a loading task:
 
 ```tsx
-useScope(key, factory);
-useScope(key, factory, options);
-useScope(key, factory, args);
-useScope(key, factory, args, options);
+const t = task.loading(fetchData());
 ```
 
-**Basic usage:**
+#### `task.success(value)`
+
+Create a success task:
 
 ```tsx
-// Create scoped signals (auto-disposed on unmount)
-const { count, increment } = useScope("counter", () => {
-  const count = signal(0);
-  return {
-    count,
-    increment: () => count.set((c) => c + 1),
-  };
-});
+const t = task.success({ id: 1, name: "Alice" });
 ```
 
-**With args (recreates when args change):**
+#### `task.error(error)`
+
+Create an error task:
 
 ```tsx
-const scope = useScope("userProfile", (id) => {
-  const user = signal(async () => fetchUser(id));
-  return { user };
-}, [userId]);
-```
-
-**Multiple instances (user-controlled key):**
-
-```tsx
-// Each tab gets its own scope
-const scope = useScope(`tab:${tabId}`, () => {
-  const content = signal("");
-  return { content };
-});
-```
-
-**Custom equality for args:**
-
-```tsx
-useScope("data", factory, [filters], "shallow");
-useScope("data", factory, [filters], (a, b) => a.id === b.id);
-```
-
-**With Logic:**
-
-```tsx
-const { count, increment } = useScope("counter", counterLogic);
-```
-
-### `provider()`
-
-React context with three modes:
-
-```tsx
-// Signal mode (default) - wraps value in signal
-const [useTheme, ThemeProvider] = provider<"dark" | "light">({ name: "Theme" });
-
-// Raw mode - pass value directly (for logic instances)
-const [useStore, StoreProvider] = provider<StoreType>({ name: "Store", raw: true });
-
-// Factory mode - custom initialization
-const [useAuth, AuthProvider] = provider({
-  name: "Auth",
-  create: (user) => ({ user: signal(user) }),
-});
-```
-
-**Usage:**
-
-```tsx
-// Provide
-<ThemeProvider value="dark">{children}</ThemeProvider>
-
-// Consume
-const theme = useTheme();  // Mutable<"dark" | "light">
+const t = task.error(new Error("Not found"));
 ```
 
 ---
 
-## Async Utilities
+### `wait`
 
-### `wait()` / `wait.all()`
+Async coordination utilities.
+
+#### `wait()` / `wait.all()`
 
 Wait for all promises:
 
@@ -498,7 +491,7 @@ await wait(promise, (value) => processValue(value));
 await wait([p1, p2], (a, b) => combine(a, b));
 ```
 
-### `wait.any()`
+#### `wait.any()`
 
 First to resolve:
 
@@ -506,7 +499,7 @@ First to resolve:
 const [value, key] = wait.any({ fast, slow });
 ```
 
-### `wait.race()`
+#### `wait.race()`
 
 First to settle:
 
@@ -514,15 +507,16 @@ First to settle:
 const [value, key] = wait.race({ p1, p2 });
 ```
 
-### `wait.settled()`
+#### `wait.settled()`
 
 All settled (never throws):
 
 ```tsx
 const results = wait.settled([p1, p2, p3]);
+// [{ status: "fulfilled", value }, { status: "rejected", reason }, ...]
 ```
 
-### `wait.timeout()`
+#### `wait.timeout()`
 
 With timeout:
 
@@ -530,7 +524,7 @@ With timeout:
 const data = await wait.timeout(fetchData(), 5000);
 ```
 
-### `wait.delay()`
+#### `wait.delay()`
 
 Simple delay:
 
@@ -538,93 +532,85 @@ Simple delay:
 await wait.delay(1000);
 ```
 
-### `task.from()`
+---
 
-Access loading/error/success state from a Promise:
+### `logic()`
+
+Create reusable logic units:
 
 ```tsx
-const state = task.from(promise);
+export const counterLogic = logic("counterLogic", () => {
+  const count = signal(0);
+  const doubled = count.to((x) => x * 2);
 
-state.status;   // "loading" | "success" | "error"
-state.loading;  // boolean
-state.value;    // resolved value
-state.error;    // error if rejected
+  return {
+    count,
+    doubled,
+    increment: () => count.set((x) => x + 1),
+    decrement: () => count.set((x) => x - 1),
+  };
+});
+
+// Singleton access
+const { count, increment } = counterLogic();
+
+// Fresh instance
+const instance = counterLogic.create();
+instance.dispose(); // Cleanup
+```
+
+#### `logic.provide()`
+
+Override logic for testing:
+
+```tsx
+logic.provide(authLogic, () => ({
+  user: signal(mockUser),
+  logout: vi.fn(),
+}));
+```
+
+#### `logic.abstract()`
+
+Create abstract logic (must be overridden):
+
+```tsx
+const storageProvider = logic.abstract<{
+  get: (key: string) => Promise<string | null>;
+  set: (key: string, value: string) => Promise<void>;
+}>("storageProvider");
+
+// Provide implementation
+logic.provide(storageProvider, () => ({
+  get: async (key) => localStorage.getItem(key),
+  set: async (key, value) => localStorage.setItem(key, value),
+}));
+```
+
+#### `logic.clear()`
+
+Clear all overrides and dispose tracked instances:
+
+```tsx
+afterEach(() => logic.clear());
 ```
 
 ---
 
-## Type Utilities
-
-### `AnySignal<T>`
-
-Union of mutable and computed signals:
-
-```tsx
-function watchSignal<T>(s: AnySignal<T>) {
-  s.on(() => console.log(s()));
-}
-```
-
-### `Mutable<T>`
-
-Mutable signal type:
-
-```tsx
-const count: Mutable<number> = signal(0);
-```
-
-### `Computed<T>`
-
-Computed signal type:
-
-```tsx
-const doubled: Computed<number> = signal({ count }, ...);
-```
-
----
-
-## Utilities
-
-### `disposable(obj)`
+### `disposable()`
 
 Create disposable from object:
 
 ```tsx
 const scope = disposable({
   count: signal(0),
-  doubled: count.to(x => x * 2),
+  doubled: count.to((x) => x * 2),
 });
-// Automatically adds dispose array
+
+scope.dispose(); // Disposes all signals
 ```
 
-### `awaited(...selectors)`
-
-Transform async values:
-
-```tsx
-const titles = todoList.to(
-  awaited(
-    (todos) => todos.filter(t => !t.done),
-    (todos) => todos.map(t => t.title)
-  )
-);
-```
-
-### `compose(...fns)`
-
-Function composition (right to left):
-
-```tsx
-const pipeline = compose(format, double, add);
-```
-
-### `pipe(initial, ...fns)`
-
-Pipeline (left to right):
-
-```tsx
-const result = pipe(5, add1, multiply2, toString);
-```
+---
 
 ### `emitter()`
 
@@ -639,10 +625,728 @@ events.dispose();
 
 ---
 
+### Other Utilities
+
+```tsx
+// Utilities
+import {
+  compose, // Function composition (right to left)
+  isPromiseLike, // Check if value is promise-like
+  shallowEquals, // Shallow equality comparison
+  resolveEquals, // Resolve equality strategy
+  createProxy, // Create reactive proxy
+  producer, // Lazy factory manager
+  dev, // Check if in dev mode
+  awaited, // Transform async values
+  validate, // Validation utilities
+} from "rextive";
+
+// Errors
+import {
+  AbortedComputationError,
+  FallbackError,
+  SignalDisposedError,
+} from "rextive";
+```
+
+---
+
+## React (`rextive/react`)
+
+React bindings for Rextive. Re-exports all core exports for convenience.
+
+```tsx
+import { signal, rx, useScope, useStable, provider } from "rextive/react";
+```
+
+### `rx()`
+
+Reactive rendering with four overloads:
+
+```tsx
+// 1. Single signal
+{
+  rx(count);
+}
+
+// 2. With selector (property or function)
+{
+  rx(user, "name");
+}
+{
+  rx(user, (u) => u.name);
+}
+
+// 3. Reactive function (auto-tracking)
+{
+  rx(() => <div>{count()}</div>);
+}
+
+// 4. Component form
+{
+  rx(Component, { prop: signal });
+}
+{
+  rx("div", { children: count });
+}
+```
+
+#### `rx.use()`
+
+Reactive hook with auto-dispose:
+
+```tsx
+function Component() {
+  const value = rx.use(() => {
+    const userData = wait(user());
+    return { userData };
+  });
+
+  return <div>{value.userData.name}</div>;
+}
+```
+
+---
+
+### `useScope()`
+
+Component-scoped signals with automatic lifecycle management.
+
+#### Local Mode (private per-component)
+
+```tsx
+// Basic - no deps
+const { count } = useScope(() => ({ count: signal(0) }));
+
+// With deps - passed to factory
+const { user } = useScope(
+  (id) => ({
+    user: signal(async () => fetchUser(id)),
+  }),
+  [userId]
+);
+
+// With Logic
+const { count, increment } = useScope(counterLogic);
+```
+
+#### Shared Mode (keyed, shared across components)
+
+```tsx
+// Multiple components share this scope
+const { input } = useScope("searchBar", searchBarLogic);
+
+// Dynamic keys for multiple instances
+const { content } = useScope(`tab:${tabId}`, tabLogic);
+```
+
+#### Custom Equality for Deps
+
+```tsx
+useScope((filters) => ({ ... }), [filters], "shallow");
+useScope((obj) => ({ ... }), [obj], (a, b) => a.id === b.id);
+```
+
+---
+
+### `useStable()`
+
+Dynamic stable getter for callbacks and objects:
+
+```tsx
+const stable = useStable<{
+  onClick: () => void;
+  config: { theme: string };
+}>();
+
+// Single key-value
+const onClick = stable("onClick", () => handleClick());
+const config = stable("config", { theme: "dark" }, "shallow");
+
+// Multiple values
+const handlers = stable({
+  onSubmit: () => submitForm(),
+  onCancel: () => cancelForm(),
+});
+```
+
+---
+
+### `provider()`
+
+React context with three modes:
+
+#### Signal Mode (default)
+
+```tsx
+const [useTheme, ThemeProvider] = provider<"dark" | "light">({ name: "Theme" });
+
+<ThemeProvider value="dark">{children}</ThemeProvider>;
+
+const theme = useTheme(); // Mutable<"dark" | "light">
+```
+
+#### Raw Mode
+
+```tsx
+const [useStore, StoreProvider] = provider<StoreType>({
+  name: "Store",
+  raw: true,
+});
+
+<StoreProvider value={storeInstance}>{children}</StoreProvider>;
+
+const $store = useStore(); // StoreType directly
+```
+
+#### Factory Mode
+
+```tsx
+const [useAuth, AuthProvider] = provider<AuthContext, User>({
+  name: "Auth",
+  create: (user) => ({ user: signal(user), logout: () => {} }),
+  update: (ctx, value) => ctx.user.set(value),
+});
+```
+
+---
+
+## Operators (`rextive/op`)
+
+Signal operators for transforming and combining signals.
+
+```tsx
+import {
+  to,
+  filter,
+  scan,
+  focus,
+  lens,
+  debounce,
+  throttle,
+  delay,
+  pace,
+  take,
+  takeWhile,
+  takeLast,
+  takeUntil,
+  skip,
+  skipWhile,
+  skipLast,
+  skipUntil,
+  min,
+  max,
+  count,
+  distinct,
+  refreshOn,
+  staleOn,
+  resetOn,
+} from "rextive/op";
+```
+
+### Transform Operators
+
+#### `to(selector, options?)`
+
+Transform values:
+
+```tsx
+const doubled = count.pipe(to((x) => x * 2));
+```
+
+#### `filter(predicate)`
+
+Filter values:
+
+```tsx
+const positive = count.pipe(filter((x) => x > 0));
+```
+
+#### `scan(fn, initial)`
+
+Accumulate values:
+
+```tsx
+const total = count.pipe(scan((acc, x) => acc + x, 0));
+```
+
+#### `focus(path, fallback?, options?)`
+
+Bidirectional lens for nested properties:
+
+```tsx
+const form = signal({ user: { name: "Alice" } });
+const userName = form.pipe(focus("user.name"));
+
+userName(); // "Alice"
+userName.set("Bob"); // Updates source immutably
+
+// With fallback for optional properties
+const nickname = user.pipe(focus("nickname", () => "Guest"));
+```
+
+#### `lens(source, path)`
+
+Lightweight lens (no signal created):
+
+```tsx
+const [getName, setName] = lens(form, "user.name");
+```
+
+---
+
+### Timing Operators
+
+#### `debounce(ms)`
+
+```tsx
+const debouncedSearch = searchInput.pipe(debounce(300));
+```
+
+#### `throttle(ms)`
+
+```tsx
+const throttledPosition = mousePos.pipe(throttle(100));
+```
+
+#### `pace(ms)`
+
+Rate limit updates:
+
+```tsx
+const pacedData = fastData.pipe(pace(1000));
+```
+
+#### `delay(ms)`
+
+Delay updates:
+
+```tsx
+const delayed = source.pipe(delay(500));
+```
+
+---
+
+### Sequence Operators
+
+#### Take Operators
+
+```tsx
+take(5); // First 5 values
+takeWhile((x) => x < 10); // While condition true
+takeLast(3); // Last 3 values
+takeUntil(stopSignal); // Until signal emits
+```
+
+#### Skip Operators
+
+```tsx
+skip(5); // Skip first 5
+skipWhile((x) => x < 10); // Skip while condition true
+skipLast(3); // Skip last 3
+skipUntil(startSignal); // Skip until signal emits
+```
+
+---
+
+### Aggregation Operators
+
+```tsx
+min(); // Minimum value
+max(); // Maximum value
+count(); // Count emissions
+distinct(); // Remove duplicates
+```
+
+---
+
+### Reactive Trigger Operators
+
+#### `refreshOn(notifier, filter?)`
+
+Trigger immediate recomputation:
+
+```tsx
+const userData = asyncSignal.pipe(refreshOn(refreshTrigger));
+```
+
+#### `staleOn(notifier, filter?)`
+
+Mark for lazy recomputation:
+
+```tsx
+const userData = asyncSignal.pipe(staleOn(invalidateCache));
+```
+
+#### `resetOn(notifier, filter?)`
+
+Reset mutable signal to initial value:
+
+```tsx
+const formData = signal({ name: "" }).pipe(resetOn(clearTrigger));
+```
+
+---
+
+## Cache (`rextive/cache`)
+
+Data caching with strategies.
+
+```tsx
+import {
+  cache,
+  lru,
+  staleOn,
+  evictOn,
+  hydrate,
+  ObjectKeyedMap,
+} from "rextive/cache";
+```
+
+### `cache(name, factory, options?)`
+
+Create cached data fetcher:
+
+```tsx
+const getUser = cache(
+  "users",
+  async (userId: string) => {
+    const res = await fetch(`/api/users/${userId}`);
+    return res.json();
+  },
+  {
+    strategy: [lru(100), staleOn({ maxAge: 60_000 })],
+  }
+);
+
+// Access cached data
+const { value, unref } = getUser("123");
+const user = await value;
+unref(); // Release reference
+
+// Cache operations
+getUser.stale("123"); // Mark stale
+getUser.refresh("123"); // Force re-fetch
+getUser.delete("123"); // Remove
+getUser.clear(); // Clear all
+```
+
+### Strategies
+
+```tsx
+lru(maxSize); // LRU eviction
+staleOn({ maxAge }); // Mark stale after time
+evictOn({ maxAge }); // Evict after time
+hydrate(loadFn); // Hydrate from storage
+```
+
+### `ObjectKeyedMap`
+
+Map with object keys:
+
+```tsx
+const map = new ObjectKeyedMap<{ id: number }, string>();
+map.set({ id: 1 }, "value");
+map.get({ id: 1 }); // "value"
+```
+
+---
+
+## Plugins (`rextive/plugins`)
+
+Signal plugins for extended behavior.
+
+```tsx
+import { persistor } from "rextive/plugins";
+```
+
+### `persistor(options)`
+
+Auto-persistence plugin:
+
+```tsx
+const persist = persistor<{ theme: string; fontSize: number }>({
+  load: () => JSON.parse(localStorage.getItem("settings") || "{}"),
+  save: (args) => {
+    const existing = JSON.parse(localStorage.getItem("settings") || "{}");
+    localStorage.setItem(
+      "settings",
+      JSON.stringify({ ...existing, ...args.values })
+    );
+  },
+});
+
+const theme = signal("dark", { use: [persist("theme")] });
+```
+
+---
+
+## Immer (`rextive/immer`)
+
+Immer integration for immutable updates.
+
+```tsx
+import { produce } from "rextive/immer";
+```
+
+### `produce(recipe)`
+
+Write mutations that are actually immutable:
+
+```tsx
+const state = signal({ count: 0, user: { name: "John" } });
+
+state.set(
+  produce((draft) => {
+    draft.count++;
+    draft.user.name = "Jane";
+  })
+);
+```
+
+---
+
+## DevTools (`rextive/devtools`)
+
+Debug and inspect signals.
+
+```tsx
+import {
+  enableDevTools,
+  disableDevTools,
+  isDevToolsEnabled,
+  getSignals,
+  getSignal,
+  getTags,
+  getTag,
+  getStats,
+  getSnapshot,
+  onDevToolsEvent,
+  enableChainTracking,
+  disableChainTracking,
+  getChains,
+  clearChains,
+} from "rextive/devtools";
+```
+
+### Setup
+
+```tsx
+// Enable devtools (call before creating signals)
+enableDevTools({
+  maxHistory: 100,
+  name: "my-app",
+  logToConsole: true,
+});
+
+// Check status
+isDevToolsEnabled(); // true
+
+// Disable
+disableDevTools();
+```
+
+### Inspection
+
+```tsx
+// Get all signals
+const signals = getSignals(); // Map<string, SignalInfo>
+
+// Get specific signal
+const info = getSignal("counter");
+
+// Get all tags
+const tags = getTags();
+
+// Get statistics
+const stats = getStats();
+// { signalCount, mutableCount, computedCount, tagCount, totalChanges, ... }
+
+// Get snapshot of all values
+const snapshot = getSnapshot();
+// { counter: 5, userName: "Alice", ... }
+```
+
+### Event Subscription
+
+```tsx
+const unsubscribe = onDevToolsEvent((event) => {
+  switch (event.type) {
+    case "signal:create":
+      console.log("Created:", event.signal.id);
+      break;
+    case "signal:change":
+      console.log("Changed:", event.signalId, "→", event.value);
+      break;
+    case "signal:error":
+      console.error("Error:", event.signalId, event.error);
+      break;
+  }
+});
+```
+
+### Chain Tracking
+
+```tsx
+// Enable chain tracking (for Chains tab)
+enableChainTracking();
+
+// Get chain reactions
+const chains = getChains();
+
+// Clear chains
+clearChains();
+
+// Disable
+disableChainTracking();
+```
+
+### DevTools Panel
+
+```tsx
+import { DevToolsPanel } from "rextive/devtools-panel";
+
+function App() {
+  return (
+    <div>
+      <YourApp />
+      {process.env.NODE_ENV === "development" && <DevToolsPanel />}
+    </div>
+  );
+}
+```
+
+---
+
+## Test (`rextive/test`)
+
+Testing utilities for Rextive.
+
+```tsx
+import { mockLogic } from "rextive/test";
+```
+
+### `mockLogic(logic)`
+
+Create mock for logic testing:
+
+```tsx
+import { mockLogic } from "rextive/test";
+import { signal } from "rextive";
+import { vi } from "vitest";
+
+const $auth = mockLogic(authLogic);
+
+beforeEach(() => {
+  $auth.default({
+    user: signal(null),
+    isRestoring: signal(false),
+    logout: vi.fn(),
+    openLoginModal: vi.fn(),
+  });
+});
+
+afterEach(() => $auth.clear());
+
+it("should show Sign In when not authenticated", () => {
+  $auth.provide({ user: signal(null) });
+  render(<UserMenu />);
+  expect(screen.getByText("Sign In")).toBeInTheDocument();
+});
+
+it("should call logout when clicked", () => {
+  const mock = $auth.provide({
+    user: signal({ id: 1, name: "John" }),
+    logout: vi.fn(),
+  });
+  render(<UserMenu />);
+  fireEvent.click(screen.getByTitle("Logout"));
+  expect(mock.logout).toHaveBeenCalledTimes(1);
+});
+```
+
+#### Methods
+
+| Method               | Description                                       |
+| -------------------- | ------------------------------------------------- |
+| `.default(partial)`  | Set default mock values (merged with overrides)   |
+| `.provide(partial?)` | Apply mock to logic registry, returns merged mock |
+| `.clear()`           | Clear defaults, overrides, and logic registry     |
+
+---
+
+## Type Utilities
+
+### Signal Types
+
+```tsx
+import type {
+  AnySignal, // Union of Mutable and Computed
+  Mutable, // Mutable signal type
+  Computed, // Computed signal type
+  Signal, // Base signal type
+  SignalMap, // Record<string, AnySignal>
+  SignalKind, // "mutable" | "computed" | "any"
+} from "rextive";
+```
+
+### Logic Types
+
+```tsx
+import type {
+  Logic, // Logic factory type
+  AbstractLogic, // Abstract logic type
+  Instance, // Logic instance with dispose
+  InferLogic, // Extract type from Logic
+  InferInstance, // Extract instance type from Logic
+  TestInstance, // For testing (preserves Signal types)
+} from "rextive";
+```
+
+### Task Types
+
+```tsx
+import type {
+  Task, // Task<T> = LoadingTask | SuccessTask | ErrorTask
+  LoadingTask, // { status: "loading", loading: true, ... }
+  SuccessTask, // { status: "success", value: T, ... }
+  ErrorTask, // { status: "error", error: unknown, ... }
+  TaskStatus, // "loading" | "success" | "error"
+} from "rextive";
+```
+
+### Path Types
+
+```tsx
+import type {
+  Path, // Valid dot-notation paths for object
+  PathValue, // Value type at path
+  PathSetter, // Setter function for nested paths
+  PathGetter, // Getter function for nested paths
+} from "rextive";
+```
+
+### Other Types
+
+```tsx
+import type {
+  Tag, // Signal tag type
+  Plugin, // Plugin function type
+  GroupPlugin, // Group plugin type
+  SignalContext, // Compute function context
+  ComputedSignalContext, // Context with deps
+  SignalOptions, // Signal creation options
+  EqualsStrategy, // "strict" | "shallow" | "deep"
+  Awaitable, // Task | PromiseLike | Signal
+} from "rextive";
+```
+
+---
+
 ## Next Steps
 
+- **[Core Concepts](./CORE_CONCEPTS.md)** - Understand the fundamentals
 - **[React Integration](./REACT.md)** - Deep dive into rx(), useScope()
 - **[Operators](./OPERATORS.md)** - Full operators reference
+- **[Logic](./LOGIC.md)** - Building reusable logic units
 - **[Examples](./EXAMPLES.md)** - Real-world examples
-
-
