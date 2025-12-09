@@ -1,6 +1,22 @@
 /**
  * CSS-in-JS styles for DevTools Panel
- * Bottom drawer layout - responsive for mobile
+ *
+ * Design System:
+ * - Dark theme with accent colors for different signal types
+ * - Responsive layout: bottom drawer on mobile, left panel on desktop
+ * - Resizable panels with min/max constraints
+ * - Flash animations for signal updates
+ *
+ * Color Palette:
+ * - Background: Dark blue-gray (#1a1a2e, #16213e, #0f3460)
+ * - Accent: Coral red (#e94560) for errors and highlights
+ * - Success: Teal green (#4ecca3) for mutable signals
+ * - Computed: Purple (#7b68ee) for computed signals
+ * - Change: Orange (#ffa502) for updates and tags
+ *
+ * Typography:
+ * - UI text: Roboto/system sans-serif
+ * - Code/values: JetBrains Mono/monospace
  */
 
 // Font families

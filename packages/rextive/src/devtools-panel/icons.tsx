@@ -1,4 +1,22 @@
-// SVG Icons for consistent sizing in DevTools panel
+/**
+ * SVG Icon Components for DevTools Panel
+ *
+ * All icons are:
+ * - Memoized for performance
+ * - Stroke-based for consistent styling with currentColor
+ * - Configurable size (default 16px)
+ * - ViewBox normalized to 24x24
+ *
+ * Usage:
+ *   <IconRefresh size={20} />
+ *   <IconTrash />  // defaults to 16px
+ *
+ * Icon categories:
+ * - Navigation: ArrowLeft, ArrowDown, ChevronUp/Down/Left/Right
+ * - Actions: Reset, Copy, Edit, Refresh, Trash, Close
+ * - UI: History, Bolt, Help, Star, Search, Camera, Settings
+ * - State: Record (for recording/active states)
+ */
 import { memo } from "react";
 
 interface IconProps {
