@@ -39,6 +39,7 @@ A signal-based reactive state management library with explicit dependencies.
 rextive           Core signals (works anywhere)
 rextive/react     React bindings (rx, useScope, provider)
 rextive/op        Operators (to, filter, scan, debounce, throttle, etc.)
+rextive/helpers   Utility functions (patch)
 rextive/immer     Immer integration for immutable updates
 rextive/cache     Data caching with strategies
 rextive/plugins   Plugins (persistor)
@@ -541,6 +542,49 @@ rx(() => {
   );
 });
 ```
+
+---
+
+## 🛠️ Helpers
+
+Import from `rextive/helpers`:
+
+```tsx
+import { patch } from "rextive/helpers";
+```
+
+### `patch()` - Partial Object Updates
+
+A utility for partial object updates in `signal.set()`. Cleaner alternative to the spread pattern.
+
+```tsx
+const person = signal({ name: "John", age: 30, city: "NYC" });
+
+// Partial object update
+person.set(patch({ name: "Jane" }));
+person.set(patch({ name: "Jane", age: 25 }));
+
+// Key-value update  
+person.set(patch("name", "Jane"));
+person.set(patch("age", 25));
+
+// Equivalent to (but shorter):
+person.set(prev => ({ ...prev, name: "Jane" }));
+```
+
+**Features:**
+- Type-safe with `Partial<T>` for partial objects
+- Type-safe key-value with inferred value type
+- Immutable - creates new object reference
+- Preserves unmodified nested references
+
+**When to use `patch()` vs alternatives:**
+
+| Method | Use Case |
+|--------|----------|
+| `patch()` | Simple property updates, one-off changes |
+| `focus.lens()` | Repeated access to same property |
+| `immer` | Complex nested mutations |
 
 ---
 
@@ -1174,6 +1218,12 @@ refreshOn, staleOn, resetOn
 
 // Async
 task (operator version)
+```
+
+### Helper Exports (`rextive/helpers`)
+
+```tsx
+patch                        // Partial object updates
 ```
 
 ### Plugin Exports

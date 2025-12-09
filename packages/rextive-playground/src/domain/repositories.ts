@@ -15,5 +15,6 @@ export interface ParentAuthRepository {
   isSetup(): Promise<boolean>;
   setup(password: string): Promise<void>;
   authenticate(password: string): Promise<boolean>;
+  changePassword(currentPassword: string, newPassword: string): Promise<boolean>;
 }
 

@@ -53,6 +53,13 @@ export const parentAuthLogic = logic("parentAuthLogic", () => {
     clearSession();
   }
 
+  async function changePassword(
+    currentPassword: string,
+    newPassword: string
+  ): Promise<boolean> {
+    return parentAuthRepository.changePassword(currentPassword, newPassword);
+  }
+
   return {
     isSetup,
     isAuthenticated,
@@ -60,6 +67,7 @@ export const parentAuthLogic = logic("parentAuthLogic", () => {
     setup,
     login,
     logout,
+    changePassword,
   };
 });
 

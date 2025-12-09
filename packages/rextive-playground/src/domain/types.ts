@@ -50,6 +50,7 @@ export interface KidGameSettings {
 export const AVAILABLE_GAMES = [
   { id: "typing-adventure", name: "Typing Adventure", icon: "⌨️" },
   { id: "memory-match", name: "Memory Match", icon: "🧠" },
+  { id: "road-racer", name: "Road Racer", icon: "🏎️" },
   { id: "math-quest", name: "Math Quest", icon: "➕" },
   { id: "word-builder", name: "Word Builder", icon: "📝" },
   { id: "puzzle-time", name: "Puzzle Time", icon: "🧩" },

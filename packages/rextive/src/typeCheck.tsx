@@ -20,6 +20,7 @@ import { is } from "./is";
 import { wait, type Awaitable, type AwaitedFromAwaitable } from "./wait";
 import { awaited } from "./awaited";
 import { compose } from "./utils/compose";
+import { patch } from "./helpers";
 // Operators imported when needed for type checking
 import {
   to,
@@ -3645,6 +3646,302 @@ function signalActionTests() {
     strSig);
 }
 
+// =============================================================================
+// PATCH HELPER TYPE CHECKS
+// =============================================================================
+
+function patchHelperTests() {
+  // -----------------------------------------------------------------------------
+  // Test types
+  // -----------------------------------------------------------------------------
+
+  interface Person {
+    name: string;
+    age: number;
+    address: {
+      city: string;
+      country: string;
+    };
+  }
+
+  // -----------------------------------------------------------------------------
+  // Test 1: patch(partial) - partial object update
+  // -----------------------------------------------------------------------------
+
+  const partialUpdater1 = patch<Person>({ name: "Jane" });
+  expectType<(prev: Person) => Person>(partialUpdater1);
+
+  const partialUpdater2 = patch<Person>({ name: "Jane", age: 25 });
+  expectType<(prev: Person) => Person>(partialUpdater2);
+
+  // -----------------------------------------------------------------------------
+  // Test 2: patch(key, value) - single property update
+  // -----------------------------------------------------------------------------
+
+  const keyValueUpdater1 = patch<Person, "name">("name", "Jane");
+  expectType<(prev: Person) => Person>(keyValueUpdater1);
+
+  const keyValueUpdater2 = patch<Person, "age">("age", 30);
+  expectType<(prev: Person) => Person>(keyValueUpdater2);
+
+  // -----------------------------------------------------------------------------
+  // Test 3: patch(key, updater) - single property with updater function
+  // -----------------------------------------------------------------------------
+
+  const keyUpdaterFn1 = patch<Person, "age">("age", (prev) => prev + 1);
+  expectType<(prev: Person) => Person>(keyUpdaterFn1);
+
+  const keyUpdaterFn2 = patch<Person, "name">("name", (prev) =>
+    prev.toUpperCase()
+  );
+  expectType<(prev: Person) => Person>(keyUpdaterFn2);
+
+  // -----------------------------------------------------------------------------
+  // Test 4: patch(index, value) - array index update
+  // -----------------------------------------------------------------------------
+
+  const indexValueUpdater1 = patch<number>(0, 100);
+  expectType<(prev: number[]) => number[]>(indexValueUpdater1);
+
+  const indexValueUpdater2 = patch<string>(2, "new");
+  expectType<(prev: string[]) => string[]>(indexValueUpdater2);
+
+  // -----------------------------------------------------------------------------
+  // Test 5: patch(index, updater) - array index with updater
+  // -----------------------------------------------------------------------------
+
+  const indexUpdaterFn1 = patch<number>(0, (prev) => prev * 2);
+  expectType<(prev: number[]) => number[]>(indexUpdaterFn1);
+
+  const indexUpdaterFn2 = patch<string>(1, (prev) => prev.toUpperCase());
+  expectType<(prev: string[]) => string[]>(indexUpdaterFn2);
+
+  // -----------------------------------------------------------------------------
+  // Test 6: patch(".pop") - array pop
+  // -----------------------------------------------------------------------------
+
+  const popUpdater = patch(".pop");
+  expectType<<T>(prev: T[]) => T[]>(popUpdater);
+
+  // Usage type check
+  const numArrayAfterPop = popUpdater([1, 2, 3]);
+  expectType<number[]>(numArrayAfterPop);
+
+  const strArrayAfterPop = popUpdater(["a", "b", "c"]);
+  expectType<string[]>(strArrayAfterPop);
+
+  // -----------------------------------------------------------------------------
+  // Test 7: patch(".shift") - array shift
+  // -----------------------------------------------------------------------------
+
+  const shiftUpdater = patch(".shift");
+  expectType<<T>(prev: T[]) => T[]>(shiftUpdater);
+
+  // -----------------------------------------------------------------------------
+  // Test 8: patch(".reverse") - array reverse
+  // -----------------------------------------------------------------------------
+
+  const reverseUpdater = patch(".reverse");
+  expectType<<T>(prev: T[]) => T[]>(reverseUpdater);
+
+  // -----------------------------------------------------------------------------
+  // Test 9: patch(".push", ...values) - array push
+  // -----------------------------------------------------------------------------
+
+  const pushUpdater1 = patch<number>(".push", 4);
+  expectType<(prev: number[]) => number[]>(pushUpdater1);
+
+  const pushUpdater2 = patch<number>(".push", 4, 5, 6);
+  expectType<(prev: number[]) => number[]>(pushUpdater2);
+
+  const pushUpdater3 = patch<string>(".push", "a", "b");
+  expectType<(prev: string[]) => string[]>(pushUpdater3);
+
+  // -----------------------------------------------------------------------------
+  // Test 10: patch(".unshift", ...values) - array unshift
+  // -----------------------------------------------------------------------------
+
+  const unshiftUpdater1 = patch<number>(".unshift", 0);
+  expectType<(prev: number[]) => number[]>(unshiftUpdater1);
+
+  const unshiftUpdater2 = patch<number>(".unshift", -2, -1, 0);
+  expectType<(prev: number[]) => number[]>(unshiftUpdater2);
+
+  // -----------------------------------------------------------------------------
+  // Test 11: patch(".splice", start, deleteCount?, ...items) - array splice
+  // -----------------------------------------------------------------------------
+
+  const spliceUpdater1 = patch<number>(".splice", 1, 2);
+  expectType<(prev: number[]) => number[]>(spliceUpdater1);
+
+  const spliceUpdater2 = patch<number>(".splice", 1, 0, 10, 20);
+  expectType<(prev: number[]) => number[]>(spliceUpdater2);
+
+  const spliceUpdater3 = patch<string>(".splice", 0, 1, "new");
+  expectType<(prev: string[]) => string[]>(spliceUpdater3);
+
+  // -----------------------------------------------------------------------------
+  // Test 12: patch(".sort", compareFn?) - array sort
+  // -----------------------------------------------------------------------------
+
+  const sortUpdater1 = patch<number>(".sort");
+  expectType<(prev: number[]) => number[]>(sortUpdater1);
+
+  const sortUpdater2 = patch<number>(".sort", (a, b) => b - a);
+  expectType<(prev: number[]) => number[]>(sortUpdater2);
+
+  const sortUpdater3 = patch<string>(".sort", (a, b) => a.localeCompare(b));
+  expectType<(prev: string[]) => string[]>(sortUpdater3);
+
+  // -----------------------------------------------------------------------------
+  // Test 13: patch(".fill", value, start?, end?) - array fill
+  // -----------------------------------------------------------------------------
+
+  const fillUpdater1 = patch<number>(".fill", 0);
+  expectType<(prev: number[]) => number[]>(fillUpdater1);
+
+  const fillUpdater2 = patch<number>(".fill", 0, 2);
+  expectType<(prev: number[]) => number[]>(fillUpdater2);
+
+  const fillUpdater3 = patch<number>(".fill", 0, 1, 4);
+  expectType<(prev: number[]) => number[]>(fillUpdater3);
+
+  // -----------------------------------------------------------------------------
+  // Test 14: patch(".filter", predicate) - array filter
+  // -----------------------------------------------------------------------------
+
+  const filterUpdater1 = patch<number>(".filter", (x) => x > 0);
+  expectType<(prev: number[]) => number[]>(filterUpdater1);
+
+  const filterUpdater2 = patch<string>(".filter", (x) => x.length > 0);
+  expectType<(prev: string[]) => string[]>(filterUpdater2);
+
+  // With index parameter
+  const filterUpdater3 = patch<number>(".filter", (_x, i) => i % 2 === 0);
+  expectType<(prev: number[]) => number[]>(filterUpdater3);
+
+  // -----------------------------------------------------------------------------
+  // Test 15: patch(".map", mapper) - array map
+  // -----------------------------------------------------------------------------
+
+  const mapUpdater1 = patch<number>(".map", (x) => x * 2);
+  expectType<(prev: number[]) => number[]>(mapUpdater1);
+
+  const mapUpdater2 = patch<string, number>(".map", (x) => x.length);
+  expectType<(prev: string[]) => number[]>(mapUpdater2);
+
+  // With index parameter
+  const mapUpdater3 = patch<number>(".map", (x, i) => x + i);
+  expectType<(prev: number[]) => number[]>(mapUpdater3);
+
+  // -----------------------------------------------------------------------------
+  // Test 16: Usage with signal.set()
+  // -----------------------------------------------------------------------------
+
+  const person = signal<Person>({
+    name: "John",
+    age: 30,
+    address: { city: "NYC", country: "USA" },
+  });
+
+  // Partial update - explicit type needed for proper inference
+  person.set(patch<Person>({ name: "Jane" }));
+
+  // Key-value update - explicit types for both T and K
+  person.set(patch<Person, "age">("age", 25));
+
+  // Key with updater - explicit types for both T and K
+  person.set(patch<Person, "age">("age", (prev) => prev + 1));
+
+  // Array signal operations
+  const items = signal([1, 2, 3, 4, 5]);
+
+  items.set(patch(0, 100));
+  items.set(patch(-1, (prev) => prev * 10));
+  items.set(patch(".push", 6, 7));
+  items.set(patch(".pop"));
+  items.set(patch(".filter", (x) => x % 2 === 0));
+  items.set(patch(".map", (x) => x * 2));
+  items.set(patch(".sort", (a, b) => b - a));
+  items.set(patch(".reverse"));
+  items.set(patch(".splice", 1, 2, 10, 20));
+  items.set(patch(".fill", 0, 0, 3));
+
+  // -----------------------------------------------------------------------------
+  // Test 17: Complex types
+  // -----------------------------------------------------------------------------
+
+  interface Item {
+    id: number;
+    name: string;
+    active: boolean;
+  }
+
+  const itemsSignal = signal<Item[]>([
+    { id: 1, name: "First", active: true },
+    { id: 2, name: "Second", active: false },
+  ]);
+
+  // Update item at index
+  itemsSignal.set(patch(0, { id: 1, name: "Updated", active: true }));
+
+  // Update with function
+  itemsSignal.set(
+    patch(0, (prev) => ({ ...prev, active: !prev.active }))
+  );
+
+  // Filter items
+  itemsSignal.set(patch(".filter", (item) => item.active));
+
+  // Map items
+  itemsSignal.set(
+    patch(".map", (item) => ({ ...item, name: item.name.toUpperCase() }))
+  );
+
+  // -----------------------------------------------------------------------------
+  // Cleanup - suppress unused variable warnings
+  // -----------------------------------------------------------------------------
+
+  (void partialUpdater1,
+    partialUpdater2,
+    keyValueUpdater1,
+    keyValueUpdater2,
+    keyUpdaterFn1,
+    keyUpdaterFn2,
+    indexValueUpdater1,
+    indexValueUpdater2,
+    indexUpdaterFn1,
+    indexUpdaterFn2,
+    popUpdater,
+    numArrayAfterPop,
+    strArrayAfterPop,
+    shiftUpdater,
+    reverseUpdater,
+    pushUpdater1,
+    pushUpdater2,
+    pushUpdater3,
+    unshiftUpdater1,
+    unshiftUpdater2,
+    spliceUpdater1,
+    spliceUpdater2,
+    spliceUpdater3,
+    sortUpdater1,
+    sortUpdater2,
+    sortUpdater3,
+    fillUpdater1,
+    fillUpdater2,
+    fillUpdater3,
+    filterUpdater1,
+    filterUpdater2,
+    filterUpdater3,
+    mapUpdater1,
+    mapUpdater2,
+    mapUpdater3,
+    person,
+    items,
+    itemsSignal);
+}
+
 export {
   signalTests,
   taskTests,
@@ -3665,6 +3962,7 @@ export {
   signalWhenTests,
   operatorOptionsTests,
   signalActionTests,
+  patchHelperTests,
 };
 
 // =============================================================================

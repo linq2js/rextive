@@ -42,6 +42,10 @@
     "./test": {
       "types": "./dist/test/index.d.ts",
       "default": "./dist/test/index.js"
+    },
+    "./helpers": {
+      "types": "./dist/helpers/index.d.ts",
+      "default": "./dist/helpers/index.js"
     }
   },
   "files": [

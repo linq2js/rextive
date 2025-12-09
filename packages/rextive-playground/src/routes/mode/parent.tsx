@@ -208,7 +208,11 @@ function ParentDashboardLayout() {
 
   // Determine active tab from URL
   const pathname = location.pathname;
-  const activeTab = pathname.endsWith("/data") ? "data" : "kids";
+  const activeTab = pathname.endsWith("/data")
+    ? "data"
+    : pathname.endsWith("/settings")
+    ? "settings"
+    : "kids";
 
   return rx(() => {
     if ($profiles.isLoading()) {
@@ -265,6 +269,11 @@ function ParentDashboardLayout() {
                 to="/mode/parent/data"
                 active={activeTab === "data"}
                 label="💾 Data"
+              />
+              <TabLink
+                to="/mode/parent/settings"
+                active={activeTab === "settings"}
+                label="⚙️ Settings"
               />
             </div>
           </div>

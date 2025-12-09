@@ -23,5 +23,28 @@ export const parentAuthRepository: ParentAuthRepository = {
     if (settings.length === 0) return false;
     return verifyPassword(password, settings[0].passwordHash);
   },
+
+  async changePassword(
+    currentPassword: string,
+    newPassword: string
+  ): Promise<boolean> {
+    const settings = await db.parentSettings.toArray();
+    if (settings.length === 0) return false;
+
+    // Verify current password first
+    const isValid = await verifyPassword(
+      currentPassword,
+      settings[0].passwordHash
+    );
+    if (!isValid) return false;
+
+    // Hash new password and update
+    const newHash = await hashPassword(newPassword);
+    await db.parentSettings.update(settings[0].id!, {
+      passwordHash: newHash,
+    });
+
+    return true;
+  },
 };
 
