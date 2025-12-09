@@ -4,13 +4,16 @@
   "private": true,
   "scripts": {
     "build": "pnpm --filter rextive build",
+    "build:all": "pnpm -r build",
     "test": "pnpm --filter rextive test",
     "dev:demo": "concurrently -k -n rextive,demo -c cyan,green \"pnpm --filter rextive watch\" \"pnpm --filter rextive-demo dev\"",
     "dev:ecom": "concurrently -k -n rextive,ecommerce -c cyan,magenta \"pnpm --filter rextive watch\" \"pnpm --filter rextive-ecommerce dev\"",
-    "dev:game": "concurrently -k -n rextive,playground -c cyan,yellow \"pnpm --filter rextive watch\" \"pnpm --filter rextive-playground dev\""
+    "dev:game": "concurrently -k -n rextive,playground -c cyan,yellow \"pnpm --filter rextive watch\" \"pnpm --filter rextive-playground dev\"",
+    "prepare": "husky"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
+    "husky": "^9.1.7",
     "typescript": "^5.3.3"
   },
   "engines": {

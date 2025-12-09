@@ -881,9 +881,7 @@ describe.each(wrappers)(
 
       it("should work with Map return", () => {
         const TestComponent = () => {
-          const result = useScope(
-            () => new Map([["key", "value"]])
-          );
+          const result = useScope(() => new Map([["key", "value"]]));
 
           expect(result).toBeInstanceOf(Map);
           expect(result.get("key")).toBe("value");
@@ -965,7 +963,9 @@ describe.each(wrappers)(
           return <div data-testid="value">{result}</div>;
         };
 
-        const { rerender } = renderWithWrapper(<TestComponent multiplier={2} />);
+        const { rerender } = renderWithWrapper(
+          <TestComponent multiplier={2} />
+        );
         expect(screen.getByTestId("value")).toHaveTextContent("20");
 
         rerender(<TestComponent multiplier={3} />);
@@ -1247,13 +1247,10 @@ describe.each(wrappers)(
         const depsArray = [1, 2, 3];
 
         const TestComponent = ({ deps }: { deps: number[] }) => {
-          useScope(
-            (...args: number[]) => {
-              createCount++;
-              return { args };
-            },
-            deps
-          );
+          useScope((...args: number[]) => {
+            createCount++;
+            return { args };
+          }, deps);
 
           return <div>Test</div>;
         };
@@ -1281,13 +1278,10 @@ describe.each(wrappers)(
         let createCount = 0;
 
         const TestComponent = ({ deps }: { deps: number[] }) => {
-          useScope(
-            (...args: number[]) => {
-              createCount++;
-              return { args };
-            },
-            deps
-          );
+          useScope((...args: number[]) => {
+            createCount++;
+            return { args };
+          }, deps);
 
           return <div>Test</div>;
         };
@@ -1324,7 +1318,9 @@ describe.each(wrappers)(
           return <div>Test</div>;
         };
 
-        const { rerender } = renderWithWrapper(<TestComponent useKeyA={true} />);
+        const { rerender } = renderWithWrapper(
+          <TestComponent useKeyA={true} />
+        );
         expect(createCountA).toBe(1);
         expect(createCountB).toBe(0);
 
@@ -1418,6 +1414,230 @@ describe.each(wrappers)(
         // Each component's useScope should be created at least once
         expect(outerCreateCount).toBeGreaterThanOrEqual(1);
         expect(innerCreateCount).toBeGreaterThanOrEqual(1);
+      });
+    });
+
+    describe("proxy mode (on-demand signal creation)", () => {
+      it("should create empty signal on property access", () => {
+        const TestComponent = () => {
+          const proxy = useScope<{
+            submitState: Promise<string>;
+            searchState: Promise<number>;
+          }>();
+
+          // Access creates empty signal
+          const submitSignal = proxy.submitState;
+
+          // Signal exists and returns undefined (empty signal)
+          expect(submitSignal()).toBeUndefined();
+
+          return <div data-testid="value">Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("value")).toHaveTextContent("Test");
+      });
+
+      it("should return same signal on subsequent access", () => {
+        const TestComponent = () => {
+          const proxy = useScope<{ count: number }>();
+
+          const signal1 = proxy.count;
+          const signal2 = proxy.count;
+
+          // Should be the same signal instance
+          expect(signal1).toBe(signal2);
+
+          return <div>Test</div>;
+        };
+
+        renderWithWrapper(<TestComponent />);
+      });
+
+      it("should allow setting values on proxy signals", () => {
+        let proxyRef: { count: any } | undefined;
+
+        const TestComponent = () => {
+          const proxy = useScope<{ count: number }>();
+          proxyRef = proxy;
+
+          return (
+            <div data-testid="value">{rx(() => proxy.count() ?? "empty")}</div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("value")).toHaveTextContent("empty");
+
+        act(() => {
+          proxyRef?.count.set(42);
+        });
+
+        expect(screen.getByTestId("value")).toHaveTextContent("42");
+      });
+
+      it("should dispose all proxy signals on unmount", async () => {
+        let proxyRef: { a: any; b: any } | undefined;
+
+        const TestComponent = () => {
+          const proxy = useScope<{ a: number; b: string }>();
+          proxyRef = proxy;
+
+          // Access both to create them
+          proxy.a;
+          proxy.b;
+
+          return <div>Test</div>;
+        };
+
+        const { unmount } = renderWithWrapper(<TestComponent />);
+
+        // Signals should exist
+        expect(proxyRef?.a).toBeDefined();
+        expect(proxyRef?.b).toBeDefined();
+
+        unmount();
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // Signals should be disposed
+        expect(proxyRef?.a.disposed()).toBe(true);
+        expect(proxyRef?.b.disposed()).toBe(true);
+      });
+
+      it("should work with rx() for reactive rendering", () => {
+        let proxyRef: { message: any } | undefined;
+
+        const TestComponent = () => {
+          const proxy = useScope<{ message: string }>();
+          proxyRef = proxy;
+
+          return (
+            <div data-testid="value">
+              {rx(() => proxy.message() ?? "initial")}
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("value")).toHaveTextContent("initial");
+
+        act(() => {
+          proxyRef?.message.set("updated");
+        });
+
+        expect(screen.getByTestId("value")).toHaveTextContent("updated");
+      });
+
+      it("should not be captured by outer scopes (disposalHandled = true)", () => {
+        // This test verifies that signals created inside rx() aren't captured
+        // by the rx() tracking scope
+        let proxyRef: { count: any } | undefined;
+        let capturedByOuterScope = false;
+
+        const TestComponent = () => {
+          const proxy = useScope<{ count: number }>();
+          proxyRef = proxy;
+
+          return rx(() => {
+            // Access signal inside rx() - should NOT be captured by rx() scope
+            const signal = proxy.count;
+            return <div data-testid="value">{signal() ?? "empty"}</div>;
+          });
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("value")).toHaveTextContent("empty");
+
+        // If signal wasn't captured by outer scope, it should still work after set
+        act(() => {
+          proxyRef?.count.set(100);
+        });
+
+        expect(screen.getByTestId("value")).toHaveTextContent("100");
+      });
+
+      it("should handle multiple proxies in same component", () => {
+        const TestComponent = () => {
+          const formProxy = useScope<{ name: string; email: string }>();
+          const stateProxy = useScope<{ loading: boolean }>();
+
+          return (
+            <div>
+              <div data-testid="name">
+                {rx(() => formProxy.name() ?? "no name")}
+              </div>
+              <div data-testid="loading">
+                {rx(() => String(stateProxy.loading() ?? false))}
+              </div>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("name")).toHaveTextContent("no name");
+        expect(screen.getByTestId("loading")).toHaveTextContent("false");
+      });
+
+      it("should work with Promise types for async action states", () => {
+        type SubmitResult = { success: boolean };
+        let proxyRef: { submitState: any } | undefined;
+
+        const TestComponent = () => {
+          const proxy = useScope<{ submitState: Promise<SubmitResult> }>();
+          proxyRef = proxy;
+
+          return rx(() => {
+            const state = proxy.submitState();
+            if (!state) return <div data-testid="status">idle</div>;
+            return <div data-testid="status">pending</div>;
+          });
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("status")).toHaveTextContent("idle");
+
+        act(() => {
+          proxyRef?.submitState.set(Promise.resolve({ success: true }));
+        });
+
+        expect(screen.getByTestId("status")).toHaveTextContent("pending");
+      });
+
+      it("should preserve proxy reference across re-renders", () => {
+        let proxyRefs: any[] = [];
+
+        const TestComponent = () => {
+          const proxy = useScope<{ value: number }>();
+          proxyRefs.push(proxy);
+
+          return <div>Render count: {proxyRefs.length}</div>;
+        };
+
+        const { rerender } = renderWithWrapper(<TestComponent />);
+        rerender(<TestComponent />);
+        rerender(<TestComponent />);
+
+        // In StrictMode, the first render creates orphaned entries due to double-invoke.
+        // After commit, subsequent rerenders should use the same proxy.
+        // So we check that the LAST few renders use the same proxy.
+        if (mode === "strict") {
+          // In strict mode: first 2 renders are double-invoke (different proxies)
+          // Subsequent rerenders should use same proxy
+          const committedProxies = proxyRefs.slice(2); // After initial double-invoke
+          if (committedProxies.length > 0) {
+            const firstCommitted = committedProxies[0];
+            expect(committedProxies.every((p) => p === firstCommitted)).toBe(
+              true
+            );
+          }
+        } else {
+          // In normal mode, all proxies should be the same
+          const firstProxy = proxyRefs[0];
+          expect(proxyRefs.every((p) => p === firstProxy)).toBe(true);
+        }
       });
     });
 

@@ -1,7 +1,10 @@
 import { useLayoutEffect, useEffect, useRef } from "react";
-import { AnyFunc, EqualsFn, EqualsStrategy } from "../types";
+import { AnyFunc, EqualsFn, EqualsStrategy, Mutable } from "../types";
 import { resolveEquals } from "../utils/resolveEquals";
 import { scopeCache } from "./scopeCache";
+import { signal } from "../signal";
+import { withHooks } from "../hooks";
+import { emitter } from "../utils/emitter";
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -36,6 +39,14 @@ export type UseScopeOptions = {
  * - EqualsFn custom function
  */
 type OptionsOrEquals = UseScopeOptions | EqualsStrategy | EqualsFn<any>;
+
+/**
+ * Proxy type that creates empty signals on demand.
+ * Each property access creates/returns a Mutable signal.
+ */
+export type SignalProxy<T extends Record<string, unknown>> = {
+  [K in keyof T]: Mutable<T[K], T[K] | undefined>;
+};
 
 // ============================================================================
 // Helper Functions
@@ -200,6 +211,39 @@ export function __clearCache() {
  */
 
 // ============================================================================
+// Proxy Mode Overload (on-demand signal creation)
+// ============================================================================
+
+/**
+ * **Proxy Mode** - Creates signals on-demand when properties are accessed.
+ *
+ * This is syntactic sugar for creating multiple empty signals without
+ * boilerplate. Signals are created lazily on first property access.
+ *
+ * @typeParam T - Record type defining the signal types
+ * @returns A proxy that creates Mutable signals on property access
+ *
+ * @example
+ * ```tsx
+ * // Define signal types via type parameter
+ * const proxy = useScope<{
+ *   submitState: Promise<SubmitResult>;
+ *   searchState: Promise<SearchResult>;
+ * }>();
+ *
+ * // Signals are created on first access
+ * proxy.submitState.set(promise);  // Creates empty signal, then sets value
+ *
+ * // Use with rx() for reactive rendering
+ * {rx(() => {
+ *   const state = task.from(proxy.submitState());
+ *   return state?.loading ? <Spinner /> : <Content />;
+ * })}
+ * ```
+ */
+export function useScope<T extends Record<string, unknown>>(): SignalProxy<T>;
+
+// ============================================================================
 // Local Mode Overloads (private per-component scope)
 // ============================================================================
 
@@ -272,15 +316,26 @@ export function useScope(...args: any[]): any {
   let factory: AnyFunc;
   let deps: unknown[] = [];
   let options: OptionsOrEquals | undefined;
+  let isProxyMode = false;
   const localKeyRef = useRef<any>();
+  // Auto-generate stable key per component instance
+  if (!localKeyRef.current) {
+    localKeyRef.current = {};
+  }
 
-  // Detect mode: shared (keyed) vs local
-  // Shared mode: useScope(key, factory, ...)
-  // Local mode: useScope(factory, ...)
-  const isSharedMode = typeof args[1] === "function";
-
-  if (isSharedMode) {
-    // Shared mode - use provided key
+  // Detect mode based on arguments
+  if (args.length === 0) {
+    // ========================================
+    // Proxy Mode: useScope<T>() with no args
+    // ========================================
+    isProxyMode = true;
+    key = localKeyRef.current;
+    // Factory returns { proxy, dispose } - dispose is accessible without Proxy interception
+    factory = createSignalProxy;
+  } else if (typeof args[1] === "function") {
+    // ========================================
+    // Shared Mode: useScope(key, factory, ...)
+    // ========================================
     key = args[0];
     factory = args[1];
     if (Array.isArray(args[2])) {
@@ -290,10 +345,6 @@ export function useScope(...args: any[]): any {
       options = args[2];
     }
   } else {
-    // Local mode - auto-generate stable key per component instance
-    if (!localKeyRef.current) {
-      localKeyRef.current = {};
-    }
     key = localKeyRef.current;
     factory = args[0];
     if (Array.isArray(args[1])) {
@@ -322,5 +373,50 @@ export function useScope(...args: any[]): any {
     return entry.uncommit;
   }, [entry, key]);
 
-  return entry.scope;
+  // For proxy mode, return just the proxy (not { proxy, dispose })
+  return isProxyMode ? entry.scope.proxy : entry.scope;
+}
+
+/**
+ * Create a proxy that creates empty signals on demand.
+ * Returns { proxy, dispose } so dispose is accessible without Proxy interception.
+ */
+function createSignalProxy(): {
+  proxy: any;
+  dispose: VoidFunction;
+} {
+  const signalCache = new Map<string | symbol, Mutable<any, any>>();
+  const onCleanup = emitter();
+
+  const proxy = new Proxy(
+    {},
+    {
+      get(_, key: string | symbol) {
+        // Return cached signal if exists
+        let sig = signalCache.get(key);
+        if (sig) return sig;
+
+        // Create new signal with disposalHandled = true to prevent
+        // outer scopes (like rx()) from capturing and disposing it
+        sig = withHooks(
+          (hooks) => ({
+            ...hooks,
+            onSignalCreate(createdSignal, deps) {
+              // Mark as handled - we manage disposal ourselves
+              hooks.onSignalCreate?.(createdSignal, deps, true);
+            },
+          }),
+          () => signal<any>()
+        );
+
+        // Cache and register for disposal
+        signalCache.set(key, sig);
+        onCleanup.on(sig.dispose);
+
+        return sig;
+      },
+    }
+  );
+
+  return { proxy, dispose: onCleanup.settle };
 }

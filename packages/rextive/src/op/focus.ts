@@ -503,7 +503,13 @@ export function lens<T extends object, P extends Path<T>>(
     return value as V;
   };
 
-  const setter = (value: V): void => {
+  const setter = (valueOrUpdater: V | ((prev: V) => V)): void => {
+    // Resolve updater function if provided
+    const value =
+      typeof valueOrUpdater === "function"
+        ? (valueOrUpdater as (prev: V) => V)(getter())
+        : valueOrUpdater;
+
     if (isSourceLens) {
       // Update through parent lens - need to get root and set path
       const rootGetter = source[0] as () => T;

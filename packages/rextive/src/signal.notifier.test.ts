@@ -127,14 +127,10 @@ describe("signal() - Notifier Pattern (Empty Signal)", () => {
       const refreshTrigger = signal<"refresh">();
       let computeCount = 0;
 
-      const data = signal(
-        { dep: signal(0) },
-        ({ when }) => {
-          when(refreshTrigger, "refresh");
-          computeCount++;
-          return computeCount;
-        }
-      );
+      const data = signal({ dep: signal(0) }, () => {
+        computeCount++;
+        return computeCount;
+      }).when(refreshTrigger, "refresh");
 
       // Initial compute
       data();
@@ -159,14 +155,10 @@ describe("signal() - Notifier Pattern (Empty Signal)", () => {
       const invalidate = signal<"invalidate">();
       let computeCount = 0;
 
-      const data = signal(
-        { dep: signal(0) },
-        ({ when }) => {
-          when(invalidate, "stale");
-          computeCount++;
-          return computeCount;
-        }
-      );
+      const data = signal({ dep: signal(0) }, () => {
+        computeCount++;
+        return computeCount;
+      }).when(invalidate, "stale");
 
       // Initial compute
       data();
