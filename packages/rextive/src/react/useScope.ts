@@ -56,6 +56,16 @@ export type SignalProxy<T extends Record<string, unknown>> = {
 
 /**
  * Parse options argument into an equals function.
+ *
+ * Handles multiple input formats:
+ * - undefined → Object.is (strict equality)
+ * - "strict" | "shallow" | "deep" → corresponding strategy
+ * - Custom function → returns as-is
+ * - { equals: ... } → recursively parses equals property
+ *
+ * @param options - Options or equals strategy
+ * @returns Equality comparison function
+ * @internal
  */
 function parseEquals(options: OptionsOrEquals | undefined): EqualsFn<any> {
   if (options === undefined) {
@@ -173,8 +183,8 @@ export function __clearCache() {
  * function Header() {
  *   return (
  *     <>
- *       <SearchBar />  {/* Uses shared scope **}
- *       <MobileSearchBar />  {/* Same scope! **}
+ *       <SearchBar />
+ *       <MobileSearchBar />
  *     </>
  *   );
  * }
@@ -186,7 +196,7 @@ export function __clearCache() {
  *
  * function MobileSearchBar() {
  *   const { input } = useScope("searchBar", searchBarLogic);
- *   return <input value={rx(input)} />;  // Same state as SearchBar
+ *   return <input value={rx(input)} />;  // Same state as SearchBar!
  * }
  * ```
  *
@@ -209,6 +219,50 @@ export function __clearCache() {
  *
  * // Using custom function
  * useScope((obj) => ({ ... }), [obj], (a, b) => a.id === b.id);
+ * ```
+ *
+ * @example Component Effects - Logic communicates with component
+ * ```ts
+ * // Logic exposes component effects
+ * const gameLogic = () => {
+ *   const gameState = signal("menu");
+ *
+ *   // Component effect for DOM concerns
+ *   const onStateChange = (listener) => {
+ *     listener(gameState()); // Immediate call
+ *     return { dispose: gameState.on(() => listener(gameState())) };
+ *   };
+ *
+ *   return { gameState, onStateChange };
+ * };
+ *
+ * // Component binds effect with callback
+ * function Game() {
+ *   const $game = useScope(gameLogic);
+ *   const inputRef = useRef(null);
+ *
+ *   // Bind component effect - auto-cleanup on unmount
+ *   useScope($game.onStateChange, [(state) => {
+ *     if (state === "playing") inputRef.current?.focus();
+ *   }]);
+ *
+ *   return createElement("input", { ref: inputRef });
+ * }
+ * ```
+ *
+ * @example Multiple Scopes - Create multiple scopes at once
+ * ```ts
+ * // Returns tuple of scope values
+ * const [counter, form] = useScope([
+ *   scope(counterLogic),
+ *   scope(formLogic),
+ * ]);
+ *
+ * // Mixed: shared and local scopes
+ * const [shared, local] = useScope([
+ *   scope("shared-key", sharedLogic),
+ *   () => ({ value: signal("local") }),
+ * ]);
  * ```
  */
 
@@ -248,19 +302,45 @@ export function useScope<T extends Record<string, unknown>>(): SignalProxy<T>;
 /**
  * **Multiple Scopes Mode** - Create multiple scopes in a single call.
  *
- * @param scopes - Array of Scope descriptors or factory functions
- * @returns Tuple of scope values in the same order
+ * Useful when you need multiple independent scopes in one component.
+ * Returns a tuple preserving the types and order of each scope.
  *
- * @example
+ * **Type Parameter:** Uses `const TScopes` (TS 5.0+) to ensure tuple type
+ * is inferred as narrowly as possible (like `as const`). With `const`, we
+ * don't need spread syntax `[...TScopes]` - the tuple is preserved automatically.
+ *
+ * @typeParam TScopes - Tuple type of Scope descriptors or factory functions (const inference)
+ * @param scopes - Array of Scope descriptors (via `scope()`) or factory functions
+ * @returns Tuple of scope values in the same order as input
+ *
+ * @example Basic - Array of factories
+ * ```tsx
+ * const [counter, form] = useScope([
+ *   () => ({ count: signal(0) }),
+ *   () => ({ name: signal(""), email: signal("") }),
+ * ]);
+ * ```
+ *
+ * @example With scope() helper
  * ```tsx
  * const [counter, form] = useScope([
  *   scope(counterLogic),
  *   scope(formLogic, [initialData]),
  * ]);
  * ```
+ *
+ * @example Mixed shared and local
+ * ```tsx
+ * const [shared, local] = useScope([
+ *   scope("shared-key", sharedLogic), // Shared across components
+ *   () => ({ value: signal("local") }), // Local to this component
+ * ]);
+ * ```
  */
-export function useScope<TScopes extends readonly (Scope<any> | AnyFunc)[]>(
-  scopes: [...TScopes]
+export function useScope<
+  const TScopes extends readonly (Scope<any> | AnyFunc)[],
+>(
+  scopes: TScopes
 ): {
   [K in keyof TScopes]: TScopes[K] extends Scope<infer T>
     ? T
@@ -338,13 +418,13 @@ export function useScope<TScope, TArgs extends any[]>(
 // ============================================================================
 
 export function useScope(...args: any[]): any {
-  // Stable keys for local mode scopes (one per component instance)
+  // Stable keys for local mode scopes (one per component instance, persists across renders)
   const localKeysRef = useRef<unknown[]>([]);
 
-  // Get or create a stable key for a given index
+  // Get or create a stable key for a given index (used for local mode scopes)
   const getLocalKey = (index: number) => {
     if (!localKeysRef.current[index]) {
-      localKeysRef.current[index] = {};
+      localKeysRef.current[index] = {}; // Unique object as key
     }
     return localKeysRef.current[index];
   };
@@ -392,35 +472,48 @@ export function useScope(...args: any[]): any {
     scopes = [new Scope(getLocalKey(0), args[0], args[1], args[2])];
   }
 
-  // Get entries from cache
+  // Get or create entries from cache (stable objects, won't cause re-renders)
   const entries = scopes.map((s) => {
     const equals = parseEquals(s.options);
     return scopeCache.get(s.key, s.factory, s.deps ?? [], equals);
   });
 
-  // Lifecycle management
+  // Lifecycle management - commit on mount, uncommit on unmount
+  // Dependencies: entries array (stable objects from cache)
   useIsomorphicLayoutEffect(() => {
     for (const entry of entries) {
-      entry.commit();
+      entry.commit(); // Increment ref count
     }
     return () => {
       for (const entry of entries) {
-        entry.uncommit();
+        entry.uncommit(); // Decrement ref count, dispose if zero
       }
     };
   }, entries);
 
+  // Return based on mode
   if (isMultiple) {
+    // Multiple mode: return tuple of scope values
     return entries.map((entry) => entry.scope);
   }
 
-  // For proxy mode, return just the proxy (not { proxy, dispose })
+  // Proxy mode: return just the proxy (not { proxy, dispose })
+  // Single mode: return the scope value directly
   return isProxyMode ? entries[0].scope.proxy : entries[0].scope;
 }
 
 /**
- * Create a proxy that creates empty signals on demand.
- * Returns { proxy, dispose } so dispose is accessible without Proxy interception.
+ * Create a proxy that creates empty signals on demand (for proxy mode).
+ *
+ * This function supports the proxy mode of `useScope<T>()` where signals are
+ * created lazily on first property access. Returns an object with a proxy and
+ * a dispose function (separate from proxy to avoid Proxy interception issues).
+ *
+ * Each property access creates a new empty Mutable signal if it doesn't exist,
+ * and all created signals are tracked for proper disposal.
+ *
+ * @internal
+ * @returns Object with proxy and dispose function
  */
 function createSignalProxy(): {
   proxy: any;
@@ -464,27 +557,63 @@ function createSignalProxy(): {
 
 /**
  * Scope descriptor - captures useScope configuration without executing it.
- * Useful for passing scope configuration to wrapper components.
+ *
+ * This class represents a deferred scope configuration that will be executed
+ * by `useScope()` at the appropriate time. Use the `scope()` helper function
+ * to create instances instead of constructing directly.
+ *
+ * @typeParam TScope - The type returned by the factory function
+ *
+ * @example
+ * ```tsx
+ * // Create descriptors with scope() helper
+ * const counterScope = scope(counterLogic);
+ * const formScope = scope("shared-form", formLogic, [initialData]);
+ *
+ * // Pass to useScope for multiple scopes
+ * const [counter, form] = useScope([counterScope, formScope]);
+ * ```
  */
 export class Scope<TScope> {
   constructor(
+    /** Unique key for the scope (undefined = local mode, value = shared mode) */
     public readonly key: unknown | undefined,
+    /** Factory function that creates the scope */
     public readonly factory: (...args: any[]) => TScope,
+    /** Optional dependencies passed to factory */
     public readonly deps?: unknown[],
+    /** Optional equality strategy for deps comparison */
     public readonly options?: OptionsOrEquals | undefined
   ) {}
 }
 
 // ============================================================================
-// scope() - Create Scope descriptors (mirrors useScope overloads)
+// scope() - Create Scope descriptors (mirrors useScope overloads, except proxy mode)
 // ============================================================================
 
 /**
+ * Create a Scope descriptor without executing it.
+ *
+ * Use with `useScope([...])` for multiple scopes mode. The `scope()` function
+ * mirrors `useScope()` overloads (local and shared modes) but doesn't support
+ * proxy mode. It creates a descriptor that `useScope` will execute later.
+ *
  * **Local Mode** - Creates a Scope descriptor for local (per-component) scope.
  *
+ * @typeParam TScope - The type returned by the factory function
+ * @typeParam TArgs - Tuple type of factory arguments
  * @param factory - Factory function to create the scope
- * @param deps - Optional dependencies passed to factory
+ * @param deps - Optional dependencies passed to factory (scope recreates when deps change)
  * @param options - Optional equality strategy for deps comparison
+ * @returns Scope descriptor for use with `useScope([...])`
+ *
+ * @example
+ * ```tsx
+ * // Local scope (private per-component)
+ * scope(() => ({ count: signal(0) }))
+ * scope(counterLogic)
+ * scope(counterLogic, [initialValue])
+ * ```
  */
 export function scope<TScope, TArgs extends any[]>(
   factory: (...deps: TArgs) => TScope,
@@ -499,10 +628,23 @@ export function scope<TScope, TArgs extends any[]>(
 /**
  * **Shared Mode** - Creates a Scope descriptor for shared (keyed) scope.
  *
- * @param key - Unique identifier for the scope (same key = same instance)
+ * Multiple components using the same key will share the same scope instance.
+ *
+ * @typeParam TScope - The type returned by the factory function
+ * @typeParam TArgs - Tuple type of factory arguments
+ * @param key - Unique identifier for the scope (same key = same instance across components)
  * @param factory - Factory function to create the scope
- * @param deps - Optional dependencies passed to factory
+ * @param deps - Optional dependencies passed to factory (scope recreates when deps change)
  * @param options - Optional equality strategy for deps comparison
+ * @returns Scope descriptor for use with `useScope([...])`
+ *
+ * @example
+ * ```tsx
+ * // Shared scope (same instance across components with same key)
+ * scope("searchBar", searchBarLogic)
+ * scope("tab:123", tabLogic, [tabData])
+ * scope("filters", filterLogic, [initialFilters], "shallow")
+ * ```
  */
 export function scope<TScope, TArgs extends any[]>(
   key: unknown,
@@ -517,13 +659,15 @@ export function scope<TScope, TArgs extends any[]>(
 
 // Implementation
 export function scope(...args: any[]): Scope<any> {
-  let key: unknown | undefined = NO_KEY;
+  let key: unknown | undefined = NO_KEY; // NO_KEY signals local mode
   let factory: AnyFunc;
   let deps: unknown[] = [];
   let options: OptionsOrEquals | undefined;
 
   if (typeof args[1] === "function") {
-    // Shared mode: scope(key, factory, ...)
+    // ========================================
+    // Shared mode: scope(key, factory, [deps], [options])
+    // ========================================
     key = args[0];
     factory = args[1];
     if (Array.isArray(args[2])) {
@@ -533,8 +677,10 @@ export function scope(...args: any[]): Scope<any> {
       options = args[2];
     }
   } else {
-    // Local mode: scope(factory, ...)
-    key = undefined;
+    // ========================================
+    // Local mode: scope(factory, [deps], [options])
+    // ========================================
+    key = undefined; // Will be replaced with stable key in useScope
     factory = args[0];
     if (Array.isArray(args[1])) {
       deps = args[1];

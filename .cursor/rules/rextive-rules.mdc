@@ -369,6 +369,28 @@ const { content } = useScope(`tab:${tabId}`, () => ({
 }));
 ```
 
+**Multiple Scopes Mode** (returns tuple):
+
+```tsx
+// Array of factories
+const [counter, form] = useScope([
+  () => ({ count: signal(0) }),
+  () => ({ name: signal("") }),
+]);
+
+// With scope() helper
+const [counter, form] = useScope([
+  scope(counterLogic),
+  scope(formLogic),
+]);
+
+// Mixed: shared and local
+const [shared, local] = useScope([
+  scope("shared-key", sharedLogic),
+  () => ({ value: signal("local") }),
+]);
+```
+
 **Features:**
 - Auto-dispose on unmount
 - Deps comparison (recreates scope when deps change)
@@ -888,6 +910,98 @@ function ContactForm() {
 |--------|-------------|-----------------|
 | Sharing | ✅ Multiple consumers | ❌ Single component |
 | Use case | Global actions | UI-specific actions |
+
+### Component Effects Pattern
+
+**Component effects** allow logic to communicate with component-level concerns (refs, hooks, DOM, local state) while maintaining proper cleanup on unmount.
+
+**Problem:** Logic should stay pure, but sometimes you need to trigger component-specific side effects (focus input, play sound, animate).
+
+**Solution:** Logic exposes methods that accept callbacks from components.
+
+```tsx
+// ============================================================
+// Logic: Expose component effects
+// ============================================================
+export function typingGameLogic() {
+  const gameState = signal<"menu" | "playing" | "paused">("menu");
+  const currentWord = signal("");
+
+  function startGame() {
+    gameState.set("playing");
+  }
+
+  // Component effect: Subscribe to state changes
+  function onStateChange(listener: (state: string) => void) {
+    listener(gameState()); // Immediate call with current value
+    return { dispose: gameState.on(() => listener(gameState())) };
+  }
+
+  // Component effect: Subscribe to word changes
+  function onWordChange(listener: (word: string) => void) {
+    listener(currentWord());
+    return { dispose: currentWord.on(() => listener(currentWord())) };
+  }
+
+  return {
+    gameState,
+    currentWord,
+    startGame,
+    // Component Effects (for DOM, refs, hooks concerns)
+    onStateChange,
+    onWordChange,
+  };
+}
+
+// ============================================================
+// Component: Bind component effects
+// ============================================================
+function TypingGame() {
+  const $game = useScope(typingGameLogic);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wordRef = useRef<HTMLDivElement>(null);
+
+  // Effect 1: Auto-focus input when playing
+  useScope($game.onStateChange, [
+    (state) => {
+      if (state === "playing") {
+        inputRef.current?.focus(); // ✅ Component handles DOM
+      }
+    },
+  ]);
+
+  // Effect 2: Animate word changes
+  useScope($game.onWordChange, [
+    (word) => {
+      wordRef.current?.classList.add("animate-pop");
+      setTimeout(() => wordRef.current?.classList.remove("animate-pop"), 200);
+    },
+  ]);
+
+  return (
+    <div>
+      <div ref={wordRef}>{rx(() => $game.currentWord())}</div>
+      <input ref={inputRef} />
+    </div>
+  );
+}
+```
+
+**Benefits:**
+- Logic stays pure and framework-agnostic
+- Component handles DOM/UI concerns (refs, hooks, animations, sounds)
+- Auto-cleanup when component unmounts
+- Callback is stable when passed through `useScope`
+- One logic can expose multiple component effects
+
+**Naming convention:** Event-style names (`onStateChange`, `onMessage`, `onScoreIncrease`)
+
+**When to use:**
+- ✅ Auto-focus input
+- ✅ Play sounds/animations
+- ✅ Show modals/toasts
+- ✅ Scroll to element
+- ❌ Pure logic side effects (use `.on()` in logic instead)
 
 ---
 

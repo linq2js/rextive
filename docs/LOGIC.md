@@ -1959,6 +1959,406 @@ function LocalCounter() {
 
 ---
 
+## Component Effects Pattern
+
+**Component effects** allow logic to communicate with component-level concerns (refs, hooks, DOM) while keeping logic pure and framework-agnostic.
+
+### The Problem
+
+Sometimes you need to trigger component-specific side effects based on logic state changes:
+
+```tsx
+// ❌ BAD: Mixing logic with component concerns
+const gameLogic = logic("gameLogic", () => {
+  const gameState = signal<"menu" | "playing">("menu");
+  
+  // ❌ Logic shouldn't know about refs!
+  let inputRef: HTMLInputElement | null = null;
+  
+  gameState.on(() => {
+    if (gameState() === "playing") {
+      inputRef?.focus(); // ❌ DOM manipulation in logic!
+    }
+  });
+  
+  return { gameState, setInputRef: (ref) => inputRef = ref };
+});
+```
+
+### The Solution: Component Effects
+
+Logic exposes methods that accept callbacks from components. Callbacks can access refs, hooks, and DOM:
+
+```tsx
+// ✅ GOOD: Logic exposes component effects
+export const gameLogic = logic("gameLogic", () => {
+  const gameState = signal<"menu" | "playing" | "paused" | "finished">("menu");
+  const score = signal(0);
+  const currentWord = signal("");
+
+  function startGame() {
+    gameState.set("playing");
+  }
+
+  function pauseGame() {
+    gameState.set("paused");
+  }
+
+  // ============================================================
+  // Component Effects: Logic → Component Communication
+  // ============================================================
+  
+  /**
+   * Component effect for game state changes.
+   * Allows components to react with DOM/UI concerns (focus, animations).
+   */
+  function onStateChange(listener: (state: string) => void) {
+    // Immediate call with current state
+    listener(gameState());
+    // Subscribe to future changes
+    return { dispose: gameState.on(() => listener(gameState())) };
+  }
+
+  /**
+   * Component effect for word changes.
+   * Useful for triggering animations or sounds.
+   */
+  function onWordChange(listener: (word: string) => void) {
+    listener(currentWord());
+    return { dispose: currentWord.on(() => listener(currentWord())) };
+  }
+
+  /**
+   * Component effect for score changes.
+   * Useful for confetti, sounds, or celebration animations.
+   */
+  function onScoreIncrease(listener: (newScore: number, delta: number) => void) {
+    let prevScore = score();
+    return {
+      dispose: score.on(() => {
+        const curr = score();
+        if (curr > prevScore) {
+          listener(curr, curr - prevScore);
+          prevScore = curr;
+        }
+      }),
+    };
+  }
+
+  return {
+    // State
+    gameState,
+    score,
+    currentWord,
+    
+    // Actions
+    startGame,
+    pauseGame,
+    
+    // Component Effects (for DOM, refs, hooks concerns)
+    onStateChange,
+    onWordChange,
+    onScoreIncrease,
+  };
+});
+```
+
+**Component binds effects with callbacks:**
+
+```tsx
+import { useScope, rx } from "rextive/react";
+import { useRef } from "react";
+import { gameLogic } from "./gameLogic";
+
+function GameScreen() {
+  const $game = useScope(gameLogic);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wordRef = useRef<HTMLDivElement>(null);
+  const { playCoin, playLevelUp } = useSound();
+
+  // Effect 1: Auto-focus input when playing
+  useScope($game.onStateChange, [
+    (state) => {
+      if (state === "playing") {
+        inputRef.current?.focus(); // ✅ Component handles DOM
+      }
+    },
+  ]);
+
+  // Effect 2: Animate word changes
+  useScope($game.onWordChange, [
+    (word) => {
+      wordRef.current?.classList.add("animate-pop");
+      setTimeout(() => wordRef.current?.classList.remove("animate-pop"), 200);
+    },
+  ]);
+
+  // Effect 3: Celebrate score increase
+  useScope($game.onScoreIncrease, [
+    (newScore, delta) => {
+      playCoin(); // ✅ Component handles sounds
+      if (delta >= 10) {
+        playLevelUp();
+        showConfetti(); // ✅ Component handles UI effects
+      }
+    },
+  ]);
+
+  return (
+    <div>
+      <div ref={wordRef}>{rx(() => $game.currentWord())}</div>
+      <input ref={inputRef} />
+      <div>Score: {rx($game.score)}</div>
+    </div>
+  );
+}
+```
+
+### Benefits
+
+| Benefit | Description |
+|---------|-------------|
+| **Pure logic** | Logic doesn't know about DOM, refs, or React |
+| **Testable** | Logic can be tested without React |
+| **Reusable** | Same logic, different component behaviors |
+| **Auto-cleanup** | `useScope` disposes on unmount automatically |
+| **Stable callbacks** | `useScope` keeps args stable across renders |
+| **Multiple effects** | One logic exposes many component effects |
+
+### Multiple Components, Same Logic
+
+Different components can bind different effects from the same logic:
+
+```tsx
+// Component 1: Focus management
+function GameInput() {
+  const $game = gameLogic(); // Singleton
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useScope($game.onStateChange, [
+    (state) => {
+      if (state === "playing") inputRef.current?.focus();
+    },
+  ]);
+
+  return <input ref={inputRef} />;
+}
+
+// Component 2: Sound effects
+function GameSounds() {
+  const $game = gameLogic(); // Same singleton
+  const { playCoin } = useSound();
+
+  useScope($game.onScoreIncrease, [
+    (score, delta) => playCoin(),
+  ]);
+
+  return null; // Invisible component
+}
+
+// Component 3: Visual effects
+function GameVisuals() {
+  const $game = gameLogic(); // Same singleton
+
+  useScope($game.onScoreIncrease, [
+    (score, delta) => {
+      if (delta >= 10) showConfetti();
+    },
+  ]);
+
+  return null;
+}
+```
+
+### Pattern Variations
+
+**Immediate call with current value:**
+
+```tsx
+function onStateChange(listener: (state: string) => void) {
+  listener(gameState()); // ✅ Sync immediately
+  return { dispose: gameState.on(() => listener(gameState())) };
+}
+```
+
+**No immediate call (only future changes):**
+
+```tsx
+function onScoreChange(listener: (score: number) => void) {
+  // No immediate call - only future changes
+  return { dispose: score.on(() => listener(score())) };
+}
+```
+
+**Filtered events:**
+
+```tsx
+function onLevelUp(listener: (level: number) => void) {
+  let prevLevel = level();
+  return {
+    dispose: level.on(() => {
+      const curr = level();
+      if (curr > prevLevel) {
+        listener(curr); // Only fire on level increase
+        prevLevel = curr;
+      }
+    }),
+  };
+}
+```
+
+**Multiple signal events:**
+
+```tsx
+function onGameEnd(listener: (finalScore: number, won: boolean) => void) {
+  return {
+    dispose: gameState.on(() => {
+      const state = gameState();
+      if (state === "finished") {
+        listener(score(), score() >= 100);
+      }
+    }),
+  };
+}
+```
+
+### Testing Component Effects
+
+Component effects are easy to test - just call them with a mock listener:
+
+```tsx
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { logic } from "rextive";
+import { gameLogic } from "./gameLogic";
+
+describe("gameLogic component effects", () => {
+  afterEach(() => logic.clear());
+
+  it("should call listener on state change", () => {
+    const $game = logic.create(gameLogic);
+    const listener = vi.fn();
+
+    // Bind component effect
+    const { dispose } = $game.onStateChange(listener);
+
+    // Should call immediately with current state
+    expect(listener).toHaveBeenCalledWith("menu");
+
+    // Change state
+    $game.startGame();
+    expect(listener).toHaveBeenCalledWith("playing");
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    // Cleanup
+    dispose();
+    $game.pauseGame();
+    expect(listener).toHaveBeenCalledTimes(2); // No more calls after dispose
+  });
+
+  it("should only fire onScoreIncrease when score goes up", () => {
+    const $game = logic.create(gameLogic);
+    const listener = vi.fn();
+
+    $game.onScoreIncrease(listener);
+
+    $game.score.set(10);
+    expect(listener).toHaveBeenCalledWith(10, 10);
+
+    $game.score.set(5); // Score decreased
+    expect(listener).toHaveBeenCalledTimes(1); // Should NOT fire
+
+    $game.score.set(15); // Score increased again
+    expect(listener).toHaveBeenCalledWith(15, 10);
+  });
+});
+```
+
+### When to Use Component Effects
+
+| Scenario | Component Effect | Direct `.on()` in Component |
+|----------|-----------------|----------------------------|
+| Auto-focus input | ✅ Use component effect | ❌ Manual cleanup needed |
+| Play sounds/animations | ✅ Use component effect | ❌ Hard to test |
+| Show modals/toasts | ✅ Use component effect | ❌ Couples logic to UI |
+| Scroll to element | ✅ Use component effect | ❌ Logic knows about DOM |
+| Pure logic reactions | ❌ Overkill | ✅ Use `.on()` in logic |
+
+### Real-World Example: Form Validation
+
+```tsx
+// formLogic.ts
+export const formLogic = logic("formLogic", () => {
+  const fields = signal({ email: "", password: "" });
+  const errors = signal<Record<string, string>>({});
+  const isSubmitting = signal(false);
+
+  async function submit() {
+    isSubmitting.set(true);
+    // ... validation and submission
+    isSubmitting.set(false);
+  }
+
+  // Component effect: Notify when validation errors occur
+  function onValidationError(listener: (field: string, error: string) => void) {
+    return {
+      dispose: errors.on(() => {
+        const errs = errors();
+        Object.entries(errs).forEach(([field, error]) => {
+          listener(field, error);
+        });
+      }),
+    };
+  }
+
+  return {
+    fields,
+    errors,
+    isSubmitting,
+    submit,
+    onValidationError, // Component effect
+  };
+});
+
+// Form.tsx
+function Form() {
+  const $form = useScope(formLogic);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
+  // Shake fields when validation fails
+  useScope($form.onValidationError, [
+    (field, error) => {
+      const ref = field === "email" ? emailRef : passwordRef;
+      ref.current?.classList.add("animate-shake", "border-red-500");
+      setTimeout(() => {
+        ref.current?.classList.remove("animate-shake", "border-red-500");
+      }, 500);
+    },
+  ]);
+
+  return (
+    <form onSubmit={$form.submit}>
+      <input ref={emailRef} {...bindInput($form.fields, "email")} />
+      <input ref={passwordRef} type="password" {...bindInput($form.fields, "password")} />
+      <button disabled={rx(() => $form.isSubmitting())}>Submit</button>
+    </form>
+  );
+}
+```
+
+### Summary
+
+| Aspect | Description |
+|--------|-------------|
+| **Purpose** | Logic → component communication for DOM/UI concerns |
+| **Pattern** | Logic exposes `onXxx(callback)` methods |
+| **Binding** | `useScope($logic.onXxx, [callback])` |
+| **Cleanup** | Auto-disposed by `useScope` on unmount |
+| **Return** | `{ dispose: () => void }` |
+| **Naming** | Event-style: `onStateChange`, `onMessage`, `onScoreIncrease` |
+
+---
+
 ## Best Practices
 
 ### 1. Use `logic.clear()` in Tests

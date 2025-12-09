@@ -404,6 +404,94 @@ function Component() {
 }
 ```
 
+### Pattern 9: Component Effects
+
+**Component effects** allow logic to communicate with component-level concerns (refs, hooks, DOM) while keeping logic pure.
+
+```tsx
+// ============================================================
+// Logic: Expose component effects
+// ============================================================
+function gameLogic() {
+  const gameState = signal<"menu" | "playing">("menu");
+  const score = signal(0);
+
+  function startGame() {
+    gameState.set("playing");
+  }
+
+  // Component effect: for DOM/UI concerns
+  function onStateChange(listener: (state: string) => void) {
+    listener(gameState()); // Immediate call
+    return { dispose: gameState.on(() => listener(gameState())) };
+  }
+
+  function onScoreIncrease(listener: (score: number) => void) {
+    let prevScore = score();
+    return {
+      dispose: score.on(() => {
+        const curr = score();
+        if (curr > prevScore) {
+          listener(curr);
+          prevScore = curr;
+        }
+      }),
+    };
+  }
+
+  return {
+    gameState,
+    score,
+    startGame,
+    // Component effects (for refs, hooks, DOM)
+    onStateChange,
+    onScoreIncrease,
+  };
+}
+
+// ============================================================
+// Component: Bind component effects
+// ============================================================
+function GameScreen() {
+  const $game = useScope(gameLogic);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { playCoin } = useSound();
+
+  // Effect 1: Auto-focus input when playing
+  useScope($game.onStateChange, [
+    (state) => {
+      if (state === "playing") {
+        inputRef.current?.focus(); // ✅ Component handles DOM
+      }
+    },
+  ]);
+
+  // Effect 2: Play sound on score increase
+  useScope($game.onScoreIncrease, [(score) => playCoin()]);
+
+  return (
+    <div>
+      <input ref={inputRef} />
+      <div>Score: {rx($game.score)}</div>
+    </div>
+  );
+}
+```
+
+**Benefits:**
+- Logic stays pure and framework-agnostic
+- Component handles DOM/UI concerns (refs, hooks, animations, sounds)
+- Auto-cleanup when component unmounts
+- Callback is stable when passed through `useScope`
+- One logic can expose multiple component effects
+
+**When to use:**
+- ✅ Auto-focus input
+- ✅ Play sounds/animations
+- ✅ Show modals/toasts
+- ✅ Scroll to element
+- ❌ Pure logic side effects (use `.on()` in logic instead)
+
 ## API Reference Quick Guide
 
 ### signal
@@ -516,6 +604,24 @@ const { userData } = useScope(
   (userId, filter) => createUserScope(userId, filter),
   [userId, filter]
 );
+
+// Multiple scopes - returns tuple
+const [counter, form] = useScope([
+  () => ({ count: signal(0) }),
+  () => ({ name: signal("") }),
+]);
+
+// With scope() helper for better clarity
+const [counter, form] = useScope([
+  scope(counterLogic),
+  scope(formLogic),
+]);
+
+// Mixed: scope descriptors and factories
+const [counter, form] = useScope([
+  scope("shared-key", counterLogic), // Shared mode
+  () => ({ name: signal("") }),      // Local mode
+]);
 ```
 
 ### useAwaited

@@ -19,16 +19,58 @@ export interface GameStats {
 // Constants
 export const WORD_LISTS = {
   easy: [
-    "cat", "dog", "sun", "hat", "cup", "red", "big", "run", "fun", "hop",
-    "top", "pot", "bat", "rat", "map", "cap", "tap", "nap", "zip", "tip",
+    "cat",
+    "dog",
+    "sun",
+    "hat",
+    "cup",
+    "red",
+    "big",
+    "run",
+    "fun",
+    "hop",
+    "top",
+    "pot",
+    "bat",
+    "rat",
+    "map",
+    "cap",
+    "tap",
+    "nap",
+    "zip",
+    "tip",
   ],
   medium: [
-    "apple", "happy", "house", "mouse", "water", "green", "plant", "cloud",
-    "smile", "dance", "horse", "tiger", "pizza", "candy", "beach", "train",
+    "apple",
+    "happy",
+    "house",
+    "mouse",
+    "water",
+    "green",
+    "plant",
+    "cloud",
+    "smile",
+    "dance",
+    "horse",
+    "tiger",
+    "pizza",
+    "candy",
+    "beach",
+    "train",
   ],
   hard: [
-    "rainbow", "butterfly", "elephant", "sunshine", "computer", "dinosaur",
-    "chocolate", "adventure", "playground", "wonderful", "fantastic", "birthday",
+    "rainbow",
+    "butterfly",
+    "elephant",
+    "sunshine",
+    "computer",
+    "dinosaur",
+    "chocolate",
+    "adventure",
+    "playground",
+    "wonderful",
+    "fantastic",
+    "birthday",
   ],
 };
 
@@ -218,6 +260,74 @@ export function typingGameLogic() {
     gameState.set("menu");
   }
 
+  // ============================================================
+  // Component Effects Pattern
+  // ============================================================
+  //
+  // Component effects allow logic to communicate with component-level
+  // concerns (refs, hooks, local state) while maintaining proper
+  // cleanup on unmount.
+  //
+  // Why "Component Effect"?
+  // - "Effect" = side effect with automatic cleanup (like useEffect)
+  // - "Component" = callback can access refs, hooks, DOM, local state
+  //
+  // Usage in component:
+  //   const inputRef = useRef<HTMLInputElement>(null);
+  //   const $game = useTypingGame(); // or typingGameLogic()
+  //
+  //   // Bind component effect with callback
+  //   useScope($game.onStateChange, [
+  //     (state) => {
+  //       if (state === "playing") {
+  //         inputRef.current?.focus();  // Access refs, hooks, etc.
+  //       }
+  //     }
+  //   ]);
+  //
+  // Benefits:
+  // - Callback is stable when passed through useScope
+  // - Auto-cleanup when component unmounts
+  // - Logic stays pure, component handles DOM/UI concerns
+  // - Clear separation: logic emits events, component reacts
+  // ============================================================
+
+  /**
+   * Component effect for game state changes.
+   * @param listener - Callback receiving state (stable via useScope)
+   * @returns Disposable for cleanup on unmount
+   */
+  function onStateChange(listener: (state: GameState) => void) {
+    // Notify immediately with current state
+    listener(gameState());
+    // Subscribe to future changes
+    return { dispose: gameState.on(() => listener(gameState())) };
+  }
+
+  /**
+   * Component effect for word changes.
+   * Useful for: animations, sounds when word changes.
+   */
+  function onWordChange(listener: (word: string) => void) {
+    listener(currentWord());
+    return { dispose: currentWord.on(() => listener(currentWord())) };
+  }
+
+  /**
+   * Component effect for feedback messages.
+   * Useful for: shake animations, visual feedback.
+   */
+  function onMessage(listener: (message: string, isCorrect: boolean) => void) {
+    return {
+      dispose: message.on(() => {
+        const msg = message();
+        if (msg) {
+          listener(msg, CORRECT_MESSAGES.includes(msg));
+        }
+      }),
+    };
+  }
+
   return {
     // State
     gameState,
@@ -237,6 +347,9 @@ export function typingGameLogic() {
     pauseGame,
     resumeGame,
     backToMenu,
+    // Component Effects (for DOM, refs, hooks concerns)
+    onStateChange,
+    onWordChange,
+    onMessage,
   };
 }
-

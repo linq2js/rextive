@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { rx, useScope } from "rextive/react";
 import { energyLogic, selectedProfileLogic } from "@/logic";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import {
   typingGameLogic,
   TypingGameProvider,
@@ -33,15 +33,16 @@ function TypingAdventureContent() {
   const $energy = energyLogic();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus input when playing (DOM concern - must stay in component)
-  useEffect(() => {
-    const unsub = $game.gameState.on(() => {
-      if ($game.gameState() === "playing") {
+  // Component Effect: Auto-focus input when playing
+  // - Logic emits state changes, component handles DOM concerns
+  // - Auto-cleanup on unmount
+  useScope($game.onStateChange, [
+    (state) => {
+      if (state === "playing") {
         inputRef.current?.focus();
       }
-    });
-    return unsub;
-  }, [$game]);
+    },
+  ]);
 
   return rx(() => {
     const state = $game.gameState();

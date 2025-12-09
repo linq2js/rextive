@@ -750,6 +750,56 @@ useScope((filters) => ({ ... }), [filters], "shallow");
 useScope((obj) => ({ ... }), [obj], (a, b) => a.id === b.id);
 ```
 
+#### Multiple Scopes Mode
+
+Create multiple scopes at once, returning a tuple:
+
+```tsx
+// Array of factories - returns tuple
+const [counter, form] = useScope([
+  () => ({ count: signal(0) }),
+  () => ({ name: signal(""), email: signal("") }),
+]);
+
+// With scope() helper for clarity
+import { scope } from "rextive/react";
+
+const [counter, form] = useScope([
+  scope(counterLogic),
+  scope(formLogic),
+]);
+
+// Shared mode with scope()
+const [shared, local] = useScope([
+  scope("shared-key", sharedLogic), // Shared across components
+  () => ({ value: signal("local") }), // Local to this component
+]);
+
+// Mixed: logic and factories
+const [counter, form, validator] = useScope([
+  scope(counterLogic),
+  () => ({ name: signal("") }),
+  scope(validationLogic),
+]);
+```
+
+**`scope()` helper function:**
+
+```tsx
+// Local mode
+scope(factory);
+scope(factory, deps);
+scope(factory, deps, equals);
+
+// Shared mode
+scope(key, factory);
+scope(key, factory, deps);
+scope(key, factory, deps, equals);
+
+// Returns a Scope<T> descriptor
+// Note: No proxy mode for scope()
+```
+
 ---
 
 ### `useStable()`

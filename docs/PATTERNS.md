@@ -653,6 +653,260 @@ function ContactForm() {
 
 ---
 
+## Pattern 9: Component Effects
+
+**Component effects** allow logic to communicate with component-level concerns (refs, hooks, DOM, local state) while maintaining proper cleanup on unmount.
+
+### The Problem
+
+Logic should stay pure and framework-agnostic, but sometimes you need to:
+- Auto-focus an input when game state changes
+- Trigger animations when data updates
+- Play sounds on specific events
+- Scroll to an element when a list changes
+
+These are **component concerns** (DOM, refs, hooks) that shouldn't live in pure logic.
+
+### The Solution: Component Effect Pattern
+
+Logic exposes methods that accept a callback from the component. The callback can access refs, hooks, and DOM, while logic handles the subscription lifecycle.
+
+```tsx
+import { signal, useScope } from "rextive/react";
+import { useRef } from "react";
+
+// ============================================================
+// Logic: Expose component effects
+// ============================================================
+export function typingGameLogic() {
+  const gameState = signal<"menu" | "playing" | "paused">("menu");
+  const currentWord = signal("");
+  const message = signal("");
+
+  // ... game logic ...
+
+  // Component effect: Subscribe to state changes
+  function onStateChange(listener: (state: string) => void) {
+    listener(gameState()); // Immediate call with current value
+    return { dispose: gameState.on(() => listener(gameState())) };
+  }
+
+  // Component effect: Subscribe to word changes
+  function onWordChange(listener: (word: string) => void) {
+    listener(currentWord());
+    return { dispose: currentWord.on(() => listener(currentWord())) };
+  }
+
+  // Component effect: Subscribe to messages
+  function onMessage(listener: (msg: string, isCorrect: boolean) => void) {
+    return {
+      dispose: message.on(() => {
+        const msg = message();
+        if (msg) listener(msg, msg.includes("Great"));
+      }),
+    };
+  }
+
+  return {
+    gameState,
+    currentWord,
+    message,
+    startGame: () => gameState.set("playing"),
+    // Component effects
+    onStateChange,
+    onWordChange,
+    onMessage,
+  };
+}
+
+// ============================================================
+// Component: Bind component effects
+// ============================================================
+function TypingGame() {
+  const $game = useScope(typingGameLogic);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wordRef = useRef<HTMLDivElement>(null);
+
+  // Effect 1: Auto-focus input when playing
+  useScope($game.onStateChange, [
+    (state) => {
+      if (state === "playing") {
+        inputRef.current?.focus();
+      }
+    },
+  ]);
+
+  // Effect 2: Animate word changes
+  useScope($game.onWordChange, [
+    (word) => {
+      wordRef.current?.classList.add("animate-pop");
+      setTimeout(() => wordRef.current?.classList.remove("animate-pop"), 200);
+    },
+  ]);
+
+  // Effect 3: Shake on wrong answer
+  useScope($game.onMessage, [
+    (msg, isCorrect) => {
+      if (!isCorrect) {
+        wordRef.current?.classList.add("animate-shake");
+        setTimeout(() => wordRef.current?.classList.remove("animate-shake"), 300);
+      }
+    },
+  ]);
+
+  return (
+    <div>
+      <div ref={wordRef}>{rx(() => $game.currentWord())}</div>
+      <input ref={inputRef} />
+    </div>
+  );
+}
+```
+
+### Pattern Structure
+
+**In Logic:**
+
+```tsx
+function myLogic() {
+  const state = signal("idle");
+
+  // Component effect method
+  function onStateChange(listener: (state: string) => void) {
+    // 1. Immediate call with current value (optional)
+    listener(state());
+    
+    // 2. Subscribe to future changes
+    const unsubscribe = state.on(() => listener(state()));
+    
+    // 3. Return disposable for cleanup
+    return { dispose: unsubscribe };
+  }
+
+  return {
+    state,
+    onStateChange, // Expose for components
+  };
+}
+```
+
+**In Component:**
+
+```tsx
+function MyComponent() {
+  const $logic = useScope(myLogic);
+  const ref = useRef<HTMLElement>(null);
+
+  // Bind component effect
+  useScope($logic.onStateChange, [
+    (state) => {
+      // Access refs, hooks, DOM, local state
+      if (state === "active") {
+        ref.current?.focus();
+      }
+    },
+  ]);
+
+  return <div ref={ref}>...</div>;
+}
+```
+
+### Key Benefits
+
+| Benefit | Description |
+|---------|-------------|
+| **Separation of concerns** | Logic stays pure, component handles DOM/UI |
+| **Auto-cleanup** | `useScope` disposes on unmount automatically |
+| **Stable callbacks** | `useScope` keeps args stable across renders |
+| **Multiple effects** | One logic can expose many component effects |
+| **Reusable** | Same logic, different component behaviors |
+
+### Multiple Component Effects
+
+One logic can expose multiple component effects for different concerns:
+
+```tsx
+export function gameLogic() {
+  const score = signal(0);
+  const lives = signal(3);
+  const level = signal(1);
+
+  return {
+    // State
+    score,
+    lives,
+    level,
+    
+    // Component effects (multiple!)
+    onScoreChange: (listener: (score: number) => void) => ({
+      dispose: score.on(() => listener(score())),
+    }),
+    
+    onLivesChange: (listener: (lives: number) => void) => ({
+      dispose: lives.on(() => listener(lives())),
+    }),
+    
+    onLevelUp: (listener: (level: number) => void) => ({
+      dispose: level.on((trigger) => {
+        if (trigger() > level.peek()) listener(level());
+      }),
+    }),
+  };
+}
+```
+
+```tsx
+function GameScreen() {
+  const $game = useScope(gameLogic);
+  const { playCoin, playHurt, playLevelUp } = useSound();
+
+  // Effect 1: Play sound on score
+  useScope($game.onScoreChange, [(score) => playCoin()]);
+
+  // Effect 2: Play sound + shake on damage
+  useScope($game.onLivesChange, [(lives) => {
+    playHurt();
+    document.body.classList.add("shake");
+    setTimeout(() => document.body.classList.remove("shake"), 500);
+  }]);
+
+  // Effect 3: Show level up modal
+  useScope($game.onLevelUp, [(level) => {
+    playLevelUp();
+    setShowLevelUpModal(true);
+  }]);
+
+  return ...;
+}
+```
+
+### Naming Convention
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| **Event style** | `onStateChange`, `onMessage` | Mirrors React event handlers |
+| **Return type** | `{ dispose: () => void }` | Compatible with `useScope` disposal |
+| **Immediate call** | `listener(state())` first | Sync with current state |
+
+### When to Use
+
+| Use Case | Component Effect | Direct `.on()` in Component |
+|----------|-----------------|----------------------------|
+| Access refs/DOM | ✅ Use component effect | ❌ Leaks refs to logic |
+| Play sounds/animations | ✅ Use component effect | ❌ Hard to test |
+| Show modals/alerts | ✅ Use component effect | ❌ Couples logic to UI |
+| Pure logic side effects | ❌ Keep in logic | ✅ Use `.on()` in logic |
+
+### Comparison with Other Patterns
+
+| Pattern | Logic → Component | Component → Logic |
+|---------|------------------|-------------------|
+| **Component Effect** | Logic exposes `onXxx(callback)` | Component provides callback |
+| **Direct Signal Access** | Component reads signal | Component calls methods |
+| **Props** | Parent passes to child | Child emits events up |
+
+---
+
 ## Pattern Quick Reference
 
 | Pattern | Use When | Example |
@@ -670,6 +924,7 @@ function ContactForm() {
 | **Export getters/setters** | Controlled access, easy mocking | `return { getName, setName }` |
 | **Async state (logic)** | Shared action state | `loginState` in logic |
 | **Async state (local)** | Single component action | `useScope(() => signal<Promise>())` |
+| **Component effects** | Logic → component communication | `useScope($logic.onStateChange, [callback])` |
 
 ---
 
