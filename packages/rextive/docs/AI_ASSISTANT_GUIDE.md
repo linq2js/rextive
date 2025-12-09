@@ -54,6 +54,25 @@ Creates component-scoped signals/disposables with automatic cleanup.
   - `dispose() { ... }` - custom dispose method
 - Can return non-disposable helpers without them being disposed
 
+**Proxy Mode** - Creates signals on-demand:
+```tsx
+// Type parameter defines available signals
+const proxy = useScope<{
+  submitState: Promise<SubmitResult>;
+  searchState: Promise<SearchResult>;
+}>();
+
+// Signals created lazily on first access
+proxy.submitState.set(promise);  // Creates empty signal, then sets
+proxy.searchState();              // Creates empty signal, returns undefined
+
+// Use with rx() for reactive rendering
+{rx(() => {
+  const state = task.from(proxy.submitState());
+  return state?.loading ? <Spinner /> : <Content />;
+})}
+```
+
 ### 4. signal.persist - Batch Persistence
 
 Persist multiple signals with centralized load/save operations.

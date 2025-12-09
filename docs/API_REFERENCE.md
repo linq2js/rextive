@@ -431,7 +431,7 @@ is(value, "observable"); // Is an Observable?
 
 ### `task`
 
-Async state utilities.
+Async state access without Suspense.
 
 #### `task.from(promise)`
 
@@ -440,85 +440,60 @@ Access loading/error/success state from a Promise:
 ```tsx
 const state = task.from(promise);
 
-state.status; // "loading" | "success" | "error"
+state.status;  // "loading" | "success" | "error"
 state.loading; // boolean
-state.value; // resolved value
-state.error; // error if rejected
+state.value;   // resolved value (undefined while loading)
+state.error;   // error if rejected
 ```
 
-#### `task.loading(promise)`
-
-Create a loading task:
-
+**Example - Stale-while-revalidate pattern:**
 ```tsx
-const t = task.loading(fetchData());
-```
-
-#### `task.success(value)`
-
-Create a success task:
-
-```tsx
-const t = task.success({ id: 1, name: "Alice" });
-```
-
-#### `task.error(error)`
-
-Create an error task:
-
-```tsx
-const t = task.error(new Error("Not found"));
+rx(() => {
+  const state = task.from(userDataSignal());
+  return (
+    <div>
+      {state?.loading && <Spinner />}
+      {state?.error && <Error error={state.error} />}
+      {state?.value && <UserCard user={state.value} />}
+    </div>
+  );
+});
 ```
 
 ---
 
 ### `wait`
 
-Async coordination utilities.
+Suspense integration for async values. Use inside `rx()` to unwrap promises.
 
 #### `wait()` / `wait.all()`
 
-Wait for all promises:
+Unwrap promises for Suspense (throws promise for React to catch):
 
 ```tsx
-// Suspense mode (throws for Suspense)
-const value = wait(promise);
-const [a, b] = wait([p1, p2]);
-const { user, posts } = wait({ user: p1, posts: p2 });
-
-// Promise mode
-await wait(promise, (value) => processValue(value));
-await wait([p1, p2], (a, b) => combine(a, b));
+// Inside rx() - triggers Suspense boundary
+rx(() => {
+  const value = wait(asyncSignal());
+  const [a, b] = wait([promise1, promise2]);
+  const { user, posts } = wait({ user: userPromise, posts: postsPromise });
+  return <div>{value.name}</div>;
+});
 ```
 
-#### `wait.any()`
-
-First to resolve:
-
-```tsx
-const [value, key] = wait.any({ fast, slow });
-```
-
-#### `wait.race()`
-
-First to settle:
-
-```tsx
-const [value, key] = wait.race({ p1, p2 });
-```
-
-#### `wait.settled()`
-
-All settled (never throws):
-
-```tsx
-const results = wait.settled([p1, p2, p3]);
-// [{ status: "fulfilled", value }, { status: "rejected", reason }, ...]
-```
+> **Why not Promise.race/settled?** Use `wait()` + `task.from()` instead of creating
+> wrapper promises. You get loading/error states without extra promise overhead:
+> ```tsx
+> rx(() => {
+>   const state = task.from(asyncSignal());
+>   if (state?.loading) return <Spinner />;
+>   if (state?.error) return <Error error={state.error} />;
+>   return <Content data={state.value} />;
+> });
+> ```
 
 #### `wait.timeout()`
 
-With timeout:
+Promise with timeout (utility):
 
 ```tsx
 const data = await wait.timeout(fetchData(), 5000);
@@ -526,7 +501,7 @@ const data = await wait.timeout(fetchData(), 5000);
 
 #### `wait.delay()`
 
-Simple delay:
+Simple delay (utility):
 
 ```tsx
 await wait.delay(1000);
@@ -628,24 +603,52 @@ events.dispose();
 ### Other Utilities
 
 ```tsx
-// Utilities
 import {
-  compose, // Function composition (right to left)
-  isPromiseLike, // Check if value is promise-like
-  shallowEquals, // Shallow equality comparison
-  resolveEquals, // Resolve equality strategy
-  createProxy, // Create reactive proxy
-  producer, // Lazy factory manager
-  dev, // Check if in dev mode
-  awaited, // Transform async values
-  validate, // Validation utilities
+  // Equality helpers
+  shallowEquals,    // Shallow equality comparison
+  resolveEquals,    // Resolve equality strategy string to function
+  
+  // Type checks
+  isPromiseLike,    // Check if value is promise-like
+  
+  // Function utilities
+  compose,          // Function composition (right to left)
+  
+  // Development
+  dev,              // Check if in dev mode: dev() => boolean
 } from "rextive";
+```
 
-// Errors
+#### `compose(...fns)`
+
+Right-to-left function composition:
+
+```tsx
+const process = compose(
+  (x: number) => x.toString(),
+  (x: number) => x * 2,
+  (x: number) => x + 1
+);
+process(5); // "12" (5+1=6, 6*2=12, "12")
+```
+
+#### `dev()`
+
+Check development mode (useful for conditional logging):
+
+```tsx
+if (dev()) {
+  console.log("Debug info:", signal.peek());
+}
+```
+
+### Error Types
+
+```tsx
 import {
-  AbortedComputationError,
-  FallbackError,
-  SignalDisposedError,
+  AbortedComputationError, // Thrown when async computation is aborted
+  FallbackError,           // Thrown when fallback handler fails
+  SignalDisposedError,     // Thrown when accessing disposed signal
 } from "rextive";
 ```
 
@@ -751,7 +754,17 @@ useScope((obj) => ({ ... }), [obj], (a, b) => a.id === b.id);
 
 ### `useStable()`
 
-Dynamic stable getter for callbacks and objects:
+Dynamic stable reference getter. Similar to `useCallback`/`useMemo` but with dynamic keys.
+
+**When to use `useStable()` vs React hooks:**
+
+| Use Case | Recommendation |
+|----------|---------------|
+| Single callback with known deps | `useCallback` |
+| Single memoized value | `useMemo` |
+| Multiple callbacks in one place | `useStable()` |
+| Dynamic/computed keys | `useStable()` |
+| Need stable ref without deps array | `useStable()` |
 
 ```tsx
 const stable = useStable<{
@@ -759,15 +772,24 @@ const stable = useStable<{
   config: { theme: string };
 }>();
 
-// Single key-value
+// Single key-value (always returns same reference)
 const onClick = stable("onClick", () => handleClick());
 const config = stable("config", { theme: "dark" }, "shallow");
 
-// Multiple values
+// Multiple values at once
 const handlers = stable({
   onSubmit: () => submitForm(),
   onCancel: () => cancelForm(),
 });
+```
+
+**vs React hooks:**
+```tsx
+// useStable - one line, no deps array
+const onClick = stable("onClick", () => doSomething(count));
+
+// useCallback - requires deps array
+const onClick = useCallback(() => doSomething(count), [count]);
 ```
 
 ---
@@ -924,24 +946,37 @@ const delayed = source.pipe(delay(500));
 
 ---
 
-### Sequence Operators
+### Sequence Operators (Advanced)
+
+> **When to use:** These RxJS-style operators are useful for streaming scenarios
+> (real-time data, event sequences). For typical app state, computed signals
+> with conditionals are often simpler.
 
 #### Take Operators
 
 ```tsx
-take(5); // First 5 values
-takeWhile((x) => x < 10); // While condition true
-takeLast(3); // Last 3 values
-takeUntil(stopSignal); // Until signal emits
+take(5);                    // First 5 values
+takeWhile((x) => x < 10);   // While condition true
+takeLast(3);                // Last 3 values
+takeUntil(stopSignal);      // Until signal emits
 ```
 
 #### Skip Operators
 
 ```tsx
-skip(5); // Skip first 5
-skipWhile((x) => x < 10); // Skip while condition true
-skipLast(3); // Skip last 3
-skipUntil(startSignal); // Skip until signal emits
+skip(5);                    // Skip first 5
+skipWhile((x) => x < 10);   // Skip while condition true
+skipLast(3);                // Skip last 3
+skipUntil(startSignal);     // Skip until signal emits
+```
+
+**Example - Stream processing:**
+```tsx
+// Only process first 10 mouse events, then stop
+const limitedClicks = clicks.pipe(take(10));
+
+// Skip events until user is authenticated
+const protectedEvents = events.pipe(skipUntil(isAuthenticated));
 ```
 
 ---
@@ -949,10 +984,10 @@ skipUntil(startSignal); // Skip until signal emits
 ### Aggregation Operators
 
 ```tsx
-min(); // Minimum value
-max(); // Maximum value
-count(); // Count emissions
-distinct(); // Remove duplicates
+min();      // Track minimum value seen
+max();      // Track maximum value seen
+count();    // Count emissions
+distinct(); // Remove consecutive duplicates
 ```
 
 ---

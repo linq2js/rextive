@@ -644,6 +644,43 @@ const { userData } = useScope(
 
 ---
 
+#### Overload 5: Proxy mode (on-demand signal creation)
+
+```ts
+function useScope<T extends Record<string, unknown>>(): SignalProxy<T>
+
+type SignalProxy<T> = {
+  [K in keyof T]: Mutable<T[K], T[K] | undefined>;
+};
+```
+
+Creates signals lazily on first property access. Useful for action state tracking patterns.
+
+**Example:**
+```ts
+// Define signal types via type parameter
+const proxy = useScope<{
+  submitState: Promise<SubmitResult>;
+  searchState: Promise<SearchResult>;
+}>();
+
+// Signals created on first access (returns Mutable<T, T | undefined>)
+proxy.submitState.set(promise);  // Creates empty signal, then sets value
+proxy.submitState();             // Returns undefined initially
+
+// Use with rx() for reactive rendering
+{rx(() => {
+  const state = task.from(proxy.submitState());
+  return state?.loading ? <Spinner /> : <Content />;
+})}
+
+// ~40% less boilerplate than explicit signal creation:
+// Before: const { submitState } = useScope(() => ({ submitState: signal<Promise<SubmitResult>>() }));
+// After:  const proxy = useScope<{ submitState: Promise<SubmitResult> }>();
+```
+
+---
+
 ### Other React Hooks
 
 - `useWatch(signals)` - Subscribe to signals and track changes
@@ -690,7 +727,7 @@ count.map(x => x * 2, { equals: (a, b) => a === b, name: 'mapped' })
 | `task` | 1 main + 6 namespace methods | Namespace pattern |
 | `wait()` | 6 main overloads | Suspense + Promise modes |
 | `wait.*` | Each has multiple overloads | any, race, settled, timeout, delay |
-| `useScope()` | 3 overloads | Component, Object, Factory modes |
+| `useScope()` | 5 overloads | Component, Object, Factory, Args, Proxy modes |
 
 ---
 
