@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { signal } from "rextive";
+import { patch } from "rextive/helpers";
 import { rx, useScope, inputValue, inputNumber } from "rextive/react";
 import { focus } from "rextive/op";
 import { kidProfilesLogic } from "@/logic";
@@ -259,9 +260,7 @@ function KidActionsPanel({
                 <button
                   key={game.id}
                   onClick={() => {
-                    if (
-                      confirm(`Reset ${game.name} stats for ${kid.name}?`)
-                    ) {
+                    if (confirm(`Reset ${game.name} stats for ${kid.name}?`)) {
                       $tab.resetGameStats(kid.id, game.id);
                     }
                   }}
@@ -316,9 +315,7 @@ function KidActionsPanel({
                     </span>
                   </div>
                   <button
-                    onClick={() =>
-                      $tab.toggleGameVisibility(kid.id, game.id)
-                    }
+                    onClick={() => $tab.toggleGameVisibility(kid.id, game.id)}
                     disabled={isLoading}
                     className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                       isVisible
@@ -417,9 +414,7 @@ function ProfileFormModal({
                     <button
                       key={emoji}
                       type="button"
-                      onClick={() =>
-                        $form.state.set((s) => ({ ...s, avatar: emoji }))
-                      }
+                      onClick={() => $form.state.set(patch("avatar", emoji))}
                       className={`h-12 w-12 rounded-xl text-2xl transition-all ${
                         currentAvatar === emoji
                           ? `${AVATAR_COLORS[emoji]} ring-2 ring-primary-500 scale-110`
@@ -439,9 +434,7 @@ function ProfileFormModal({
                     <button
                       key={emoji}
                       type="button"
-                      onClick={() =>
-                        $form.state.set((s) => ({ ...s, avatar: emoji }))
-                      }
+                      onClick={() => $form.state.set(patch("avatar", emoji))}
                       className={`h-12 w-12 rounded-xl text-2xl transition-all ${
                         currentAvatar === emoji
                           ? `${AVATAR_COLORS[emoji]} ring-2 ring-primary-500 scale-110`
@@ -474,8 +467,8 @@ function ProfileFormModal({
                 {$form.state().loading
                   ? "Saving..."
                   : $form.isEditing
-                  ? "Save Changes"
-                  : "Add Profile"}
+                    ? "Save Changes"
+                    : "Add Profile"}
               </button>
             ))}
           </div>
@@ -497,10 +490,7 @@ function ProfileFormModal({
                         <button
                           type="button"
                           onClick={() =>
-                            $form.state.set((s) => ({
-                              ...s,
-                              showDeleteConfirm: false,
-                            }))
+                            $form.state.set(patch("showDeleteConfirm", false))
                           }
                           className="btn btn-outline flex-1 py-2"
                         >
@@ -523,10 +513,7 @@ function ProfileFormModal({
                   <button
                     type="button"
                     onClick={() =>
-                      $form.state.set((s) => ({
-                        ...s,
-                        showDeleteConfirm: true,
-                      }))
+                      $form.state.set(patch("showDeleteConfirm", true))
                     }
                     className="mt-4 w-full text-center text-sm text-red-500 hover:text-red-700"
                   >

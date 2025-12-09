@@ -49,6 +49,10 @@ export default defineConfig({
         replacement: resolve(rextiveSrc, "op/index.ts"),
       },
       {
+        find: "rextive/helpers",
+        replacement: resolve(rextiveSrc, "helpers/index.ts"),
+      },
+      {
         find: /^rextive$/,
         replacement: resolve(rextiveSrc, "index.ts"),
       },
@@ -63,6 +67,7 @@ export default defineConfig({
       "rextive/devtools-panel",
       "rextive/react",
       "rextive/op",
+      "rextive/helpers",
     ],
   },
 });

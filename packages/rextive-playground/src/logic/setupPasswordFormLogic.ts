@@ -1,5 +1,6 @@
 // Local logic for setup password form
 import { signal } from "rextive";
+import { patch } from "rextive/helpers";
 import { parentAuthLogic } from "./parentAuthLogic";
 
 interface SetupFormState {
@@ -26,28 +27,26 @@ export function setupPasswordFormLogic() {
     const { password, confirm } = state();
 
     if (password.length < 4) {
-      state.set((s) => ({
-        ...s,
-        error: "Password must be at least 4 characters",
-      }));
+      state.set(patch("error", "Password must be at least 4 characters"));
       return;
     }
 
     if (password !== confirm) {
-      state.set((s) => ({ ...s, error: "Passwords do not match" }));
+      state.set(patch("error", "Passwords do not match"));
       return;
     }
 
-    state.set((s) => ({ ...s, loading: true, error: "" }));
+    state.set(patch<SetupFormState>({ loading: true, error: "" }));
 
     try {
       await $auth.setup(password);
     } catch {
-      state.set((s) => ({
-        ...s,
-        error: "Failed to set up password",
-        loading: false,
-      }));
+      state.set(
+        patch<SetupFormState>({
+          error: "Failed to set up password",
+          loading: false,
+        })
+      );
     }
   }
 

@@ -34,6 +34,7 @@ export default defineConfig({
         ),
         "op/index": resolve(__dirname, "src/op/index.ts"),
         "test/index": resolve(__dirname, "src/test/index.ts"),
+        "helpers/index": resolve(__dirname, "src/helpers/index.ts"),
       },
       formats: ["es"],
     },

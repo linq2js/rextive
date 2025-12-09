@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { signal } from "rextive";
+import { patch } from "rextive/helpers";
 import { rx, useScope } from "rextive/react";
 import { energyLogic, selectedProfileLogic } from "@/logic";
 import { useEffect, useRef } from "react";
@@ -114,10 +115,7 @@ function typingGameLogic() {
     const input = userInput();
     const expectedChar = current[input.length];
 
-    stats.set((s) => ({
-      ...s,
-      totalKeystrokes: s.totalKeystrokes + 1,
-    }));
+    stats.set(patch("totalKeystrokes", (t) => t + 1));
 
     if (key.toLowerCase() === expectedChar?.toLowerCase()) {
       // Correct keystroke
@@ -157,11 +155,7 @@ function typingGameLogic() {
       }
     } else {
       // Wrong keystroke - reset streak
-      stats.set((s) => ({
-        ...s,
-        streak: 0,
-        accuracy: Math.round((s.correctKeystrokes / (s.totalKeystrokes + 1)) * 100),
-      }));
+      stats.set(patch<GameStats>({ streak: 0, accuracy: Math.round((stats().correctKeystrokes / (stats().totalKeystrokes + 1)) * 100) }));
       message.set(getRandomMessage(false));
     }
   }
@@ -173,7 +167,7 @@ function typingGameLogic() {
 
   function skipWord() {
     if (gameState() !== "playing") return;
-    stats.set((s) => ({ ...s, streak: 0 }));
+    stats.set(patch("streak", 0));
     userInput.set("");
     currentWord.set(getRandomWord(difficulty()));
     message.set("Skipped! 👋");

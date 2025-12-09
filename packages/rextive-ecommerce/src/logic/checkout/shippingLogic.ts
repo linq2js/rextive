@@ -1,4 +1,5 @@
 import { signal, logic } from "rextive";
+import { patch } from "rextive/helpers";
 import { authLogic } from "../authLogic";
 import { DEFAULT_SHIPPING_INFO, type ShippingInfo } from "./types";
 
@@ -33,19 +34,20 @@ export const shippingLogic = logic("checkout.shippingLogic", () => {
   // Actions
   /** Update shipping info with partial data */
   const update = (updates: Partial<ShippingInfo>) => {
-    info.set((prev) => ({ ...prev, ...updates }));
+    info.set(patch<ShippingInfo>(updates));
   };
 
   /** Pre-fill shipping form from logged-in user profile */
   const prefillFromUser = () => {
     const user = $auth.user();
     if (user) {
-      info.set((prev) => ({
-        ...prev,
-        firstName: user.firstName || prev.firstName,
-        lastName: user.lastName || prev.lastName,
-        email: user.email || prev.email,
-      }));
+      info.set(
+        patch<ShippingInfo>({
+          firstName: user.firstName || info().firstName,
+          lastName: user.lastName || info().lastName,
+          email: user.email || info().email,
+        })
+      );
     }
   };
 

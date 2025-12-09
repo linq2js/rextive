@@ -1,5 +1,6 @@
 // Local logic for login form
 import { signal } from "rextive";
+import { patch } from "rextive/helpers";
 import { parentAuthLogic } from "./parentAuthLogic";
 
 interface LoginFormState {
@@ -21,23 +22,15 @@ export function loginFormLogic() {
   );
 
   async function submit() {
-    state.set((s) => ({ ...s, loading: true, error: "" }));
+    state.set(patch<LoginFormState>({ loading: true, error: "" }));
 
     try {
       const success = await $auth.login(state().password);
       if (!success) {
-        state.set((s) => ({
-          ...s,
-          error: "Incorrect password",
-          loading: false,
-        }));
+        state.set(patch<LoginFormState>({ error: "Incorrect password", loading: false }));
       }
     } catch {
-      state.set((s) => ({
-        ...s,
-        error: "Authentication failed",
-        loading: false,
-      }));
+      state.set(patch<LoginFormState>({ error: "Authentication failed", loading: false }));
     }
   }
 

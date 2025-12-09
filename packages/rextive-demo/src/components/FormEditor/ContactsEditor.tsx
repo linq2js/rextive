@@ -1,6 +1,7 @@
 /**
  * Contacts editor - repeatable nested group using focus operator
  */
+import { patch } from "rextive/helpers";
 import { rx, useScope } from "rextive/react";
 import { focus } from "rextive/op";
 import { useFormContext } from "../../store/formStore";
@@ -26,10 +27,10 @@ export function ContactsEditor() {
           email: "",
           addresses: [],
         };
-        contacts.set((prev) => [...prev, newContact]);
+        contacts.set(patch(".push", newContact));
       },
       removeContact: (index: number) =>
-        contacts.set((prev) => prev.filter((_, i) => i !== index)),
+        contacts.set(patch(".filter", (_, i) => i !== index)),
     };
   });
 
@@ -91,10 +92,10 @@ function ContactItem({ index, onRemove }: ContactItemProps) {
           city: "",
           country: "",
         };
-        addresses.set((prev) => [...prev, newAddress]);
+        addresses.set(patch(".push", newAddress));
       },
       removeAddress: (addrIndex: number) =>
-        addresses.set((prev) => prev.filter((_, i) => i !== addrIndex)),
+        addresses.set(patch(".filter", (_, i) => i !== addrIndex)),
     };
   }, [index]);
 

@@ -2,6 +2,7 @@
  * Tags editor - dynamic list using focus operator
  */
 import { useState } from "react";
+import { patch } from "rextive/helpers";
 import { rx, useScope, disposable } from "rextive/react";
 import { focus } from "rextive/op";
 import { useFormContext } from "../../store/formStore";
@@ -21,13 +22,13 @@ export function TagsEditor() {
   const addTag = () => {
     const trimmed = newTag.trim();
     if (trimmed && !scope.tags().includes(trimmed)) {
-      scope.tags.set((prev) => [...prev, trimmed]);
+      scope.tags.set(patch(".push", trimmed));
       setNewTag("");
     }
   };
 
   const removeTag = (tagToRemove: string) => {
-    scope.tags.set((prev) => prev.filter((t) => t !== tagToRemove));
+    scope.tags.set(patch(".filter", (t) => t !== tagToRemove));
   };
 
   return (

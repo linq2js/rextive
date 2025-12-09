@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { signal } from "rextive";
+import { patch } from "rextive/helpers";
 import { rx, useScope, inputValue } from "rextive/react";
 import { focus } from "rextive/op";
 import { parentAuthLogic } from "@/logic";
@@ -37,24 +38,21 @@ function changePasswordFormLogic() {
 
     // Validation
     if (!currentPassword || !newPassword || !confirmPassword) {
-      state.set((s) => ({ ...s, error: "All fields are required" }));
+      state.set(patch("error", "All fields are required"));
       return;
     }
 
     if (newPassword.length < 4) {
-      state.set((s) => ({
-        ...s,
-        error: "New password must be at least 4 characters",
-      }));
+      state.set(patch("error", "New password must be at least 4 characters"));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      state.set((s) => ({ ...s, error: "New passwords do not match" }));
+      state.set(patch("error", "New passwords do not match"));
       return;
     }
 
-    state.set((s) => ({ ...s, loading: true, error: "", success: false }));
+    state.set(patch<ChangePasswordFormState>({ loading: true, error: "", success: false }));
 
     try {
       const success = await $auth.changePassword(currentPassword, newPassword);
@@ -69,18 +67,10 @@ function changePasswordFormLogic() {
           success: true,
         });
       } else {
-        state.set((s) => ({
-          ...s,
-          loading: false,
-          error: "Current password is incorrect",
-        }));
+        state.set(patch<ChangePasswordFormState>({ loading: false, error: "Current password is incorrect" }));
       }
     } catch {
-      state.set((s) => ({
-        ...s,
-        loading: false,
-        error: "Failed to change password",
-      }));
+      state.set(patch<ChangePasswordFormState>({ loading: false, error: "Failed to change password" }));
     }
   }
 

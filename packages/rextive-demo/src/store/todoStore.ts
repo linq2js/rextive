@@ -1,4 +1,5 @@
 import { signal, validate } from "rextive";
+import { patch } from "rextive/helpers";
 import { persistor } from "rextive/plugins";
 import { debounce, to } from "rextive/op";
 import { z } from "zod";
@@ -224,7 +225,7 @@ export function addTodo(text: string) {
     timestamp: Date.now(),
   };
 
-  offlineChanges.set((prev) => [...prev, change]);
+  offlineChanges.set(patch(".push", change));
 }
 
 // Update stored modifiedAt when making offline changes
@@ -247,7 +248,7 @@ export function toggleTodo(id: string) {
     timestamp,
   };
 
-  offlineChanges.set((prev) => [...prev, change]);
+  offlineChanges.set(patch(".push", change));
   updateStoredModifiedAt(id, timestamp);
 }
 
@@ -264,7 +265,7 @@ export function updateTodoText(id: string, text: string) {
     timestamp,
   };
 
-  offlineChanges.set((prev) => [...prev, change]);
+  offlineChanges.set(patch(".push", change));
   updateStoredModifiedAt(id, timestamp);
 }
 
@@ -276,7 +277,7 @@ export function deleteTodo(id: string) {
     timestamp: Date.now(),
   };
 
-  offlineChanges.set((prev) => [...prev, change]);
+  offlineChanges.set(patch(".push", change));
 }
 
 export function clearCompleted() {
@@ -288,7 +289,7 @@ export function clearCompleted() {
     timestamp: Date.now(),
   }));
 
-  offlineChanges.set((prev) => [...prev, ...changes]);
+  offlineChanges.set(patch(".push", ...changes));
 }
 
 // ==================== SYNC ====================

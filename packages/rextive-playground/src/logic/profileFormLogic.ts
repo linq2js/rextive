@@ -1,5 +1,6 @@
 // Local logic for profile form (add/edit kid profile)
 import { signal } from "rextive";
+import { patch } from "rextive/helpers";
 import { kidProfilesLogic } from "./kidProfilesLogic";
 import type { KidProfile, AvatarEmoji } from "@/domain/types";
 
@@ -29,7 +30,7 @@ export function profileFormLogic(onClose: () => void, editProfile?: KidProfile) 
     const { name, avatar, age } = state();
     if (!name.trim()) return;
 
-    state.set((s) => ({ ...s, loading: true }));
+    state.set(patch("loading", true));
 
     try {
       if (editProfile) {
@@ -39,20 +40,20 @@ export function profileFormLogic(onClose: () => void, editProfile?: KidProfile) 
       }
       onClose();
     } finally {
-      state.set((s) => ({ ...s, loading: false }));
+      state.set(patch("loading", false));
     }
   }
 
   async function remove() {
     if (!editProfile) return;
 
-    state.set((s) => ({ ...s, loading: true }));
+    state.set(patch("loading", true));
 
     try {
       await $profiles.remove(editProfile.id);
       onClose();
     } finally {
-      state.set((s) => ({ ...s, loading: false }));
+      state.set(patch("loading", false));
     }
   }
 

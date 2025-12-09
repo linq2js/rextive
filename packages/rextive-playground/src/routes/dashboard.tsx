@@ -81,6 +81,7 @@ function dashboardLogic() {
     [
       { id: "typing-adventure", name: "Typing Adventure", icon: "⌨️", description: "Practice typing!", color: "bg-indigo-100", available: true },
       { id: "memory-match", name: "Memory Match", icon: "🧠", description: "Train your memory!", color: "bg-purple-100", available: true },
+      { id: "road-racer", name: "Road Racer", icon: "🏎️", description: "Race to win!", color: "bg-red-100", available: true },
       { id: "math-quest", name: "Math Quest", icon: "➕", description: "Fun with numbers!", color: "bg-blue-100", available: false },
       { id: "word-builder", name: "Word Builder", icon: "📝", description: "Build cool words!", color: "bg-green-100", available: false },
       { id: "puzzle-time", name: "Puzzle Time", icon: "🧩", description: "Solve puzzles!", color: "bg-orange-100", available: false },
