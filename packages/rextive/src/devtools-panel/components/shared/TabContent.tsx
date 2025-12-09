@@ -17,7 +17,7 @@ interface TabContentProps {
     placeholder?: string;
     showHelp?: boolean;
     onHelpClick?: () => void;
-    leftActions?: React.ReactNode;
+    leftActions?: JSX.Element | null;
   };
 
   // Optional filter bar (unified - use FilterSeparator for grouping)

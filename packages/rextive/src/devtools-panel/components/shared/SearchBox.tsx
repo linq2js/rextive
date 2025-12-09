@@ -13,7 +13,7 @@ interface SearchBoxProps {
   placeholder?: string;
   showHelp?: boolean;
   onHelpClick?: () => void;
-  leftActions?: React.ReactNode;
+  leftActions?: JSX.Element | null;
 }
 
 export const SearchBox = memo(function SearchBox({
