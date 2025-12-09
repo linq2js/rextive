@@ -8,8 +8,8 @@ const STORAGE_KEY = "selected_profile_id";
 export const selectedProfileLogic = logic("selectedProfileLogic", () => {
   const $profiles = kidProfilesLogic();
 
-  // Restore from session
-  const storedId = sessionStorage.getItem(STORAGE_KEY);
+  // Restore from localStorage (persists across browser sessions)
+  const storedId = localStorage.getItem(STORAGE_KEY);
   const selectedId = signal<number | null>(storedId ? Number(storedId) : null, {
     name: "selectedProfile.id",
   });
@@ -26,12 +26,12 @@ export const selectedProfileLogic = logic("selectedProfileLogic", () => {
 
   function select(id: number) {
     selectedId.set(id);
-    sessionStorage.setItem(STORAGE_KEY, String(id));
+    localStorage.setItem(STORAGE_KEY, String(id));
   }
 
   function clear() {
     selectedId.set(null);
-    sessionStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY);
   }
 
   return {

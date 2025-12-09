@@ -5,6 +5,11 @@ import { rx, useScope } from "rextive/react";
 import { energyLogic, selectedProfileLogic } from "@/logic";
 import { gameProgressRepository } from "@/infrastructure/repositories";
 import { useEffect, useRef, useCallback } from "react";
+import {
+  playCoinSound,
+  playCollisionSound,
+  backgroundMusic,
+} from "@/hooks/useSound";
 
 export const Route = createFileRoute("/games/road-racer")({
   component: RoadRacer,
@@ -160,35 +165,58 @@ function roadRacerLogic() {
   }
 
   async function startGame(): Promise<boolean> {
-    const hasEnergy = await $energy.spend($energy.costPerGame);
-    if (!hasEnergy) return false;
+    try {
+      console.log("Road Racer: Starting game...");
+      console.log("Energy:", $energy.energy(), "Cost:", $energy.costPerGame);
 
-    const difficulty = state().difficulty;
-    const config = DIFFICULTY_CONFIG[difficulty];
+      const hasEnergy = await $energy.spend($energy.costPerGame);
+      console.log("Energy spent result:", hasEnergy);
 
-    state.set((s) => ({
-      ...s,
-      status: "playing",
-      playerLane: 1,
-      obstacles: [],
-      coins: [],
-      score: 100,
-      distance: 0,
-      speed: config.baseSpeed,
-      lives: config.lives,
-      maxLives: config.lives,
-      lastCollisionTime: 0,
-    }));
+      if (!hasEnergy) {
+        console.warn("Road Racer: No energy to start game");
+        return false;
+      }
 
-    nextObstacleId = 0;
-    nextCoinId = 0;
-    lastFrameTime = performance.now();
-    gameLoop();
-    return true;
+      const difficulty = state().difficulty;
+      const config = DIFFICULTY_CONFIG[difficulty];
+      console.log("Starting with difficulty:", difficulty, config);
+
+      state.set((s) => ({
+        ...s,
+        status: "playing",
+        playerLane: 1,
+        obstacles: [],
+        coins: [],
+        score: 100,
+        distance: 0,
+        speed: config.baseSpeed,
+        lives: config.lives,
+        maxLives: config.lives,
+        lastCollisionTime: 0,
+      }));
+
+      nextObstacleId = 0;
+      nextCoinId = 0;
+      lastFrameTime = performance.now();
+
+      try {
+        backgroundMusic.playRacingMusic();
+      } catch (e) {
+        console.warn("Could not play background music:", e);
+      }
+
+      console.log("Road Racer: Game started, calling gameLoop");
+      gameLoop();
+      return true;
+    } catch (error) {
+      console.error("Road Racer: Error starting game:", error);
+      return false;
+    }
   }
 
   function pauseGame() {
     state.set(patch("status", "paused"));
+    backgroundMusic.stop();
     if (gameLoopId) {
       cancelAnimationFrame(gameLoopId);
       gameLoopId = null;
@@ -198,10 +226,12 @@ function roadRacerLogic() {
   function resumeGame() {
     state.set(patch("status", "playing"));
     lastFrameTime = performance.now();
+    backgroundMusic.playRacingMusic();
     gameLoop();
   }
 
   async function endGame() {
+    backgroundMusic.stop();
     if (gameLoopId) {
       cancelAnimationFrame(gameLoopId);
       gameLoopId = null;
@@ -237,7 +267,9 @@ function roadRacerLogic() {
   }
 
   function moveRight() {
-    state.set(patch("playerLane", (lane) => Math.min(LANE_COUNT - 1, lane + 1)));
+    state.set(
+      patch("playerLane", (lane) => Math.min(LANE_COUNT - 1, lane + 1))
+    );
   }
 
   function gameLoop() {
@@ -322,6 +354,7 @@ function roadRacerLogic() {
             newLives--;
             lastCollision = now;
             newObstacles = newObstacles.filter((o) => o.id !== obs.id);
+            playCollisionSound();
           }
         }
       }
@@ -338,6 +371,7 @@ function roadRacerLogic() {
         ) {
           newScore += 10;
           newCoins = newCoins.filter((c) => c.id !== coin.id);
+          playCoinSound();
         }
       }
 
@@ -364,6 +398,7 @@ function roadRacerLogic() {
   }
 
   function cleanup() {
+    backgroundMusic.stop();
     if (gameLoopId) {
       cancelAnimationFrame(gameLoopId);
       gameLoopId = null;
@@ -833,23 +868,27 @@ function RoadRacer() {
               {/* Road markings */}
               <div className="absolute inset-0">
                 {/* Grass/roadside on left */}
-                <div 
+                <div
                   className="absolute left-0 top-0 bottom-0 w-3"
                   style={{
-                    background: "repeating-linear-gradient(to bottom, #22c55e 0px, #16a34a 30px, #22c55e 60px)",
-                    animation: gameState.status === "playing" 
-                      ? `roadsideMove ${0.3 / gameState.speed * 5}s linear infinite` 
-                      : "none",
+                    background:
+                      "repeating-linear-gradient(to bottom, #22c55e 0px, #16a34a 30px, #22c55e 60px)",
+                    animation:
+                      gameState.status === "playing"
+                        ? `roadsideMove ${(0.3 / gameState.speed) * 5}s linear infinite`
+                        : "none",
                   }}
                 />
                 {/* Grass/roadside on right */}
-                <div 
+                <div
                   className="absolute right-0 top-0 bottom-0 w-3"
                   style={{
-                    background: "repeating-linear-gradient(to bottom, #22c55e 0px, #16a34a 30px, #22c55e 60px)",
-                    animation: gameState.status === "playing" 
-                      ? `roadsideMove ${0.3 / gameState.speed * 5}s linear infinite` 
-                      : "none",
+                    background:
+                      "repeating-linear-gradient(to bottom, #22c55e 0px, #16a34a 30px, #22c55e 60px)",
+                    animation:
+                      gameState.status === "playing"
+                        ? `roadsideMove ${(0.3 / gameState.speed) * 5}s linear infinite`
+                        : "none",
                   }}
                 />
                 {/* Road edge lines */}
@@ -867,7 +906,7 @@ function RoadRacer() {
                         "repeating-linear-gradient(to bottom, #fbbf24 0px, #fbbf24 30px, transparent 30px, transparent 60px)",
                       animation:
                         gameState.status === "playing"
-                          ? `roadMove ${0.2 / gameState.speed * 5}s linear infinite`
+                          ? `roadMove ${(0.2 / gameState.speed) * 5}s linear infinite`
                           : "none",
                     }}
                   />
@@ -988,7 +1027,9 @@ function RoadRacer() {
                                 : "bg-slate-700 hover:bg-slate-600"
                             }`}
                           >
-                            <div className="font-bold text-lg">{config.name}</div>
+                            <div className="font-bold text-lg">
+                              {config.name}
+                            </div>
                             <div className="text-xs opacity-80">
                               {config.description}
                             </div>
@@ -1005,7 +1046,22 @@ function RoadRacer() {
                     )}
                   </div>
                   <button
-                    onClick={() => $game.startGame()}
+                    onClick={async () => {
+                      const started = await $game.startGame();
+                      if (!started) {
+                        if (!$game.profile()) {
+                          alert(
+                            "Please select a kid profile first from the home page!"
+                          );
+                        } else if ($game.energy() <= 0) {
+                          alert(
+                            "No energy left! Come back tomorrow to play again."
+                          );
+                        } else {
+                          alert("Could not start game. Please try again.");
+                        }
+                      }
+                    }}
                     className={`mt-6 btn bg-gradient-to-r ${difficultyConfig.color} text-white px-8 py-3 text-lg font-bold hover:opacity-90 transition-all transform hover:scale-105`}
                   >
                     <PlayIcon /> Play {difficultyConfig.name}
@@ -1069,7 +1125,9 @@ function RoadRacer() {
                   </p>
                   {playerCanPlay ? (
                     <button
-                      onClick={() => $game.showDifficultySelect()}
+                      onClick={() => {
+                        $game.showDifficultySelect();
+                      }}
                       className="btn bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-8 py-3 font-bold hover:from-emerald-600 hover:to-teal-600"
                     >
                       Play Again

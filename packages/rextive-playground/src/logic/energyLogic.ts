@@ -12,11 +12,11 @@ export const energyLogic = logic("energyLogic", () => {
   });
   const isLoading = signal(true, { name: "energy.isLoading" });
 
-  // Load energy when profile changes
-  $selected.selectedId.on(async () => {
-    const kidId = $selected.selectedId();
+  // Function to load energy for a kid
+  async function loadEnergy(kidId: number | null) {
     if (kidId === null) {
       energy.set(ENERGY_CONFIG.maxEnergy);
+      isLoading.set(false);
       return;
     }
 
@@ -27,13 +27,32 @@ export const energyLogic = logic("energyLogic", () => {
     } finally {
       isLoading.set(false);
     }
+  }
+
+  // Load energy immediately if there's already a selected kid (restored from localStorage)
+  const initialKidId = $selected.selectedId();
+  if (initialKidId !== null) {
+    loadEnergy(initialKidId);
+  } else {
+    isLoading.set(false);
+  }
+
+  // Also load energy when profile changes
+  $selected.selectedId.on(() => {
+    loadEnergy($selected.selectedId());
   });
 
   async function spend(amount: number = ENERGY_CONFIG.costPerGame): Promise<boolean> {
     const kidId = $selected.selectedId();
-    if (kidId === null) return false;
+    if (kidId === null) {
+      console.warn("Energy spend failed: No kid profile selected");
+      return false;
+    }
 
-    if (energy() < amount) return false;
+    if (energy() < amount) {
+      console.warn("Energy spend failed: Not enough energy", energy(), "<", amount);
+      return false;
+    }
 
     const success = await energyRepository.spendEnergy(kidId, amount);
     if (success) {
