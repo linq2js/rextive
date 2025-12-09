@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@/test/utils";
-import { signal, task } from "rextive";
+import { signal } from "rextive";
 import { mockLogic } from "rextive/test";
 import { CategoryFilter } from "./CategoryFilter";
 import { productsLogic } from "@/logic/productsLogic";
@@ -12,15 +12,20 @@ const mockCategories: Category[] = [
   { slug: "fragrances", name: "Fragrances", url: "/category/fragrances" },
 ];
 
+// Helper to create mock task states for testing
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createMockTaskSignal = <T,>(taskState: { loading: boolean; value: T; error?: unknown }) => {
+  return signal(taskState) as any;
+};
+
 describe("CategoryFilter", () => {
   const $products = mockLogic(productsLogic);
 
   beforeEach(() => {
     // Use a signal that directly returns the success task state
-    const categoriesTaskSignal = signal(task.success(mockCategories));
     $products.default({
       category: signal<string | null>(null),
-      categoriesTask: categoriesTaskSignal,
+      categoriesTask: createMockTaskSignal({ loading: false, value: mockCategories }),
       setCategory: vi.fn(),
     });
   });
@@ -77,14 +82,10 @@ describe("CategoryFilter", () => {
   });
 
   it("should show loading skeletons when loading", () => {
-    // Create a loading task state with the value fallback (matching how task operator works)
-    const loadingTask = task.loading(new Promise<Category[]>(() => {}));
-    // Add the fallback value like the task operator does
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const loadingTaskSignal = signal({ ...loadingTask, value: [] as Category[] }) as any;
+    // Create a loading task state with empty array as fallback
     $products.provide({
       category: signal(null),
-      categoriesTask: loadingTaskSignal,
+      categoriesTask: createMockTaskSignal<Category[]>({ loading: true, value: [] }),
     });
 
     render(<CategoryFilter />);

@@ -5,6 +5,7 @@
   "scripts": {
     "build": "pnpm --filter rextive build",
     "build:all": "pnpm -r build",
+    "build:check": "pnpm -r build:check",
     "test": "pnpm --filter rextive test",
     "dev:demo": "concurrently -k -n rextive,demo -c cyan,green \"pnpm --filter rextive watch\" \"pnpm --filter rextive-demo dev\"",
     "dev:ecom": "concurrently -k -n rextive,ecommerce -c cyan,magenta \"pnpm --filter rextive watch\" \"pnpm --filter rextive-ecommerce dev\"",

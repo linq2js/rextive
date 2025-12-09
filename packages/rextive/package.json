@@ -50,6 +50,7 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "tsc && vite build",
+    "build:check": "tsc --noEmit",
     "build:watch": "tsc && vite build --watch",
     "watch": "npm run build:watch",
     "test": "vitest --no-watch",
