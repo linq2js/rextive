@@ -43,18 +43,20 @@ type Updater<T> = (prev: T) => T;
 // ============================================================================
 
 /** Update with partial object */
-export function patch<T extends object>(partial: Partial<T>): (prev: T) => T;
+export function patch<T extends object>(
+  partial: NoInfer<Partial<T>>
+): (prev: T) => T;
 
 /** Update single property with value */
 export function patch<T extends object, K extends keyof T>(
   key: K,
-  value: T[K]
+  value: NoInfer<T[K]>
 ): (prev: T) => T;
 
 /** Update single property with updater function */
 export function patch<T extends object, K extends keyof T>(
   key: K,
-  updater: Updater<T[K]>
+  updater: Updater<NoInfer<T[K]>>
 ): (prev: T) => T;
 
 // ============================================================================
@@ -62,12 +64,12 @@ export function patch<T extends object, K extends keyof T>(
 // ============================================================================
 
 /** Update array item at index with value */
-export function patch<T>(index: number, value: T): (prev: T[]) => T[];
+export function patch<T>(index: number, value: NoInfer<T>): (prev: T[]) => T[];
 
 /** Update array item at index with updater */
 export function patch<T>(
   index: number,
-  updater: Updater<T>
+  updater: Updater<NoInfer<T>>
 ): (prev: T[]) => T[];
 
 /** Array pop - remove last item */
@@ -80,12 +82,15 @@ export function patch(method: ".shift"): <T>(prev: T[]) => T[];
 export function patch(method: ".reverse"): <T>(prev: T[]) => T[];
 
 /** Array push - add items at end */
-export function patch<T>(method: ".push", ...values: T[]): (prev: T[]) => T[];
+export function patch<T>(
+  method: ".push",
+  ...values: NoInfer<T>[]
+): (prev: T[]) => T[];
 
 /** Array unshift - add items at start */
 export function patch<T>(
   method: ".unshift",
-  ...values: T[]
+  ...values: NoInfer<T>[]
 ): (prev: T[]) => T[];
 
 /** Array splice - remove/insert items */
@@ -93,19 +98,19 @@ export function patch<T>(
   method: ".splice",
   start: number,
   deleteCount?: number,
-  ...items: T[]
+  ...items: NoInfer<T>[]
 ): (prev: T[]) => T[];
 
 /** Array sort - with optional comparator */
 export function patch<T>(
   method: ".sort",
-  compareFn?: (a: T, b: T) => number
+  compareFn?: (a: NoInfer<T>, b: NoInfer<T>) => number
 ): (prev: T[]) => T[];
 
 /** Array fill - fill with value */
 export function patch<T>(
   method: ".fill",
-  value: T,
+  value: NoInfer<T>,
   start?: number,
   end?: number
 ): (prev: T[]) => T[];
@@ -113,13 +118,13 @@ export function patch<T>(
 /** Array filter - filter items */
 export function patch<T>(
   method: ".filter",
-  predicate: (value: T, index: number, array: T[]) => boolean
+  predicate: (value: NoInfer<T>, index: number, array: NoInfer<T>[]) => boolean
 ): (prev: T[]) => T[];
 
 /** Array map - transform items */
 export function patch<T, U = T>(
   method: ".map",
-  mapper: (value: T, index: number, array: T[]) => U
+  mapper: (value: NoInfer<T>, index: number, array: NoInfer<T>[]) => U
 ): (prev: T[]) => U[];
 
 // ============================================================================

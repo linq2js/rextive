@@ -1,7 +1,7 @@
 import React, { act } from "react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { screen } from "@testing-library/react";
-import { useScope, __clearCache } from "./useScope";
+import { useScope, __clearCache, scope, Scope } from "./useScope";
 import { signal } from "../signal";
 import { logic } from "../logic";
 import { wrappers } from "../test/strictModeTests";
@@ -1700,6 +1700,188 @@ describe.each(wrappers)(
         });
         expect(Array.from(signals).every((x) => x.disposed())).toBe(true);
         expect(Array.from(instances).every((x) => x.disposed)).toBe(true);
+      });
+    });
+
+    describe("multiple scopes mode", () => {
+      it("should create multiple scopes from array of factories", () => {
+        const TestComponent = () => {
+          const [counter, form] = useScope([
+            () => ({ count: signal(0) }),
+            () => ({ name: signal("test") }),
+          ]);
+
+          return (
+            <div>
+              <div data-testid="count">{counter.count()}</div>
+              <div data-testid="name">{form.name()}</div>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("count")).toHaveTextContent("0");
+        expect(screen.getByTestId("name")).toHaveTextContent("test");
+      });
+
+      it("should create multiple scopes from scope() descriptors", () => {
+        const counterLogic = () => ({ count: signal(42) });
+        const formLogic = () => ({ name: signal("hello") });
+
+        const TestComponent = () => {
+          const [counter, form] = useScope([
+            scope(counterLogic),
+            scope(formLogic),
+          ]);
+
+          return (
+            <div>
+              <div data-testid="count">{counter.count()}</div>
+              <div data-testid="name">{form.name()}</div>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("count")).toHaveTextContent("42");
+        expect(screen.getByTestId("name")).toHaveTextContent("hello");
+      });
+
+      it("should support mixed factories and scope descriptors", () => {
+        const counterLogic = () => ({ count: signal(100) });
+
+        const TestComponent = () => {
+          const [counter, form] = useScope([
+            scope(counterLogic),
+            () => ({ name: signal("mixed") }),
+          ]);
+
+          return (
+            <div>
+              <div data-testid="count">{counter.count()}</div>
+              <div data-testid="name">{form.name()}</div>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("count")).toHaveTextContent("100");
+        expect(screen.getByTestId("name")).toHaveTextContent("mixed");
+      });
+
+      it("should dispose all scopes on unmount", async () => {
+        const signals: AnySignal<any>[] = [];
+
+        const TestComponent = () => {
+          const [a, b] = useScope([
+            () => {
+              const s = signal(1);
+              signals.push(s);
+              return { value: s };
+            },
+            () => {
+              const s = signal(2);
+              signals.push(s);
+              return { value: s };
+            },
+          ]);
+
+          return (
+            <div>
+              <span data-testid="a">{a.value()}</span>
+              <span data-testid="b">{b.value()}</span>
+            </div>
+          );
+        };
+
+        const { unmount } = renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("a")).toHaveTextContent("1");
+        expect(screen.getByTestId("b")).toHaveTextContent("2");
+
+        unmount();
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // All signals should be disposed after unmount
+        expect(signals.every((s) => s.disposed())).toBe(true);
+      });
+
+      it("should maintain scope identity across re-renders", async () => {
+        let renderCount = 0;
+        let scopeA1: any, scopeA2: any;
+
+        const TestComponent = ({ trigger }: { trigger: number }) => {
+          renderCount++;
+          const [a] = useScope([() => ({ count: signal(trigger) })]);
+
+          if (renderCount === 1) scopeA1 = a;
+          if (renderCount === 2) scopeA2 = a;
+
+          return <div data-testid="count">{a.count()}</div>;
+        };
+
+        const { rerender } = renderWithWrapper(<TestComponent trigger={1} />);
+        expect(screen.getByTestId("count")).toHaveTextContent("1");
+
+        rerender(<TestComponent trigger={1} />);
+
+        // Same scope instance should be reused
+        if (mode === "normal") {
+          expect(scopeA1).toBe(scopeA2);
+        }
+      });
+
+      it("should support shared scopes via scope() with key", () => {
+        const sharedLogic = () => ({ value: signal("shared") });
+
+        const TestComponent = () => {
+          const [shared, local] = useScope([
+            scope("shared-key", sharedLogic),
+            () => ({ value: signal("local") }),
+          ]);
+
+          return (
+            <div>
+              <div data-testid="shared">{shared.value()}</div>
+              <div data-testid="local">{local.value()}</div>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("shared")).toHaveTextContent("shared");
+        expect(screen.getByTestId("local")).toHaveTextContent("local");
+      });
+
+      it("should update values reactively", async () => {
+        const TestComponent = () => {
+          const [counter] = useScope([() => ({ count: signal(0) })]);
+
+          return (
+            <div>
+              <button
+                data-testid="inc"
+                onClick={() => counter.count.set((c) => c + 1)}
+              >
+                Inc
+              </button>
+              {rx(() => (
+                <div data-testid="count">{counter.count()}</div>
+              ))}
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("count")).toHaveTextContent("0");
+
+        await act(async () => {
+          screen.getByTestId("inc").click();
+        });
+
+        expect(screen.getByTestId("count")).toHaveTextContent("1");
       });
     });
   }

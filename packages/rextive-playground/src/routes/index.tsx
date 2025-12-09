@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { rx } from "rextive/react";
 import { kidProfilesLogic, selectedProfileLogic } from "@/logic";
@@ -71,6 +71,17 @@ function HomePage() {
           ) : (
             <ProfileSelector profiles={profiles} />
           )}
+
+          {/* Parent Mode Link */}
+          <div className="mt-12 text-center">
+            <Link
+              to="/mode/parent"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <span>👨‍👩‍👧‍👦</span>
+              <span>Parent Mode</span>
+            </Link>
+          </div>
         </div>
       </div>
     );

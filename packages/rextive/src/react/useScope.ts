@@ -6,6 +6,8 @@ import { signal } from "../signal";
 import { withHooks } from "../hooks";
 import { emitter } from "../utils/emitter";
 
+const NO_KEY = Symbol("no-key");
+
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
@@ -243,6 +245,30 @@ export function __clearCache() {
  */
 export function useScope<T extends Record<string, unknown>>(): SignalProxy<T>;
 
+/**
+ * **Multiple Scopes Mode** - Create multiple scopes in a single call.
+ *
+ * @param scopes - Array of Scope descriptors or factory functions
+ * @returns Tuple of scope values in the same order
+ *
+ * @example
+ * ```tsx
+ * const [counter, form] = useScope([
+ *   scope(counterLogic),
+ *   scope(formLogic, [initialData]),
+ * ]);
+ * ```
+ */
+export function useScope<TScopes extends readonly (Scope<any> | AnyFunc)[]>(
+  scopes: [...TScopes]
+): {
+  [K in keyof TScopes]: TScopes[K] extends Scope<infer T>
+    ? T
+    : TScopes[K] extends AnyFunc
+      ? ReturnType<TScopes[K]>
+      : never;
+};
+
 // ============================================================================
 // Local Mode Overloads (private per-component scope)
 // ============================================================================
@@ -312,69 +338,84 @@ export function useScope<TScope, TArgs extends any[]>(
 // ============================================================================
 
 export function useScope(...args: any[]): any {
-  let key: any;
-  let factory: AnyFunc;
-  let deps: unknown[] = [];
-  let options: OptionsOrEquals | undefined;
-  let isProxyMode = false;
-  const localKeyRef = useRef<any>();
-  // Auto-generate stable key per component instance
-  if (!localKeyRef.current) {
-    localKeyRef.current = {};
-  }
+  // Stable keys for local mode scopes (one per component instance)
+  const localKeysRef = useRef<unknown[]>([]);
 
-  // Detect mode based on arguments
-  if (args.length === 0) {
+  // Get or create a stable key for a given index
+  const getLocalKey = (index: number) => {
+    if (!localKeysRef.current[index]) {
+      localKeysRef.current[index] = {};
+    }
+    return localKeysRef.current[index];
+  };
+
+  let isMultiple = false;
+  let isProxyMode = false;
+  let scopes: Scope<any>[] = [];
+
+  if (args.length === 1 && Array.isArray(args[0])) {
+    // ========================================
+    // Multiple Mode: useScope([scope1, scope2, ...])
+    // ========================================
+    isMultiple = true;
+    scopes = args[0].map((item: Scope<any> | AnyFunc, index: number) => {
+      if (typeof item === "function") {
+        return new Scope(getLocalKey(index), item);
+      } else if (item.key === undefined || item.key === NO_KEY) {
+        // Local scope - use component-stable key
+        return new Scope(
+          getLocalKey(index),
+          item.factory,
+          item.deps,
+          item.options
+        );
+      } else {
+        // Shared scope - use provided key
+        return item;
+      }
+    });
+  } else if (args.length === 0) {
     // ========================================
     // Proxy Mode: useScope<T>() with no args
     // ========================================
     isProxyMode = true;
-    key = localKeyRef.current;
-    // Factory returns { proxy, dispose } - dispose is accessible without Proxy interception
-    factory = createSignalProxy;
+    scopes = [new Scope(getLocalKey(0), createSignalProxy)];
   } else if (typeof args[1] === "function") {
     // ========================================
     // Shared Mode: useScope(key, factory, ...)
     // ========================================
-    key = args[0];
-    factory = args[1];
-    if (Array.isArray(args[2])) {
-      deps = args[2];
-      options = args[3];
-    } else {
-      options = args[2];
-    }
+    scopes = [new Scope(args[0], args[1], args[2], args[3])];
   } else {
-    key = localKeyRef.current;
-    factory = args[0];
-    if (Array.isArray(args[1])) {
-      deps = args[1];
-      options = args[2];
-    } else {
-      options = args[1];
-    }
+    // ========================================
+    // Local Mode: useScope(factory, ...)
+    // ========================================
+    scopes = [new Scope(getLocalKey(0), args[0], args[1], args[2])];
   }
 
-  // Parse equals function from options
-  const equals = parseEquals(options);
+  // Get entries from cache
+  const entries = scopes.map((s) => {
+    const equals = parseEquals(s.options);
+    return scopeCache.get(s.key, s.factory, s.deps ?? [], equals);
+  });
 
-  // Get or create entry from cache
-  const entry = scopeCache.get(key, factory as any, deps, equals);
-
-  // Lifecycle management via useIsomorphicLayoutEffect
-  // - On mount: commit entry (increment refs)
-  // - On key/entry change: cleanup runs (uncommit old), setup runs (commit new)
-  // - On unmount: cleanup runs (uncommit)
-  //
-  // Note: No need to manually dispose old entries - uncommit() handles ref counting
-  // and schedules disposal via microtask when refs reach 0.
+  // Lifecycle management
   useIsomorphicLayoutEffect(() => {
-    entry.commit();
-    return entry.uncommit;
-  }, [entry, key]);
+    for (const entry of entries) {
+      entry.commit();
+    }
+    return () => {
+      for (const entry of entries) {
+        entry.uncommit();
+      }
+    };
+  }, entries);
+
+  if (isMultiple) {
+    return entries.map((entry) => entry.scope);
+  }
 
   // For proxy mode, return just the proxy (not { proxy, dispose })
-  return isProxyMode ? entry.scope.proxy : entry.scope;
+  return isProxyMode ? entries[0].scope.proxy : entries[0].scope;
 }
 
 /**
@@ -419,4 +460,89 @@ function createSignalProxy(): {
   );
 
   return { proxy, dispose: onCleanup.settle };
+}
+
+/**
+ * Scope descriptor - captures useScope configuration without executing it.
+ * Useful for passing scope configuration to wrapper components.
+ */
+export class Scope<TScope> {
+  constructor(
+    public readonly key: unknown | undefined,
+    public readonly factory: (...args: any[]) => TScope,
+    public readonly deps?: unknown[],
+    public readonly options?: OptionsOrEquals | undefined
+  ) {}
+}
+
+// ============================================================================
+// scope() - Create Scope descriptors (mirrors useScope overloads)
+// ============================================================================
+
+/**
+ * **Local Mode** - Creates a Scope descriptor for local (per-component) scope.
+ *
+ * @param factory - Factory function to create the scope
+ * @param deps - Optional dependencies passed to factory
+ * @param options - Optional equality strategy for deps comparison
+ */
+export function scope<TScope, TArgs extends any[]>(
+  factory: (...deps: TArgs) => TScope,
+  ...extra: [] extends TArgs
+    ? [deps?: unknown[]]
+    : [
+        deps: [...args: TArgs, ...customDeps: unknown[]],
+        options?: OptionsOrEquals,
+      ]
+): Scope<TScope>;
+
+/**
+ * **Shared Mode** - Creates a Scope descriptor for shared (keyed) scope.
+ *
+ * @param key - Unique identifier for the scope (same key = same instance)
+ * @param factory - Factory function to create the scope
+ * @param deps - Optional dependencies passed to factory
+ * @param options - Optional equality strategy for deps comparison
+ */
+export function scope<TScope, TArgs extends any[]>(
+  key: unknown,
+  factory: (...deps: TArgs) => TScope,
+  ...extra: [] extends TArgs
+    ? [deps?: unknown[]]
+    : [
+        deps: [...args: TArgs, ...customDeps: unknown[]],
+        options?: OptionsOrEquals,
+      ]
+): Scope<TScope>;
+
+// Implementation
+export function scope(...args: any[]): Scope<any> {
+  let key: unknown | undefined = NO_KEY;
+  let factory: AnyFunc;
+  let deps: unknown[] = [];
+  let options: OptionsOrEquals | undefined;
+
+  if (typeof args[1] === "function") {
+    // Shared mode: scope(key, factory, ...)
+    key = args[0];
+    factory = args[1];
+    if (Array.isArray(args[2])) {
+      deps = args[2];
+      options = args[3];
+    } else {
+      options = args[2];
+    }
+  } else {
+    // Local mode: scope(factory, ...)
+    key = undefined;
+    factory = args[0];
+    if (Array.isArray(args[1])) {
+      deps = args[1];
+      options = args[2];
+    } else {
+      options = args[1];
+    }
+  }
+
+  return new Scope(key, factory, deps, options);
 }

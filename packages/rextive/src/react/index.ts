@@ -35,12 +35,12 @@ export * from "../index";
 // React-specific exports
 // =============================================================================
 
-// Re-export useScope options
+// Re-export useScope types
 export type { UseScopeOptions } from "./useScope";
 
 // Export React components and hooks
 export { rx } from "./rx";
-export { useScope } from "./useScope";
+export { useScope, scope, Scope } from "./useScope";
 export * from "./provider";
 export { useStable } from "./useStable";
 export type { StableGet } from "./useStable";

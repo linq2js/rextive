@@ -58,9 +58,20 @@ export function parentKidManagementLogic() {
   }
 
   // Show message helper
+  let messageTimeout: ReturnType<typeof setTimeout> | null = null;
+
   function showMessage(type: "success" | "error", text: string) {
+    // Clear any existing timeout
+    if (messageTimeout) clearTimeout(messageTimeout);
+
     actionMessage.set({ type, text });
-    setTimeout(() => actionMessage.set(null), 3000);
+    messageTimeout = setTimeout(() => {
+      try {
+        actionMessage.set(null);
+      } catch {
+        // Signal may be disposed if user navigated away, ignore
+      }
+    }, 3000);
   }
 
   // Energy actions

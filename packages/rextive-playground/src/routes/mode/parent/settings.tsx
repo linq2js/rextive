@@ -52,7 +52,13 @@ function changePasswordFormLogic() {
       return;
     }
 
-    state.set(patch<ChangePasswordFormState>({ loading: true, error: "", success: false }));
+    state.set(
+      patch<ChangePasswordFormState>({
+        loading: true,
+        error: "",
+        success: false,
+      })
+    );
 
     try {
       const success = await $auth.changePassword(currentPassword, newPassword);
@@ -67,10 +73,20 @@ function changePasswordFormLogic() {
           success: true,
         });
       } else {
-        state.set(patch<ChangePasswordFormState>({ loading: false, error: "Current password is incorrect" }));
+        state.set(
+          patch<ChangePasswordFormState>({
+            loading: false,
+            error: "Current password is incorrect",
+          })
+        );
       }
     } catch {
-      state.set(patch<ChangePasswordFormState>({ loading: false, error: "Failed to change password" }));
+      state.set(
+        patch<ChangePasswordFormState>({
+          loading: false,
+          error: "Failed to change password",
+        })
+      );
     }
   }
 
@@ -217,4 +233,3 @@ function SettingsTab() {
     </div>
   );
 }
-

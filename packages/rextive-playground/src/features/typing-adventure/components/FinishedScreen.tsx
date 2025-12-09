@@ -1,0 +1,100 @@
+import { useNavigate } from "@tanstack/react-router";
+import { rx } from "rextive/react";
+import { energyLogic } from "@/logic";
+import { useTypingGame } from "../provider";
+import { StatItem } from "./StatItem";
+
+export function FinishedScreen() {
+  const $game = useTypingGame();
+  const $energy = energyLogic();
+  const navigate = useNavigate();
+
+  return rx(() => {
+    const stats = $game.stats();
+    const difficulty = $game.difficulty();
+    const energy = $energy.energy();
+
+    // Calculate star rating
+    const stars =
+      stats.accuracy >= 95 && stats.bestStreak >= 5
+        ? 3
+        : stats.accuracy >= 80 && stats.bestStreak >= 3
+          ? 2
+          : 1;
+
+    // Calculate XP earned
+    const baseXP = stats.score;
+    const accuracyBonus = Math.round(stats.accuracy * 0.5);
+    const totalXP = baseXP + accuracyBonus;
+
+    return (
+      <div className="space-y-6">
+        <div className="card text-center py-8">
+          <div className="text-6xl mb-4">🎉</div>
+          <h2 className="font-display text-2xl font-bold text-gray-800">
+            Great Job!
+          </h2>
+
+          {/* Stars */}
+          <div className="mt-4 flex justify-center gap-2">
+            {[1, 2, 3].map((i) => (
+              <span
+                key={i}
+                className={`text-4xl ${i <= stars ? "animate-bounce" : "grayscale opacity-30"}`}
+                style={{ animationDelay: `${i * 0.1}s` }}
+              >
+                ⭐
+              </span>
+            ))}
+          </div>
+
+          {/* Score */}
+          <div className="mt-6 text-4xl font-bold text-primary-600">
+            {stats.score} pts
+          </div>
+
+          {/* Stats Grid */}
+          <div className="mt-6 grid grid-cols-2 gap-4 text-left">
+            <StatItem label="Words Typed" value={stats.wordsCompleted} />
+            <StatItem label="Accuracy" value={`${stats.accuracy}%`} />
+            <StatItem label="Best Streak" value={`🔥 ${stats.bestStreak}`} />
+            <StatItem
+              label="Difficulty"
+              value={difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+            />
+          </div>
+
+          {/* XP Earned */}
+          <div className="mt-6 p-4 bg-amber-50 rounded-xl">
+            <div className="text-sm text-amber-700">XP Earned</div>
+            <div className="text-2xl font-bold text-amber-600">
+              +{totalXP} XP
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={() => $game.startGame()}
+            disabled={energy === 0}
+            className={`py-4 rounded-2xl font-display text-lg font-bold transition-all ${
+              energy > 0
+                ? "bg-gradient-to-r from-green-400 to-emerald-500 text-white hover:scale-105 active:scale-95 shadow-lg"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
+          >
+            {energy > 0 ? <>Play Again ⚡1</> : <>No Energy Left</>}
+          </button>
+          <button
+            onClick={() => navigate({ to: "/dashboard" })}
+            className="btn btn-outline py-3"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  });
+}
+
