@@ -1581,7 +1581,7 @@ describe.each(wrappers)(
         expect(screen.getByTestId("loading")).toHaveTextContent("false");
       });
 
-      it("should work with Promise types for async action states", () => {
+      it("should work with Promise types for async action states", async () => {
         type SubmitResult = { success: boolean };
         let proxyRef: { submitState: any } | undefined;
 
@@ -1599,7 +1599,7 @@ describe.each(wrappers)(
         renderWithWrapper(<TestComponent />);
         expect(screen.getByTestId("status")).toHaveTextContent("idle");
 
-        act(() => {
+        await act(async () => {
           proxyRef?.submitState.set(Promise.resolve({ success: true }));
         });
 
