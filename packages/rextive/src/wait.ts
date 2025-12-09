@@ -1,26 +1,16 @@
 /**
  * wait.ts
  *
- * This module provides a small "wait" DSL for coordinating async work in two modes:
+ * This module provides a small "wait" DSL for coordinating async work:
  *
- * - **Suspense mode (sync)**: `wait(...)`, `wait.any(...)`, `wait.race(...)`, `wait.settled(...)`
- *   without callbacks are synchronous helpers that:
- *   - Return plain values (or tuples/records/settled-shapes)
+ * - **Suspense mode (sync)**: `wait(...)` without callbacks are synchronous helpers that:
+ *   - Return plain values (or tuples/records)
  *   - Throw Promises while any awaitable is loading (React Suspense compatible)
- *   - Throw errors when awaitables fail (EXCEPT `wait.settled` which captures errors as "rejected")
+ *   - Throw errors when awaitables fail
  *
- * - **Promise mode (async)**: when you pass callbacks (`onResolve`/`onError` for most APIs,
- *   `onSettled` for `wait.settled`), the helpers return a Promise and run your callbacks.
- *   These Promises are also registered with the task cache (via `task.from()`) so their
- *   status can be observed through the normal `Task` API without awaiting them.
- *
- * `wait.timeout` and `wait.delay` are Promise-only utilities with no callback overloads.
- *
- * **Important**: `wait.settled()` behavior differs from other wait APIs:
- * - Sync mode: Throws promises (loading) but NOT errors (captured as "rejected" status)
- * - Async mode: Always resolves (never rejects), even when awaitables fail
+ * - `wait.timeout` and `wait.delay` are Promise-only utilities.
  */
-import type { AnyFunc, Task, ResolveAwaitable, Signal } from "./types";
+import type { Task, ResolveAwaitable, Signal } from "./types";
 import { task } from "./utils/task";
 import { isPromiseLike } from "./utils/isPromiseLike";
 import { is } from "./is";
@@ -67,16 +57,6 @@ export type AwaitedFromRecord<
 > = {
   [K in keyof TAwaitables]: AwaitedFromAwaitable<TAwaitables[K]>;
 };
-
-/**
- * Result type for waitAny / waitRace over record of awaitables.
- * Produces a [value, key] tuple for whichever entry wins.
- */
-export type AwaitedKeyedResult<
-  TAwaitables extends Record<string, Awaitable<any>>
-> = {
-  [K in keyof TAwaitables]: [AwaitedFromAwaitable<TAwaitables[K]>, K];
-}[keyof TAwaitables];
 
 /**
  * Checks if a value should be treated as a "single" awaitable
@@ -186,50 +166,29 @@ function waitAllSyncRecord<
 
 /**
  * Async "wait all" for a single awaitable.
+ * @internal Used by waitTimeout
  */
-async function waitAllAsyncSingle<T, R, E>(
-  awaitable: Awaitable<T>,
-  onResolve?: (value: T) => R | PromiseLike<R>,
-  onError?: (error: unknown) => E | PromiseLike<E>
-): Promise<R | E | T> {
+async function waitAllAsyncSingle<T>(awaitable: Awaitable<T>): Promise<T> {
   const l = resolveAwaitable(awaitable);
 
-  const runResolve = async (value: T) => {
-    if (!onResolve) return value;
-    return await onResolve(value);
-  };
-
-  try {
-    if (l.status === "loading") {
-      const value = (await l.promise) as T;
-      return await runResolve(value);
-    }
-
-    if (l.status === "error") {
-      throw l.error;
-    }
-
-    return await runResolve(l.value as T);
-  } catch (error) {
-    if (!onError) {
-      throw error;
-    }
-    return await onError(error);
+  if (l.status === "loading") {
+    return (await l.promise) as T;
   }
+
+  if (l.status === "error") {
+    throw l.error;
+  }
+
+  return l.value as T;
 }
 
 /**
  * Async "wait all" for an array/tuple of awaitables.
+ * @internal Used by waitTimeout
  */
 async function waitAllAsyncArray<
-  const TAwaitables extends readonly Awaitable<any>[],
-  R,
-  E
->(
-  awaitables: TAwaitables,
-  onResolve?: (...values: AwaitedFromTuple<TAwaitables>) => R | PromiseLike<R>,
-  onError?: (error: unknown) => E | PromiseLike<E>
-): Promise<R | E | AwaitedFromTuple<TAwaitables>> {
+  const TAwaitables extends readonly Awaitable<any>[]
+>(awaitables: TAwaitables): Promise<AwaitedFromTuple<TAwaitables>> {
   const tasks = awaitables.map(resolveAwaitable);
 
   const promises = tasks.map((t) =>
@@ -240,36 +199,16 @@ async function waitAllAsyncArray<
       : Promise.reject(t.error)
   );
 
-  const runResolve = async (values: AwaitedFromTuple<TAwaitables>) => {
-    if (!onResolve) return values;
-    return await onResolve(...values);
-  };
-
-  try {
-    const values = (await Promise.all(
-      promises
-    )) as AwaitedFromTuple<TAwaitables>;
-    return await runResolve(values);
-  } catch (error) {
-    if (!onError) {
-      throw error;
-    }
-    return await onError(error);
-  }
+  return (await Promise.all(promises)) as AwaitedFromTuple<TAwaitables>;
 }
 
 /**
  * Async "wait all" for a record of awaitables.
+ * @internal Used by waitTimeout
  */
 async function waitAllAsyncRecord<
-  const TAwaitables extends Record<string, Awaitable<any>>,
-  R,
-  E
->(
-  awaitables: TAwaitables,
-  onResolve?: (values: AwaitedFromRecord<TAwaitables>) => R | PromiseLike<R>,
-  onError?: (error: unknown) => E | PromiseLike<E>
-): Promise<R | E | AwaitedFromRecord<TAwaitables>> {
+  const TAwaitables extends Record<string, Awaitable<any>>
+>(awaitables: TAwaitables): Promise<AwaitedFromRecord<TAwaitables>> {
   const entries = Object.entries(awaitables) as [string, Awaitable<unknown>][];
 
   const tasks = entries.map(([key, awaitable]) => ({
@@ -285,47 +224,42 @@ async function waitAllAsyncRecord<
       : Promise.reject(t.error)
   );
 
-  const runResolve = async (values: AwaitedFromRecord<TAwaitables>) => {
-    if (!onResolve) return values;
-    return await onResolve(values);
-  };
-
-  try {
-    const resolved = await Promise.all(promises);
-    const result: any = {};
-    for (let i = 0; i < resolved.length; i++) {
-      const { key } = tasks[i];
-      result[key] = resolved[i];
-    }
-    return await runResolve(result as AwaitedFromRecord<TAwaitables>);
-  } catch (error) {
-    if (!onError) {
-      throw error;
-    }
-    return await onError(error);
+  const resolved = await Promise.all(promises);
+  const result: any = {};
+  for (let i = 0; i < resolved.length; i++) {
+    const { key } = tasks[i];
+    result[key] = resolved[i];
   }
+  return result as AwaitedFromRecord<TAwaitables>;
 }
 
 /**
- * Overloads
+ * Wait for awaitables to resolve. Suspense-compatible.
  *
- * 1) Synchronous:
- *    wait(awaitable);           // T
- *    wait(tuple);               // [...values]
- *    wait(record);              // { ...values }
+ * @example Single awaitable
+ * ```tsx
+ * rx(() => {
+ *   const user = wait(userSignal());
+ *   return <div>{user.name}</div>;
+ * });
+ * ```
  *
- * 2) Async with onResolve:
- *    wait(awaitable, onResolve);        // Promise<Awaited<R>>
- *    wait(tuple, onResolve);            // Promise<Awaited<R>>
- *    wait(record, onResolve);           // Promise<Awaited<R>>
+ * @example Multiple awaitables (tuple)
+ * ```tsx
+ * rx(() => {
+ *   const [user, posts] = wait([userSignal(), postsSignal()]);
+ *   return <div>{user.name}: {posts.length} posts</div>;
+ * });
+ * ```
  *
- * 3) Async with onResolve + onError:
- *    wait(awaitable, onResolve, onError);  // Promise<Awaited<R | E>>
- *    wait(tuple, onResolve, onError);      // Promise<Awaited<R | E>>
- *    wait(record, onResolve, onError);     // Promise<Awaited<R | E>>
+ * @example Multiple awaitables (record)
+ * ```tsx
+ * rx(() => {
+ *   const { user, posts } = wait({ user: userSignal(), posts: postsSignal() });
+ *   return <div>{user.name}: {posts.length} posts</div>;
+ * });
+ * ```
  */
-
-// 1) Synchronous overloads
 export function waitAll<T>(awaitable: Awaitable<T>): ResolveAwaitable<T>;
 
 export function waitAll<const TAwaitables extends readonly Awaitable<any>[]>(
@@ -336,736 +270,15 @@ export function waitAll<
   const TAwaitables extends Record<string, Awaitable<any>>
 >(awaitables: TAwaitables): AwaitedFromRecord<TAwaitables>;
 
-// 2) Async with onResolve
-export function waitAll<T, R>(
-  awaitable: Awaitable<T>,
-  onResolve: (value: T) => R | PromiseLike<R>
-): Promise<Awaited<R>>;
-
-export function waitAll<const TAwaitables extends readonly Awaitable<any>[], R>(
-  awaitables: TAwaitables,
-  onResolve: (...values: AwaitedFromTuple<TAwaitables>) => R | PromiseLike<R>
-): Promise<Awaited<R>>;
-
-export function waitAll<
-  const TAwaitables extends Record<string, Awaitable<any>>,
-  R
->(
-  awaitables: TAwaitables,
-  onResolve: (values: AwaitedFromRecord<TAwaitables>) => R | PromiseLike<R>
-): Promise<Awaited<R>>;
-
-// 3) Async with onResolve + onError
-export function waitAll<T, R, E>(
-  awaitable: Awaitable<T>,
-  onResolve: (value: T) => R | PromiseLike<R>,
-  onError: (error: unknown) => E | PromiseLike<E>
-): Promise<Awaited<R | E>>;
-
-export function waitAll<
-  const TAwaitables extends readonly Awaitable<any>[],
-  R,
-  E
->(
-  awaitables: TAwaitables,
-  onResolve: (...values: AwaitedFromTuple<TAwaitables>) => R | PromiseLike<R>,
-  onError: (error: unknown) => E | PromiseLike<E>
-): Promise<Awaited<R | E>>;
-
-export function waitAll<
-  const TAwaitables extends Record<string, Awaitable<any>>,
-  R,
-  E
->(
-  awaitables: TAwaitables,
-  onResolve: (values: AwaitedFromRecord<TAwaitables>) => R | PromiseLike<R>,
-  onError: (error: unknown) => E | PromiseLike<E>
-): Promise<Awaited<R | E>>;
-
 // Implementation
-export function waitAll(
-  awaitableOrCollection: any,
-  onResolve?: any,
-  onError?: any
-): any {
-  const hasOnResolve = typeof onResolve === "function";
-  const hasOnError = typeof onError === "function";
-
-  // Synchronous mode (no handlers)
-  if (!hasOnResolve && !hasOnError) {
-    if (Array.isArray(awaitableOrCollection)) {
-      return waitAllSyncArray(awaitableOrCollection);
-    }
-    if (isSingleAwaitable(awaitableOrCollection)) {
-      return waitAllSyncSingle(awaitableOrCollection);
-    }
-    return waitAllSyncRecord(awaitableOrCollection);
-  }
-
-  // Async mode (with onResolve / onError)
+export function waitAll(awaitableOrCollection: any): any {
   if (Array.isArray(awaitableOrCollection)) {
-    const promise = waitAllAsyncArray(
-      awaitableOrCollection,
-      onResolve,
-      hasOnError ? onError : undefined
-    );
-    task.from(promise);
-    return promise;
+    return waitAllSyncArray(awaitableOrCollection);
   }
-
   if (isSingleAwaitable(awaitableOrCollection)) {
-    const promise = waitAllAsyncSingle(
-      awaitableOrCollection,
-      onResolve,
-      hasOnError ? onError : undefined
-    );
-    task.from(promise);
-    return promise;
+    return waitAllSyncSingle(awaitableOrCollection);
   }
-
-  const promise = waitAllAsyncRecord(
-    awaitableOrCollection,
-    onResolve,
-    hasOnError ? onError : undefined
-  );
-  task.from(promise);
-  return promise;
-}
-
-/**
- * Synchronous core for waitAny.
- * Throws promise while loading, or aggregated error if all fail.
- */
-function waitAnySync<const TAwaitables extends Record<string, Awaitable<any>>>(
-  awaitables: TAwaitables
-): AwaitedKeyedResult<TAwaitables> {
-  const entries = Object.entries(awaitables) as [string, Awaitable<unknown>][];
-
-  const tasks = entries.map(([key, awaitable]) => ({
-    key,
-    task: resolveAwaitable(awaitable),
-  }));
-
-  // Check if any succeeded immediately
-  const succeeded = tasks.find(({ task: t }) => t.status === "success");
-  if (succeeded) {
-    return [
-      succeeded.task.value,
-      succeeded.key,
-    ] as AwaitedKeyedResult<TAwaitables>;
-  }
-
-  // Check if all failed
-  const allFailed = tasks.every(({ task: t }) => t.status === "error");
-  if (allFailed) {
-    const errors = tasks.map(({ task: t }) => t.error);
-    const error = new Error("All awaitables failed");
-    (error as any).errors = errors;
-    throw error;
-  }
-
-  // Some are still loading - create Promise.any equivalent and throw it
-  const promises = tasks.map(({ key, task: t }) =>
-    t.status === "loading"
-      ? t.promise.then<[unknown, string]>((data) => [data, key])
-      : t.status === "success"
-      ? Promise.resolve<[unknown, string]>([t.value, key])
-      : Promise.reject(t.error)
-  );
-
-  const anyPromise = new Promise<[unknown, string]>((resolve, reject) => {
-    let rejectionCount = 0;
-    const rejections: any[] = [];
-
-    for (let i = 0; i < promises.length; i++) {
-      promises[i].then(resolve, (error) => {
-        rejections[i] = error;
-        rejectionCount++;
-        if (rejectionCount === promises.length) {
-          const err = new Error("All awaitables failed");
-          (err as any).errors = rejections;
-          reject(err);
-        }
-      });
-    }
-  });
-
-  throw anyPromise;
-}
-
-/**
- * Async helper for waitAny with onResolve/onError.
- */
-async function waitAnyAsync<
-  const TAwaitables extends Record<string, Awaitable<any>>,
-  R,
-  E
->(
-  awaitables: TAwaitables,
-  onResolve?: (result: AwaitedKeyedResult<TAwaitables>) => R | PromiseLike<R>,
-  onError?: (error: unknown) => E | PromiseLike<E>
-): Promise<Awaited<R | E>> {
-  const entries = Object.entries(awaitables) as [string, Awaitable<unknown>][];
-
-  const tasks = entries.map(([key, awaitable]) => ({
-    key,
-    task: resolveAwaitable(awaitable),
-  }));
-
-  const promises = tasks.map(({ key, task: t }) =>
-    t.status === "loading"
-      ? t.promise.then<[unknown, string]>((data) => [data, key])
-      : t.status === "success"
-      ? Promise.resolve<[unknown, string]>([t.value, key])
-      : Promise.reject(t.error)
-  );
-
-  try {
-    const [value, key] = await new Promise<[unknown, string]>(
-      (resolve, reject) => {
-        let rejectionCount = 0;
-        const rejections: any[] = [];
-
-        for (let i = 0; i < promises.length; i++) {
-          promises[i].then(resolve, (error) => {
-            rejections[i] = error;
-            rejectionCount++;
-            if (rejectionCount === promises.length) {
-              const err = new Error("All awaitables failed");
-              (err as any).errors = rejections;
-              reject(err);
-            }
-          });
-        }
-      }
-    );
-    const result = [value, key] as AwaitedKeyedResult<TAwaitables>;
-    return (
-      onResolve ? await onResolve(result) : (result as unknown)
-    ) as Awaited<R | E>;
-  } catch (error) {
-    if (!onError) throw error;
-    return (await onError(error)) as Awaited<R | E>;
-  }
-}
-
-/**
- * Overloads for waitAny:
- *
- * 1) Synchronous (no handlers): Suspense-style (throws promises/errors, returns [value, key])
- * 2) Async with onResolve / onError: Promise-based
- */
-export function waitAny<
-  const TAwaitables extends Record<string, Awaitable<any>>
->(awaitables: TAwaitables): AwaitedKeyedResult<TAwaitables>;
-export function waitAny<
-  const TAwaitables extends Record<string, Awaitable<any>>,
-  R
->(
-  awaitables: TAwaitables,
-  onResolve: (result: AwaitedKeyedResult<TAwaitables>) => R | PromiseLike<R>
-): Promise<Awaited<R>>;
-export function waitAny<
-  const TAwaitables extends Record<string, Awaitable<any>>,
-  R,
-  E
->(
-  awaitables: TAwaitables,
-  onResolve: (result: AwaitedKeyedResult<TAwaitables>) => R | PromiseLike<R>,
-  onError: (error: unknown) => E | PromiseLike<E>
-): Promise<Awaited<R | E>>;
-export function waitAny(
-  awaitables: Record<string, Awaitable<any>>,
-  onResolve?: any,
-  onError?: any
-): any {
-  const hasOnResolve = typeof onResolve === "function";
-  const hasOnError = typeof onError === "function";
-
-  if (!hasOnResolve && !hasOnError) {
-    // Synchronous Suspense-style
-    return waitAnySync(awaitables);
-  }
-
-  const promise = waitAnyAsync(
-    awaitables,
-    onResolve,
-    hasOnError ? onError : undefined
-  );
-  // Track this Promise in the task cache so its state is observable
-  task.from(promise);
-  return promise;
-}
-
-/**
- * Synchronous core for waitRace.
- * Throws promise while loading, or error for first failed completion.
- */
-function waitRaceSync<const TAwaitables extends Record<string, Awaitable<any>>>(
-  awaitables: TAwaitables
-): AwaitedKeyedResult<TAwaitables> {
-  const entries = Object.entries(awaitables) as [string, Awaitable<unknown>][];
-
-  const tasks = entries.map(([key, awaitable]) => ({
-    key,
-    task: resolveAwaitable(awaitable),
-  }));
-
-  // Check if any already completed
-  const completed = tasks.find(
-    ({ task: t }) => t.status === "success" || t.status === "error"
-  );
-
-  if (completed) {
-    if (completed.task.status === "error") {
-      throw completed.task.error;
-    }
-    return [
-      completed.task.value,
-      completed.key,
-    ] as AwaitedKeyedResult<TAwaitables>;
-  }
-
-  // All still loading - throw Promise.race of underlying promises
-  const promises = tasks.map(({ key, task: t }) =>
-    t.promise.then<[unknown, string]>(
-      (data) => [data, key],
-      (error) => Promise.reject(error)
-    )
-  );
-  throw Promise.race(promises);
-}
-
-/**
- * Async helper for waitRace with onResolve/onError.
- */
-async function waitRaceAsync<
-  const TAwaitables extends Record<string, Awaitable<any>>,
-  R,
-  E
->(
-  awaitables: TAwaitables,
-  onResolve?: (result: AwaitedKeyedResult<TAwaitables>) => R | PromiseLike<R>,
-  onError?: (error: unknown) => E | PromiseLike<E>
-): Promise<Awaited<R | E>> {
-  const entries = Object.entries(awaitables) as [string, Awaitable<unknown>][];
-
-  const tasks = entries.map(([key, awaitable]) => ({
-    key,
-    task: resolveAwaitable(awaitable),
-  }));
-
-  const promises = tasks.map(({ key, task: t }) =>
-    t.status === "loading"
-      ? t.promise.then<[unknown, string]>((data) => [data, key])
-      : t.status === "success"
-      ? Promise.resolve<[unknown, string]>([t.value, key])
-      : Promise.reject(t.error)
-  );
-
-  try {
-    const [value, key] = await Promise.race(promises);
-    const result = [value, key] as AwaitedKeyedResult<TAwaitables>;
-    return (
-      onResolve ? await onResolve(result) : (result as unknown)
-    ) as Awaited<R | E>;
-  } catch (error) {
-    if (!onError) throw error;
-    return (await onError(error)) as Awaited<R | E>;
-  }
-}
-
-/**
- * Overloads for waitRace:
- *
- * 1) Synchronous (no handlers): Suspense-style (throws promises/errors, returns [value, key])
- * 2) Async with onResolve / onError: Promise-based
- */
-export function waitRace<
-  const TAwaitables extends Record<string, Awaitable<any>>
->(awaitables: TAwaitables): AwaitedKeyedResult<TAwaitables>;
-export function waitRace<
-  const TAwaitables extends Record<string, Awaitable<any>>,
-  R
->(
-  awaitables: TAwaitables,
-  onResolve: (result: AwaitedKeyedResult<TAwaitables>) => R | PromiseLike<R>
-): Promise<Awaited<R>>;
-export function waitRace<
-  const TAwaitables extends Record<string, Awaitable<any>>,
-  R,
-  E
->(
-  awaitables: TAwaitables,
-  onResolve: (result: AwaitedKeyedResult<TAwaitables>) => R | PromiseLike<R>,
-  onError: (error: unknown) => E | PromiseLike<E>
-): Promise<Awaited<R | E>>;
-export function waitRace(
-  awaitables: Record<string, Awaitable<any>>,
-  onResolve?: any,
-  onError?: any
-): any {
-  const hasOnResolve = typeof onResolve === "function";
-  const hasOnError = typeof onError === "function";
-
-  if (!hasOnResolve && !hasOnError) {
-    // Synchronous Suspense-style
-    return waitRaceSync(awaitables);
-  }
-
-  const promise = waitRaceAsync(
-    awaitables,
-    onResolve,
-    hasOnError ? onError : undefined
-  );
-  task.from(promise);
-  return promise;
-}
-
-/**
- * Synchronous core for waitSettled.
- * Returns PromiseSettledResult shapes, but uses promise-throwing when still loading.
- */
-function waitSettledSync(awaitable: Awaitable<any>): PromiseSettledResult<any>;
-function waitSettledSync<const TAwaitables extends readonly Awaitable<any>[]>(
-  awaitables: TAwaitables
-): {
-  [K in keyof TAwaitables]: PromiseSettledResult<
-    AwaitedFromAwaitable<TAwaitables[K]>
-  >;
-};
-function waitSettledSync<
-  const TAwaitables extends Record<string, Awaitable<any>>
->(
-  awaitables: TAwaitables
-): {
-  [K in keyof TAwaitables]: PromiseSettledResult<
-    AwaitedFromAwaitable<TAwaitables[K]>
-  >;
-};
-function waitSettledSync(awaitableOrCollection: any): any {
-  // Single awaitable
-  if (
-    !Array.isArray(awaitableOrCollection) &&
-    isSingleAwaitable(awaitableOrCollection)
-  ) {
-    const l = resolveAwaitable(awaitableOrCollection);
-    if (l.status === "loading") {
-      throw l.promise.then(
-        (value) => ({ status: "fulfilled" as const, value }),
-        (reason) => ({ status: "rejected" as const, reason })
-      );
-    }
-    if (l.status === "error") {
-      return { status: "rejected" as const, reason: l.error };
-    }
-    return { status: "fulfilled" as const, value: l.value };
-  }
-
-  // Array of awaitables
-  if (Array.isArray(awaitableOrCollection)) {
-    const tasks = awaitableOrCollection.map(resolveAwaitable);
-
-    const anyLoading = tasks.some((t) => t.status === "loading");
-    if (anyLoading) {
-      const promises = tasks.map((t) =>
-        t.status === "loading"
-          ? t.promise
-          : t.status === "success"
-          ? Promise.resolve(t.value)
-          : Promise.reject(t.error)
-      );
-
-      throw Promise.all(
-        promises.map((p) =>
-          p.then(
-            (value) => ({ status: "fulfilled" as const, value }),
-            (reason) => ({ status: "rejected" as const, reason })
-          )
-        )
-      );
-    }
-
-    // All settled
-    return tasks.map((t) =>
-      t.status === "success"
-        ? { status: "fulfilled" as const, value: t.value }
-        : { status: "rejected" as const, reason: t.error }
-    );
-  }
-
-  // Record of awaitables
-  const entries = Object.entries(awaitableOrCollection) as [
-    string,
-    Awaitable<unknown>
-  ][];
-  const tasks = entries.map(([key, awaitable]) => ({
-    key,
-    task: resolveAwaitable(awaitable),
-  }));
-
-  const anyLoading = tasks.some(({ task: t }) => t.status === "loading");
-
-  if (anyLoading) {
-    const promises = tasks.map(({ task: t }) =>
-      t.status === "loading"
-        ? t.promise
-        : t.status === "success"
-        ? Promise.resolve(t.value)
-        : Promise.reject(t.error)
-    );
-
-    throw Promise.all(
-      promises.map((p) =>
-        p.then(
-          (value) => ({ status: "fulfilled" as const, value }),
-          (reason) => ({ status: "rejected" as const, reason })
-        )
-      )
-    );
-  }
-
-  const result: any = {};
-  for (const { key, task: t } of tasks) {
-    result[key] =
-      t.status === "success"
-        ? { status: "fulfilled" as const, value: t.value }
-        : { status: "rejected" as const, reason: t.error };
-  }
-  return result;
-}
-
-/**
- * Async helper for waitSettled that always resolves (never throws).
- * Accepts an optional onSettled callback to transform the result.
- */
-async function waitSettledAsync<R = any>(
-  awaitable: Awaitable<any>,
-  onSettled: (result: PromiseSettledResult<any>) => R | PromiseLike<R>
-): Promise<R | PromiseSettledResult<any>>;
-async function waitSettledAsync<
-  const TAwaitables extends readonly Awaitable<any>[],
-  R = any
->(
-  awaitables: TAwaitables,
-  onSettled: (result: {
-    [K in keyof TAwaitables]: PromiseSettledResult<
-      AwaitedFromAwaitable<TAwaitables[K]>
-    >;
-  }) => R | PromiseLike<R>
-): Promise<
-  | R
-  | {
-      [K in keyof TAwaitables]: PromiseSettledResult<
-        AwaitedFromAwaitable<TAwaitables[K]>
-      >;
-    }
->;
-async function waitSettledAsync<
-  const TAwaitables extends Record<string, Awaitable<any>>,
-  R = any
->(
-  awaitables: TAwaitables,
-  onSettled: (result: {
-    [K in keyof TAwaitables]: PromiseSettledResult<
-      AwaitedFromAwaitable<TAwaitables[K]>
-    >;
-  }) => R | PromiseLike<R>
-): Promise<
-  | R
-  | {
-      [K in keyof TAwaitables]: PromiseSettledResult<
-        AwaitedFromAwaitable<TAwaitables[K]>
-      >;
-    }
->;
-async function waitSettledAsync(
-  awaitableOrCollection: any,
-  onSettled: AnyFunc
-): Promise<any> {
-  // Single
-  if (
-    !Array.isArray(awaitableOrCollection) &&
-    isSingleAwaitable(awaitableOrCollection)
-  ) {
-    const l = resolveAwaitable(awaitableOrCollection);
-    let result: PromiseSettledResult<any>;
-
-    if (l.status === "loading") {
-      try {
-        const value = await l.promise;
-        result = { status: "fulfilled" as const, value };
-      } catch (reason) {
-        result = { status: "rejected" as const, reason };
-      }
-    } else if (l.status === "error") {
-      result = { status: "rejected" as const, reason: l.error };
-    } else {
-      result = { status: "fulfilled" as const, value: l.value };
-    }
-
-    return onSettled ? await onSettled(result) : result;
-  }
-
-  // Array
-  if (Array.isArray(awaitableOrCollection)) {
-    const tasks = awaitableOrCollection.map(resolveAwaitable);
-    const promises = tasks.map((t) =>
-      t.status === "loading"
-        ? t.promise
-        : t.status === "success"
-        ? Promise.resolve(t.value)
-        : Promise.reject(t.error)
-    );
-
-    const results = await Promise.all(
-      promises.map((p) =>
-        p.then(
-          (value) => ({ status: "fulfilled" as const, value }),
-          (reason) => ({ status: "rejected" as const, reason })
-        )
-      )
-    );
-
-    return onSettled ? await onSettled(results) : results;
-  }
-
-  // Record
-  const entries = Object.entries(awaitableOrCollection) as [
-    string,
-    Awaitable<unknown>
-  ][];
-  const tasks = entries.map(([key, awaitable]) => ({
-    key,
-    task: resolveAwaitable(awaitable),
-  }));
-
-  const promises = tasks.map(({ task: t }) =>
-    t.status === "loading"
-      ? t.promise
-      : t.status === "success"
-      ? Promise.resolve(t.value)
-      : Promise.reject(t.error)
-  );
-
-  const settled = await Promise.all(
-    promises.map((p) =>
-      p.then(
-        (value) => ({ status: "fulfilled" as const, value }),
-        (reason) => ({ status: "rejected" as const, reason })
-      )
-    )
-  );
-
-  const result: any = {};
-  for (let i = 0; i < settled.length; i++) {
-    const { key } = tasks[i];
-    result[key] = settled[i];
-  }
-
-  return onSettled ? await onSettled(result) : result;
-}
-
-/**
- * Wait for awaitables to settle (complete with success or failure).
- *
- * Unlike `wait()`, `wait.any()`, and `wait.race()`, `wait.settled()` captures
- * both successful and failed outcomes as PromiseSettledResult shapes instead of
- * throwing errors.
- *
- * ## Modes
- *
- * ### 1. Synchronous (Suspense-style) - No callback
- * - ✅ **DOES** throw promises while any awaitable is still loading (Suspense-compatible)
- * - ❌ **NEVER** throws errors - failed awaitables become `{ status: "rejected", reason }`
- * - Returns PromiseSettledResult shapes when all are complete
- *
- * ### 2. Async (Promise-style) - With `onSettled` callback
- * - Returns a Promise that **always resolves** (never rejects)
- * - Callback receives PromiseSettledResult shapes
- * - Callback can transform the results into any shape
- *
- * @example
- * // Synchronous mode
- * const results = wait.settled([promise1, promise2]);
- * // [{ status: "fulfilled", value }, { status: "rejected", reason }]
- *
- * @example
- * // Async mode with callback
- * const successful = await wait.settled([p1, p2, p3], (results) =>
- *   results.filter(r => r.status === "fulfilled").map(r => r.value)
- * );
- *
- * @example
- * // Handle partial failures
- * const data = await wait.settled({ user, posts, settings }, (settled) => ({
- *   user: settled.user.status === "fulfilled" ? settled.user.value : null,
- *   posts: settled.posts.status === "fulfilled" ? settled.posts.value : [],
- *   settings: settled.settings.status === "fulfilled" ? settled.settings.value : {},
- * }));
- */
-export function waitSettled(
-  awaitable: Awaitable<any>
-): PromiseSettledResult<any>;
-export function waitSettled<
-  const TAwaitables extends readonly Awaitable<any>[]
->(
-  awaitables: TAwaitables
-): {
-  [K in keyof TAwaitables]: PromiseSettledResult<
-    AwaitedFromAwaitable<TAwaitables[K]>
-  >;
-};
-export function waitSettled<
-  const TAwaitables extends Record<string, Awaitable<any>>
->(
-  awaitables: TAwaitables
-): {
-  [K in keyof TAwaitables]: PromiseSettledResult<
-    AwaitedFromAwaitable<TAwaitables[K]>
-  >;
-};
-export function waitSettled<R>(
-  awaitable: Awaitable<any>,
-  onSettled: (result: PromiseSettledResult<any>) => R | PromiseLike<R>
-): Promise<Awaited<R>>;
-export function waitSettled<
-  const TAwaitables extends readonly Awaitable<any>[],
-  R
->(
-  awaitables: TAwaitables,
-  onSettled: (result: {
-    [K in keyof TAwaitables]: PromiseSettledResult<
-      AwaitedFromAwaitable<TAwaitables[K]>
-    >;
-  }) => R | PromiseLike<R>
-): Promise<Awaited<R>>;
-export function waitSettled<
-  const TAwaitables extends Record<string, Awaitable<any>>,
-  R
->(
-  awaitables: TAwaitables,
-  onSettled: (result: {
-    [K in keyof TAwaitables]: PromiseSettledResult<
-      AwaitedFromAwaitable<TAwaitables[K]>
-    >;
-  }) => R | PromiseLike<R>
-): Promise<Awaited<R>>;
-export function waitSettled(awaitableOrCollection: any, onSettled?: any): any {
-  const hasOnSettled = typeof onSettled === "function";
-
-  if (!hasOnSettled) {
-    // Synchronous Suspense-style
-    // Throws promise while loading, but NEVER throws errors
-    // Always returns PromiseSettledResult shapes
-    return waitSettledSync(awaitableOrCollection);
-  }
-
-  // Async mode with callback
-  // Always resolves (never rejects) with transformed result
-  const promise = waitSettledAsync(awaitableOrCollection, onSettled);
-  task.from(promise);
-  return promise;
+  return waitAllSyncRecord(awaitableOrCollection);
 }
 
 /**
@@ -1122,23 +335,11 @@ export function waitTimeout(
   let mainPromise: Promise<any>;
 
   if (Array.isArray(awaitableOrCollection)) {
-    mainPromise = waitAllAsyncArray(
-      awaitableOrCollection,
-      undefined,
-      undefined
-    );
+    mainPromise = waitAllAsyncArray(awaitableOrCollection);
   } else if (isSingleAwaitable(awaitableOrCollection)) {
-    mainPromise = waitAllAsyncSingle(
-      awaitableOrCollection,
-      undefined,
-      undefined
-    );
+    mainPromise = waitAllAsyncSingle(awaitableOrCollection);
   } else {
-    mainPromise = waitAllAsyncRecord(
-      awaitableOrCollection,
-      undefined,
-      undefined
-    );
+    mainPromise = waitAllAsyncRecord(awaitableOrCollection);
   }
 
   const promise = Promise.race([mainPromise, timeoutPromise]);
@@ -1159,24 +360,17 @@ export function waitDelay(ms: number): Promise<void> {
  * Exported wait API:
  *
  * - wait() is the primary entry point (alias of waitAll)
- * - wait.all, wait.any, wait.race, wait.settled, wait.timeout, wait.delay
- *   provide Promise-based helpers for common coordination patterns
+ * - wait.all, wait.timeout, wait.delay provide Promise-based helpers
  */
 /** Combined wait API type */
 export type WaitApi = typeof waitAll & {
   all: typeof waitAll;
-  any: typeof waitAny;
-  race: typeof waitRace;
-  settled: typeof waitSettled;
   timeout: typeof waitTimeout;
   delay: typeof waitDelay;
 };
 
 export const wait: WaitApi = Object.assign(waitAll, {
   all: waitAll,
-  any: waitAny,
-  race: waitRace,
-  settled: waitSettled,
   timeout: waitTimeout,
   delay: waitDelay,
 });

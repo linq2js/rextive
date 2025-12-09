@@ -1,5 +1,4 @@
 import { isPromiseLike } from "./utils/isPromiseLike";
-import { wait } from "./wait";
 
 /**
  * Helper to create a selector that works with both promise and non-promise values
@@ -162,7 +161,7 @@ export function awaited<TSource>(
 ): (value: TSource) => any {
   return ((value: TSource): any => {
     if (isPromiseLike(value)) {
-      return wait(value, (awaited) =>
+      return (value as PromiseLike<any>).then((awaited) =>
         selectors.reduce((acc, selector) => selector(acc), awaited as any)
       );
     }

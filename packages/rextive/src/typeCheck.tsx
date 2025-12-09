@@ -134,33 +134,21 @@ declare const signalStringAwaitable: Signal<Promise<string> | Task<string>>;
 // Integration test instances
 // -----------------------------------------------------------------------------
 
-const sigWithTask = signal(task.success(42));
-const task1 = task.success(1);
-const task2 = task.success(2);
+const sigWithValue = signal(42);
 
-const mixedArray = wait([sigWithTask, task1, task2]);
-const singleSig = wait(sigWithTask);
-const promiseResultSig = wait(sigWithTask, (value) => value.value);
+const mixedArray = wait([sigWithValue, promiseNumber]);
+const singleSig = wait(sigWithValue);
 
 const mixedRecord = wait({
-  sig: sigWithTask,
-  task: task1,
+  sig: sigWithValue,
   promise: promiseNumber,
 });
 
 const userResultFromSignal = wait(userSignal);
-const usersArray = wait([userTask, userPromise, userSignal]);
+const usersArray = wait([userPromise, userSignal]);
 const usersRecord = wait({
-  task: userTask,
   promise: userPromise,
   signal: userSignal,
-});
-
-const transformedUser = wait(userSignal, (user) => {
-  if (user.status === "success") {
-    return user.value.name;
-  }
-  return "";
 });
 
 // =============================================================================
@@ -552,116 +540,42 @@ function signalTests() {
 
 function taskTests() {
   // Clone variables from global scope
-  const loadingNumber = task.loading(promiseNumber);
-  const loadingString = task.loading(promiseString);
-  const loadingUser = task.loading(promiseUser);
-  const successNumber = task.success(42);
-  const successString = task.success("hello");
-  const successUser = task.success({ id: 1, name: "Alice" });
-  const successArray = task.success([1, 2, 3]);
-  const successWithPromise = task.success(100, Promise.resolve(100));
-  const errorWithError = task.error(new Error("Something failed"));
-  const errorWithString = task.error("Error message");
-  const errorWithNumber = task.error(404);
-  const errorTyped = task.error<string>(new Error("Failed to load string"));
-  const errorWithPromise = task.error<number>(
-    new Error("Failed"),
-    Promise.reject(new Error("Failed"))
-  );
   const unknownValue: unknown = { status: "success", value: 42 };
-  const maybeTask: unknown = successNumber;
   const getLoadNumber = task.get(promiseNumber);
   const getLoadString = task.get(promiseString);
   const getLoadUser = task.get(promiseUser);
-  const setLoad1 = task.set(promiseNumber, successNumber);
-  const setLoad2 = task.set(promiseString, loadingString);
-  const setLoad3 = task.set(
-    promiseUser,
-    task.error<{ id: number; name: string }>(new Error("Failed"))
-  );
   const norm1 = task.from(42);
   const norm2 = task.from(promiseNumber);
-  const norm3 = task.from(successNumber);
   const norm4 = task.from({ id: 1, name: "Alice" });
   const norm5 = task.from(null);
   const norm6 = task.from(undefined);
-  const testTask: Task<number> = successNumber as unknown as Task<number>;
+  const testTask: Task<number> = norm1 as unknown as Task<number>;
 
   // -----------------------------------------------------------------------------
-  // task.loading(promise) - LoadingTask
+  // task.from() - Normalize value to Task
   // -----------------------------------------------------------------------------
 
-  expectType<LoadingTask<number>>(loadingNumber);
-  expectType<"loading">(loadingNumber.status);
-  expectType<PromiseLike<number>>(loadingNumber.promise);
-  expectType<undefined>(loadingNumber.value);
-  expectType<undefined>(loadingNumber.error);
-  expectType<true>(loadingNumber.loading);
+  // Primitive values become SuccessTask
+  expectType<Task<number>>(norm1);
+  if (norm1.status === "success") {
+    expectType<number>(norm1.value);
+  }
 
-  expectType<LoadingTask<string>>(loadingString);
-  expectType<"loading">(loadingString.status);
-  expectType<PromiseLike<string>>(loadingString.promise);
+  // Promises become Task (initially loading)
+  expectType<Task<number>>(norm2);
+  expectType<"loading" | "success" | "error">(norm2.status);
 
-  expectType<LoadingTask<{ id: number; name: string }>>(loadingUser);
-  expectType<"loading">(loadingUser.status);
-  expectType<PromiseLike<{ id: number; name: string }>>(loadingUser.promise);
+  // Objects become SuccessTask
+  expectType<Task<{ id: number; name: string }>>(norm4);
+  if (norm4.status === "success") {
+    expectType<{ id: number; name: string }>(norm4.value);
+  }
 
-  // -----------------------------------------------------------------------------
-  // task.success(value) - SuccessTask
-  // -----------------------------------------------------------------------------
-
-  expectType<SuccessTask<number>>(successNumber);
-  expectType<"success">(successNumber.status);
-  expectType<number>(successNumber.value);
-  expectType<undefined>(successNumber.error);
-  expectType<false>(successNumber.loading);
-  expectType<PromiseLike<number>>(successNumber.promise);
-
-  expectType<SuccessTask<string>>(successString);
-  expectType<"success">(successString.status);
-  expectType<string>(successString.value);
-
-  expectType<SuccessTask<{ id: number; name: string }>>(successUser);
-  expectType<"success">(successUser.status);
-  expectType<{ id: number; name: string }>(successUser.value);
-
-  expectType<SuccessTask<number[]>>(successArray);
-  expectType<"success">(successArray.status);
-  expectType<number[]>(successArray.value);
-
-  // With explicit promise
-  expectType<SuccessTask<number>>(successWithPromise);
-  expectType<number>(successWithPromise.value);
-  expectType<PromiseLike<number>>(successWithPromise.promise);
-
-  // -----------------------------------------------------------------------------
-  // task.error(error) - ErrorTask
-  // -----------------------------------------------------------------------------
-
-  expectType<ErrorTask<any>>(errorWithError);
-  expectType<"error">(errorWithError.status);
-  expectType<unknown>(errorWithError.error);
-  expectType<undefined>(errorWithError.value);
-  expectType<false>(errorWithError.loading);
-  expectType<PromiseLike<any>>(errorWithError.promise);
-
-  expectType<ErrorTask<any>>(errorWithString);
-  expectType<"error">(errorWithString.status);
-  expectType<unknown>(errorWithString.error);
-
-  expectType<ErrorTask<any>>(errorWithNumber);
-  expectType<"error">(errorWithNumber.status);
-  expectType<unknown>(errorWithNumber.error);
-
-  // With explicit type parameter
-  expectType<ErrorTask<string>>(errorTyped);
-  expectType<"error">(errorTyped.status);
-  expectType<unknown>(errorTyped.error);
-
-  // With explicit promise
-  expectType<ErrorTask<number>>(errorWithPromise);
-  expectType<unknown>(errorWithPromise.error);
-  expectType<PromiseLike<number>>(errorWithPromise.promise);
+  // Null becomes SuccessTask
+  expectType<Task<null>>(norm5);
+  if (norm5.status === "success") {
+    expectType<null>(norm5.value);
+  }
 
   // -----------------------------------------------------------------------------
   // is(value, "task") type guard
@@ -682,6 +596,7 @@ function taskTests() {
   }
 
   // Narrowing within task
+  const maybeTask: unknown = norm1;
   if (is<string>(maybeTask, "task")) {
     if (maybeTask.status === "success") {
       expectType<string>(maybeTask.value);
@@ -707,16 +622,6 @@ function taskTests() {
   expectType<Task<{ id: number; name: string }>>(getLoadUser);
 
   // -----------------------------------------------------------------------------
-  // task.set() - Associate task with promise
-  // -----------------------------------------------------------------------------
-
-  expectType<SuccessTask<number>>(setLoad1);
-
-  expectType<LoadingTask<string>>(setLoad2);
-
-  expectType<ErrorTask<{ id: number; name: string }>>(setLoad3);
-
-  // -----------------------------------------------------------------------------
   // task.from() - Normalize any value to task
   // -----------------------------------------------------------------------------
 
@@ -725,9 +630,6 @@ function taskTests() {
 
   // From promise
   expectType<Task<number>>(norm2);
-
-  // From existing task
-  expectType<SuccessTask<number>>(norm3);
 
   // From object
   expectType<Task<{ id: number; name: string }>>(norm4);
@@ -783,47 +685,29 @@ function taskTests() {
   // -----------------------------------------------------------------------------
 
   void (function testComplexTaskScenarios() {
-    // Union types
-    const unionTask = task.success<string | number>(42);
-    expectType<SuccessTask<string | number>>(unionTask);
-    expectType<string | number>(unionTask.value);
-
-    // Optional types
-    const optionalTask = task.success<string | undefined>(undefined);
-    expectType<SuccessTask<string | undefined>>(optionalTask);
-    expectType<string | undefined>(optionalTask.value);
-
-    // Nullable types
-    const nullableTask = task.success<string | null>(null);
-    expectType<SuccessTask<string | null>>(nullableTask);
-    expectType<string | null>(nullableTask.value);
-
     // Generic types
     interface Result<T> {
       data: T;
       timestamp: number;
     }
 
-    const genericTask = task.success<Result<number>>({
+    const genericTask = task.from<Result<number>>({
       data: 42,
       timestamp: Date.now(),
     });
-    expectType<SuccessTask<Result<number>>>(genericTask);
-    expectType<Result<number>>(genericTask.value);
+    expectType<Task<Result<number>>>(genericTask);
 
     // Array of tasks
     const taskArray: Array<Task<number>> = [
-      task.loading(promiseNumber),
-      task.success(42),
-      task.error(new Error("Failed")),
+      task.get(promiseNumber),
+      task.from(42),
     ];
     expectType<Array<Task<number>>>(taskArray);
 
     // Map of tasks
     const taskMap: Record<string, Task<string>> = {
-      a: task.success("hello"),
-      b: task.loading(promiseString),
-      c: task.error(new Error("Failed")),
+      a: task.from("hello"),
+      b: task.get(promiseString),
     };
     expectType<Record<string, Task<string>>>(taskMap);
   })();
@@ -832,53 +716,19 @@ function taskTests() {
     // Async function returning task
     async function fetchData(): Promise<Task<number>> {
       const data = await promiseNumber;
-      return task.success(data);
+      return task.from(data);
     }
 
     const asyncResult = fetchData();
     expectType<PromiseLike<Task<number>>>(asyncResult);
-
-    // Helper function to map task values
-    function mapTask<T, U>(t: Task<T>, fn: (value: T) => U): Task<U> {
-      if (t.status === "success") {
-        return task.success(fn(t.value));
-      }
-      if (t.status === "loading") {
-        return task.loading(t.promise.then(fn));
-      }
-      return task.error(t.error);
-    }
-
-    const mapped = mapTask(successNumber, (n) => n * 2);
-    expectType<Task<number>>(mapped);
 
     // Helper to extract value or default
     function getValueOr<T>(t: Task<T>, defaultValue: T): T {
       return t.status === "success" ? t.value : defaultValue;
     }
 
-    const extracted = getValueOr(successNumber, 0);
+    const extracted = getValueOr(norm1, 0);
     expectType<number>(extracted);
-
-    // Chaining tasks
-    const chain1 = task.success(5);
-    const chain2 = mapTask(chain1, (n) => n.toString());
-    expectType<Task<string>>(chain2);
-
-    // Error recovery
-    function recoverFromError<T>(t: Task<T>, recovery: T): SuccessTask<T> {
-      if (t.status === "error") {
-        return task.success(recovery);
-      }
-      if (t.status === "success") {
-        return t;
-      }
-      // Loading state - need to handle somehow
-      throw new Error("Cannot recover from loading state");
-    }
-
-    const recovered = recoverFromError(errorWithNumber as Task<number>, 0);
-    expectType<SuccessTask<number>>(recovered);
   })();
 }
 
@@ -889,58 +739,15 @@ function taskTests() {
 function waitTests() {
   // Clone variables from global scope
   const awaitableNumber: Awaitable<number> =
-    taskNumber ?? promiseNumber ?? signalNumberAwaitable;
+    promiseNumber ?? signalNumberAwaitable;
   const awaitableString: Awaitable<string> =
-    taskString ?? promiseString ?? signalStringAwaitable;
+    promiseString ?? signalStringAwaitable;
   const tupleResult = wait([awaitableNumber, awaitableString]);
   const recordResult = wait({
     num: awaitableNumber,
     str: awaitableString,
   });
   const singleResult = wait(awaitableNumber);
-  const tuplePromise = wait(
-    [awaitableNumber, awaitableString],
-    (n, s) => `${n}:${s}`
-  );
-  const tuplePromiseWithError = wait(
-    [awaitableNumber, awaitableString],
-    (n, s) => `${n}:${s}`,
-    (error) => (error instanceof Error ? error.message : "unknown")
-  );
-  const recordPromise = wait(
-    { num: awaitableNumber, str: awaitableString },
-    (values) => values.num + values.str.length
-  );
-  const anyResult = wait.any({
-    num: awaitableNumber,
-    str: awaitableString,
-  });
-  const anyPromise = wait.any(
-    { num: awaitableNumber, str: awaitableString },
-    ([_value, key]) => key
-  );
-  const anyPromiseWithError = wait.any(
-    { num: awaitableNumber, str: awaitableString },
-    ([_value, key]) => key,
-    (error) => (error instanceof Error ? error.message : "err")
-  );
-  const raceResult = wait.race({
-    num: awaitableNumber,
-    str: awaitableString,
-  });
-  const racePromise = wait.race(
-    { num: awaitableNumber, str: awaitableString },
-    ([value, key]) => ({ key, value })
-  );
-  const settledTuple = wait.settled([awaitableNumber, awaitableString]);
-  const settledRecord = wait.settled({
-    num: awaitableNumber,
-    str: awaitableString,
-  });
-  const settledPromise = wait.settled(
-    [awaitableNumber, awaitableString],
-    (results) => results.map((r) => r.status)
-  );
   const timeoutSingle = wait.timeout(awaitableNumber, 1000);
   const timeoutTuple = wait.timeout([awaitableNumber, awaitableNumber], 1000);
   const timeoutRecord = wait.timeout(
@@ -953,18 +760,10 @@ function waitTests() {
   // Type inference tests for AwaitedFromAwaitable
   // -----------------------------------------------------------------------------
 
-  // Test Task type extraction using Awaited<Task["promise"]>
-  expectType<number>(0 as AwaitedFromAwaitable<typeof taskNumber>);
-
-  expectType<string>("" as AwaitedFromAwaitable<typeof taskString>);
-
   // Test Promise type extraction
   expectType<number>(0 as AwaitedFromAwaitable<typeof promiseNum>);
 
   expectType<string>("" as AwaitedFromAwaitable<typeof promiseStr>);
-
-  // Test Signal wrapping Task
-  expectType<number>(0 as AwaitedFromAwaitable<typeof signalTaskNumber>);
 
   // Test Signal wrapping Promise
   expectType<number>(0 as AwaitedFromAwaitable<typeof signalPromiseNumber>);
@@ -988,54 +787,6 @@ function waitTests() {
   expectType<number>(singleResult);
 
   // -----------------------------------------------------------------------------
-  // wait / wait.all – Promise mode (with callbacks)
-  // -----------------------------------------------------------------------------
-
-  // Tuple with onResolve
-  expectType<Promise<string>>(tuplePromise);
-
-  // Tuple with onResolve + onError
-  expectType<Promise<string>>(tuplePromiseWithError);
-
-  // Record with onResolve
-  expectType<Promise<number>>(recordPromise);
-
-  // -----------------------------------------------------------------------------
-  // wait.any
-  // -----------------------------------------------------------------------------
-
-  expectType<[number | string, "num" | "str"]>(anyResult);
-
-  expectType<Promise<"num" | "str">>(anyPromise);
-
-  expectType<Promise<"num" | "str" | string>>(anyPromiseWithError);
-
-  // -----------------------------------------------------------------------------
-  // wait.race
-  // -----------------------------------------------------------------------------
-
-  expectType<[number | string, "num" | "str"]>(raceResult);
-
-  expectType<Promise<{ key: "num" | "str"; value: number | string }>>(
-    racePromise
-  );
-
-  // -----------------------------------------------------------------------------
-  // wait.settled
-  // -----------------------------------------------------------------------------
-
-  expectType<
-    readonly [PromiseSettledResult<number>, PromiseSettledResult<string>]
-  >(settledTuple);
-
-  expectType<{
-    num: PromiseSettledResult<number>;
-    str: PromiseSettledResult<string>;
-  }>(settledRecord);
-
-  expectType<Promise<("fulfilled" | "rejected")[]>>(settledPromise);
-
-  // -----------------------------------------------------------------------------
   // wait.timeout & wait.delay
   // -----------------------------------------------------------------------------
 
@@ -1054,34 +805,26 @@ function waitTests() {
 
 function integrationTests() {
   // Test array with mixed types
-  expectType<readonly [number, number, number]>(mixedArray);
+  expectType<readonly [number, number]>(mixedArray);
 
-  // Test single signal with task
+  // Test single signal
   expectType<number>(singleSig);
-
-  // Test with promise callbacks
-  expectType<Promise<number>>(promiseResultSig);
 
   // Test record with mixed types
   expectType<{
     sig: number;
-    task: number;
     promise: number;
   }>(mixedRecord);
 
   // Complex transformation
   expectType<UserType>(userResultFromSignal);
 
-  expectType<readonly [UserType, UserType, UserType]>(usersArray);
+  expectType<readonly [UserType, UserType]>(usersArray);
 
   expectType<{
-    task: UserType;
     promise: UserType;
     signal: UserType;
   }>(usersRecord);
-
-  // Test async transformation
-  expectType<Promise<string>>(transformedUser);
 }
 
 // =============================================================================

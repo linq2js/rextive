@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { DevToolsPanel } from "./DevToolsPanel";
 import { enableDevTools, disableDevTools } from "../devtools";
 import { signal } from "../signal";
@@ -60,10 +60,9 @@ describe("DevToolsPanel", () => {
     render(<DevToolsPanel />);
     fireEvent.click(screen.getByTitle("Expand"));
 
-    // Wait for refresh
-    await new Promise((resolve) => setTimeout(resolve, 600));
-
-    expect(screen.getByText("testSignal")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("testSignal")).toBeInTheDocument();
+    });
   });
 
   it("should show tags when devtools enabled", async () => {
@@ -76,10 +75,9 @@ describe("DevToolsPanel", () => {
     // Switch to tags tab
     fireEvent.click(screen.getByText(/Tags/));
 
-    // Wait for refresh
-    await new Promise((resolve) => setTimeout(resolve, 600));
-
-    expect(screen.getByText("testTag")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("testTag")).toBeInTheDocument();
+    });
   });
 
   it("should switch between tabs", () => {
@@ -97,7 +95,9 @@ describe("DevToolsPanel", () => {
     fireEvent.click(screen.getByText(/Chains/));
 
     // Should show chains empty state
-    expect(screen.getByText("No chain reactions detected yet")).toBeInTheDocument();
+    expect(
+      screen.getByText("No chain reactions detected yet")
+    ).toBeInTheDocument();
   });
 
   it("should show filter buttons in signals tab when enabled and expanded", () => {

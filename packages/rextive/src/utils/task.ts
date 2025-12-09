@@ -14,6 +14,73 @@ import { getHooks } from "../hooks";
 import { is } from "../is";
 import { operatorId, chainName } from "./nameGenerator";
 
+// ============================================================================
+// Internal Task Factory Helpers
+// ============================================================================
+
+/**
+ * Creates a loading task from a promise.
+ * @internal
+ */
+function createLoadingTask<TValue>(
+  promise: PromiseLike<TValue>
+): LoadingTask<TValue> {
+  return {
+    [TASK_TYPE]: true,
+    status: "loading",
+    promise,
+    value: undefined,
+    error: undefined,
+    loading: true,
+  };
+}
+
+/**
+ * Creates a success task with data.
+ * @internal
+ */
+function createSuccessTask<TValue>(
+  value: TValue,
+  promise?: PromiseLike<TValue>
+): SuccessTask<TValue> {
+  const resolvedPromise = promise || Promise.resolve(value);
+  return {
+    [TASK_TYPE]: true,
+    status: "success",
+    promise: resolvedPromise,
+    value,
+    error: undefined,
+    loading: false,
+  };
+}
+
+/**
+ * Creates an error task.
+ * @internal
+ */
+function createErrorTask<TValue = any>(
+  error: unknown,
+  promise?: PromiseLike<TValue>
+): ErrorTask<TValue> {
+  const rejectedPromise = promise || Promise.reject(error);
+  if (rejectedPromise instanceof Promise) {
+    // Prevent unhandled rejection warnings
+    rejectedPromise.catch(() => {});
+  }
+  return {
+    [TASK_TYPE]: true,
+    status: "error",
+    promise: rejectedPromise,
+    value: undefined,
+    error,
+    loading: false,
+  };
+}
+
+// ============================================================================
+// Task Operator
+// ============================================================================
+
 /**
  * Creates an operator that transforms an async signal into a Task signal with guaranteed `value`.
  *
@@ -107,93 +174,11 @@ export function task<TValue>(
   };
 }
 
-// Namespace with factory and helper methods
+// ============================================================================
+// Task Namespace (Public API)
+// ============================================================================
+
 export namespace task {
-  /**
-   * Creates a loading task from a promise.
-   *
-   * @param promise - The promise representing the ongoing operation
-   * @returns A LoadingTask wrapping the promise
-   *
-   * @example
-   * ```typescript
-   * const userPromise = fetchUser(1);
-   * const loading = task.loading(userPromise);
-   * ```
-   */
-  export function loading<TValue>(
-    promise: PromiseLike<TValue>
-  ): LoadingTask<TValue> {
-    return {
-      [TASK_TYPE]: true,
-      status: "loading",
-      promise,
-      value: undefined,
-      error: undefined,
-      loading: true,
-    };
-  }
-
-  /**
-   * Creates a success task with data.
-   *
-   * @param value - The successful result data
-   * @param promise - The resolved promise (optional)
-   * @returns A SuccessTask containing the data
-   *
-   * @example
-   * ```typescript
-   * const user = { id: 1, name: "Alice" };
-   * const success = task.success(user);
-   * ```
-   */
-  export function success<TValue>(
-    value: TValue,
-    promise?: PromiseLike<TValue>
-  ): SuccessTask<TValue> {
-    const resolvedPromise = promise || Promise.resolve(value);
-    return {
-      [TASK_TYPE]: true,
-      status: "success",
-      promise: resolvedPromise,
-      value,
-      error: undefined,
-      loading: false,
-    };
-  }
-
-  /**
-   * Creates an error task.
-   *
-   * @param error - The error that occurred
-   * @param promise - The rejected promise (optional)
-   * @returns An ErrorTask containing the error
-   *
-   * @example
-   * ```typescript
-   * const err = new Error("User not found");
-   * const error = task.error(err);
-   * ```
-   */
-  export function error<TValue = any>(
-    error: unknown,
-    promise?: PromiseLike<TValue>
-  ): ErrorTask<TValue> {
-    const rejectedPromise = promise || Promise.reject(error);
-    if (rejectedPromise instanceof Promise) {
-      // Prevent unhandled rejection warnings
-      rejectedPromise.catch(() => {});
-    }
-    return {
-      [TASK_TYPE]: true,
-      status: "error",
-      promise: rejectedPromise,
-      value: undefined,
-      error,
-      loading: false,
-    };
-  }
-
   /**
    * Associates a task with a promise in the cache.
    *
@@ -204,8 +189,7 @@ export namespace task {
    * @example
    * ```typescript
    * const promise = fetchUser(1);
-   * const t = task.loading(promise);
-   * task.set(promise, t);
+   * const t = task.set(promise, { status: "loading", ... });
    * ```
    */
   export function set<T, L extends Task<T>>(promise: PromiseLike<T>, t: L): L {
@@ -232,19 +216,18 @@ export namespace task {
 
     promise.then(
       (data) => {
-        task.set(promise, task.success(data, promise as Promise<T>));
+        task.set(promise, createSuccessTask(data, promise as Promise<T>));
       },
       (error) => {
-        task.set(promise, task.error(error, promise as Promise<T>));
+        task.set(promise, createErrorTask(error, promise as Promise<T>));
       }
     );
 
-    return task.set(promise, task.loading(promise as Promise<T>));
+    return task.set(promise, createLoadingTask(promise as Promise<T>));
   }
 
   /**
    * Normalizes an arbitrary value into a Task.
-   * This is an alias for the main `task()` function.
    *
    * - If the value is already a Task, returns it as-is.
    * - If the value is a PromiseLike, wraps or reuses a cached Task.
@@ -267,8 +250,7 @@ export namespace task {
    * const signalTask = task.from(userSignal);
    *
    * // Already a task? Returns as-is
-   * const t = task.success(42);
-   * const same = task.from(t); // same === t
+   * const t = task.from(existingTask); // same reference
    * ```
    */
   export function from<TValue>(
@@ -282,7 +264,7 @@ export namespace task {
     : Task<TValue> {
     if (is(value)) {
       if (value.error()) {
-        return task.error(value.error()) as any;
+        return createErrorTask(value.error()) as any;
       }
       value = (value as Signal<any>)();
     }
@@ -293,6 +275,10 @@ export namespace task {
     return t;
   }
 }
+
+// ============================================================================
+// Internal Helpers
+// ============================================================================
 
 /**
  * Get or create global promise cache (shared across all module instances).
@@ -352,11 +338,11 @@ function toTaskImpl<T>(value: unknown): Task<T> {
     if (existing) {
       return existing as Task<T>;
     }
-    const t = task.success(value as T) as Task<T>;
+    const t = createSuccessTask(value as T) as Task<T>;
     staticCache.set(value as object, t);
     return t;
   }
 
   // Primitives are cheap to wrap, no caching needed
-  return task.success(value as T) as Task<T>;
+  return createSuccessTask(value as T) as Task<T>;
 }
