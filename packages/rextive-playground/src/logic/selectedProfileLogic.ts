@@ -37,7 +37,6 @@ export const selectedProfileLogic = logic("selectedProfileLogic", () => {
   return {
     selectedId,
     profile,
-    isLoading: $profiles.isLoading,
     select,
     clear,
   };

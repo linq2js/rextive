@@ -36,7 +36,6 @@ export function gameStatsLogic(gameName: string) {
   return {
     stats,
     isLoading,
-    profile: $profile.profile,
     refresh,
   };
 }

@@ -185,8 +185,6 @@ export function parentKidManagementLogic() {
     kidGameStats,
     isLoading,
     actionMessage,
-    profiles: $profiles.profiles,
-    profilesLoading: $profiles.isLoading,
     availableGames: AVAILABLE_GAMES,
     // Actions
     selectKid,

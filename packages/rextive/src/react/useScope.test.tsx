@@ -1,4 +1,4 @@
-import React, { act } from "react";
+import React, { act, Suspense } from "react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { useScope, __clearCache, scope, Scope } from "./useScope";
@@ -8,6 +8,7 @@ import { wrappers } from "../test/strictModeTests";
 import "@testing-library/jest-dom/vitest";
 import { AnySignal } from "../types";
 import { rx } from "./rx";
+import { wait } from "../wait";
 
 describe.each(wrappers)(
   "useScope ($mode mode)",
@@ -1882,6 +1883,397 @@ describe.each(wrappers)(
         });
 
         expect(screen.getByTestId("count")).toHaveTextContent("1");
+      });
+    });
+
+    describe("useScope + rx + Suspense integration", () => {
+      it("should handle parent scope with async signal accessed via wait() in child rx", async () => {
+        let resolveAsync: (value: string) => void;
+        const asyncPromise = new Promise<string>((resolve) => {
+          resolveAsync = resolve;
+        });
+
+        const Parent = () => {
+          const parentScope = useScope(() => ({
+            asyncSignal: signal(async () => asyncPromise),
+            count: signal(0),
+          }));
+
+          return (
+            <div>
+              <Suspense fallback={<div data-testid="loading">Loading...</div>}>
+                <Child parentScope={parentScope} />
+              </Suspense>
+            </div>
+          );
+        };
+
+        const Child = ({ parentScope }: { parentScope: any }) => {
+          return rx(() => {
+            const asyncData = wait(parentScope.asyncSignal());
+            const count = parentScope.count();
+
+            return (
+              <div>
+                <div data-testid="async-data">{asyncData}</div>
+                <div data-testid="count">{count}</div>
+                <button
+                  data-testid="increment"
+                  onClick={() => parentScope.count.set(count + 1)}
+                >
+                  Increment
+                </button>
+              </div>
+            );
+          });
+        };
+
+        renderWithWrapper(<Parent />);
+
+        // Should show loading initially
+        expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+        // Resolve async signal
+        await act(async () => {
+          resolveAsync!("Async Data Loaded");
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+
+        // Should show resolved data
+        expect(screen.getByTestId("async-data")).toHaveTextContent(
+          "Async Data Loaded"
+        );
+        expect(screen.getByTestId("count")).toHaveTextContent("0");
+
+        // Click increment button
+        await act(async () => {
+          screen.getByTestId("increment").click();
+        });
+
+        // Count should increment
+        expect(screen.getByTestId("count")).toHaveTextContent("1");
+        expect(screen.getByTestId("async-data")).toHaveTextContent(
+          "Async Data Loaded"
+        );
+      });
+
+      it("should handle multiple clicks after async resolution", async () => {
+        let resolveAsync: (value: number) => void;
+        const asyncPromise = new Promise<number>((resolve) => {
+          resolveAsync = resolve;
+        });
+
+        const Parent = () => {
+          const parentScope = useScope(() => ({
+            asyncSignal: signal(async () => asyncPromise),
+            count: signal(0),
+          }));
+
+          return (
+            <Suspense fallback={<div data-testid="loading">Loading...</div>}>
+              {rx(() => {
+                const asyncValue = wait(parentScope.asyncSignal());
+                const count = parentScope.count();
+
+                return (
+                  <div>
+                    <div data-testid="async-value">{asyncValue}</div>
+                    <div data-testid="count">{count}</div>
+                    <button
+                      data-testid="increment"
+                      onClick={() => parentScope.count.set(count + 1)}
+                    >
+                      +
+                    </button>
+                    <button
+                      data-testid="decrement"
+                      onClick={() => parentScope.count.set(count - 1)}
+                    >
+                      -
+                    </button>
+                  </div>
+                );
+              })}
+            </Suspense>
+          );
+        };
+
+        renderWithWrapper(<Parent />);
+
+        expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+        // Resolve async
+        await act(async () => {
+          resolveAsync!(42);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+
+        expect(screen.getByTestId("async-value")).toHaveTextContent("42");
+        expect(screen.getByTestId("count")).toHaveTextContent("0");
+
+        await act(async () => wait.delay(100));
+
+        // Multiple increments
+        await act(async () => {
+          screen.getByTestId("increment").click();
+        });
+        expect(screen.getByTestId("count")).toHaveTextContent("1");
+
+        await act(async () => {
+          screen.getByTestId("increment").click();
+        });
+        expect(screen.getByTestId("count")).toHaveTextContent("2");
+
+        // Decrement
+        await act(async () => {
+          screen.getByTestId("decrement").click();
+        });
+        expect(screen.getByTestId("count")).toHaveTextContent("1");
+
+        // Async value should remain stable
+        expect(screen.getByTestId("async-value")).toHaveTextContent("42");
+      });
+
+      it("should handle nested rx with parent scope access", async () => {
+        let resolveUser: (value: { name: string; age: number }) => void;
+        const userPromise = new Promise<{ name: string; age: number }>(
+          (resolve) => {
+            resolveUser = resolve;
+          }
+        );
+
+        const Parent = () => {
+          const parentScope = useScope(() => ({
+            user: signal(async () => userPromise),
+            visitCount: signal(0),
+          }));
+
+          return (
+            <div>
+              <Suspense
+                fallback={<div data-testid="loading">Loading user...</div>}
+              >
+                <UserDisplay parentScope={parentScope} />
+              </Suspense>
+              <VisitCounter parentScope={parentScope} />
+            </div>
+          );
+        };
+
+        const UserDisplay = ({ parentScope }: { parentScope: any }) => {
+          return rx(() => {
+            const user = wait(parentScope.user());
+            return (
+              <div>
+                <div data-testid="user-name">{user.name}</div>
+                <div data-testid="user-age">{user.age}</div>
+              </div>
+            );
+          });
+        };
+
+        const VisitCounter = ({ parentScope }: { parentScope: any }) => {
+          return rx(() => {
+            const visitCount = parentScope.visitCount();
+            return (
+              <div>
+                <div data-testid="visit-count">{visitCount}</div>
+                <button
+                  data-testid="visit"
+                  onClick={() => parentScope.visitCount.set(visitCount + 1)}
+                >
+                  Visit
+                </button>
+              </div>
+            );
+          });
+        };
+
+        renderWithWrapper(<Parent />);
+
+        // User is loading, but visit counter should work
+        expect(screen.getByTestId("loading")).toBeInTheDocument();
+        expect(screen.getByTestId("visit-count")).toHaveTextContent("0");
+
+        // Increment visit count while user is loading
+        await act(async () => {
+          screen.getByTestId("visit").click();
+        });
+        expect(screen.getByTestId("visit-count")).toHaveTextContent("1");
+
+        // Resolve user
+        await act(async () => {
+          resolveUser!({ name: "Alice", age: 30 });
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+
+        // User should be displayed
+        expect(screen.getByTestId("user-name")).toHaveTextContent("Alice");
+        expect(screen.getByTestId("user-age")).toHaveTextContent("30");
+
+        // Visit count should be preserved
+        expect(screen.getByTestId("visit-count")).toHaveTextContent("1");
+
+        // Increment again
+        await act(async () => {
+          screen.getByTestId("visit").click();
+        });
+        expect(screen.getByTestId("visit-count")).toHaveTextContent("2");
+      });
+
+      it("should handle scope initialization before child rx effect runs", async () => {
+        const logs: string[] = [];
+
+        const Parent = () => {
+          const parentScope = useScope(() => {
+            logs.push("parent scope created");
+            return {
+              data: signal("parent data"),
+              count: signal(0),
+            };
+          });
+
+          logs.push("parent render");
+
+          return (
+            <div>
+              <Child parentScope={parentScope} />
+            </div>
+          );
+        };
+
+        const Child = ({ parentScope }: { parentScope: any }) => {
+          logs.push("child render");
+
+          return rx(() => {
+            logs.push("rx render function");
+            const data = parentScope.data();
+            const count = parentScope.count();
+
+            return (
+              <div>
+                <div data-testid="data">{data}</div>
+                <div data-testid="count">{count}</div>
+                <button
+                  data-testid="increment"
+                  onClick={() => parentScope.count.set(count + 1)}
+                >
+                  +
+                </button>
+              </div>
+            );
+          });
+        };
+
+        renderWithWrapper(<Parent />);
+
+        // Verify scope was created before child effects run
+        // Note: In StrictMode, the order may differ due to double-rendering
+        if (mode === "strict") {
+          // StrictMode: double render causes different order
+          expect(logs).toContain("parent scope created");
+          expect(logs).toContain("parent render");
+          expect(logs).toContain("child render");
+          expect(logs).toContain("rx render function");
+          // Key assertion: scope created appears before first rx render
+          const scopeIdx = logs.indexOf("parent scope created");
+          const rxIdx = logs.indexOf("rx render function");
+          expect(scopeIdx).toBeLessThan(rxIdx);
+        } else {
+          // Normal mode: straightforward order
+          expect(logs[0]).toBe("parent scope created");
+          expect(logs[1]).toBe("parent render");
+          expect(logs[2]).toBe("child render");
+          expect(logs[3]).toBe("rx render function");
+        }
+
+        // Verify data is accessible
+        expect(screen.getByTestId("data")).toHaveTextContent("parent data");
+        expect(screen.getByTestId("count")).toHaveTextContent("0");
+
+        // Verify updates work
+        await act(async () => {
+          screen.getByTestId("increment").click();
+        });
+
+        expect(screen.getByTestId("count")).toHaveTextContent("1");
+      });
+
+      it("should handle scope with both sync and async signals in rx", async () => {
+        let resolveAsync: (value: string) => void;
+        const asyncPromise = new Promise<string>((resolve) => {
+          resolveAsync = resolve;
+        });
+
+        const Parent = () => {
+          const parentScope = useScope(() => ({
+            syncData: signal("Immediate"),
+            asyncData: signal(async () => asyncPromise),
+            counter: signal(0),
+          }));
+
+          return (
+            <div>
+              <Suspense fallback={<div data-testid="loading">Loading...</div>}>
+                {rx(() => {
+                  const syncData = parentScope.syncData();
+                  const asyncData = wait(parentScope.asyncData());
+                  const counter = parentScope.counter();
+
+                  return (
+                    <div>
+                      <div data-testid="sync">{syncData}</div>
+                      <div data-testid="async">{asyncData}</div>
+                      <div data-testid="counter">{counter}</div>
+                      <button
+                        data-testid="increment"
+                        onClick={() => parentScope.counter.set(counter + 1)}
+                      >
+                        +
+                      </button>
+                      <button
+                        data-testid="update-sync"
+                        onClick={() => parentScope.syncData.set("Updated")}
+                      >
+                        Update Sync
+                      </button>
+                    </div>
+                  );
+                })}
+              </Suspense>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<Parent />);
+
+        expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+        // Resolve async
+        await act(async () => {
+          resolveAsync!("Delayed");
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+
+        expect(screen.getByTestId("sync")).toHaveTextContent("Immediate");
+        expect(screen.getByTestId("async")).toHaveTextContent("Delayed");
+        expect(screen.getByTestId("counter")).toHaveTextContent("0");
+
+        // Update sync data
+        await act(async () => {
+          screen.getByTestId("update-sync").click();
+        });
+        expect(screen.getByTestId("sync")).toHaveTextContent("Updated");
+
+        // Increment counter
+        await act(async () => {
+          screen.getByTestId("increment").click();
+        });
+        expect(screen.getByTestId("counter")).toHaveTextContent("1");
+
+        // All data should remain stable
+        expect(screen.getByTestId("sync")).toHaveTextContent("Updated");
+        expect(screen.getByTestId("async")).toHaveTextContent("Delayed");
       });
     });
   }
