@@ -2,6 +2,7 @@ import { rx } from "rextive/react";
 import { useTypingGame } from "../provider";
 import { GameIcon, getIconForWord } from "@/components/GameIcons";
 import { playTypingSound } from "@/hooks/useSound";
+import { Icon } from "@/components/Icons";
 
 export function PlayingScreen({
   inputRef,
@@ -158,8 +159,8 @@ export function PlayingScreen({
           </p>
 
           {/* Tap to Focus hint (Mobile) */}
-          <p className="mt-4 text-primary-600 text-sm font-medium sm:hidden pointer-events-none">
-            Tap here to type ⌨️
+          <p className="mt-4 text-primary-600 text-sm font-medium sm:hidden pointer-events-none flex items-center justify-center gap-1">
+            Tap here to type <Icon name="keyboard" size={16} />
           </p>
         </div>
 

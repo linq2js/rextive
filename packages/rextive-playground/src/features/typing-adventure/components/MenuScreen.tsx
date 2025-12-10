@@ -2,6 +2,7 @@ import { rx } from "rextive/react";
 import { energyLogic } from "@/logic";
 import { useTypingGame } from "../provider";
 import { DifficultyButton } from "./DifficultyButton";
+import { Icon } from "@/components/Icons";
 
 export function MenuScreen() {
   const $game = useTypingGame();
@@ -16,7 +17,9 @@ export function MenuScreen() {
       <div className="space-y-6">
         {/* Game Info Card */}
         <div className="card text-center">
-          <div className="text-6xl mb-4">⌨️</div>
+          <div className="text-primary-500 mb-4 flex justify-center">
+            <Icon name="keyboard" size={64} />
+          </div>
           <h2 className="font-display text-2xl font-bold text-gray-800">
             Typing Adventure
           </h2>
@@ -32,21 +35,21 @@ export function MenuScreen() {
           </h3>
           <div className="grid grid-cols-3 gap-3">
             <DifficultyButton
-              icon="🐣"
+              iconName="star"
               label="Easy"
               description="5 pts/word"
               selected={difficulty === "easy"}
               onClick={() => $game.setDifficulty("easy")}
             />
             <DifficultyButton
-              icon="🐥"
+              iconName="fire"
               label="Medium"
               description="10 pts/word"
               selected={difficulty === "medium"}
               onClick={() => $game.setDifficulty("medium")}
             />
             <DifficultyButton
-              icon="🦅"
+              iconName="trophy"
               label="Hard"
               description="20 pts/word"
               selected={difficulty === "hard"}
@@ -58,7 +61,7 @@ export function MenuScreen() {
         {/* How to Play */}
         <div className="card bg-blue-50">
           <h3 className="font-display text-lg font-semibold text-blue-800 mb-2">
-            📖 How to Play
+            How to Play
           </h3>
           <ul className="text-sm text-blue-700 space-y-1">
             <li>• Type the words that appear on screen</li>
@@ -78,7 +81,7 @@ export function MenuScreen() {
               : "bg-gray-300 text-gray-500 cursor-not-allowed"
           }`}
         >
-          {hasEnergy ? <>Start Game ⚡1</> : <>No Energy - Come Back Tomorrow!</>}
+          {hasEnergy ? <>Start Game <Icon name="lightning" size={20} className="inline" />1</> : <>No Energy - Come Back Tomorrow!</>}
         </button>
       </div>
     );

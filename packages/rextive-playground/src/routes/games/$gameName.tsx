@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { rx, useScope } from "rextive/react";
 import { gameStatsLogic, selectedProfileLogic } from "@/logic";
 import { Avatar } from "@/components/Avatar";
+import { Icon } from "@/components/Icons";
 
 export const Route = createFileRoute("/games/$gameName")({
   component: GamePage,
@@ -36,8 +37,8 @@ function GamePage() {
               <span>←</span>
               <span className="text-sm font-medium hidden sm:inline">Back</span>
             </Link>
-            <h1 className="font-display text-2xl font-bold text-white drop-shadow-lg">
-              🎮 {displayName}
+            <h1 className="font-display text-2xl font-bold text-white drop-shadow-lg flex items-center gap-2">
+              <Icon name="controller" size={28} /> {displayName}
             </h1>
             <div className="w-12" />
           </header>
@@ -65,31 +66,35 @@ function GamePage() {
           {profile && (
             <div className="card mb-6">
               <h3 className="font-display text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                📊 Your Stats
+                <Icon name="chart" size={20} className="text-blue-500" /> Your Stats
               </h3>
               {isLoading ? (
                 <div className="text-center py-4">
-                  <div className="text-2xl animate-spin">⏳</div>
+                  <div className="text-2xl text-gray-400 animate-spin">
+                    <Icon name="refresh" size={32} />
+                  </div>
                   <p className="text-gray-500 mt-2">Loading stats...</p>
                 </div>
               ) : stats ? (
                 <div className="grid grid-cols-2 gap-4">
-                  <StatItem label="High Score" value={stats.highScore ?? 0} icon="🏆" />
-                  <StatItem label="Level" value={stats.level} icon="⭐" />
+                  <StatItem label="High Score" value={stats.highScore ?? 0} iconName="trophy" />
+                  <StatItem label="Level" value={stats.level} iconName="star" />
                   <StatItem
                     label="Last Played"
                     value={formatLastPlayed(stats.lastPlayed)}
-                    icon="📅"
+                    iconName="clock"
                   />
                   <StatItem
                     label="Games Played"
                     value={stats.level > 0 ? "Active" : "—"}
-                    icon="🎮"
+                    iconName="controller"
                   />
                 </div>
               ) : (
                 <div className="text-center py-4">
-                  <div className="text-4xl mb-2">🌟</div>
+                  <div className="text-4xl mb-2 text-amber-400">
+                    <Icon name="star" size={48} />
+                  </div>
                   <p className="text-gray-600">
                     No stats yet! Play your first game to start tracking.
                   </p>
@@ -100,7 +105,9 @@ function GamePage() {
 
           {/* Game Content */}
           <div className="card text-center">
-            <div className="text-6xl">🚧</div>
+            <div className="text-amber-500">
+              <Icon name="warning" size={64} />
+            </div>
             <h2 className="mt-4 font-display text-xl font-semibold">
               Coming Soon!
             </h2>
@@ -123,16 +130,16 @@ function GamePage() {
 function StatItem({
   label,
   value,
-  icon,
+  iconName,
 }: {
   label: string;
   value: string | number;
-  icon: string;
+  iconName: import("@/components/Icons").IconName;
 }) {
   return (
     <div className="p-3 bg-gray-50 rounded-xl">
       <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
-        <span>{icon}</span>
+        <Icon name={iconName} size={14} />
         <span>{label}</span>
       </div>
       <div className="font-display font-bold text-gray-800 text-lg">

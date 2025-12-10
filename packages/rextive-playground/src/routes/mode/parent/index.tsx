@@ -4,6 +4,7 @@ import { kidProfilesLogic, appOverlaysLogic, modalLogic } from "@/logic";
 import { parentKidManagementLogic } from "@/logic/parentKidManagementLogic";
 import { AVAILABLE_GAMES } from "@/domain/types";
 import { Avatar } from "@/components/Avatar";
+import { Icon } from "@/components/Icons";
 
 export const Route = createFileRoute("/mode/parent/")({
   component: KidsTab,
@@ -41,7 +42,7 @@ function KidsTab() {
     if ($tab.isLoading()) {
       return (
         <div className="flex items-center justify-center py-8">
-          <div className="text-2xl animate-bounce">⏳</div>
+          <div className="text-2xl animate-bounce text-gray-400"><Icon name="refresh" size={32} /></div>
         </div>
       );
     }
@@ -67,35 +68,35 @@ function KidsTab() {
 
         {/* Quick Actions */}
         <div className="card">
-          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3">
-            ⚡ Quick Actions
+          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <Icon name="lightning" size={20} className="text-amber-500" /> Quick Actions
           </h3>
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => $overlays.openProfileForm()}
               className="btn btn-primary flex-1 py-3"
             >
-              ➕ Add Kid Profile
+              <Icon name="plus" size={18} /> Add Kid Profile
             </button>
             <button
               onClick={() => $tab.refillAllEnergy()}
               disabled={$tab.mgmtIsLoading() || profiles.length === 0}
               className="btn btn-outline flex-1 py-3"
             >
-              ⚡ Refill All Energy
+              <Icon name="lightning" size={18} /> Refill All Energy
             </button>
           </div>
         </div>
 
         {/* Kid Selection */}
         <div className="card">
-          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3">
-            👶 Select a Kid to Manage
+          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <Icon name="baby" size={20} className="text-pink-500" /> Select a Kid to Manage
           </h3>
 
           {profiles.length === 0 ? (
             <div className="text-center py-6">
-              <div className="text-5xl mb-4">👶</div>
+              <div className="text-primary-500 mb-4"><Icon name="baby" size={64} /></div>
               <h4 className="font-display text-lg font-semibold text-gray-800">
                 No Kids Yet
               </h4>
@@ -176,29 +177,29 @@ function KidActionsPanel({
               onClick={onEditProfile}
               className="btn btn-outline px-4 py-2"
             >
-              ✏️ Edit Profile
+              <Icon name="pencil" size={16} /> Edit Profile
             </button>
           </div>
         </div>
 
         {/* Energy Actions */}
         <div className="card">
-          <h4 className="font-display font-semibold text-gray-800 mb-3">
-            ⚡ Energy
+          <h4 className="font-display font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <Icon name="lightning" size={18} className="text-amber-500" /> Energy
           </h4>
           <button
             onClick={() => $tab.refillEnergy(kid.id)}
             disabled={isLoading}
             className="btn btn-outline w-full py-2"
           >
-            ⚡ Refill Energy to Max (10)
+            <Icon name="lightning" size={16} /> Refill Energy to Max (10)
           </button>
         </div>
 
         {/* XP & Unlocks */}
         <div className="card">
-          <h4 className="font-display font-semibold text-gray-800 mb-3">
-            ⭐ XP & Unlocks
+          <h4 className="font-display font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <Icon name="star" size={18} className="text-purple-500" /> XP & Unlocks
           </h4>
           <button
             onClick={async () => {
@@ -214,7 +215,7 @@ function KidActionsPanel({
             disabled={isLoading}
             className="btn btn-outline w-full py-2 text-purple-600 border-purple-200 hover:bg-purple-50"
           >
-            🎁 Grant Max XP (Unlock All Games)
+            <Icon name="gift" size={16} /> Grant Max XP (Unlock All Games)
           </button>
           <p className="mt-2 text-xs text-gray-500 text-center">
             Grants 15,000 XP - unlocks all games instantly
@@ -223,8 +224,8 @@ function KidActionsPanel({
 
         {/* Stats Actions */}
         <div className="card">
-          <h4 className="font-display font-semibold text-gray-800 mb-3">
-            📊 Stats
+          <h4 className="font-display font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <Icon name="chart" size={18} className="text-blue-500" /> Stats
           </h4>
           <button
             onClick={async () => {
@@ -240,7 +241,7 @@ function KidActionsPanel({
             disabled={isLoading}
             className="btn btn-outline w-full py-2 text-red-600 border-red-200 hover:bg-red-50"
           >
-            🗑️ Reset All Stats
+            <Icon name="trash" size={16} /> Reset All Stats
           </button>
 
           <div className="mt-3 space-y-2">
@@ -262,7 +263,7 @@ function KidActionsPanel({
                   disabled={isLoading}
                   className="btn btn-outline py-2 text-sm"
                 >
-                  {game.icon} {game.name}
+                  <Icon name={game.icon as import("@/components/Icons").IconName} size={16} /> {game.name}
                 </button>
               ))}
             </div>
@@ -272,23 +273,23 @@ function KidActionsPanel({
         {/* Game Visibility */}
         <div className="card">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-display font-semibold text-gray-800">
-              🎮 Game Visibility
+            <h4 className="font-display font-semibold text-gray-800 flex items-center gap-2">
+              <Icon name="controller" size={18} className="text-indigo-500" /> Game Visibility
             </h4>
             <div className="flex gap-2">
               <button
                 onClick={() => $tab.setAllGamesVisibility(kid.id, true)}
                 disabled={isLoading}
-                className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200"
+                className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 flex items-center gap-1"
               >
-                Show All
+                <Icon name="eye" size={12} /> Show All
               </button>
               <button
                 onClick={() => $tab.setAllGamesVisibility(kid.id, false)}
                 disabled={isLoading}
-                className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 flex items-center gap-1"
               >
-                Hide All
+                <Icon name="eye-off" size={12} /> Hide All
               </button>
             </div>
           </div>
@@ -304,7 +305,7 @@ function KidActionsPanel({
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{game.icon}</span>
+                    <span className="text-2xl text-primary-500"><Icon name={game.icon as import("@/components/Icons").IconName} size={28} /></span>
                     <span className="font-medium text-gray-800">
                       {game.name}
                     </span>
@@ -312,13 +313,13 @@ function KidActionsPanel({
                   <button
                     onClick={() => $tab.toggleGameVisibility(kid.id, game.id)}
                     disabled={isLoading}
-                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors flex items-center gap-1 ${
                       isVisible
                         ? "bg-green-100 text-green-700"
                         : "bg-gray-200 text-gray-500"
                     }`}
                   >
-                    {isVisible ? "👁️ Visible" : "🙈 Hidden"}
+                    {isVisible ? <><Icon name="eye" size={14} /> Visible</> : <><Icon name="eye-off" size={14} /> Hidden</>}
                   </button>
                 </div>
               );

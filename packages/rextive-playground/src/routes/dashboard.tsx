@@ -330,8 +330,8 @@ function Dashboard() {
 
           {/* Welcome Banner */}
           <div className="card bg-gradient-to-r from-primary-500 to-purple-500 text-white">
-            <h1 className="font-display text-2xl font-bold">
-              Welcome back, {profile.name}! 🎉
+            <h1 className="font-display text-2xl font-bold flex items-center gap-2">
+              Welcome back, {profile.name}! <Icon name="star" size={24} className="text-amber-300" />
             </h1>
             <p className="mt-1 text-white/80">
               You're on a {stats.currentStreak} day streak! Keep it up!

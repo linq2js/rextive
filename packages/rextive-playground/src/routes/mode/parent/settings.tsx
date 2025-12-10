@@ -4,6 +4,7 @@ import { patch } from "rextive/helpers";
 import { rx, useScope, inputValue } from "rextive/react";
 import { focus } from "rextive/op";
 import { parentAuthLogic } from "@/logic";
+import { Icon } from "@/components/Icons";
 
 export const Route = createFileRoute("/mode/parent/settings")({
   component: SettingsTab,
@@ -111,8 +112,8 @@ function SettingsTab() {
     <div className="space-y-6">
       {/* Change Password Card */}
       <div className="card">
-        <h3 className="font-display text-lg font-semibold text-gray-800 mb-4">
-          🔐 Change Password
+        <h3 className="font-display text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <Icon name="lock" size={20} className="text-gray-600" /> Change Password
         </h3>
 
         <form
@@ -126,8 +127,8 @@ function SettingsTab() {
           {rx(() => {
             const success = $form.state().success;
             return success ? (
-              <div className="p-3 rounded-xl bg-green-100 text-green-800 text-center font-medium animate-pop">
-                ✅ Password changed successfully!
+              <div className="p-3 rounded-xl bg-green-100 text-green-800 text-center font-medium animate-pop flex items-center justify-center gap-2">
+                <Icon name="check" size={18} /> Password changed successfully!
               </div>
             ) : null;
           })}
@@ -222,7 +223,7 @@ function SettingsTab() {
       {/* Security Tips */}
       <div className="card bg-blue-50">
         <h4 className="font-display font-semibold text-gray-800 mb-2">
-          💡 Security Tips
+          Security Tips
         </h4>
         <ul className="text-sm text-gray-600 space-y-1">
           <li>• Use a password that's easy for you to remember</li>

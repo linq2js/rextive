@@ -9,6 +9,7 @@ import { focus } from "rextive/op";
 import { parentAuthLogic, kidProfilesLogic } from "@/logic";
 import { setupPasswordFormLogic } from "@/logic/setupPasswordFormLogic";
 import { loginFormLogic } from "@/logic/loginFormLogic";
+import { Icon } from "@/components/Icons";
 
 export const Route = createFileRoute("/mode/parent")({
   component: ParentLayout,
@@ -51,8 +52,8 @@ function SetupPassword() {
         <Link to="/" className="mb-4 inline-block text-2xl">
           ←
         </Link>
-        <h1 className="font-display text-2xl font-bold text-gray-800">
-          🔐 Set Up Parent Access
+        <h1 className="font-display text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
+          <Icon name="lock" size={24} /> Set Up Parent Access
         </h1>
         <p className="mt-2 text-gray-600">
           Create a password to protect parent settings.
@@ -142,8 +143,8 @@ function LoginScreen() {
         <Link to="/" className="mb-4 inline-block text-2xl">
           ←
         </Link>
-        <h1 className="font-display text-2xl font-bold text-gray-800">
-          🔐 Parent Access
+        <h1 className="font-display text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
+          <Icon name="lock" size={24} /> Parent Access
         </h1>
         <p className="mt-2 text-gray-600">Enter your password to continue.</p>
 
@@ -239,8 +240,8 @@ function ParentDashboardLayout() {
                 </span>
               </Link>
 
-              <h1 className="font-display text-lg font-bold text-gray-800">
-                👨‍👩‍👧 Parent Dashboard
+              <h1 className="font-display text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Icon name="settings" size={20} /> Parent Dashboard
               </h1>
 
               <button
@@ -250,7 +251,7 @@ function ParentDashboardLayout() {
                 <span className="text-sm font-medium hidden sm:inline">
                   Logout
                 </span>
-                <span className="text-xl">🚪</span>
+                <Icon name="arrow-left" size={20} />
               </button>
             </div>
           </div>
@@ -263,17 +264,20 @@ function ParentDashboardLayout() {
               <TabLink
                 to="/mode/parent"
                 active={activeTab === "kids"}
-                label="👶 Kids"
+                icon="baby"
+                label="Kids"
               />
               <TabLink
                 to="/mode/parent/data"
                 active={activeTab === "data"}
-                label="💾 Data"
+                icon="download"
+                label="Data"
               />
               <TabLink
                 to="/mode/parent/settings"
                 active={activeTab === "settings"}
-                label="⚙️ Settings"
+                icon="settings"
+                label="Settings"
               />
             </div>
           </div>
@@ -291,21 +295,24 @@ function ParentDashboardLayout() {
 function TabLink({
   to,
   active,
+  icon,
   label,
 }: {
   to: string;
   active: boolean;
+  icon: import("@/components/Icons").IconName;
   label: string;
 }) {
   return (
     <Link
       to={to}
-      className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+      className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-1.5 ${
         active
           ? "border-primary-500 text-primary-600"
           : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
       }`}
     >
+      <Icon name={icon} size={16} />
       {label}
     </Link>
   );

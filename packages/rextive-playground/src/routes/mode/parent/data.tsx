@@ -6,6 +6,7 @@ import { kidProfilesLogic, modalLogic } from "@/logic";
 import { dataExportRepository } from "@/infrastructure/repositories";
 import { db } from "@/infrastructure/database";
 import { useRef } from "react";
+import { Icon } from "@/components/Icons";
 
 export const Route = createFileRoute("/mode/parent/data")({
   component: DataTab,
@@ -57,7 +58,7 @@ function dataTabLogic() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      showMessage("success", "Data exported successfully! 📥");
+      showMessage("success", "Data exported successfully!");
     } catch (e) {
       console.error("Export error:", e);
       showMessage("error", "Failed to export data");
@@ -175,8 +176,8 @@ function DataTab() {
 
         {/* Export Section */}
         <div className="card">
-          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3">
-            📤 Export Data
+          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <Icon name="upload" size={20} className="text-green-500" /> Export Data
           </h3>
           <p className="text-sm text-gray-600 mb-4">
             Download all your data as a JSON file. This includes:
@@ -193,21 +194,22 @@ function DataTab() {
             disabled={exporting}
             className="btn btn-primary w-full py-3"
           >
-            {exporting ? "Exporting..." : "📥 Download Backup"}
+            {exporting ? "Exporting..." : <><Icon name="download" size={18} /> Download Backup</>}
           </button>
         </div>
 
         {/* Import Section */}
         <div className="card">
-          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3">
-            📥 Import Data
+          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <Icon name="download" size={20} className="text-blue-500" /> Import Data
           </h3>
           <p className="text-sm text-gray-600 mb-4">
             Restore data from a previously exported JSON file.
           </p>
-          <div className="p-4 bg-amber-50 rounded-xl mb-4">
+          <div className="p-4 bg-amber-50 rounded-xl mb-4 flex items-start gap-2">
+            <Icon name="warning" size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-amber-800 font-medium">
-              ⚠️ Warning: Importing will replace ALL existing data!
+              Warning: Importing will replace ALL existing data!
             </p>
           </div>
 
@@ -234,14 +236,14 @@ function DataTab() {
             disabled={importing}
             className="btn btn-outline w-full py-3"
           >
-            {importing ? "Importing..." : "📤 Choose File to Import"}
+            {importing ? "Importing..." : <><Icon name="upload" size={18} /> Choose File to Import</>}
           </button>
         </div>
 
         {/* Info */}
         <div className="card bg-blue-50">
           <h4 className="font-display font-semibold text-blue-800 mb-2">
-            💡 Tips
+            Tips
           </h4>
           <ul className="text-sm text-blue-700 space-y-1">
             <li>• Export regularly to keep backups</li>
@@ -264,8 +266,8 @@ function DangerZone({ $data }: { $data: ReturnType<typeof dataTabLogic> }) {
 
     return (
       <div className="card border-2 border-red-200 bg-red-50">
-        <h3 className="font-display text-lg font-semibold text-red-800 mb-2">
-          ⚠️ Danger Zone
+        <h3 className="font-display text-lg font-semibold text-red-800 mb-2 flex items-center gap-2">
+          <Icon name="warning" size={20} className="text-red-600" /> Danger Zone
         </h3>
         <p className="text-sm text-red-700 mb-4">
           These actions are irreversible. Please proceed with caution.
@@ -308,7 +310,7 @@ function DangerZone({ $data }: { $data: ReturnType<typeof dataTabLogic> }) {
             onClick={() => $data.showResetConfirm()}
             className="btn w-full py-3 bg-red-100 text-red-700 border border-red-300 hover:bg-red-200"
           >
-            🗑️ Reset All Data
+            <Icon name="trash" size={18} /> Reset All Data
           </button>
         )}
       </div>

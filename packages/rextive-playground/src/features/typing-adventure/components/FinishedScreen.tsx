@@ -3,6 +3,7 @@ import { rx } from "rextive/react";
 import { energyLogic } from "@/logic";
 import { useTypingGame } from "../provider";
 import { StatItem } from "./StatItem";
+import { Icon } from "@/components/Icons";
 
 export function FinishedScreen() {
   const $game = useTypingGame();
@@ -30,7 +31,9 @@ export function FinishedScreen() {
     return (
       <div className="space-y-6">
         <div className="card text-center py-8">
-          <div className="text-6xl mb-4">🎉</div>
+          <div className="text-amber-400 mb-4 flex justify-center">
+            <Icon name="trophy" size={64} />
+          </div>
           <h2 className="font-display text-2xl font-bold text-gray-800">
             Great Job!
           </h2>
@@ -40,10 +43,10 @@ export function FinishedScreen() {
             {[1, 2, 3].map((i) => (
               <span
                 key={i}
-                className={`text-4xl ${i <= stars ? "animate-bounce" : "grayscale opacity-30"}`}
+                className={`${i <= stars ? "animate-bounce text-amber-400" : "text-gray-300"}`}
                 style={{ animationDelay: `${i * 0.1}s` }}
               >
-                ⭐
+                <Icon name="star" size={40} />
               </span>
             ))}
           </div>
@@ -57,7 +60,7 @@ export function FinishedScreen() {
           <div className="mt-6 grid grid-cols-2 gap-4 text-left">
             <StatItem label="Words Typed" value={stats.wordsCompleted} />
             <StatItem label="Accuracy" value={`${stats.accuracy}%`} />
-            <StatItem label="Best Streak" value={`🔥 ${stats.bestStreak}`} />
+            <StatItem label="Best Streak" value={stats.bestStreak} iconName="fire" />
             <StatItem
               label="Difficulty"
               value={difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
@@ -84,7 +87,7 @@ export function FinishedScreen() {
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }`}
           >
-            {energy > 0 ? <>Play Again ⚡1</> : <>No Energy Left</>}
+            {energy > 0 ? <>Play Again <Icon name="lightning" size={20} className="inline" />1</> : <>No Energy Left</>}
           </button>
           <button
             onClick={() => navigate({ to: "/dashboard" })}

@@ -11,6 +11,7 @@ import {
 } from "@/domain/types";
 import { kidProfilesLogic } from "@/logic";
 import { Avatar } from "@/components/Avatar";
+import { Icon } from "@/components/Icons";
 
 export function AppOverlays() {
   const $overlays = appOverlaysLogic();
@@ -161,9 +162,9 @@ function ProfileFormModal({
           if (showDeleteConfirm && isEditing) {
             return (
               <div className="space-y-3">
-                <div className="p-3 bg-amber-50 text-amber-800 rounded-xl text-sm">
-                  ⚠️ Are you sure? This will delete all progress data for this
-                  profile.
+                <div className="p-3 bg-amber-50 text-amber-800 rounded-xl text-sm flex items-start gap-2">
+                  <Icon name="warning" size={18} className="flex-shrink-0 mt-0.5" />
+                  <span>Are you sure? This will delete all progress data for this profile.</span>
                 </div>
                 <div className="flex gap-3">
                   <button
@@ -215,7 +216,7 @@ function ProfileFormModal({
                   disabled={loading}
                   className="btn bg-red-100 text-red-600 hover:bg-red-200 px-4"
                 >
-                  🗑️
+                  <Icon name="trash" size={18} />
                 </button>
               )}
             </div>

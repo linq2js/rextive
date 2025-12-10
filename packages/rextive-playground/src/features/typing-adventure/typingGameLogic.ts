@@ -83,14 +83,14 @@ export const WORD_LISTS = {
 };
 
 export const CORRECT_MESSAGES = [
-  "Great job! 🎉",
-  "Awesome! ⭐",
-  "Perfect! 💯",
-  "Amazing! 🚀",
-  "Super! 🌟",
+  "Great job!",
+  "Awesome!",
+  "Perfect!",
+  "Amazing!",
+  "Super!",
 ];
 
-export const WRONG_MESSAGES = ["Try again! 💪", "Almost! 🤔", "Keep going! 🎯"];
+export const WRONG_MESSAGES = ["Try again!", "Almost!", "Keep going!"];
 
 // Helpers
 export function getRandomWord(difficulty: Difficulty): string {
@@ -238,7 +238,7 @@ export function typingGameLogic() {
     stats.set(patch("streak", 0));
     userInput.set("");
     currentWord.set(getRandomWord(difficulty()));
-    message.set("Skipped! 👋");
+    message.set("Skipped!");
   }
 
   function tick() {

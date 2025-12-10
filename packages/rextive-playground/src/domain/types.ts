@@ -63,14 +63,15 @@ export interface GameConfig {
 
 // Available games list with unlock requirements
 // Order matters - games unlock progressively
+// Icons are IconName strings from components/Icons.tsx
 export const AVAILABLE_GAMES: GameConfig[] = [
-  { id: "typing-adventure", name: "Typing Adventure", icon: "⌨️", xpRequired: 0, implemented: true },      // Always unlocked (first game)
-  { id: "memory-match", name: "Memory Match", icon: "🧠", xpRequired: 500, implemented: true },           // Unlock at 500 XP
-  { id: "road-racer", name: "Road Racer", icon: "🏎️", xpRequired: 1500, implemented: true },             // Unlock at 1500 XP
-  { id: "math-quest", name: "Math Quest", icon: "➕", xpRequired: 3000, implemented: false },             // Unlock at 3000 XP
-  { id: "word-builder", name: "Word Builder", icon: "📝", xpRequired: 5000, implemented: false },         // Unlock at 5000 XP
-  { id: "puzzle-time", name: "Puzzle Time", icon: "🧩", xpRequired: 8000, implemented: false },           // Unlock at 8000 XP
-  { id: "color-fun", name: "Color Fun", icon: "🎨", xpRequired: 12000, implemented: false },              // Unlock at 12000 XP
+  { id: "typing-adventure", name: "Typing Adventure", icon: "keyboard", xpRequired: 0, implemented: true },   // Always unlocked (first game)
+  { id: "memory-match", name: "Memory Match", icon: "brain", xpRequired: 500, implemented: true },            // Unlock at 500 XP
+  { id: "road-racer", name: "Road Racer", icon: "car", xpRequired: 1500, implemented: true },                 // Unlock at 1500 XP
+  { id: "math-quest", name: "Math Quest", icon: "math", xpRequired: 3000, implemented: false },               // Unlock at 3000 XP
+  { id: "word-builder", name: "Word Builder", icon: "pencil", xpRequired: 5000, implemented: false },         // Unlock at 5000 XP
+  { id: "puzzle-time", name: "Puzzle Time", icon: "puzzle", xpRequired: 8000, implemented: false },           // Unlock at 8000 XP
+  { id: "color-fun", name: "Color Fun", icon: "palette", xpRequired: 12000, implemented: false },             // Unlock at 12000 XP
 ];
 
 // Helper to check if game is unlocked

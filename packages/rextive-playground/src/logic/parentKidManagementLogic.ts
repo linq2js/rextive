@@ -79,7 +79,7 @@ export function parentKidManagementLogic() {
     isLoading.set(true);
     try {
       await parentManagementRepository.refillEnergy(kidId);
-      showMessage("success", "Energy refilled! ⚡");
+      showMessage("success", "Energy refilled!");
     } catch {
       showMessage("error", "Failed to refill energy");
     } finally {
@@ -91,7 +91,7 @@ export function parentKidManagementLogic() {
     isLoading.set(true);
     try {
       await parentManagementRepository.refillAllEnergy();
-      showMessage("success", "All kids' energy refilled! ⚡");
+      showMessage("success", "All kids' energy refilled!");
     } catch {
       showMessage("error", "Failed to refill energy");
     } finally {
@@ -105,7 +105,7 @@ export function parentKidManagementLogic() {
     try {
       await parentManagementRepository.resetKidStats(kidId);
       kidGameStats.set([]);
-      showMessage("success", "All stats reset! 📊");
+      showMessage("success", "All stats reset!");
     } catch {
       showMessage("error", "Failed to reset stats");
     } finally {
@@ -120,7 +120,7 @@ export function parentKidManagementLogic() {
       // Refresh stats
       const stats = await parentManagementRepository.getKidGameStats(kidId);
       kidGameStats.set(stats);
-      showMessage("success", "Game stats reset! 🎮");
+      showMessage("success", "Game stats reset!");
     } catch {
       showMessage("error", "Failed to reset game stats");
     } finally {
@@ -136,7 +136,7 @@ export function parentKidManagementLogic() {
       // Refresh stats
       const stats = await parentManagementRepository.getKidGameStats(kidId);
       kidGameStats.set(stats);
-      showMessage("success", "Max XP granted! All games unlocked! 🎉");
+      showMessage("success", "Max XP granted! All games unlocked!");
     } catch {
       showMessage("error", "Failed to set max XP");
     } finally {
@@ -163,7 +163,7 @@ export function parentKidManagementLogic() {
 
       showMessage(
         "success",
-        newVisible ? "Game enabled! 👁️" : "Game hidden! 🙈"
+        newVisible ? "Game enabled!" : "Game hidden!"
       );
     } catch {
       showMessage("error", "Failed to update game visibility");
@@ -184,7 +184,7 @@ export function parentKidManagementLogic() {
 
       showMessage(
         "success",
-        visible ? "All games enabled! 👁️" : "All games hidden! 🙈"
+        visible ? "All games enabled!" : "All games hidden!"
       );
     } catch {
       showMessage("error", "Failed to update game visibility");
