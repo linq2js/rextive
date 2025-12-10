@@ -1,7 +1,8 @@
 # Netlify configuration for rextive-playground
 
 [build]
-  command = "pnpm install && pnpm run build"
+  # Build rextive package first (via pnpm filter with dependencies)
+  command = "pnpm install && pnpm --filter rextive run build && pnpm run build"
   publish = "dist"
 
 # SPA redirect - all routes go to index.html
