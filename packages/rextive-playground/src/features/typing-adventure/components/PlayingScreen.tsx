@@ -85,14 +85,12 @@ export function PlayingScreen({
             )}
           </div>
 
-          {/* Word Image */}
-          {wordIcon && (
-            <div className="mb-6 flex justify-center">
-              <div className="p-4 bg-gradient-to-br from-primary-100 to-purple-100 rounded-2xl shadow-inner">
-                <GameIcon name={wordIcon} size={96} className="drop-shadow-lg" />
-              </div>
+          {/* Word Image - show specific icon or generic fallback */}
+          <div className="mb-6 flex justify-center">
+            <div className="p-4 bg-gradient-to-br from-primary-100 to-purple-100 rounded-2xl shadow-inner">
+              <GameIcon name={wordIcon || "generic"} size={96} className="drop-shadow-lg" />
             </div>
-          )}
+          </div>
 
           {/* Current Word Display */}
           <div className="mb-6">
@@ -122,20 +120,47 @@ export function PlayingScreen({
             </div>
           </div>
 
-          {/* Hidden Input */}
+          {/* Hidden Input - handles both desktop (onKeyDown) and mobile (onInput) */}
           <input
             ref={inputRef}
             type="text"
             value={userInput}
-            onChange={() => {}}
+            onChange={(e) => {
+              // Mobile keyboards use onChange/onInput instead of onKeyDown
+              const newValue = e.target.value;
+              const oldValue = userInput;
+              
+              if (newValue.length > oldValue.length) {
+                // Character(s) added - get the last typed character
+                const typedChar = newValue.slice(oldValue.length);
+                for (const char of typedChar) {
+                  if (char === " ") {
+                    $game.skipWord();
+                  } else if (/[a-zA-Z]/.test(char)) {
+                    playTypingSound();
+                    $game.handleKeyPress(char);
+                  }
+                }
+              } else if (newValue.length < oldValue.length) {
+                // Character(s) deleted - handle as backspace
+                const deletedCount = oldValue.length - newValue.length;
+                for (let i = 0; i < deletedCount; i++) {
+                  playTypingSound();
+                  $game.handleBackspace();
+                }
+              }
+            }}
             onKeyDown={(e) => {
+              // Desktop keyboard events (more reliable for special keys)
               if (e.key === "Backspace") {
+                e.preventDefault(); // Prevent double-handling with onChange
                 playTypingSound();
                 $game.handleBackspace();
               } else if (e.key === " " || e.key === "Enter") {
                 e.preventDefault();
                 $game.skipWord();
               } else if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                e.preventDefault(); // Prevent double-handling with onChange
                 playTypingSound();
                 $game.handleKeyPress(e.key);
               }
@@ -145,6 +170,8 @@ export function PlayingScreen({
               setTimeout(() => inputRef.current?.focus(), 100);
             }}
             className="opacity-0 absolute -z-10"
+            inputMode="text"
+            enterKeyHint="next"
             autoFocus
             autoComplete="off"
             autoCorrect="off"

@@ -288,18 +288,18 @@ function DangerZone({ $data }: { $data: ReturnType<typeof dataTabLogic> }) {
             <p className="text-sm text-red-800 font-bold mb-4">
               This action CANNOT be undone!
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => $data.hideResetConfirm()}
                 disabled={loading}
-                className="btn btn-outline flex-1 py-2"
+                className="btn btn-outline flex-1 py-3 w-full sm:w-auto"
               >
                 Cancel
               </button>
               <button
                 onClick={() => $data.resetAllData()}
                 disabled={loading}
-                className="btn flex-1 py-2 bg-red-500 text-white hover:bg-red-600"
+                className="btn flex-1 py-3 w-full sm:w-auto bg-red-500 text-white hover:bg-red-600"
               >
                 {loading ? "Deleting..." : "Yes, Delete Everything"}
               </button>

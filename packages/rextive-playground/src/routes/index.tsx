@@ -57,43 +57,43 @@ function HomePage() {
     return unsub;
   }, [$profiles.profilesTask]);
 
-  return (
+      return (
     <Suspense fallback={<LoadingSpinner />}>
       {rx(() => {
         // Use wait() to read async data - will suspend if loading
         const profiles = wait($profiles.profiles());
 
-        return (
-          <div className="min-h-screen p-4 safe-bottom">
-            <div className="mx-auto max-w-4xl">
-              <header className="mb-8 text-center">
-                <h1 className="font-display text-3xl font-bold text-gray-800 sm:text-4xl flex items-center justify-center gap-2">
-                  <Icon name="controller" size={36} className="text-primary-500" />
-                  Rextive
-                  <span className="text-gradient-kid"> Playground</span>
-                </h1>
-                <p className="mt-2 text-gray-600">Fun learning games for kids!</p>
-              </header>
+    return (
+      <div className="min-h-screen p-4 safe-bottom">
+        <div className="mx-auto max-w-4xl">
+          <header className="mb-8 text-center">
+            <h1 className="font-display text-3xl font-bold text-gray-800 sm:text-4xl flex items-center justify-center gap-2">
+              <Icon name="controller" size={36} className="text-primary-500" />
+              Rextive
+              <span className="text-gradient-kid"> Playground</span>
+            </h1>
+            <p className="mt-2 text-gray-600">Fun learning games for kids!</p>
+          </header>
 
-              {profiles.length === 0 ? (
-                <NoProfiles quote={quote} />
-              ) : (
-                <ProfileSelector profiles={profiles} />
-              )}
+          {profiles.length === 0 ? (
+            <NoProfiles quote={quote} />
+          ) : (
+            <ProfileSelector profiles={profiles} />
+          )}
 
-              {/* Parent Mode Link */}
-              <div className="mt-12 text-center">
-                <Link
-                  to="/mode/parent"
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  <Icon name="lock" size={16} />
-                  <span>Parent Mode</span>
-                </Link>
-              </div>
-            </div>
+          {/* Parent Mode Link */}
+          <div className="mt-12 text-center">
+            <Link
+              to="/mode/parent"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <Icon name="lock" size={16} />
+              <span>Parent Mode</span>
+            </Link>
           </div>
-        );
+        </div>
+      </div>
+    );
       })}
     </Suspense>
   );

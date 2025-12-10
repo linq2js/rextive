@@ -26,7 +26,9 @@ export type GameIconName =
   // Music & Fun (10)
   | "music" | "drum" | "guitar" | "piano" | "dice" | "puzzle" | "kite" | "teddy" | "yo-yo" | "top"
   // Tech & Tools (10)
-  | "computer" | "phone" | "camera" | "lamp" | "hammer" | "wrench" | "magnet" | "battery" | "bulb" | "gear";
+  | "computer" | "phone" | "camera" | "lamp" | "hammer" | "wrench" | "magnet" | "battery" | "bulb" | "gear"
+  // Generic fallback
+  | "generic";
 
 export const GameIcons: Record<GameIconName, React.FC<React.SVGProps<SVGSVGElement>>> = {
   // ============================================
@@ -1154,6 +1156,20 @@ export const GameIcons: Record<GameIconName, React.FC<React.SVGProps<SVGSVGEleme
     <svg viewBox="0 0 64 64" {...props}>
       <path d="M28 4 H36 L38 12 L46 16 L54 12 L60 20 L54 26 L56 34 H64 V42 L56 44 L54 52 L60 58 L52 64 L46 58 L38 62 L36 70 H28 L26 62 L18 58 L12 64 L4 58 L10 52 L8 44 L0 42 V34 L8 32 L10 24 L4 18 L12 12 L18 18 L26 14 Z" fill="#6b7280" transform="translate(0,-3) scale(1)" />
       <circle cx="32" cy="32" r="10" fill="#4b5563" />
+    </svg>
+  ),
+
+  // ============================================
+  // GENERIC FALLBACK
+  // ============================================
+  generic: (props) => (
+    <svg viewBox="0 0 64 64" {...props}>
+      {/* Alphabet block / letter icon */}
+      <rect x="8" y="8" width="48" height="48" rx="8" fill="#a78bfa" />
+      <rect x="12" y="12" width="40" height="40" rx="6" fill="#c4b5fd" />
+      <text x="32" y="44" textAnchor="middle" fontSize="28" fontWeight="bold" fill="#7c3aed" fontFamily="sans-serif">
+        Aa
+      </text>
     </svg>
   ),
 };

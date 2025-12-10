@@ -58,7 +58,7 @@ function KidsTab() {
     }, 100);
   };
 
-  return (
+      return (
     <Suspense fallback={<LoadingSpinner />}>
       {rx(() => {
         // Use profilesTask for stale-while-revalidate pattern
@@ -70,98 +70,98 @@ function KidsTab() {
           return <LoadingSpinner />;
         }
 
-        const selectedKid = $tab.selectedKid();
-        const message = $tab.actionMessage();
+    const selectedKid = $tab.selectedKid();
+    const message = $tab.actionMessage();
 
-        return (
-          <div className="space-y-6">
-            {/* Action Message */}
-            {message && (
-              <div
-                className={`p-3 rounded-xl text-center font-medium animate-pop ${
-                  message.type === "success"
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
-                }`}
-              >
-                {message.text}
-              </div>
-            )}
-
-            {/* Quick Actions */}
-            <div className="card">
-              <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <Icon name="lightning" size={20} className="text-amber-500" /> Quick Actions
-              </h3>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={() => $overlays.openProfileForm()}
-                  className="btn btn-primary flex-1 py-3"
-                >
-                  <Icon name="plus" size={18} /> Add Kid Profile
-                </button>
-                <button
-                  onClick={() => $tab.refillAllEnergy()}
-                  disabled={profiles.length === 0}
-                  className="btn btn-outline flex-1 py-3"
-                >
-                  <Icon name="lightning" size={18} /> Refill All Energy
-                </button>
-              </div>
-            </div>
-
-            {/* Kid Selection */}
-            <div className="card">
-              <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <Icon name="baby" size={20} className="text-pink-500" /> Select a Kid to Manage
-              </h3>
-
-              {profiles.length === 0 ? (
-                <div className="text-center py-6">
-                  <div className="text-primary-500 mb-4"><Icon name="baby" size={64} /></div>
-                  <h4 className="font-display text-lg font-semibold text-gray-800">
-                    No Kids Yet
-                  </h4>
-                  <p className="mt-2 text-gray-600">
-                    Add your first kid profile to get started!
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {profiles.map((profile) => (
-                    <button
-                      key={profile.id}
-                      onClick={() => handleSelectKid(profile.id)}
-                      className={`p-3 rounded-xl text-center transition-all ${
-                        selectedKid?.id === profile.id
-                          ? "bg-primary-100 border-2 border-primary-500 scale-105"
-                          : "bg-gray-50 border-2 border-transparent hover:bg-gray-100"
-                      }`}
-                    >
-                      <div className="mx-auto h-12 w-12 mb-2">
-                        <Avatar avatar={profile.avatar} className="w-full h-full" />
-                      </div>
-                      <div className="mt-2 font-medium text-gray-800 truncate">
-                        {profile.name}
-                      </div>
-                      <div className="text-xs text-gray-500">{profile.age} yrs</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Selected Kid Actions */}
-            {selectedKid && (
-              <div ref={kidActionsPanelRef}>
-                <KidActionsPanel
-                  $tab={$tab}
-                  onEditProfile={() => $overlays.openProfileForm(selectedKid)}
-                />
-              </div>
-            )}
+    return (
+      <div className="space-y-6">
+        {/* Action Message */}
+        {message && (
+          <div
+            className={`p-3 rounded-xl text-center font-medium animate-pop ${
+              message.type === "success"
+                ? "bg-green-100 text-green-800"
+                : "bg-red-100 text-red-800"
+            }`}
+          >
+            {message.text}
           </div>
-        );
+        )}
+
+        {/* Quick Actions */}
+        <div className="card">
+          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <Icon name="lightning" size={20} className="text-amber-500" /> Quick Actions
+          </h3>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+                  onClick={() => $overlays.open({ type: "profileForm" })}
+              className="btn btn-primary flex-1 py-3"
+            >
+              <Icon name="plus" size={18} /> Add Kid Profile
+            </button>
+            <button
+              onClick={() => $tab.refillAllEnergy()}
+                  disabled={profiles.length === 0}
+              className="btn btn-outline flex-1 py-3"
+            >
+              <Icon name="lightning" size={18} /> Refill All Energy
+            </button>
+          </div>
+        </div>
+
+        {/* Kid Selection */}
+        <div className="card">
+          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <Icon name="baby" size={20} className="text-pink-500" /> Select a Kid to Manage
+          </h3>
+
+          {profiles.length === 0 ? (
+            <div className="text-center py-6">
+              <div className="text-primary-500 mb-4"><Icon name="baby" size={64} /></div>
+              <h4 className="font-display text-lg font-semibold text-gray-800">
+                No Kids Yet
+              </h4>
+              <p className="mt-2 text-gray-600">
+                Add your first kid profile to get started!
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {profiles.map((profile) => (
+                <button
+                  key={profile.id}
+                      onClick={() => handleSelectKid(profile.id)}
+                  className={`p-3 rounded-xl text-center transition-all ${
+                    selectedKid?.id === profile.id
+                      ? "bg-primary-100 border-2 border-primary-500 scale-105"
+                      : "bg-gray-50 border-2 border-transparent hover:bg-gray-100"
+                  }`}
+                >
+                  <div className="mx-auto h-12 w-12 mb-2">
+                    <Avatar avatar={profile.avatar} className="w-full h-full" />
+                  </div>
+                  <div className="mt-2 font-medium text-gray-800 truncate">
+                    {profile.name}
+                  </div>
+                  <div className="text-xs text-gray-500">{profile.age} yrs</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Selected Kid Actions */}
+        {selectedKid && (
+              <div ref={kidActionsPanelRef}>
+          <KidActionsPanel
+            $tab={$tab}
+                  onEditProfile={() => $overlays.open({ type: "profileForm", editProfile: selectedKid })}
+          />
+              </div>
+        )}
+      </div>
+    );
       })}
     </Suspense>
   );
