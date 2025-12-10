@@ -1,18 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { signal } from "rextive";
-import { patch } from "rextive/helpers";
-import { rx, useScope, inputValue, inputNumber } from "rextive/react";
-import { focus } from "rextive/op";
-import { kidProfilesLogic } from "@/logic";
-import { profileFormLogic } from "@/logic/profileFormLogic";
+import { rx, useScope } from "rextive/react";
+import { kidProfilesLogic, appOverlaysLogic } from "@/logic";
 import { parentKidManagementLogic } from "@/logic/parentKidManagementLogic";
-import {
-  CHINESE_ZODIAC_OPTIONS,
-  WESTERN_ZODIAC_OPTIONS,
-  AVATAR_COLORS,
-  AVAILABLE_GAMES,
-  type KidProfile,
-} from "@/domain/types";
+import { AVAILABLE_GAMES } from "@/domain/types";
+import { Avatar } from "@/components/Avatar";
 
 export const Route = createFileRoute("/mode/parent/")({
   component: KidsTab,
@@ -22,16 +13,9 @@ function kidsTabLogic() {
   const $profiles = kidProfilesLogic();
   const $mgmt = parentKidManagementLogic();
 
-  const editingId = signal<number | null>(null, {
-    name: "kids.editingId",
-  });
-  const isAdding = signal(false, { name: "kids.isAdding" });
-
   return {
     profiles: $profiles.profiles,
     isLoading: $profiles.isLoading,
-    editingId,
-    isAdding,
     // Management
     selectedKidId: $mgmt.selectedKidId,
     selectedKid: $mgmt.selectedKid,
@@ -50,6 +34,7 @@ function kidsTabLogic() {
 
 function KidsTab() {
   const $tab = useScope(kidsTabLogic);
+  const $overlays = appOverlaysLogic();
 
   return rx(() => {
     if ($tab.isLoading()) {
@@ -61,8 +46,6 @@ function KidsTab() {
     }
 
     const profiles = $tab.profiles();
-    const editingId = $tab.editingId();
-    const editingProfile = profiles.find((p) => p.id === editingId);
     const selectedKid = $tab.selectedKid();
     const message = $tab.actionMessage();
 
@@ -88,7 +71,7 @@ function KidsTab() {
           </h3>
           <div className="flex flex-col sm:flex-row gap-3">
             <button
-              onClick={() => $tab.isAdding.set(true)}
+              onClick={() => $overlays.openProfileForm()}
               className="btn btn-primary flex-1 py-3"
             >
               ➕ Add Kid Profile
@@ -131,12 +114,8 @@ function KidsTab() {
                       : "bg-gray-50 border-2 border-transparent hover:bg-gray-100"
                   }`}
                 >
-                  <div
-                    className={`mx-auto h-12 w-12 rounded-full flex items-center justify-center text-2xl ${
-                      AVATAR_COLORS[profile.avatar]
-                    }`}
-                  >
-                    {profile.avatar}
+                  <div className="mx-auto h-12 w-12 mb-2">
+                    <Avatar avatar={profile.avatar} className="w-full h-full" />
                   </div>
                   <div className="mt-2 font-medium text-gray-800 truncate">
                     {profile.name}
@@ -152,20 +131,7 @@ function KidsTab() {
         {selectedKid && (
           <KidActionsPanel
             $tab={$tab}
-            onEditProfile={() => $tab.editingId.set(selectedKid.id)}
-          />
-        )}
-
-        {/* Add Profile Modal */}
-        {$tab.isAdding() && (
-          <ProfileFormModal onClose={() => $tab.isAdding.set(false)} />
-        )}
-
-        {/* Edit Profile Modal */}
-        {editingProfile && (
-          <ProfileFormModal
-            profile={editingProfile}
-            onClose={() => $tab.editingId.set(null)}
+            onEditProfile={() => $overlays.openProfileForm(selectedKid)}
           />
         )}
       </div>
@@ -196,12 +162,8 @@ function KidActionsPanel({
         {/* Selected Kid Header */}
         <div className="card bg-primary-50">
           <div className="flex items-center gap-4">
-            <div
-              className={`h-14 w-14 rounded-full flex items-center justify-center text-3xl ${
-                AVATAR_COLORS[kid.avatar]
-              }`}
-            >
-              {kid.avatar}
+            <div className="h-14 w-14">
+              <Avatar avatar={kid.avatar} className="w-full h-full" />
             </div>
             <div className="flex-1">
               <h3 className="font-display text-xl font-bold text-gray-800">
@@ -333,198 +295,4 @@ function KidActionsPanel({
       </div>
     );
   });
-}
-
-// ============================================================================
-// Profile Form Modal
-// ============================================================================
-
-function ProfileFormModal({
-  profile,
-  onClose,
-}: {
-  profile?: KidProfile;
-  onClose: () => void;
-}) {
-  const $form = useScope(profileFormLogic, [onClose, profile]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="card w-full max-w-md max-h-[90vh] overflow-y-auto animate-pop">
-        <h2 className="font-display text-xl font-bold text-gray-800">
-          {$form.isEditing ? "Edit Profile" : "Add Kid Profile"}
-        </h2>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            $form.submit();
-          }}
-          className="mt-4 space-y-4"
-        >
-          {/* Name */}
-          {rx(() => {
-            const [get, set] = focus.lens($form.state, "name").map(inputValue);
-            return (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={get()}
-                  onChange={set}
-                  className="input"
-                  placeholder="Kid's name"
-                />
-              </div>
-            );
-          })}
-
-          {/* Age */}
-          {rx(() => {
-            const [get, set] = focus.lens($form.state, "age").map(inputNumber);
-            return (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Age
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={18}
-                  value={get()}
-                  onChange={set}
-                  className="input"
-                />
-              </div>
-            );
-          })}
-
-          {/* Avatar Selection */}
-          {rx(() => {
-            const currentAvatar = $form.state().avatar;
-            return (
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Avatar - Chinese Zodiac
-                </label>
-                <div className="grid grid-cols-6 gap-2">
-                  {CHINESE_ZODIAC_OPTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => $form.state.set(patch("avatar", emoji))}
-                      className={`h-12 w-12 rounded-xl text-2xl transition-all ${
-                        currentAvatar === emoji
-                          ? `${AVATAR_COLORS[emoji]} ring-2 ring-primary-500 scale-110`
-                          : "bg-gray-100 hover:bg-gray-200"
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-
-                <label className="mb-2 mt-4 block text-sm font-medium text-gray-700">
-                  Avatar - Western Zodiac
-                </label>
-                <div className="grid grid-cols-6 gap-2">
-                  {WESTERN_ZODIAC_OPTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => $form.state.set(patch("avatar", emoji))}
-                      className={`h-12 w-12 rounded-xl text-2xl transition-all ${
-                        currentAvatar === emoji
-                          ? `${AVATAR_COLORS[emoji]} ring-2 ring-primary-500 scale-110`
-                          : "bg-gray-100 hover:bg-gray-200"
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn btn-outline flex-1 py-3"
-            >
-              Cancel
-            </button>
-            {rx(() => (
-              <button
-                type="submit"
-                disabled={$form.state().loading}
-                className="btn btn-primary flex-1 py-3"
-              >
-                {$form.state().loading
-                  ? "Saving..."
-                  : $form.isEditing
-                    ? "Save Changes"
-                    : "Add Profile"}
-              </button>
-            ))}
-          </div>
-
-          {/* Delete Button (only for editing) */}
-          {$form.isEditing && (
-            <>
-              {rx(() => {
-                const showConfirm = $form.state().showDeleteConfirm;
-
-                if (showConfirm) {
-                  return (
-                    <div className="mt-4 p-4 bg-red-50 rounded-xl">
-                      <p className="text-sm text-red-800 mb-3">
-                        Are you sure you want to delete this profile? This
-                        cannot be undone.
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            $form.state.set(patch("showDeleteConfirm", false))
-                          }
-                          className="btn btn-outline flex-1 py-2"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => $form.remove()}
-                          disabled={$form.state().loading}
-                          className="btn flex-1 py-2 bg-red-500 text-white hover:bg-red-600"
-                        >
-                          {$form.state().loading ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                }
-
-                return (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      $form.state.set(patch("showDeleteConfirm", true))
-                    }
-                    className="mt-4 w-full text-center text-sm text-red-500 hover:text-red-700"
-                  >
-                    🗑️ Delete Profile
-                  </button>
-                );
-              })}
-            </>
-          )}
-        </form>
-      </div>
-    </div>
-  );
 }

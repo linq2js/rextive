@@ -2,8 +2,9 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { rx } from "rextive/react";
 import { kidProfilesLogic, selectedProfileLogic } from "@/logic";
-import { AVATAR_COLORS, ZODIAC_NAMES } from "@/domain/types";
+import { AVATAR_COLORS, AVATAR_NAMES } from "@/domain/types";
 import { WELCOME_CHIME } from "@/hooks/useSound";
+import { Avatar } from "@/components/Avatar";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -119,24 +120,22 @@ function ProfileSelector({
       </h2>
       <div className="flex flex-wrap justify-center gap-4">
         {profiles.map((profile) => {
-          const zodiacName =
-            ZODIAC_NAMES[profile.avatar as keyof typeof ZODIAC_NAMES] || "";
+          const avatarName =
+            AVATAR_NAMES[profile.avatar as keyof typeof AVATAR_NAMES] || "";
           return (
             <button
               key={profile.id}
               onClick={() => handleSelect(profile.id)}
               className="card flex w-36 flex-col items-center p-4 transition-transform hover:scale-105 active:scale-95 sm:w-40"
             >
-              <div
-                className={`avatar ${AVATAR_COLORS[profile.avatar as keyof typeof AVATAR_COLORS] || "bg-gray-200"}`}
-              >
-                {profile.avatar}
+              <div className="h-16 w-16 mb-2">
+                <Avatar avatar={profile.avatar} className="w-full h-full" />
               </div>
               <span className="mt-2 font-display font-semibold text-gray-800">
                 {profile.name}
               </span>
               <span className="text-xs text-gray-500">
-                {zodiacName && `${zodiacName} • `}
+                {avatarName && `${avatarName} • `}
                 {profile.age} years
               </span>
             </button>

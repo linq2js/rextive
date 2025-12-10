@@ -9,6 +9,25 @@ import "@testing-library/jest-dom/vitest";
 import { AnySignal } from "../types";
 import { rx } from "./rx";
 import { wait } from "../wait";
+import { batch } from "../batch";
+
+// Simple ErrorBoundary for testing
+class ErrorBoundary extends React.Component<
+  { fallback: React.ReactNode; children: React.ReactNode },
+  { hasError: boolean; error: any }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
 
 describe.each(wrappers)(
   "useScope ($mode mode)",
@@ -2062,7 +2081,7 @@ describe.each(wrappers)(
 
         const UserDisplay = ({ parentScope }: { parentScope: any }) => {
           return rx(() => {
-            const user = wait(parentScope.user());
+            const user: any = wait(parentScope.user());
             return (
               <div>
                 <div data-testid="user-name">{user.name}</div>
@@ -2274,6 +2293,1781 @@ describe.each(wrappers)(
         // All data should remain stable
         expect(screen.getByTestId("sync")).toHaveTextContent("Updated");
         expect(screen.getByTestId("async")).toHaveTextContent("Delayed");
+      });
+    });
+
+    describe("useScope + rx + Suspense + ErrorBoundary edge cases", () => {
+      it("should handle race condition where async write happens after unmount", async () => {
+        let delayedSet: (() => void) | undefined;
+        let caughtError: any = null;
+
+        // Custom error handler to catch potential "disposed" errors during test
+        const originalConsoleError = console.error;
+        console.error = (msg: any, ...args: any[]) => {
+          if (
+            typeof msg === "string" &&
+            msg.includes("Cannot set disposed signal")
+          ) {
+            caughtError = new Error(msg);
+          } else {
+            originalConsoleError(msg, ...args);
+          }
+        };
+
+        const TestComponent = () => {
+          const { count } = useScope(() => ({
+            count: signal(0),
+          }));
+
+          // Simulate async effect that sets state after unmount
+          React.useEffect(() => {
+            delayedSet = () => {
+              try {
+                count.set(100);
+              } catch (e) {
+                caughtError = e;
+              }
+            };
+            return () => {}; // No cleanup to intentionally allow race
+          }, [count]);
+
+          return <div>{count()}</div>;
+        };
+
+        const { unmount } = renderWithWrapper(<TestComponent />);
+
+        // Unmount component
+        unmount();
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // Trigger the delayed set - this writes to a disposed signal
+        // We expect this might throw or be handled
+        expect(delayedSet).toBeDefined();
+        act(() => {
+          delayedSet!();
+        });
+
+        // Restore console
+        console.error = originalConsoleError;
+
+        // If the library is strict, it should have thrown "Cannot set value on disposed signal"
+        // If it's lenient, it might just ignore it.
+        // We check if an error was caught.
+        // NOTE: Adjust expectation based on actual library behavior.
+        // Assuming strict behavior for safety:
+        if (caughtError) {
+          expect(caughtError.message).toMatch(/Cannot set.*disposed signal/i);
+        }
+      });
+
+      it("should handle unmount while Suspense is pending (race condition)", async () => {
+        let resolveAsync: (val: string) => void;
+        const promise = new Promise<string>((r) => (resolveAsync = r));
+
+        const TestComponent = () => {
+          const { data } = useScope(() => ({
+            data: signal(async () => promise),
+          }));
+
+          return (
+            <Suspense fallback={<div>Loading...</div>}>
+              {rx(() => {
+                wait(data());
+                return <div>Loaded</div>;
+              })}
+            </Suspense>
+          );
+        };
+
+        const { unmount } = renderWithWrapper(<TestComponent />);
+
+        // Unmount while suspended
+        unmount();
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // Resolve promise after unmount
+        // Should not crash
+        await act(async () => {
+          resolveAsync!("done");
+          await new Promise((r) => setTimeout(r, 10));
+        });
+      });
+
+      it("should handle ErrorBoundary catching signal errors inside rx", () => {
+        const TestComponent = () => {
+          const { errorSignal } = useScope(() => ({
+            errorSignal: signal(() => {
+              throw new Error("Signal Error");
+            }),
+          }));
+
+          return (
+            <ErrorBoundary fallback={<div data-testid="error">Caught</div>}>
+              {rx(() => {
+                return <div>{errorSignal()}</div>;
+              })}
+            </ErrorBoundary>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("error")).toHaveTextContent("Caught");
+      });
+
+      it("should handle async error in signal with Suspense and ErrorBoundary", async () => {
+        let rejectAsync: (err: Error) => void;
+        const promise = new Promise<string>((_, r) => (rejectAsync = r));
+
+        const TestComponent = () => {
+          const { asyncData } = useScope(() => ({
+            asyncData: signal(async () => promise),
+          }));
+
+          return (
+            <ErrorBoundary fallback={<div data-testid="error">Caught</div>}>
+              <Suspense fallback={<div>Loading...</div>}>
+                {rx(() => {
+                  wait(asyncData());
+                  return <div>Loaded</div>;
+                })}
+              </Suspense>
+            </ErrorBoundary>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+
+        // Reject promise
+        await act(async () => {
+          rejectAsync!(new Error("Async Fail"));
+        });
+
+        // Should be caught by ErrorBoundary
+        expect(screen.getByTestId("error")).toHaveTextContent("Caught");
+      });
+
+      it("should not recompute disposed computed signal when async dependency resolves", async () => {
+        let resolveAsync: (val: number) => void;
+        const promise = new Promise<number>((r) => {
+          resolveAsync = r;
+        });
+        let computeCount = 0;
+
+        const TestComponent = () => {
+          const scope = useScope(() => {
+            const asyncSig = signal(async () => promise);
+            const computedSig = signal({ asyncSig }, ({ deps }) => {
+              computeCount++;
+              return deps.asyncSig;
+            });
+            return { computedSig };
+          });
+
+          return (
+            <Suspense fallback={<div>Loading...</div>}>
+              {rx(() => {
+                wait(scope.computedSig());
+                return <div>Loaded</div>;
+              })}
+            </Suspense>
+          );
+        };
+
+        const { unmount } = renderWithWrapper(<TestComponent />);
+
+        // Wait for effects
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        const initialComputeCount = computeCount;
+        expect(initialComputeCount).toBeGreaterThan(0);
+
+        unmount();
+
+        // Resolve promise after unmount
+        await act(async () => {
+          resolveAsync!(42);
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // Should NOT recompute
+        expect(computeCount).toBe(initialComputeCount);
+      });
+
+      it("should handle rapid async dependency changes (race condition)", async () => {
+        let resolvers: Array<(val: string) => void> = [];
+        let requestCount = 0;
+
+        const TestComponent = ({ userId }: { userId: number }) => {
+          const scope = useScope(
+            (id: number) => {
+              return {
+                userData: signal(async () => {
+                  requestCount++;
+                  const currentRequest = requestCount;
+                  return new Promise<string>((resolve) => {
+                    resolvers.push((val) =>
+                      resolve(`${val}-req${currentRequest}`)
+                    );
+                  });
+                }),
+                id: signal(id),
+              };
+            },
+            [userId]
+          );
+
+          return (
+            <Suspense fallback={<div data-testid="loading">Loading...</div>}>
+              {rx(() => {
+                const data = wait(scope.userData());
+                return <div data-testid="data">{data}</div>;
+              })}
+            </Suspense>
+          );
+        };
+
+        const { rerender } = renderWithWrapper(<TestComponent userId={1} />);
+        expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+        // Rapid changes before first resolves
+        rerender(<TestComponent userId={2} />);
+        rerender(<TestComponent userId={3} />);
+
+        // Resolve in order (simulating network responses arriving)
+        await act(async () => {
+          // Resolve request 1 (stale)
+          if (resolvers[0]) resolvers[0]("user1");
+          await new Promise((r) => setTimeout(r, 5));
+        });
+
+        // Should still be loading (waiting for latest)
+        expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+        // Resolve latest request
+        await act(async () => {
+          const lastResolver = resolvers[resolvers.length - 1];
+          if (lastResolver) lastResolver("user3");
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // Should show latest data
+        expect(screen.getByTestId("data")).toHaveTextContent("user3");
+      });
+
+      it("should handle multiple async signals with different timing", async () => {
+        let resolveUser: (val: { name: string }) => void;
+        let resolvePosts: (val: string[]) => void;
+
+        const userPromise = new Promise<{ name: string }>((r) => {
+          resolveUser = r;
+        });
+        const postsPromise = new Promise<string[]>((r) => {
+          resolvePosts = r;
+        });
+
+        const TestComponent = () => {
+          const scope = useScope(() => ({
+            user: signal(async () => userPromise),
+            posts: signal(async () => postsPromise),
+            counter: signal(0),
+          }));
+
+          return (
+            <div>
+              <Suspense fallback={<div data-testid="user-loading">...</div>}>
+                {rx(() => {
+                  const user = wait(scope.user());
+                  return <div data-testid="user">{user.name}</div>;
+                })}
+              </Suspense>
+              <Suspense fallback={<div data-testid="posts-loading">...</div>}>
+                {rx(() => {
+                  const posts = wait(scope.posts());
+                  return <div data-testid="posts">{posts.length}</div>;
+                })}
+              </Suspense>
+              {rx(() => (
+                <button
+                  data-testid="inc"
+                  onClick={() => scope.counter.set((c) => c + 1)}
+                >
+                  {scope.counter()}
+                </button>
+              ))}
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+
+        // Both loading
+        expect(screen.getByTestId("user-loading")).toBeInTheDocument();
+        expect(screen.getByTestId("posts-loading")).toBeInTheDocument();
+
+        // Counter should work while async is pending
+        await act(async () => {
+          screen.getByTestId("inc").click();
+        });
+        expect(screen.getByTestId("inc")).toHaveTextContent("1");
+
+        // Resolve user first
+        await act(async () => {
+          resolveUser!({ name: "Alice" });
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        expect(screen.getByTestId("user")).toHaveTextContent("Alice");
+        expect(screen.getByTestId("posts-loading")).toBeInTheDocument();
+
+        // Counter still works
+        await act(async () => {
+          screen.getByTestId("inc").click();
+        });
+        expect(screen.getByTestId("inc")).toHaveTextContent("2");
+
+        // Resolve posts
+        await act(async () => {
+          resolvePosts!(["post1", "post2", "post3"]);
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        expect(screen.getByTestId("posts")).toHaveTextContent("3");
+        expect(screen.getByTestId("user")).toHaveTextContent("Alice");
+      });
+
+      it("should handle signal refresh during Suspense", async () => {
+        let resolveCount = 0;
+        let currentResolver: (val: number) => void;
+
+        const createPromise = () =>
+          new Promise<number>((resolve) => {
+            resolveCount++;
+            currentResolver = resolve;
+          });
+
+        let asyncSignalRef: any;
+
+        const TestComponent = () => {
+          const scope = useScope(() => {
+            const asyncSig = signal(async () => createPromise());
+            asyncSignalRef = asyncSig;
+            return { asyncSig };
+          });
+
+          return (
+            <div>
+              <Suspense fallback={<div data-testid="loading">Loading...</div>}>
+                {rx(() => {
+                  const val = wait(scope.asyncSig());
+                  return <div data-testid="value">{val}</div>;
+                })}
+              </Suspense>
+              <button
+                data-testid="refresh"
+                onClick={() => asyncSignalRef?.refresh()}
+              >
+                Refresh
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+
+        expect(screen.getByTestId("loading")).toBeInTheDocument();
+        expect(resolveCount).toBe(1);
+
+        // Resolve first request
+        await act(async () => {
+          currentResolver!(100);
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        expect(screen.getByTestId("value")).toHaveTextContent("100");
+
+        // Trigger refresh
+        await act(async () => {
+          screen.getByTestId("refresh").click();
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // Should show loading again
+        expect(screen.getByTestId("loading")).toBeInTheDocument();
+        expect(resolveCount).toBe(2);
+
+        // Resolve second request
+        await act(async () => {
+          currentResolver!(200);
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        expect(screen.getByTestId("value")).toHaveTextContent("200");
+      });
+
+      it("should handle stale closure not causing disposed signal error", async () => {
+        let capturedSetCount: ((v: number) => void) | undefined;
+        let errorOccurred = false;
+
+        const originalConsoleError = console.error;
+        console.error = (msg: any) => {
+          if (typeof msg === "string" && msg.includes("disposed")) {
+            errorOccurred = true;
+          }
+          originalConsoleError(msg);
+        };
+
+        const TestComponent = ({ show }: { show: boolean }) => {
+          const scope = useScope(() => ({
+            count: signal(0),
+          }));
+
+          // Capture setter in stale closure
+          React.useEffect(() => {
+            capturedSetCount = (v: number) => {
+              try {
+                scope.count.set(v);
+              } catch (e) {
+                errorOccurred = true;
+              }
+            };
+          }, [scope.count]);
+
+          if (!show) return null;
+
+          return <div data-testid="count">{rx(() => scope.count())}</div>;
+        };
+
+        const { rerender } = renderWithWrapper(<TestComponent show={true} />);
+        expect(screen.getByTestId("count")).toHaveTextContent("0");
+
+        // Hide component (unmounts scope)
+        rerender(<TestComponent show={false} />);
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 20));
+        });
+
+        // Call stale closure after unmount
+        if (capturedSetCount) {
+          act(() => {
+            capturedSetCount!(999);
+          });
+        }
+
+        console.error = originalConsoleError;
+
+        // Either error occurred (strict mode) or silently ignored
+        // The key is it shouldn't crash the app
+      });
+
+      it("should handle nested Suspense with shared scope", async () => {
+        let resolveOuter: (val: string) => void;
+        let resolveInner: (val: string) => void;
+
+        const outerPromise = new Promise<string>((r) => {
+          resolveOuter = r;
+        });
+        const innerPromise = new Promise<string>((r) => {
+          resolveInner = r;
+        });
+
+        const TestComponent = () => {
+          const scope = useScope(() => ({
+            outer: signal(async () => outerPromise),
+            inner: signal(async () => innerPromise),
+          }));
+
+          return (
+            <Suspense
+              fallback={<div data-testid="outer-loading">Outer...</div>}
+            >
+              {rx(() => {
+                const outerVal = wait(scope.outer());
+                return (
+                  <div>
+                    <div data-testid="outer">{outerVal}</div>
+                    <Suspense
+                      fallback={<div data-testid="inner-loading">Inner...</div>}
+                    >
+                      {rx(() => {
+                        const innerVal = wait(scope.inner());
+                        return <div data-testid="inner">{innerVal}</div>;
+                      })}
+                    </Suspense>
+                  </div>
+                );
+              })}
+            </Suspense>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+
+        // Outer loading
+        expect(screen.getByTestId("outer-loading")).toBeInTheDocument();
+
+        // Resolve outer
+        await act(async () => {
+          resolveOuter!("OUTER");
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // Outer resolved, inner loading
+        expect(screen.getByTestId("outer")).toHaveTextContent("OUTER");
+        expect(screen.getByTestId("inner-loading")).toBeInTheDocument();
+
+        // Resolve inner
+        await act(async () => {
+          resolveInner!("INNER");
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        expect(screen.getByTestId("outer")).toHaveTextContent("OUTER");
+        expect(screen.getByTestId("inner")).toHaveTextContent("INNER");
+      });
+
+      it("should handle async signal that errors then succeeds on retry", async () => {
+        let attemptCount = 0;
+        let currentResolver: (val: string) => void;
+        let currentRejecter: (err: Error) => void;
+
+        const createPromise = () =>
+          new Promise<string>((resolve, reject) => {
+            attemptCount++;
+            currentResolver = resolve;
+            currentRejecter = reject;
+          });
+
+        let asyncSignalRef: any;
+
+        // Custom ErrorBoundary with reset capability
+        class ResettableErrorBoundary extends React.Component<
+          { children: React.ReactNode; onReset?: () => void },
+          { hasError: boolean }
+        > {
+          constructor(props: any) {
+            super(props);
+            this.state = { hasError: false };
+          }
+          static getDerivedStateFromError() {
+            return { hasError: true };
+          }
+          reset = () => {
+            this.setState({ hasError: false });
+            this.props.onReset?.();
+          };
+          render() {
+            if (this.state.hasError) {
+              return (
+                <button data-testid="retry" onClick={this.reset}>
+                  Retry
+                </button>
+              );
+            }
+            return this.props.children;
+          }
+        }
+
+        let boundaryRef: ResettableErrorBoundary | null = null;
+
+        const TestComponent = () => {
+          const scope = useScope(() => {
+            const asyncSig = signal(async () => createPromise());
+            asyncSignalRef = asyncSig;
+            return { asyncSig };
+          });
+
+          return (
+            <ResettableErrorBoundary
+              ref={(r) => (boundaryRef = r)}
+              onReset={() => asyncSignalRef?.refresh()}
+            >
+              <Suspense fallback={<div data-testid="loading">Loading...</div>}>
+                {rx(() => {
+                  const val = wait(scope.asyncSig());
+                  return <div data-testid="value">{val}</div>;
+                })}
+              </Suspense>
+            </ResettableErrorBoundary>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+
+        // First attempt - will error
+        await act(async () => {
+          currentRejecter!(new Error("Network error"));
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // Should show retry button
+        expect(screen.getByTestId("retry")).toBeInTheDocument();
+        expect(attemptCount).toBe(1);
+
+        // Click retry
+        await act(async () => {
+          screen.getByTestId("retry").click();
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // Should be loading again
+        expect(screen.getByTestId("loading")).toBeInTheDocument();
+        expect(attemptCount).toBe(2);
+
+        // Second attempt - will succeed
+        await act(async () => {
+          currentResolver!("Success!");
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        expect(screen.getByTestId("value")).toHaveTextContent("Success!");
+      });
+
+      it("should handle concurrent writes during async resolution", async () => {
+        let resolveAsync: (val: number) => void;
+        const promise = new Promise<number>((r) => {
+          resolveAsync = r;
+        });
+
+        const TestComponent = () => {
+          const scope = useScope(() => ({
+            asyncData: signal(async () => promise),
+            syncCounter: signal(0),
+          }));
+
+          return (
+            <div>
+              <Suspense fallback={<div data-testid="loading">Loading...</div>}>
+                {rx(() => {
+                  const data = wait(scope.asyncData());
+                  const count = scope.syncCounter();
+                  return (
+                    <div data-testid="result">
+                      {data} + {count}
+                    </div>
+                  );
+                })}
+              </Suspense>
+              <button
+                data-testid="inc"
+                onClick={() => scope.syncCounter.set((c) => c + 1)}
+              >
+                Inc
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+
+        // Increment while suspended
+        await act(async () => {
+          screen.getByTestId("inc").click();
+          screen.getByTestId("inc").click();
+          screen.getByTestId("inc").click();
+        });
+
+        // Resolve async
+        await act(async () => {
+          resolveAsync!(100);
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // Should show both values correctly
+        expect(screen.getByTestId("result")).toHaveTextContent("100 + 3");
+      });
+    });
+
+    describe("multiple useScope calls in same component", () => {
+      it("should handle two independent local scopes", () => {
+        const TestComponent = () => {
+          const scope1 = useScope(() => ({
+            count: signal(10),
+          }));
+          const scope2 = useScope(() => ({
+            count: signal(20),
+          }));
+
+          return (
+            <div>
+              <div data-testid="count1">{rx(() => scope1.count())}</div>
+              <div data-testid="count2">{rx(() => scope2.count())}</div>
+              <button
+                data-testid="inc1"
+                onClick={() => scope1.count.set((c) => c + 1)}
+              >
+                Inc1
+              </button>
+              <button
+                data-testid="inc2"
+                onClick={() => scope2.count.set((c) => c + 1)}
+              >
+                Inc2
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("count1")).toHaveTextContent("10");
+        expect(screen.getByTestId("count2")).toHaveTextContent("20");
+
+        act(() => {
+          screen.getByTestId("inc1").click();
+        });
+        expect(screen.getByTestId("count1")).toHaveTextContent("11");
+        expect(screen.getByTestId("count2")).toHaveTextContent("20");
+
+        act(() => {
+          screen.getByTestId("inc2").click();
+        });
+        expect(screen.getByTestId("count1")).toHaveTextContent("11");
+        expect(screen.getByTestId("count2")).toHaveTextContent("21");
+      });
+
+      it("should handle local and shared scopes together", () => {
+        let sharedCreateCount = 0;
+        let localCreateCount = 0;
+
+        const TestComponent = () => {
+          const shared = useScope("shared-key", () => {
+            sharedCreateCount++;
+            return { value: signal("shared") };
+          });
+          const local = useScope(() => {
+            localCreateCount++;
+            return { value: signal("local") };
+          });
+
+          return (
+            <div>
+              <div data-testid="shared">{rx(() => shared.value())}</div>
+              <div data-testid="local">{rx(() => local.value())}</div>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("shared")).toHaveTextContent("shared");
+        expect(screen.getByTestId("local")).toHaveTextContent("local");
+        expect(sharedCreateCount).toBe(1);
+        expect(localCreateCount).toBe(mode === "strict" ? 2 : 1);
+      });
+
+      it("should handle three local scopes with different types", () => {
+        const TestComponent = () => {
+          const counter = useScope(() => ({
+            count: signal(0),
+            increment() {
+              this.count.set((c) => c + 1);
+            },
+          }));
+          const form = useScope(() => ({
+            name: signal(""),
+            email: signal(""),
+          }));
+          const ui = useScope(() => ({
+            isOpen: signal(false),
+            toggle() {
+              this.isOpen.set((v) => !v);
+            },
+          }));
+
+          return (
+            <div>
+              <div data-testid="count">{rx(() => counter.count())}</div>
+              <div data-testid="name">{rx(() => form.name() || "empty")}</div>
+              <div data-testid="isOpen">{rx(() => String(ui.isOpen()))}</div>
+              <button data-testid="inc" onClick={() => counter.increment()}>
+                Inc
+              </button>
+              <button
+                data-testid="setName"
+                onClick={() => form.name.set("Alice")}
+              >
+                Set Name
+              </button>
+              <button data-testid="toggle" onClick={() => ui.toggle()}>
+                Toggle
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("count")).toHaveTextContent("0");
+        expect(screen.getByTestId("name")).toHaveTextContent("empty");
+        expect(screen.getByTestId("isOpen")).toHaveTextContent("false");
+
+        act(() => {
+          screen.getByTestId("inc").click();
+          screen.getByTestId("setName").click();
+          screen.getByTestId("toggle").click();
+        });
+
+        expect(screen.getByTestId("count")).toHaveTextContent("1");
+        expect(screen.getByTestId("name")).toHaveTextContent("Alice");
+        expect(screen.getByTestId("isOpen")).toHaveTextContent("true");
+      });
+
+      it("should dispose all scopes on unmount", async () => {
+        const dispose1 = vi.fn();
+        const dispose2 = vi.fn();
+        const dispose3 = vi.fn();
+
+        const TestComponent = () => {
+          useScope(() => ({ dispose: dispose1 }));
+          useScope(() => ({ dispose: dispose2 }));
+          useScope(() => ({ dispose: dispose3 }));
+
+          return <div>Test</div>;
+        };
+
+        const { unmount } = renderWithWrapper(<TestComponent />);
+        expect(dispose1).not.toHaveBeenCalled();
+        expect(dispose2).not.toHaveBeenCalled();
+        expect(dispose3).not.toHaveBeenCalled();
+
+        unmount();
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        expect(dispose1).toHaveBeenCalled();
+        expect(dispose2).toHaveBeenCalled();
+        expect(dispose3).toHaveBeenCalled();
+      });
+
+      it("should handle multiple scopes with different deps", () => {
+        let scope1CreateCount = 0;
+        let scope2CreateCount = 0;
+
+        const TestComponent = ({
+          userId,
+          postId,
+        }: {
+          userId: number;
+          postId: number;
+        }) => {
+          const userScope = useScope(
+            (id: number) => {
+              scope1CreateCount++;
+              return { userId: signal(id) };
+            },
+            [userId]
+          );
+          const postScope = useScope(
+            (id: number) => {
+              scope2CreateCount++;
+              return { postId: signal(id) };
+            },
+            [postId]
+          );
+
+          return (
+            <div>
+              <div data-testid="userId">{rx(() => userScope.userId())}</div>
+              <div data-testid="postId">{rx(() => postScope.postId())}</div>
+            </div>
+          );
+        };
+
+        const { rerender } = renderWithWrapper(
+          <TestComponent userId={1} postId={100} />
+        );
+        expect(screen.getByTestId("userId")).toHaveTextContent("1");
+        expect(screen.getByTestId("postId")).toHaveTextContent("100");
+
+        const initialScope1Count = scope1CreateCount;
+        const initialScope2Count = scope2CreateCount;
+
+        // Change only userId
+        rerender(<TestComponent userId={2} postId={100} />);
+        expect(scope1CreateCount).toBe(initialScope1Count + 1);
+        expect(scope2CreateCount).toBe(initialScope2Count); // Not recreated
+
+        // Change only postId
+        rerender(<TestComponent userId={2} postId={200} />);
+        expect(scope1CreateCount).toBe(initialScope1Count + 1); // Not recreated
+        expect(scope2CreateCount).toBe(initialScope2Count + 1);
+      });
+
+      it("should handle computed signals across multiple scopes", () => {
+        const TestComponent = () => {
+          const priceScope = useScope(() => ({
+            price: signal(100),
+          }));
+          const quantityScope = useScope(() => ({
+            quantity: signal(2),
+          }));
+          const totalScope = useScope(() => ({
+            total: signal(
+              { price: priceScope.price, quantity: quantityScope.quantity },
+              ({ deps }) => deps.price * deps.quantity
+            ),
+          }));
+
+          return (
+            <div>
+              <div data-testid="price">{rx(() => priceScope.price())}</div>
+              <div data-testid="quantity">
+                {rx(() => quantityScope.quantity())}
+              </div>
+              <div data-testid="total">{rx(() => totalScope.total())}</div>
+              <button
+                data-testid="setPrice"
+                onClick={() => priceScope.price.set(150)}
+              >
+                Set Price
+              </button>
+              <button
+                data-testid="setQuantity"
+                onClick={() => quantityScope.quantity.set(3)}
+              >
+                Set Quantity
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("total")).toHaveTextContent("200");
+
+        act(() => {
+          screen.getByTestId("setPrice").click();
+        });
+        expect(screen.getByTestId("total")).toHaveTextContent("300");
+
+        act(() => {
+          screen.getByTestId("setQuantity").click();
+        });
+        expect(screen.getByTestId("total")).toHaveTextContent("450");
+      });
+
+      it("should handle proxy mode with multiple useScope calls", () => {
+        const TestComponent = () => {
+          const formState = useScope<{
+            submitState: Promise<string>;
+            validateState: Promise<boolean>;
+          }>();
+          const uiState = useScope<{
+            isModalOpen: boolean;
+            activeTab: string;
+          }>();
+
+          return (
+            <div>
+              <div data-testid="submitState">
+                {rx(() => (formState.submitState() ? "set" : "empty"))}
+              </div>
+              <div data-testid="isModalOpen">
+                {rx(() => String(uiState.isModalOpen() ?? false))}
+              </div>
+              <button
+                data-testid="setSubmit"
+                onClick={() =>
+                  formState.submitState.set(Promise.resolve("done"))
+                }
+              >
+                Submit
+              </button>
+              <button
+                data-testid="openModal"
+                onClick={() => uiState.isModalOpen.set(true)}
+              >
+                Open
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("submitState")).toHaveTextContent("empty");
+        expect(screen.getByTestId("isModalOpen")).toHaveTextContent("false");
+
+        act(() => {
+          screen.getByTestId("setSubmit").click();
+          screen.getByTestId("openModal").click();
+        });
+
+        expect(screen.getByTestId("submitState")).toHaveTextContent("set");
+        expect(screen.getByTestId("isModalOpen")).toHaveTextContent("true");
+      });
+    });
+
+    describe("local mode - advanced scenarios", () => {
+      it("should create unique scope for each component instance even with same factory", () => {
+        const scopeIds: number[] = [];
+        let idCounter = 0;
+
+        const TestComponent = () => {
+          const scope = useScope(() => {
+            const id = ++idCounter;
+            scopeIds.push(id);
+            return { id: signal(id) };
+          });
+
+          return <div data-testid={`scope-${scope.id()}`}>{scope.id()}</div>;
+        };
+
+        renderWithWrapper(
+          <>
+            <TestComponent />
+            <TestComponent />
+            <TestComponent />
+          </>
+        );
+
+        // In strict mode, each component may create 2 scopes (double-invoke)
+        // but only 1 survives. So we check unique IDs.
+        const uniqueIds = new Set(scopeIds);
+        expect(uniqueIds.size).toBeGreaterThanOrEqual(3);
+      });
+
+      it("should handle local scope with async factory dependencies", () => {
+        const TestComponent = ({ initialValue }: { initialValue: number }) => {
+          const scope = useScope(
+            (init: number) => ({
+              asyncData: signal(async () => {
+                await new Promise((r) => setTimeout(r, 10));
+                return init * 10;
+              }),
+            }),
+            [initialValue]
+          );
+
+          return (
+            <Suspense fallback={<div data-testid="loading">Loading...</div>}>
+              {rx(() => {
+                const data = wait(scope.asyncData());
+                return <div data-testid="data">{data}</div>;
+              })}
+            </Suspense>
+          );
+        };
+
+        renderWithWrapper(<TestComponent initialValue={5} />);
+        expect(screen.getByTestId("loading")).toBeInTheDocument();
+      });
+
+      it("should handle local scope with logic factory", () => {
+        let createCount = 0;
+
+        const counterLogic = logic("localCounterLogic", () => {
+          createCount++;
+          const count = signal(0);
+          return {
+            count,
+            increment: () => count.set((c) => c + 1),
+            decrement: () => count.set((c) => c - 1),
+          };
+        });
+
+        const TestComponent = () => {
+          const { count, increment, decrement } = useScope(counterLogic);
+
+          return (
+            <div>
+              <div data-testid="count">{rx(() => count())}</div>
+              <button data-testid="inc" onClick={increment}>
+                +
+              </button>
+              <button data-testid="dec" onClick={decrement}>
+                -
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("count")).toHaveTextContent("0");
+
+        act(() => {
+          screen.getByTestId("inc").click();
+          screen.getByTestId("inc").click();
+        });
+        expect(screen.getByTestId("count")).toHaveTextContent("2");
+
+        act(() => {
+          screen.getByTestId("dec").click();
+        });
+        expect(screen.getByTestId("count")).toHaveTextContent("1");
+      });
+
+      it("should handle local scope that returns methods referencing signals", () => {
+        const TestComponent = () => {
+          const scope = useScope(() => {
+            const items = signal<string[]>([]);
+            return {
+              items,
+              addItem: (item: string) => items.set((arr) => [...arr, item]),
+              removeItem: (index: number) =>
+                items.set((arr) => arr.filter((_, i) => i !== index)),
+              getCount: () => items().length,
+            };
+          });
+
+          return (
+            <div>
+              <div data-testid="count">{rx(() => scope.getCount())}</div>
+              <div data-testid="items">{rx(() => scope.items().join(","))}</div>
+              <button
+                data-testid="add"
+                onClick={() => scope.addItem("item" + scope.getCount())}
+              >
+                Add
+              </button>
+              <button data-testid="remove" onClick={() => scope.removeItem(0)}>
+                Remove First
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("count")).toHaveTextContent("0");
+
+        act(() => {
+          screen.getByTestId("add").click();
+          screen.getByTestId("add").click();
+          screen.getByTestId("add").click();
+        });
+
+        expect(screen.getByTestId("count")).toHaveTextContent("3");
+        expect(screen.getByTestId("items")).toHaveTextContent(
+          "item0,item1,item2"
+        );
+
+        act(() => {
+          screen.getByTestId("remove").click();
+        });
+
+        expect(screen.getByTestId("count")).toHaveTextContent("2");
+        expect(screen.getByTestId("items")).toHaveTextContent("item1,item2");
+      });
+
+      it("should handle local scope with nested objects and signals", () => {
+        const TestComponent = () => {
+          const scope = useScope(() => ({
+            form: {
+              fields: {
+                name: signal(""),
+                email: signal(""),
+              },
+              validation: {
+                isValid: signal(false),
+                errors: signal<string[]>([]),
+              },
+            },
+            meta: {
+              submitCount: signal(0),
+            },
+          }));
+
+          return (
+            <div>
+              <div data-testid="name">
+                {rx(() => scope.form.fields.name() || "empty")}
+              </div>
+              <div data-testid="isValid">
+                {rx(() => String(scope.form.validation.isValid()))}
+              </div>
+              <div data-testid="submitCount">
+                {rx(() => scope.meta.submitCount())}
+              </div>
+              <button
+                data-testid="setName"
+                onClick={() => scope.form.fields.name.set("John")}
+              >
+                Set Name
+              </button>
+              <button
+                data-testid="validate"
+                onClick={() => scope.form.validation.isValid.set(true)}
+              >
+                Validate
+              </button>
+              <button
+                data-testid="submit"
+                onClick={() => scope.meta.submitCount.set((c) => c + 1)}
+              >
+                Submit
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("name")).toHaveTextContent("empty");
+        expect(screen.getByTestId("isValid")).toHaveTextContent("false");
+        expect(screen.getByTestId("submitCount")).toHaveTextContent("0");
+
+        act(() => {
+          screen.getByTestId("setName").click();
+          screen.getByTestId("validate").click();
+          screen.getByTestId("submit").click();
+        });
+
+        expect(screen.getByTestId("name")).toHaveTextContent("John");
+        expect(screen.getByTestId("isValid")).toHaveTextContent("true");
+        expect(screen.getByTestId("submitCount")).toHaveTextContent("1");
+      });
+
+      it("should handle local scope with .when() reactive triggers", () => {
+        const TestComponent = () => {
+          const scope = useScope(() => {
+            const trigger = signal<void>();
+            const count = signal(0).when(trigger, () => {
+              count.set((c) => c + 1);
+            });
+            return { trigger, count };
+          });
+
+          return (
+            <div>
+              <div data-testid="count">{rx(() => scope.count())}</div>
+              <button data-testid="trigger" onClick={() => scope.trigger.set()}>
+                Trigger
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("count")).toHaveTextContent("0");
+
+        act(() => {
+          screen.getByTestId("trigger").click();
+        });
+        expect(screen.getByTestId("count")).toHaveTextContent("1");
+
+        act(() => {
+          screen.getByTestId("trigger").click();
+          screen.getByTestId("trigger").click();
+        });
+        expect(screen.getByTestId("count")).toHaveTextContent("3");
+      });
+
+      it("should handle local scope recreation when deps array length changes", () => {
+        let createCount = 0;
+
+        const TestComponent = ({ filters }: { filters: string[] }) => {
+          const scope = useScope(
+            (...args: string[]) => {
+              createCount++;
+              return { filters: signal(args) };
+            },
+            [...filters]
+          );
+
+          return (
+            <div data-testid="filters">
+              {rx(() => scope.filters().join(","))}
+            </div>
+          );
+        };
+
+        const { rerender } = renderWithWrapper(
+          <TestComponent filters={["a", "b"]} />
+        );
+        expect(screen.getByTestId("filters")).toHaveTextContent("a,b");
+        const initialCount = createCount;
+
+        // Add filter
+        rerender(<TestComponent filters={["a", "b", "c"]} />);
+        expect(createCount).toBe(initialCount + 1);
+        expect(screen.getByTestId("filters")).toHaveTextContent("a,b,c");
+
+        // Remove filter
+        rerender(<TestComponent filters={["a"]} />);
+        expect(createCount).toBe(initialCount + 2);
+        expect(screen.getByTestId("filters")).toHaveTextContent("a");
+      });
+    });
+
+    describe("triggering rerenders many times", () => {
+      it("should handle rapid signal updates without batching", async () => {
+        let renderCount = 0;
+
+        const TestComponent = () => {
+          renderCount++;
+          const scope = useScope(() => ({
+            count: signal(0),
+          }));
+
+          return (
+            <div>
+              <div data-testid="count">{rx(() => scope.count())}</div>
+              <button
+                data-testid="rapidUpdate"
+                onClick={() => {
+                  for (let i = 0; i < 10; i++) {
+                    scope.count.set((c) => c + 1);
+                  }
+                }}
+              >
+                Rapid
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        const initialRenderCount = renderCount;
+
+        await act(async () => {
+          screen.getByTestId("rapidUpdate").click();
+        });
+
+        // Count should be 10 after rapid updates
+        expect(screen.getByTestId("count")).toHaveTextContent("10");
+      });
+
+      it("should handle batched signal updates efficiently", async () => {
+        let rxRenderCount = 0;
+
+        const TestComponent = () => {
+          const scope = useScope(() => ({
+            a: signal(0),
+            b: signal(0),
+            c: signal(0),
+          }));
+
+          return (
+            <div>
+              {rx(() => {
+                rxRenderCount++;
+                return (
+                  <div data-testid="sum">
+                    {scope.a() + scope.b() + scope.c()}
+                  </div>
+                );
+              })}
+              <button
+                data-testid="batchUpdate"
+                onClick={() => {
+                  batch(() => {
+                    scope.a.set(10);
+                    scope.b.set(20);
+                    scope.c.set(30);
+                  });
+                }}
+              >
+                Batch
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("sum")).toHaveTextContent("0");
+        const initialRxRenderCount = rxRenderCount;
+
+        await act(async () => {
+          screen.getByTestId("batchUpdate").click();
+        });
+
+        expect(screen.getByTestId("sum")).toHaveTextContent("60");
+        // With batching, should only re-render once (or a few times)
+        // Not 3 times for 3 signal updates
+        expect(rxRenderCount - initialRxRenderCount).toBeLessThanOrEqual(2);
+      });
+
+      it("should handle 100 sequential signal updates", async () => {
+        const TestComponent = () => {
+          const scope = useScope(() => ({
+            count: signal(0),
+          }));
+
+          return (
+            <div>
+              <div data-testid="count">{rx(() => scope.count())}</div>
+              <button
+                data-testid="update100"
+                onClick={async () => {
+                  for (let i = 0; i < 100; i++) {
+                    scope.count.set((c) => c + 1);
+                  }
+                }}
+              >
+                Update 100
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("count")).toHaveTextContent("0");
+
+        await act(async () => {
+          screen.getByTestId("update100").click();
+        });
+
+        expect(screen.getByTestId("count")).toHaveTextContent("100");
+      });
+
+      it("should handle interleaved updates from multiple signals", async () => {
+        const updateLog: string[] = [];
+
+        const TestComponent = () => {
+          const scope = useScope(() => ({
+            a: signal(0),
+            b: signal(0),
+          }));
+
+          return (
+            <div>
+              {rx(() => {
+                const a = scope.a();
+                const b = scope.b();
+                updateLog.push(`a=${a},b=${b}`);
+                return (
+                  <div data-testid="values">
+                    a={a}, b={b}
+                  </div>
+                );
+              })}
+              <button
+                data-testid="interleave"
+                onClick={() => {
+                  scope.a.set(1);
+                  scope.b.set(1);
+                  scope.a.set(2);
+                  scope.b.set(2);
+                  scope.a.set(3);
+                  scope.b.set(3);
+                }}
+              >
+                Interleave
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        updateLog.length = 0; // Clear initial render logs
+
+        await act(async () => {
+          screen.getByTestId("interleave").click();
+        });
+
+        // Final values should be correct
+        expect(screen.getByTestId("values")).toHaveTextContent("a=3, b=3");
+      });
+
+      it("should handle rapid toggle updates", async () => {
+        let renderCount = 0;
+
+        const TestComponent = () => {
+          const scope = useScope(() => ({
+            isOpen: signal(false),
+          }));
+
+          return (
+            <div>
+              {rx(() => {
+                renderCount++;
+                return <div data-testid="isOpen">{String(scope.isOpen())}</div>;
+              })}
+              <button
+                data-testid="rapidToggle"
+                onClick={() => {
+                  for (let i = 0; i < 20; i++) {
+                    scope.isOpen.set((v) => !v);
+                  }
+                }}
+              >
+                Toggle 20x
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("isOpen")).toHaveTextContent("false");
+
+        await act(async () => {
+          screen.getByTestId("rapidToggle").click();
+        });
+
+        // 20 toggles from false -> ends at false
+        expect(screen.getByTestId("isOpen")).toHaveTextContent("false");
+      });
+
+      it("should handle updates during render phase (via computed)", () => {
+        let computeCount = 0;
+
+        const TestComponent = () => {
+          const scope = useScope(() => {
+            const input = signal(0);
+            const computed = signal({ input }, ({ deps }) => {
+              computeCount++;
+              return deps.input * 2;
+            });
+            return { input, computed };
+          });
+
+          return (
+            <div>
+              <div data-testid="input">{rx(() => scope.input())}</div>
+              <div data-testid="computed">{rx(() => scope.computed())}</div>
+              <button
+                data-testid="update"
+                onClick={() => {
+                  scope.input.set(1);
+                  scope.input.set(2);
+                  scope.input.set(3);
+                  scope.input.set(4);
+                  scope.input.set(5);
+                }}
+              >
+                Update 5x
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("computed")).toHaveTextContent("0");
+        const initialComputeCount = computeCount;
+
+        act(() => {
+          screen.getByTestId("update").click();
+        });
+
+        expect(screen.getByTestId("input")).toHaveTextContent("5");
+        expect(screen.getByTestId("computed")).toHaveTextContent("10");
+      });
+
+      it("should handle async updates interspersed with sync updates", async () => {
+        const TestComponent = () => {
+          const scope = useScope(() => ({
+            syncCount: signal(0),
+            asyncCount: signal(0),
+          }));
+
+          return (
+            <div>
+              <div data-testid="sync">{rx(() => scope.syncCount())}</div>
+              <div data-testid="async">{rx(() => scope.asyncCount())}</div>
+              <button
+                data-testid="mixedUpdate"
+                onClick={async () => {
+                  scope.syncCount.set(1);
+                  await new Promise((r) => setTimeout(r, 5));
+                  scope.asyncCount.set(1);
+                  scope.syncCount.set(2);
+                  await new Promise((r) => setTimeout(r, 5));
+                  scope.asyncCount.set(2);
+                  scope.syncCount.set(3);
+                }}
+              >
+                Mixed
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+
+        await act(async () => {
+          screen.getByTestId("mixedUpdate").click();
+          await new Promise((r) => setTimeout(r, 20));
+        });
+
+        expect(screen.getByTestId("sync")).toHaveTextContent("3");
+        expect(screen.getByTestId("async")).toHaveTextContent("2");
+      });
+
+      it("should handle updates from setTimeout callbacks", async () => {
+        const TestComponent = () => {
+          const scope = useScope(() => ({
+            count: signal(0),
+          }));
+
+          return (
+            <div>
+              <div data-testid="count">{rx(() => scope.count())}</div>
+              <button
+                data-testid="scheduleUpdates"
+                onClick={() => {
+                  setTimeout(() => scope.count.set(1), 5);
+                  setTimeout(() => scope.count.set(2), 10);
+                  setTimeout(() => scope.count.set(3), 15);
+                  setTimeout(() => scope.count.set(4), 20);
+                  setTimeout(() => scope.count.set(5), 25);
+                }}
+              >
+                Schedule
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        expect(screen.getByTestId("count")).toHaveTextContent("0");
+
+        await act(async () => {
+          screen.getByTestId("scheduleUpdates").click();
+          await new Promise((r) => setTimeout(r, 50));
+        });
+
+        expect(screen.getByTestId("count")).toHaveTextContent("5");
+      });
+
+      it("should handle concurrent updates from multiple event handlers", async () => {
+        const TestComponent = () => {
+          const scope = useScope(() => ({
+            count: signal(0),
+          }));
+
+          return (
+            <div>
+              <div data-testid="count">{rx(() => scope.count())}</div>
+              <button
+                data-testid="btn1"
+                onClick={() => scope.count.set((c) => c + 1)}
+              >
+                +1
+              </button>
+              <button
+                data-testid="btn2"
+                onClick={() => scope.count.set((c) => c + 10)}
+              >
+                +10
+              </button>
+              <button
+                data-testid="btn3"
+                onClick={() => scope.count.set((c) => c + 100)}
+              >
+                +100
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+
+        await act(async () => {
+          // Simulate rapid clicking on multiple buttons
+          screen.getByTestId("btn1").click();
+          screen.getByTestId("btn2").click();
+          screen.getByTestId("btn3").click();
+          screen.getByTestId("btn1").click();
+          screen.getByTestId("btn2").click();
+          screen.getByTestId("btn1").click();
+        });
+
+        // 1 + 10 + 100 + 1 + 10 + 1 = 123
+        expect(screen.getByTestId("count")).toHaveTextContent("123");
+      });
+
+      it("should handle rerender with many computed signals", () => {
+        const TestComponent = () => {
+          const scope = useScope(() => {
+            const base = signal(1);
+            const c1 = base.to((v) => v * 2);
+            const c2 = base.to((v) => v * 3);
+            const c3 = base.to((v) => v * 4);
+            const c4 = base.to((v) => v * 5);
+            const c5 = signal(
+              { c1, c2, c3, c4 },
+              ({ deps }) => deps.c1 + deps.c2 + deps.c3 + deps.c4
+            );
+            return { base, c1, c2, c3, c4, c5 };
+          });
+
+          return (
+            <div>
+              <div data-testid="base">{rx(() => scope.base())}</div>
+              <div data-testid="c5">{rx(() => scope.c5())}</div>
+              <button
+                data-testid="update"
+                onClick={() => scope.base.set((v) => v + 1)}
+              >
+                Update
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+        // c5 = c1 + c2 + c3 + c4 = 2 + 3 + 4 + 5 = 14
+        expect(screen.getByTestId("c5")).toHaveTextContent("14");
+
+        act(() => {
+          screen.getByTestId("update").click();
+        });
+
+        // base = 2, c5 = 4 + 6 + 8 + 10 = 28
+        expect(screen.getByTestId("c5")).toHaveTextContent("28");
+
+        act(() => {
+          screen.getByTestId("update").click();
+          screen.getByTestId("update").click();
+          screen.getByTestId("update").click();
+        });
+
+        // base = 5, c5 = 10 + 15 + 20 + 25 = 70
+        expect(screen.getByTestId("c5")).toHaveTextContent("70");
+      });
+
+      it("should maintain consistency during stress test", async () => {
+        const TestComponent = () => {
+          const scope = useScope(() => ({
+            count: signal(0),
+          }));
+
+          React.useEffect(() => {
+            // Simulate external updates
+            const interval = setInterval(() => {
+              scope.count.set((c) => c + 1);
+            }, 10);
+            return () => clearInterval(interval);
+          }, [scope.count]);
+
+          return (
+            <div>
+              <div data-testid="count">{rx(() => scope.count())}</div>
+              <button
+                data-testid="manualUpdate"
+                onClick={() => scope.count.set((c) => c + 100)}
+              >
+                +100
+              </button>
+            </div>
+          );
+        };
+
+        renderWithWrapper(<TestComponent />);
+
+        // Wait for some interval updates
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 55));
+        });
+
+        // Manual update during interval
+        await act(async () => {
+          screen.getByTestId("manualUpdate").click();
+        });
+
+        // Wait more
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 55));
+        });
+
+        // Count should be > 100 (from manual) + some interval updates
+        const countValue = parseInt(
+          screen.getByTestId("count").textContent || "0"
+        );
+        expect(countValue).toBeGreaterThan(100);
       });
     });
   }

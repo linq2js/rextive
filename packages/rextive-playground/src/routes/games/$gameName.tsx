@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { rx, useScope } from "rextive/react";
 import { gameStatsLogic, selectedProfileLogic } from "@/logic";
-import { AVATAR_COLORS } from "@/domain/types";
+import { Avatar } from "@/components/Avatar";
 
 export const Route = createFileRoute("/games/$gameName")({
   component: GamePage,
@@ -46,10 +46,8 @@ function GamePage() {
           {profile && (
             <div className="card mb-6">
               <div className="flex items-center gap-4">
-                <div
-                  className={`w-14 h-14 rounded-full flex items-center justify-center text-3xl ${AVATAR_COLORS[profile.avatar]}`}
-                >
-                  {profile.avatar}
+                <div className="w-14 h-14">
+                  <Avatar avatar={profile.avatar} className="w-full h-full" />
                 </div>
                 <div className="flex-1">
                   <div className="font-display text-lg font-bold text-gray-800">

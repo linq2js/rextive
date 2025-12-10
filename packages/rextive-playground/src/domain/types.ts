@@ -121,12 +121,30 @@ export const WESTERN_ZODIAC_OPTIONS: WesternZodiac[] = [
   "♓", // Pisces
 ];
 
-export const AVATAR_OPTIONS: AvatarEmoji[] = [
-  ...CHINESE_ZODIAC_OPTIONS,
-  ...WESTERN_ZODIAC_OPTIONS,
+// Basic Animals (cute faces)
+export const BASIC_ANIMALS = [
+  "🦁", "🐼", "🐨", "🦊", "🐸", // Unique
+  "🐰", "🐯", "🐷", "🐵", "🐶", // Overlap with Chinese
+] as const;
+
+export type BasicAnimal = typeof BASIC_ANIMALS[number];
+
+export const AVATAR_OPTIONS: string[] = [
+  ...new Set([
+    ...BASIC_ANIMALS,
+    ...CHINESE_ZODIAC_OPTIONS,
+    ...WESTERN_ZODIAC_OPTIONS,
+  ])
 ];
 
-export const AVATAR_COLORS: Record<AvatarEmoji, string> = {
+export const AVATAR_COLORS: Record<string, string> = {
+  // Basic Animals (Unique)
+  "🦁": "bg-yellow-300", // Lion
+  "🐼": "bg-stone-100", // Panda
+  "🐨": "bg-stone-300", // Koala
+  "🦊": "bg-orange-400", // Fox
+  "🐸": "bg-green-400", // Frog
+
   // Chinese Zodiacs
   "🐀": "bg-gray-300", // Rat
   "🐂": "bg-amber-300", // Ox
@@ -156,8 +174,15 @@ export const AVATAR_COLORS: Record<AvatarEmoji, string> = {
   "♓": "bg-violet-200", // Pisces (Water)
 };
 
-// Zodiac names for display
-export const ZODIAC_NAMES: Record<AvatarEmoji, string> = {
+// Avatar names for display
+export const AVATAR_NAMES: Record<string, string> = {
+  // Basic Animals
+  "🦁": "Lion",
+  "🐼": "Panda",
+  "🐨": "Koala",
+  "🦊": "Fox",
+  "🐸": "Frog",
+
   // Chinese Zodiacs
   "🐀": "Rat",
   "🐂": "Ox",
