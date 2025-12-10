@@ -29,6 +29,7 @@ export interface DataExportRepository {
   exportAll(): Promise<string>;
   importAll(jsonData: string): Promise<{ success: boolean; message: string }>;
   validateImportData(jsonData: string): { valid: boolean; error?: string };
+  resetAll(): Promise<void>;
 }
 
 export const dataExportRepository: DataExportRepository = {
@@ -169,6 +170,19 @@ export const dataExportRepository: DataExportRepository = {
         message: "Failed to import data. Please check the file format.",
       };
     }
+  },
+
+  async resetAll(): Promise<void> {
+    // Clear all tables - resets stats, streaks, energy, everything
+    await Promise.all([
+      db.kidProfiles.clear(),
+      db.parentSettings.clear(),
+      db.gameProgress.clear(),
+      db.kidEnergy.clear(),
+      db.kidGameSettings.clear(),
+    ]);
+    // Also clear localStorage
+    localStorage.removeItem("selected_profile_id");
   },
 };
 

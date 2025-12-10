@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { signal } from "rextive";
 import { rx, useScope } from "rextive/react";
-import { selectedProfileLogic, energyLogic } from "@/logic";
+import { selectedProfileLogic, energyLogic, kidProfilesLogic } from "@/logic";
 import { AVATAR_NAMES } from "@/domain/types";
 import { useEffect } from "react";
 import { Avatar } from "@/components/Avatar";
@@ -49,27 +49,28 @@ interface Game {
 
 function dashboardLogic() {
   const $selected = selectedProfileLogic();
+  const $profiles = kidProfilesLogic();
   const $energy = energyLogic();
 
-  // Mock stats - in real app, fetch from DB
+  // Stats - starts at zero, will be loaded from DB in real app
   const stats = signal<KidStats>(
     {
-      todayGames: 3,
-      todayScore: 450,
-      todayMinutes: 25,
-      totalGames: 47,
-      totalScore: 8250,
-      level: 5,
-      xp: 350,
-      xpToNextLevel: 500,
-      currentStreak: 7,
-      bestStreak: 12,
+      todayGames: 0,
+      todayScore: 0,
+      todayMinutes: 0,
+      totalGames: 0,
+      totalScore: 0,
+      level: 1,
+      xp: 0,
+      xpToNextLevel: 100,
+      currentStreak: 0,
+      bestStreak: 0,
       achievements: [
-        { id: "first-game", name: "First Steps", icon: "👶", unlocked: true, description: "Play your first game" },
-        { id: "streak-3", name: "On Fire", icon: "🔥", unlocked: true, description: "3 day streak" },
-        { id: "streak-7", name: "Week Warrior", icon: "⚔️", unlocked: true, description: "7 day streak" },
-        { id: "score-1000", name: "High Scorer", icon: "🏆", unlocked: true, description: "Score 1000 points" },
-        { id: "level-5", name: "Rising Star", icon: "⭐", unlocked: true, description: "Reach level 5" },
+        { id: "first-game", name: "First Steps", icon: "👶", unlocked: false, description: "Play your first game" },
+        { id: "streak-3", name: "On Fire", icon: "🔥", unlocked: false, description: "3 day streak" },
+        { id: "streak-7", name: "Week Warrior", icon: "⚔️", unlocked: false, description: "7 day streak" },
+        { id: "score-1000", name: "High Scorer", icon: "🏆", unlocked: false, description: "Score 1000 points" },
+        { id: "level-5", name: "Rising Star", icon: "⭐", unlocked: false, description: "Reach level 5" },
         { id: "all-games", name: "Explorer", icon: "🗺️", unlocked: false, description: "Try all games" },
         { id: "perfect-10", name: "Perfectionist", icon: "💯", unlocked: false, description: "10 perfect scores" },
         { id: "speed-demon", name: "Speed Demon", icon: "⚡", unlocked: false, description: "Finish in record time" },
@@ -93,7 +94,7 @@ function dashboardLogic() {
 
   return {
     profile: $selected.profile,
-    isLoading: $selected.isLoading,
+    isLoading: $profiles.isLoading,
     stats,
     games,
     energy: $energy.energy,
