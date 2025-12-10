@@ -1,9 +1,8 @@
 // Re-export all logics
-export { parentAuthLogic } from "./parentAuthLogic";
-export { kidProfilesLogic } from "./kidProfilesLogic";
-export { selectedProfileLogic } from "./selectedProfileLogic";
-export { energyLogic } from "./energyLogic";
-export { gameStatsLogic } from "./gameStatsLogic";
-export { appOverlaysLogic } from "./appOverlaysLogic";
-export { modalLogic } from "./modalLogic";
-
+export { parentAuthLogic } from "./parentAuth.logic";
+export { kidProfilesLogic } from "./kidProfiles.logic";
+export { selectedProfileLogic } from "./selectedProfile.logic";
+export { energyLogic } from "./energy.logic";
+export { gameStatsLogic } from "./gameStats.logic";
+export { appOverlaysLogic } from "./appOverlays.logic";
+export { modalLogic } from "./modal.logic";

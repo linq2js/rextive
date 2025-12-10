@@ -10,7 +10,7 @@
  */
 import { rx, useScope, inputValue, inputNumber } from "rextive/react";
 import { focus } from "rextive/op";
-import { profileFormLogic } from "@/logic/profileFormLogic";
+import { profileFormLogic } from "@/logic/profileForm.logic";
 import { AVATAR_OPTIONS, AVATAR_NAMES, type KidProfile } from "@/domain/types";
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/Icons";

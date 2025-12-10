@@ -23,7 +23,7 @@
  * ```
  */
 import { signal, task } from "rextive";
-import { selectedProfileLogic } from "./selectedProfileLogic";
+import { selectedProfileLogic } from "./selectedProfile.logic";
 import { gameProgressRepository } from "@/infrastructure/repositories";
 import type { GameProgress } from "@/domain/types";
 

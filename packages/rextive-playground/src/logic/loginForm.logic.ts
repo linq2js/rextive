@@ -23,7 +23,7 @@
  */
 import { signal } from "rextive";
 import { patch } from "rextive/helpers";
-import { parentAuthLogic } from "./parentAuthLogic";
+import { parentAuthLogic } from "./parentAuth.logic";
 
 /**
  * Login form state interface.

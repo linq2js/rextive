@@ -23,7 +23,7 @@
  * ```
  */
 import { logic, signal } from "rextive";
-import { kidProfilesLogic } from "./kidProfilesLogic";
+import { kidProfilesLogic } from "./kidProfiles.logic";
 import type { KidProfile } from "@/domain/types";
 
 /** localStorage key for persisting selected profile ID */

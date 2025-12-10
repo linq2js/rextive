@@ -1,6 +1,6 @@
 // Logic
-export { typingGameLogic } from "./typingGameLogic";
-export type { Difficulty, GameState, GameStats } from "./typingGameLogic";
+export { typingGameLogic } from "./typingGame.logic";
+export type { Difficulty, GameState, GameStats } from "./typingGame.logic";
 
 // Provider
 export { useTypingGame, TypingGameProvider } from "./provider";
@@ -15,4 +15,3 @@ export {
   DifficultyButton,
   StatItem,
 } from "./components";
-

@@ -9,8 +9,8 @@ import { rx, useScope, inputValue } from "rextive/react";
 import { focus } from "rextive/op";
 import { task } from "rextive";
 import { parentAuthLogic, kidProfilesLogic } from "@/logic";
-import { setupPasswordFormLogic } from "@/logic/setupPasswordFormLogic";
-import { loginFormLogic } from "@/logic/loginFormLogic";
+import { setupPasswordFormLogic } from "@/logic/setupPasswordForm.logic";
+import { loginFormLogic } from "@/logic/loginForm.logic";
 import { Icon } from "@/components/Icons";
 
 export const Route = createFileRoute("/mode/parent")({

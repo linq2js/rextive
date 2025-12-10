@@ -1,5 +1,5 @@
 import { provider } from "rextive/react";
-import { typingGameLogic } from "./typingGameLogic";
+import { typingGameLogic } from "./typingGame.logic";
 
 export const [useTypingGame, TypingGameProvider] = provider<
   ReturnType<typeof typingGameLogic>

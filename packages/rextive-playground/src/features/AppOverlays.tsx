@@ -7,7 +7,7 @@
  * overlays persist across route changes.
  */
 import { rx } from "rextive/react";
-import { appOverlaysLogic } from "@/logic/appOverlaysLogic";
+import { appOverlaysLogic } from "@/logic/appOverlays.logic";
 import { ProfileFormModal } from "./ProfileFormModal";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 

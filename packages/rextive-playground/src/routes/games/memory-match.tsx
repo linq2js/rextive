@@ -671,34 +671,62 @@ function GameCardComponent({
     <button
       onClick={onClick}
       disabled={card.isMatched}
-      className={`aspect-square rounded-xl transition-all duration-300 transform ${
-        card.isMatched
-          ? "opacity-50 scale-95 cursor-default"
-          : isRevealed
-          ? "bg-white shadow-lg scale-100"
-          : "bg-gradient-to-br from-purple-500 to-pink-500 hover:scale-105 active:scale-95 shadow-md"
-      }`}
-      style={{
-        transformStyle: "preserve-3d",
-      }}
+      className="aspect-square perspective-500"
+      style={{ perspective: "500px" }}
     >
-      {isRevealed ? (
-        <div className="flex flex-col items-center justify-center h-full p-2">
-          <div className="w-12 h-12 sm:w-16 sm:h-16">
-            <GameIcon name={card.item.id} size="100%" />
-          </div>
-          <span className="text-xs font-medium text-gray-700 mt-1 truncate w-full text-center">
-            {card.item.name}
-          </span>
-        </div>
-      ) : (
-        <div className="flex items-center justify-center h-full">
+      <div
+        className={`relative w-full h-full transition-transform duration-500 ease-in-out ${
+          card.isMatched ? "cursor-default" : "cursor-pointer"
+        }`}
+        style={{
+          transformStyle: "preserve-3d",
+          transform: isRevealed ? "rotateY(180deg)" : "rotateY(0deg)",
+        }}
+      >
+        {/* Card Back (Question Mark) */}
+        <div
+          className={`absolute inset-0 rounded-xl flex items-center justify-center shadow-md ${
+            card.isMatched
+              ? "bg-gradient-to-br from-purple-300 to-pink-300"
+              : "bg-gradient-to-br from-purple-500 to-pink-500 hover:scale-105 active:scale-95"
+          } transition-transform`}
+          style={{ backfaceVisibility: "hidden" }}
+        >
           <svg viewBox="0 0 24 24" className="w-8 h-8 sm:w-10 sm:h-10 text-white/60">
             <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.3" />
             <text x="12" y="16" textAnchor="middle" fontSize="12" fill="white" fontWeight="bold">?</text>
           </svg>
         </div>
-      )}
+
+        {/* Card Front (Revealed Content) */}
+        <div
+          className={`absolute inset-0 rounded-xl flex flex-col items-center justify-center p-1 shadow-lg ${
+            card.isMatched
+              ? "bg-green-100 border-2 border-green-400"
+              : "bg-white"
+          }`}
+          style={{
+            backfaceVisibility: "hidden",
+            transform: "rotateY(180deg)",
+          }}
+        >
+          <div className="w-3/4 aspect-square max-w-20">
+            <GameIcon name={card.item.id} size="100%" />
+          </div>
+          <span className={`text-[10px] sm:text-xs font-medium mt-0.5 truncate w-full text-center ${
+            card.isMatched ? "text-green-700" : "text-gray-700"
+          }`}>
+            {card.item.name}
+          </span>
+          {card.isMatched && (
+            <div className="absolute top-1 right-1">
+              <svg viewBox="0 0 24 24" className="w-4 h-4 text-green-500">
+                <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              </svg>
+            </div>
+          )}
+        </div>
+      </div>
     </button>
   );
 }

@@ -25,7 +25,7 @@
  */
 import { signal } from "rextive";
 import { patch } from "rextive/helpers";
-import { kidProfilesLogic } from "./kidProfilesLogic";
+import { kidProfilesLogic } from "./kidProfiles.logic";
 import type { KidProfile, AvatarEmoji } from "@/domain/types";
 
 /**

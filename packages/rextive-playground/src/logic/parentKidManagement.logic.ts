@@ -33,7 +33,7 @@
 import { signal, task } from "rextive";
 import { parentManagementRepository } from "@/infrastructure/repositories";
 import { AVAILABLE_GAMES, type KidGameSettings, type GameProgress } from "@/domain/types";
-import { kidProfilesLogic } from "./kidProfilesLogic";
+import { kidProfilesLogic } from "./kidProfiles.logic";
 
 export function parentKidManagementLogic() {
   // ============================================================================

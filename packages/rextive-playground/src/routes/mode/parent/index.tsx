@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Suspense, useRef } from "react";
 import { rx, useScope } from "rextive/react";
 import { kidProfilesLogic, appOverlaysLogic, modalLogic } from "@/logic";
-import { parentKidManagementLogic } from "@/logic/parentKidManagementLogic";
+import { parentKidManagementLogic } from "@/logic/parentKidManagement.logic";
 import { AVAILABLE_GAMES } from "@/domain/types";
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/Icons";

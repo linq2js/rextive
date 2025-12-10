@@ -1,7 +1,7 @@
 // Global modal component - renders modals from modalLogic
 import { rx } from "rextive/react";
-import { modalLogic } from "@/logic/modalLogic";
-import type { ModalButton } from "@/logic/modalLogic";
+import { modalLogic } from "@/logic/modal.logic";
+import type { ModalButton } from "@/logic/modal.logic";
 
 // Icon components for different modal types
 function InfoIcon() {

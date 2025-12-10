@@ -29,7 +29,7 @@
 import { logic, signal, task } from "rextive";
 import { energyRepository } from "@/infrastructure/repositories";
 import { ENERGY_CONFIG, type KidEnergy } from "@/domain/types";
-import { selectedProfileLogic } from "./selectedProfileLogic";
+import { selectedProfileLogic } from "./selectedProfile.logic";
 
 export const energyLogic = logic("energyLogic", () => {
   // ============================================================================
