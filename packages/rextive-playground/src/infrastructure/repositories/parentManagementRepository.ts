@@ -7,6 +7,9 @@ function getTodayDate(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+// Max XP value that unlocks all games (highest unlock is 12000 + buffer)
+export const MAX_XP_VALUE = 15000;
+
 export interface ParentManagementRepository {
   // Energy management
   refillEnergy(kidId: number): Promise<void>;
@@ -16,6 +19,9 @@ export interface ParentManagementRepository {
   resetKidStats(kidId: number): Promise<void>;
   resetGameStats(kidId: number, gameId: string): Promise<void>;
   getKidGameStats(kidId: number): Promise<GameProgress[]>;
+  
+  // XP management
+  setMaxXp(kidId: number): Promise<void>;
 
   // Game visibility
   getGameSettings(kidId: number): Promise<KidGameSettings[]>;
@@ -81,6 +87,34 @@ export const parentManagementRepository: ParentManagementRepository = {
   async getKidGameStats(kidId: number): Promise<GameProgress[]> {
     const stats = await db.gameProgress.where("kidId").equals(kidId).toArray();
     return stats as GameProgress[];
+  },
+
+  // XP management - set kid's total XP to max (unlocks all games)
+  async setMaxXp(kidId: number): Promise<void> {
+    // Create or update a "bonus" game progress entry to grant max XP
+    const bonusGameId = "__parent_bonus__";
+    const existing = await db.gameProgress
+      .where("[kidId+gameName]")
+      .equals([kidId, bonusGameId])
+      .first();
+
+    if (existing?.id) {
+      await db.gameProgress.update(existing.id, {
+        totalScore: MAX_XP_VALUE,
+        highScore: MAX_XP_VALUE,
+        lastPlayed: new Date(),
+      });
+    } else {
+      await db.gameProgress.add({
+        kidId,
+        gameName: bonusGameId,
+        highScore: MAX_XP_VALUE,
+        totalScore: MAX_XP_VALUE,
+        timesPlayed: 1,
+        level: 1,
+        lastPlayed: new Date(),
+      });
+    }
   },
 
   // Game visibility

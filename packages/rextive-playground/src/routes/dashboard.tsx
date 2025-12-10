@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { signal } from "rextive";
 import { rx, useScope } from "rextive/react";
 import { selectedProfileLogic, energyLogic, kidProfilesLogic } from "@/logic";
-import { AVATAR_NAMES } from "@/domain/types";
+import { AVATAR_NAMES, AVAILABLE_GAMES, isGameUnlocked, getXpToNextUnlock } from "@/domain/types";
 import { useEffect } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Icon, type IconName } from "@/components/Icons";
@@ -46,7 +46,9 @@ interface Game {
   icon: IconName;
   description: string;
   color: string;
-  available: boolean;
+  implemented: boolean;  // Game code exists
+  unlocked: boolean;     // Player has enough XP
+  xpRequired: number;    // XP needed to unlock
 }
 
 function dashboardLogic() {
@@ -69,6 +71,8 @@ function dashboardLogic() {
       bestStreak: 0,
       achievements: [
         { id: "first-game", name: "First Steps", icon: "baby", unlocked: false, description: "Play your first game" },
+        { id: "unlock-2", name: "Game Collector", icon: "lock", unlocked: false, description: "Unlock 2 games" },
+        { id: "unlock-all", name: "Master Unlocker", icon: "key", unlocked: false, description: "Unlock all games" },
         { id: "streak-3", name: "On Fire", icon: "fire", unlocked: false, description: "3 day streak" },
         { id: "streak-7", name: "Week Warrior", icon: "swords", unlocked: false, description: "7 day streak" },
         { id: "score-1000", name: "High Scorer", icon: "trophy", unlocked: false, description: "Score 1000 points" },
@@ -95,9 +99,14 @@ function dashboardLogic() {
     const xp = totalScore % 1000;
     
     // Check achievements
+    // Calculate number of unlocked games based on XP
+    const unlockedGamesCount = AVAILABLE_GAMES.filter(g => isGameUnlocked(g.id, totalScore)).length;
+    
     const achievements = stats().achievements.map(a => {
       let unlocked = a.unlocked;
       if (a.id === "first-game" && totalGames > 0) unlocked = true;
+      if (a.id === "unlock-2" && unlockedGamesCount >= 2) unlocked = true;
+      if (a.id === "unlock-all" && unlockedGamesCount >= AVAILABLE_GAMES.length) unlocked = true;
       if (a.id === "score-1000" && totalScore >= 1000) unlocked = true;
       if (a.id === "level-5" && level >= 5) unlocked = true;
       if (a.id === "all-games" && uniqueGames >= 3) unlocked = true;
@@ -117,6 +126,9 @@ function dashboardLogic() {
       todayScore: Math.min(totalScore, 500),
       todayMinutes: Math.min(Math.floor(totalGames * 3), 30),
     }));
+
+    // Update games list based on new XP total
+    games.set(buildGamesList(totalScore));
   }
 
   // Reload when profile changes
@@ -130,19 +142,45 @@ function dashboardLogic() {
     refreshStats($selected.profile()!.id);
   }
 
-  const games = signal<Game[]>(
-    [
-      { id: "typing-adventure", name: "Typing Adventure", icon: "keyboard", description: "Practice typing!", color: "bg-indigo-100", available: true },
-      { id: "memory-match", name: "Memory Match", icon: "brain", description: "Train your memory!", color: "bg-purple-100", available: true },
-      { id: "road-racer", name: "Road Racer", icon: "car", description: "Race to win!", color: "bg-red-100", available: true },
-      { id: "math-quest", name: "Math Quest", icon: "math", description: "Fun with numbers!", color: "bg-blue-100", available: false },
-      { id: "word-builder", name: "Word Builder", icon: "pencil", description: "Build cool words!", color: "bg-green-100", available: false },
-      { id: "puzzle-time", name: "Puzzle Time", icon: "puzzle", description: "Solve puzzles!", color: "bg-orange-100", available: false },
-      { id: "color-fun", name: "Color Fun", icon: "palette", description: "Learn colors!", color: "bg-pink-100", available: false },
-    ],
-    { name: "dashboard.games" }
-  );
+  // Game metadata (static info)
+  const GAME_META: Record<string, { icon: IconName; description: string; color: string }> = {
+    "typing-adventure": { icon: "keyboard", description: "Practice typing!", color: "bg-indigo-100" },
+    "memory-match": { icon: "brain", description: "Train your memory!", color: "bg-purple-100" },
+    "road-racer": { icon: "car", description: "Race to win!", color: "bg-red-100" },
+    "math-quest": { icon: "math", description: "Fun with numbers!", color: "bg-blue-100" },
+    "word-builder": { icon: "pencil", description: "Build cool words!", color: "bg-green-100" },
+    "puzzle-time": { icon: "puzzle", description: "Solve puzzles!", color: "bg-orange-100" },
+    "color-fun": { icon: "palette", description: "Learn colors!", color: "bg-pink-100" },
+  };
 
+  // Build games list based on current XP/totalScore
+  function buildGamesList(totalXp: number): Game[] {
+    return AVAILABLE_GAMES.map(gameConfig => {
+      const meta = GAME_META[gameConfig.id] || { 
+        icon: "controller" as IconName, 
+        description: "Play now!", 
+        color: "bg-gray-100" 
+      };
+      return {
+        id: gameConfig.id,
+        name: gameConfig.name,
+        icon: meta.icon,
+        description: meta.description,
+        color: meta.color,
+        implemented: gameConfig.implemented,
+        unlocked: isGameUnlocked(gameConfig.id, totalXp),
+        xpRequired: gameConfig.xpRequired,
+      };
+    });
+  }
+
+  const games = signal<Game[]>(buildGamesList(0), { name: "dashboard.games" });
+
+
+  // Get XP to next game unlock
+  function getXpToUnlock(): number {
+    return getXpToNextUnlock(stats().totalScore);
+  }
 
   return {
     profile: $selected.profile,
@@ -152,6 +190,7 @@ function dashboardLogic() {
     energy: $energy.energy,
     maxEnergy: $energy.maxEnergy,
     getTimeUntilRefill: $energy.getTimeUntilRefill,
+    getXpToUnlock,
     switchProfile: $selected.clear,
   };
 }
@@ -190,6 +229,9 @@ function Dashboard() {
     const avatarName = AVATAR_NAMES[profile.avatar] || "";
     const xpPercent = Math.round((stats.xp / stats.xpToNextLevel) * 100);
     const timeUntilRefill = $dash.getTimeUntilRefill();
+    const xpToUnlock = $dash.getXpToUnlock();
+    const nextLockedGame = games.find(g => !g.unlocked);
+    const unlockedCount = games.filter(g => g.unlocked).length;
 
     return (
       <div className="min-h-screen bg-pattern-kid pb-8 safe-bottom">
@@ -313,6 +355,49 @@ function Dashboard() {
             </div>
           </div>
 
+          {/* Next Game Unlock */}
+          {nextLockedGame && (
+            <section className="card bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Icon name="lock" size={24} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="font-display font-semibold">Next Unlock: {nextLockedGame.name}</span>
+                    <span className="text-sm text-white/80">{unlockedCount}/{games.length}</span>
+                  </div>
+                  <div className="mt-1 h-2 rounded-full bg-white/30 overflow-hidden">
+                    <div
+                      className="h-full bg-white rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, (stats.totalScore / nextLockedGame.xpRequired) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 text-sm text-white/80">
+                    {xpToUnlock > 0 ? `${xpToUnlock.toLocaleString()} XP to unlock` : 'Unlocked!'}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* All games unlocked */}
+          {!nextLockedGame && (
+            <section className="card bg-gradient-to-r from-green-500 to-emerald-500 text-white">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Icon name="trophy" size={24} />
+                </div>
+                <div className="flex-1">
+                  <div className="font-display font-semibold">All Games Unlocked!</div>
+                  <div className="text-sm text-white/80">
+                    You've unlocked all {games.length} games! Keep playing to earn more achievements.
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* Today's Progress */}
           <section>
             <h2 className="mb-3 font-display text-lg font-semibold text-gray-700 flex items-center gap-2">
@@ -375,7 +460,7 @@ function Dashboard() {
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {games.map((game) => (
-                <GameCard key={game.id} game={game} hasEnergy={energy > 0} />
+                <GameCard key={game.id} game={game} hasEnergy={energy > 0} totalXp={stats.totalScore} />
               ))}
             </div>
           </section>
@@ -485,19 +570,47 @@ function AchievementBadge({ achievement }: { achievement: Achievement }) {
   );
 }
 
-function GameCard({ game, hasEnergy }: { game: Game; hasEnergy: boolean }) {
-  // Coming soon game
-  if (!game.available) {
+function GameCard({ game, hasEnergy, totalXp }: { game: Game; hasEnergy: boolean; totalXp: number }) {
+  // Locked game (not enough XP)
+  if (!game.unlocked) {
+    const xpNeeded = game.xpRequired - totalXp;
     return (
       <div className={`card relative flex flex-col items-center p-4 ${game.color} opacity-60`}>
-        <div className="absolute -top-2 -right-2 rounded-full bg-gray-400 px-2 py-0.5 text-xs font-bold text-white">
+        <div className="absolute -top-2 -right-2 rounded-full bg-gray-500 px-2 py-0.5 text-xs font-bold text-white flex items-center gap-1">
+          <Icon name="lock" size={10} /> Locked
+        </div>
+        <span className="text-4xl text-gray-400">
+          <Icon name={game.icon} size={48} />
+        </span>
+        <h3 className="mt-2 font-display font-semibold text-gray-600">{game.name}</h3>
+        <p className="text-xs text-gray-500 text-center">
+          {xpNeeded.toLocaleString()} XP to unlock
+        </p>
+        <div className="mt-2 w-full h-1.5 rounded-full bg-gray-200 overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-purple-400 to-pink-400 transition-all duration-500"
+            style={{ width: `${Math.min(100, (totalXp / game.xpRequired) * 100)}%` }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Coming soon game (unlocked but not implemented yet)
+  if (!game.implemented) {
+    return (
+      <div className={`card relative flex flex-col items-center p-4 ${game.color} opacity-70`}>
+        <div className="absolute -top-2 -right-2 rounded-full bg-purple-400 px-2 py-0.5 text-xs font-bold text-white">
           Soon
         </div>
         <span className="text-4xl text-gray-400">
           <Icon name={game.icon} size={48} />
         </span>
         <h3 className="mt-2 font-display font-semibold text-gray-600">{game.name}</h3>
-        <p className="text-xs text-gray-500 text-center">{game.description}</p>
+        <p className="text-xs text-gray-500 text-center">Coming soon!</p>
+        <div className="mt-2 text-xs font-medium text-purple-500 flex items-center gap-1">
+          <Icon name="check" size={12} /> Unlocked!
+        </div>
       </div>
     );
   }
@@ -518,7 +631,7 @@ function GameCard({ game, hasEnergy }: { game: Game; hasEnergy: boolean }) {
     );
   }
 
-  // Available game
+  // Available game (unlocked + implemented + has energy)
   return (
     <Link
       to={`/games/${game.id}`}

@@ -51,16 +51,46 @@ export interface KidGameSettings {
   visible: boolean;
 }
 
-// Available games list
-export const AVAILABLE_GAMES = [
-  { id: "typing-adventure", name: "Typing Adventure", icon: "⌨️" },
-  { id: "memory-match", name: "Memory Match", icon: "🧠" },
-  { id: "road-racer", name: "Road Racer", icon: "🏎️" },
-  { id: "math-quest", name: "Math Quest", icon: "➕" },
-  { id: "word-builder", name: "Word Builder", icon: "📝" },
-  { id: "puzzle-time", name: "Puzzle Time", icon: "🧩" },
-  { id: "color-fun", name: "Color Fun", icon: "🎨" },
-] as const;
+// Game unlock configuration
+// xpRequired: 0 = always unlocked, >0 = requires that much total XP to unlock
+export interface GameConfig {
+  id: string;
+  name: string;
+  icon: string;
+  xpRequired: number;
+  implemented: boolean; // Whether the game is actually playable
+}
+
+// Available games list with unlock requirements
+// Order matters - games unlock progressively
+export const AVAILABLE_GAMES: GameConfig[] = [
+  { id: "typing-adventure", name: "Typing Adventure", icon: "⌨️", xpRequired: 0, implemented: true },      // Always unlocked (first game)
+  { id: "memory-match", name: "Memory Match", icon: "🧠", xpRequired: 500, implemented: true },           // Unlock at 500 XP
+  { id: "road-racer", name: "Road Racer", icon: "🏎️", xpRequired: 1500, implemented: true },             // Unlock at 1500 XP
+  { id: "math-quest", name: "Math Quest", icon: "➕", xpRequired: 3000, implemented: false },             // Unlock at 3000 XP
+  { id: "word-builder", name: "Word Builder", icon: "📝", xpRequired: 5000, implemented: false },         // Unlock at 5000 XP
+  { id: "puzzle-time", name: "Puzzle Time", icon: "🧩", xpRequired: 8000, implemented: false },           // Unlock at 8000 XP
+  { id: "color-fun", name: "Color Fun", icon: "🎨", xpRequired: 12000, implemented: false },              // Unlock at 12000 XP
+];
+
+// Helper to check if game is unlocked
+export function isGameUnlocked(gameId: string, totalXp: number): boolean {
+  const game = AVAILABLE_GAMES.find(g => g.id === gameId);
+  if (!game) return false;
+  return totalXp >= game.xpRequired;
+}
+
+// Helper to get next locked game
+export function getNextLockedGame(totalXp: number): GameConfig | null {
+  return AVAILABLE_GAMES.find(g => g.xpRequired > totalXp) || null;
+}
+
+// Helper to get XP needed for next unlock
+export function getXpToNextUnlock(totalXp: number): number {
+  const nextGame = getNextLockedGame(totalXp);
+  if (!nextGame) return 0;
+  return nextGame.xpRequired - totalXp;
+}
 
 // Chinese 12 Zodiacs
 export type ChineseZodiac =

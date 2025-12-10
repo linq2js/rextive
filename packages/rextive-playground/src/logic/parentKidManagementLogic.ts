@@ -128,6 +128,22 @@ export function parentKidManagementLogic() {
     }
   }
 
+  // Set max XP to unlock all games
+  async function setMaxXp(kidId: number) {
+    isLoading.set(true);
+    try {
+      await parentManagementRepository.setMaxXp(kidId);
+      // Refresh stats
+      const stats = await parentManagementRepository.getKidGameStats(kidId);
+      kidGameStats.set(stats);
+      showMessage("success", "Max XP granted! All games unlocked! 🎉");
+    } catch {
+      showMessage("error", "Failed to set max XP");
+    } finally {
+      isLoading.set(false);
+    }
+  }
+
   // Game visibility actions
   async function toggleGameVisibility(kidId: number, gameId: string) {
     const currentSettings = kidGameSettings();
@@ -192,6 +208,7 @@ export function parentKidManagementLogic() {
     refillAllEnergy,
     resetKidStats,
     resetGameStats,
+    setMaxXp,
     toggleGameVisibility,
     setAllGamesVisibility,
   };

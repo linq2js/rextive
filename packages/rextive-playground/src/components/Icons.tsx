@@ -6,7 +6,7 @@ export type IconName =
   | "controller" | "fire" | "swords" | "trophy" | "star" 
   | "map" | "target" | "lightning" | "keyboard" | "brain" 
   | "car" | "math" | "pencil" | "puzzle" | "palette" 
-  | "clock" | "lock" | "check" | "arrow-left" | "baby";
+  | "clock" | "lock" | "check" | "arrow-left" | "baby" | "key";
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   name?: IconName;
@@ -155,6 +155,14 @@ export const Icons: Record<IconName, React.FC<React.SVGProps<SVGSVGElement>>> = 
       <path d="M3 21v-3a5 5 0 0 1 10 0v3" />
       <path d="M16 21v-3a5 5 0 0 1 5 0v3" />
       <path d="M12 13v8" />
+    </svg>
+  ),
+  key: (props) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="8" cy="15" r="4" />
+      <path d="M10.85 12.15 19 4" />
+      <path d="M18 5 20 7" />
+      <path d="M15 8 17 10" />
     </svg>
   ),
 };

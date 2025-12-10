@@ -27,6 +27,7 @@ function kidsTabLogic() {
     refillAllEnergy: $mgmt.refillAllEnergy,
     resetKidStats: $mgmt.resetKidStats,
     resetGameStats: $mgmt.resetGameStats,
+    setMaxXp: $mgmt.setMaxXp,
     toggleGameVisibility: $mgmt.toggleGameVisibility,
     setAllGamesVisibility: $mgmt.setAllGamesVisibility,
   };
@@ -192,6 +193,31 @@ function KidActionsPanel({
           >
             ⚡ Refill Energy to Max (10)
           </button>
+        </div>
+
+        {/* XP & Unlocks */}
+        <div className="card">
+          <h4 className="font-display font-semibold text-gray-800 mb-3">
+            ⭐ XP & Unlocks
+          </h4>
+          <button
+            onClick={() => {
+              if (
+                confirm(
+                  `Grant max XP to ${kid.name}? This will unlock all games!`
+                )
+              ) {
+                $tab.setMaxXp(kid.id);
+              }
+            }}
+            disabled={isLoading}
+            className="btn btn-outline w-full py-2 text-purple-600 border-purple-200 hover:bg-purple-50"
+          >
+            🎁 Grant Max XP (Unlock All Games)
+          </button>
+          <p className="mt-2 text-xs text-gray-500 text-center">
+            Grants 15,000 XP - unlocks all games instantly
+          </p>
         </div>
 
         {/* Stats Actions */}
