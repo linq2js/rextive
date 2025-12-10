@@ -552,10 +552,13 @@ function CoinIcon({ size = 24 }: { size?: number }) {
 function HeartIcon({ filled }: { filled: boolean }) {
   return (
     <svg viewBox="0 0 24 24" className="w-6 h-6">
+      {/* White outline for better visibility on colored backgrounds */}
       <path
         d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-        fill={filled ? "#ef4444" : "#374151"}
-        className={filled ? "drop-shadow-md" : "opacity-40"}
+        fill={filled ? "#fecaca" : "#374151"}
+        stroke={filled ? "#ffffff" : "none"}
+        strokeWidth={filled ? 1.5 : 0}
+        className={filled ? "drop-shadow-lg" : "opacity-40"}
       />
     </svg>
   );
@@ -1067,13 +1070,7 @@ function RoadRacer() {
                     }}
                     className={`mt-6 btn bg-gradient-to-r ${difficultyConfig.color} text-white px-8 py-3 text-lg font-bold hover:opacity-90 transition-all transform hover:scale-105`}
                   >
-                    <PlayIcon /> Play {difficultyConfig.name}
-                  </button>
-                  <button
-                    onClick={() => $game.backToMenu()}
-                    className="mt-3 text-sm text-slate-400 hover:text-white transition-colors"
-                  >
-                    Back to Menu
+                    <PlayIcon /> Play
                   </button>
                 </div>
               )}

@@ -17,6 +17,12 @@ import {
 } from "@/hooks/useSound";
 import { GameIcon, type GameIconName } from "@/components/GameIcons";
 import { Icon } from "@/components/Icons";
+import {
+  GameMenu,
+  ThemeSelector,
+  type DifficultyOption,
+  type ThemeOption,
+} from "@/components/GameMenu";
 
 export const Route = createFileRoute("/games/memory-match")({
   component: MemoryMatch,
@@ -504,150 +510,83 @@ function MemoryMatch() {
   });
 }
 
+// Memory Match specific difficulty options
+const MEMORY_DIFFICULTY_OPTIONS: DifficultyOption[] = [
+  {
+    value: "easy",
+    label: "Easy",
+    description: "6 pairs • 2 min",
+    color: "from-emerald-400 to-green-500",
+  },
+  {
+    value: "medium",
+    label: "Medium",
+    description: "8 pairs • 90s",
+    color: "from-amber-400 to-orange-500",
+  },
+  {
+    value: "hard",
+    label: "Hard",
+    description: "10 pairs • 60s",
+    color: "from-red-400 to-rose-500",
+  },
+];
+
+// Convert CATEGORY_INFO to ThemeOption format
+const THEME_OPTIONS: ThemeOption[] = Object.entries(CATEGORY_INFO).map(
+  ([key, info]) => ({
+    value: key,
+    label: info.name,
+    color: info.color,
+  })
+);
+
+const HOW_TO_PLAY = [
+  "Tap cards to flip them",
+  "Find matching pairs",
+  "Match all pairs before time runs out!",
+  "Consecutive matches = bonus points!",
+];
+
 function MenuScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> }) {
   return rx(() => {
     const difficulty = $game.difficulty();
     const category = $game.category();
     const energy = $game.energy();
-    const hasEnergy = energy > 0;
 
     return (
-      <div className="space-y-6">
-        {/* Game Info */}
-        <div className="card text-center bg-white/95">
-          <BrainIcon />
-          <h2 className="font-display text-2xl font-bold text-gray-800 mt-2">
-            Memory Match
-          </h2>
-          <p className="mt-2 text-gray-600">
-            Find matching pairs before time runs out!
-          </p>
-        </div>
-
-        {/* Category Selection */}
-        <div className="card bg-white/95">
-          <h3 className="font-display text-lg font-semibold text-gray-700 mb-3">
-            Choose Theme
-          </h3>
-          <div className="grid grid-cols-3 gap-3">
-            {(Object.entries(CATEGORY_INFO) as [Category, { name: string; color: string }][]).map(
-              ([key, info]) => (
-                <button
-                  key={key}
-                  onClick={() => $game.setCategory(key)}
-                  className={`p-3 rounded-xl text-center transition-all ${
-                    category === key
-                      ? `bg-gradient-to-br ${info.color} text-white scale-105 shadow-lg`
-                      : "bg-gray-100 hover:bg-gray-200"
-                  }`}
-                >
-                  <div className="font-medium">{info.name}</div>
-                </button>
-              )
-            )}
-          </div>
-        </div>
-
-        {/* Difficulty Selection */}
-        <div className="card bg-white/95">
-          <h3 className="font-display text-lg font-semibold text-gray-700 mb-3">
-            Choose Difficulty
-          </h3>
-          <div className="grid grid-cols-3 gap-3">
-            <DifficultyButton
-              label="Easy"
-              description="6 pairs • 2 min"
-              selected={difficulty === "easy"}
-              onClick={() => $game.setDifficulty("easy")}
-              color="from-emerald-400 to-green-500"
-            />
-            <DifficultyButton
-              label="Medium"
-              description="8 pairs • 90s"
-              selected={difficulty === "medium"}
-              onClick={() => $game.setDifficulty("medium")}
-              color="from-amber-400 to-orange-500"
-            />
-            <DifficultyButton
-              label="Hard"
-              description="10 pairs • 60s"
-              selected={difficulty === "hard"}
-              onClick={() => $game.setDifficulty("hard")}
-              color="from-red-400 to-rose-500"
-            />
-          </div>
-        </div>
-
-        {/* How to Play */}
-        <div className="card bg-purple-100/80">
-          <h3 className="font-display text-lg font-semibold text-purple-800 mb-2">
-            How to Play
-          </h3>
-          <ul className="text-sm text-purple-700 space-y-1">
-            <li>• Tap cards to flip them</li>
-            <li>• Find matching pairs</li>
-            <li>• Match all pairs before time runs out!</li>
-            <li>• Consecutive matches = bonus points!</li>
-          </ul>
-        </div>
-
-        {/* Start Button */}
-        <button
-          onClick={async () => {
-            const started = await $game.startGame();
-            if (!started) {
-              const $modal = modalLogic();
-              await $modal.warning("No energy left! Come back tomorrow to play again.", "No Energy");
-            }
-          }}
-          disabled={!hasEnergy}
-          className={`w-full py-4 rounded-2xl font-display text-xl font-bold transition-all ${
-            hasEnergy
-              ? "bg-gradient-to-r from-green-400 to-emerald-500 text-white hover:scale-105 active:scale-95 shadow-lg"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
-          }`}
-        >
-          {hasEnergy ? (
-            <span className="flex items-center justify-center gap-2">
-              Start Game <EnergyIcon /> 1
-            </span>
-          ) : (
-            "No Energy - Come Back Tomorrow!"
-          )}
-        </button>
-      </div>
+      <GameMenu
+        title="Memory Match"
+        description="Find matching pairs before time runs out!"
+        icon="brain"
+        themeColor="from-purple-500 to-pink-500"
+        difficulty={difficulty}
+        onDifficultyChange={(d) => $game.setDifficulty(d)}
+        difficultyOptions={MEMORY_DIFFICULTY_OPTIONS}
+        energy={energy}
+        energyCost={1}
+        onPlay={async () => {
+          const started = await $game.startGame();
+          if (!started) {
+            const $modal = modalLogic();
+            await $modal.warning(
+              "No energy left! Come back tomorrow to play again.",
+              "No Energy"
+            );
+          }
+        }}
+        howToPlay={HOW_TO_PLAY}
+        howToPlayColor="bg-purple-100/80"
+      >
+        {/* Theme Selection - Memory Match specific */}
+        <ThemeSelector
+          themes={THEME_OPTIONS}
+          selected={category}
+          onChange={(c) => $game.setCategory(c as Category)}
+        />
+      </GameMenu>
     );
   });
-}
-
-function DifficultyButton({
-  label,
-  description,
-  selected,
-  onClick,
-  color,
-}: {
-  label: string;
-  description: string;
-  selected: boolean;
-  onClick: () => void;
-  color: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`p-3 rounded-xl text-center transition-all ${
-        selected
-          ? `bg-gradient-to-br ${color} text-white scale-105 shadow-lg`
-          : "bg-gray-100 hover:bg-gray-200"
-      }`}
-    >
-      <div className="font-display font-semibold">{label}</div>
-      <div className={`text-xs ${selected ? "text-white/80" : "text-gray-500"}`}>
-        {description}
-      </div>
-    </button>
-  );
 }
 
 function PlayingScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> }) {

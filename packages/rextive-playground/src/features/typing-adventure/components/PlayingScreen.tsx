@@ -86,8 +86,8 @@ export function PlayingScreen({
           </div>
 
           {/* Word Image - show specific icon or generic fallback */}
-          <div className="mb-6 flex justify-center">
-            <div className="p-4 bg-gradient-to-br from-primary-100 to-purple-100 rounded-2xl shadow-inner">
+            <div className="mb-6 flex justify-center">
+              <div className="p-4 bg-gradient-to-br from-primary-100 to-purple-100 rounded-2xl shadow-inner">
               <GameIcon name={wordIcon || "generic"} size={96} className="drop-shadow-lg" />
             </div>
           </div>
