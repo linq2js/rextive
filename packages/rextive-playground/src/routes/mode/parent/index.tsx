@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { rx, useScope } from "rextive/react";
-import { kidProfilesLogic, appOverlaysLogic } from "@/logic";
+import { kidProfilesLogic, appOverlaysLogic, modalLogic } from "@/logic";
 import { parentKidManagementLogic } from "@/logic/parentKidManagementLogic";
 import { AVAILABLE_GAMES } from "@/domain/types";
 import { Avatar } from "@/components/Avatar";
@@ -201,12 +201,13 @@ function KidActionsPanel({
             ⭐ XP & Unlocks
           </h4>
           <button
-            onClick={() => {
-              if (
-                confirm(
-                  `Grant max XP to ${kid.name}? This will unlock all games!`
-                )
-              ) {
+            onClick={async () => {
+              const $modal = modalLogic();
+              const confirmed = await $modal.confirm(
+                `Grant max XP to ${kid.name}? This will unlock all games!`,
+                "Grant Max XP"
+              );
+              if (confirmed) {
                 $tab.setMaxXp(kid.id);
               }
             }}
@@ -226,12 +227,13 @@ function KidActionsPanel({
             📊 Stats
           </h4>
           <button
-            onClick={() => {
-              if (
-                confirm(
-                  `Reset ALL stats for ${kid.name}? This cannot be undone.`
-                )
-              ) {
+            onClick={async () => {
+              const $modal = modalLogic();
+              const confirmed = await $modal.confirmDanger(
+                `Reset ALL stats for ${kid.name}? This cannot be undone.`,
+                "Reset All Stats"
+              );
+              if (confirmed) {
                 $tab.resetKidStats(kid.id);
               }
             }}
@@ -247,8 +249,13 @@ function KidActionsPanel({
               {AVAILABLE_GAMES.map((game) => (
                 <button
                   key={game.id}
-                  onClick={() => {
-                    if (confirm(`Reset ${game.name} stats for ${kid.name}?`)) {
+                  onClick={async () => {
+                    const $modal = modalLogic();
+                    const confirmed = await $modal.confirm(
+                      `Reset ${game.name} stats for ${kid.name}?`,
+                      "Reset Game Stats"
+                    );
+                    if (confirmed) {
                       $tab.resetGameStats(kid.id, game.id);
                     }
                   }}

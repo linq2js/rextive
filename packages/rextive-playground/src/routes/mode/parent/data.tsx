@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { signal } from "rextive";
 import { patch } from "rextive/helpers";
 import { rx, useScope } from "rextive/react";
-import { kidProfilesLogic } from "@/logic";
+import { kidProfilesLogic, modalLogic } from "@/logic";
 import { dataExportRepository } from "@/infrastructure/repositories";
 import { db } from "@/infrastructure/database";
 import { useRef } from "react";
@@ -79,11 +79,12 @@ function dataTabLogic() {
       }
 
       // Confirm before importing
-      if (
-        !confirm(
-          "⚠️ This will REPLACE all existing data (profiles, stats, settings).\n\nAre you sure you want to continue?"
-        )
-      ) {
+      const $modal = modalLogic();
+      const confirmed = await $modal.confirmDanger(
+        "This will REPLACE all existing data (profiles, stats, settings).\n\nAre you sure you want to continue?",
+        "Import Data"
+      );
+      if (!confirmed) {
         return;
       }
 
@@ -128,7 +129,8 @@ function dataTabLogic() {
     } catch (error) {
       console.error("Failed to reset data:", error);
       resetState.set(patch("loading", false));
-      alert("Failed to reset data. Please try again.");
+      const $modal = modalLogic();
+      await $modal.error("Failed to reset data. Please try again.");
     }
   }
 

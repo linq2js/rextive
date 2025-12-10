@@ -1,5 +1,6 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router";
 import { AppOverlays } from "@/features/AppOverlays";
+import { GlobalModal } from "@/components/Modal";
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -7,9 +8,12 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   return (
-    <div className="min-h-screen bg-pattern-kid">
-      <Outlet />
-      <AppOverlays />
+    <div className="portrait-container">
+      <div className="min-h-screen bg-pattern-kid overflow-auto">
+        <Outlet />
+        <AppOverlays />
+        <GlobalModal />
+      </div>
     </div>
   );
 }

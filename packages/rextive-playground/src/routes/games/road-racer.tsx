@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { signal } from "rextive";
 import { patch } from "rextive/helpers";
 import { rx, useScope } from "rextive/react";
-import { energyLogic, selectedProfileLogic } from "@/logic";
+import { energyLogic, selectedProfileLogic, modalLogic } from "@/logic";
 import { gameProgressRepository } from "@/infrastructure/repositories";
 import { useEffect, useRef, useCallback } from "react";
 import {
@@ -1048,16 +1048,19 @@ function RoadRacer() {
                     onClick={async () => {
                       const started = await $game.startGame();
                       if (!started) {
+                        const $modal = modalLogic();
                         if (!$game.profile()) {
-                          alert(
-                            "Please select a kid profile first from the home page!"
+                          await $modal.warning(
+                            "Please select a kid profile first from the home page!",
+                            "No Profile"
                           );
                         } else if ($game.energy() <= 0) {
-                          alert(
-                            "No energy left! Come back tomorrow to play again."
+                          await $modal.warning(
+                            "No energy left! Come back tomorrow to play again.",
+                            "No Energy"
                           );
                         } else {
-                          alert("Could not start game. Please try again.");
+                          await $modal.error("Could not start game. Please try again.");
                         }
                       }
                     }}

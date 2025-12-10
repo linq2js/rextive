@@ -3,7 +3,9 @@
 @tailwind utilities;
 
 @layer base {
-  html {
+  html,
+  body {
+    @apply bg-black;
     font-family: "Nunito", system-ui, sans-serif;
   }
 
@@ -14,6 +16,11 @@
   h5,
   h6 {
     font-family: "Fredoka", system-ui, sans-serif;
+  }
+
+  /* Portrait mode container */
+  #root {
+    @apply min-h-screen flex items-center justify-center;
   }
 }
 
@@ -63,6 +70,21 @@
 
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  /* Portrait mode container - 9:16 aspect ratio */
+  .portrait-container {
+    /* Width calculated from height to maintain 9:16 aspect ratio */
+    width: calc(100vh * 9 / 16);
+    width: calc(100dvh * 9 / 16);
+    max-width: 100%; /* Don't exceed viewport on mobile */
+    height: 100vh;
+    height: 100dvh;
+    margin: 0 auto;
+    position: relative;
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 }
 

@@ -5,4 +5,5 @@ export { selectedProfileLogic } from "./selectedProfileLogic";
 export { energyLogic } from "./energyLogic";
 export { gameStatsLogic } from "./gameStatsLogic";
 export { appOverlaysLogic } from "./appOverlaysLogic";
+export { modalLogic } from "./modalLogic";
 

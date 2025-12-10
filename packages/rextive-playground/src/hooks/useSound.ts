@@ -188,6 +188,202 @@ export function playWinSound() {
   }
 }
 
+// Button click sound - short pop
+export function playClickSound() {
+  try {
+    const ctx = getAudioContext();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.frequency.setValueAtTime(600, ctx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.05);
+    
+    gainNode.gain.setValueAtTime(0.15, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
+
+    oscillator.type = "sine";
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.05);
+  } catch {
+    // Ignore audio errors
+  }
+}
+
+// Typing/keypress sound - soft tick
+export function playTypingSound() {
+  try {
+    const ctx = getAudioContext();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.frequency.setValueAtTime(800 + Math.random() * 200, ctx.currentTime);
+    
+    gainNode.gain.setValueAtTime(0.08, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.03);
+
+    oscillator.type = "sine";
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.03);
+  } catch {
+    // Ignore audio errors
+  }
+}
+
+// Correct answer sound - happy ding
+export function playCorrectSound() {
+  try {
+    const ctx = getAudioContext();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.frequency.setValueAtTime(880, ctx.currentTime); // A5
+    oscillator.frequency.setValueAtTime(1100, ctx.currentTime + 0.08); // C#6
+    
+    gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+
+    oscillator.type = "sine";
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.15);
+  } catch {
+    // Ignore audio errors
+  }
+}
+
+// Wrong answer sound - low buzz
+export function playWrongSound() {
+  try {
+    const ctx = getAudioContext();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.frequency.setValueAtTime(200, ctx.currentTime);
+    oscillator.frequency.setValueAtTime(150, ctx.currentTime + 0.1);
+    
+    gainNode.gain.setValueAtTime(0.15, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+
+    oscillator.type = "sawtooth";
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.2);
+  } catch {
+    // Ignore audio errors
+  }
+}
+
+// Level up sound - ascending fanfare
+export function playLevelUpSound() {
+  try {
+    const ctx = getAudioContext();
+    const notes = [392, 494, 587, 784]; // G4, B4, D5, G5
+
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.1);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.1 + 0.2);
+
+      osc.type = "triangle";
+      osc.start(ctx.currentTime + i * 0.1);
+      osc.stop(ctx.currentTime + i * 0.1 + 0.25);
+    });
+  } catch {
+    // Ignore audio errors
+  }
+}
+
+// Unlock sound - magical sparkle
+export function playUnlockSound() {
+  try {
+    const ctx = getAudioContext();
+    const notes = [1047, 1319, 1568, 2093]; // C6, E6, G6, C7
+
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.08);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.08 + 0.15);
+
+      osc.type = "sine";
+      osc.start(ctx.currentTime + i * 0.08);
+      osc.stop(ctx.currentTime + i * 0.08 + 0.2);
+    });
+  } catch {
+    // Ignore audio errors
+  }
+}
+
+// Game over / lose sound - descending tones
+export function playGameOverSound() {
+  try {
+    const ctx = getAudioContext();
+    const notes = [392, 349, 311, 262]; // G4, F4, Eb4, C4
+
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.15);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.15 + 0.2);
+
+      osc.type = "triangle";
+      osc.start(ctx.currentTime + i * 0.15);
+      osc.stop(ctx.currentTime + i * 0.15 + 0.25);
+    });
+  } catch {
+    // Ignore audio errors
+  }
+}
+
+// Start game sound - energetic start
+export function playStartSound() {
+  try {
+    const ctx = getAudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.frequency.setValueAtTime(523, ctx.currentTime); // C5
+    osc.frequency.setValueAtTime(659, ctx.currentTime + 0.1); // E5
+    osc.frequency.setValueAtTime(784, ctx.currentTime + 0.2); // G5
+
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.setValueAtTime(0.2, ctx.currentTime + 0.25);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+
+    osc.type = "square";
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.35);
+  } catch {
+    // Ignore audio errors
+  }
+}
+
 // Inline chime sound (base64 encoded)
 export const WELCOME_CHIME =
   "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJSqtbWrnYR0aWFvhJqvsLKpnI98bWRqd4ugsLeyqp2PgXRrbnuMnrC1s6qejn90aWt6jJ6wtbSqno+BdGlte4yesLS0qp6Pf3Rpa3uMnrC0tKqej390aWt7jJ6wtLWqno9/dGlre4yesLS0qp6Pf3Rpa3uMnrC0tKqej390aWt7jJ6w";

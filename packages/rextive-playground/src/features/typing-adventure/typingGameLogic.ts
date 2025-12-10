@@ -2,6 +2,13 @@ import { signal } from "rextive";
 import { patch } from "rextive/helpers";
 import { energyLogic, selectedProfileLogic } from "@/logic";
 import { gameProgressRepository } from "@/infrastructure/repositories";
+import {
+  playCorrectSound,
+  playWrongSound,
+  playWinSound,
+  playGameOverSound,
+  playStartSound,
+} from "@/hooks/useSound";
 
 // Types
 export type Difficulty = "easy" | "medium" | "hard";
@@ -158,6 +165,7 @@ export function typingGameLogic() {
     message.set("");
     currentWord.set(getRandomWord(difficulty()));
     gameState.set("playing");
+    playStartSound();
     return true;
   }
 
@@ -196,6 +204,7 @@ export function typingGameLogic() {
           bestStreak: Math.max(s.bestStreak, s.streak + 1),
         }));
 
+        playCorrectSound();
         message.set(getRandomMessage(true));
         userInput.set("");
 
@@ -206,6 +215,7 @@ export function typingGameLogic() {
         }
       }
     } else {
+      playWrongSound();
       stats.set(
         patch({
           streak: 0,
@@ -244,7 +254,15 @@ export function typingGameLogic() {
 
   async function finishGame() {
     gameState.set("finished");
-    
+
+    // Play appropriate sound based on performance
+    const s = stats();
+    if (s.wordsCompleted >= wordsToComplete() || s.score >= 50) {
+      playWinSound();
+    } else {
+      playGameOverSound();
+    }
+
     // Save game progress
     const profile = $profile.profile();
     if (profile) {

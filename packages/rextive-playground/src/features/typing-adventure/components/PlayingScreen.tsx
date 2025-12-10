@@ -1,6 +1,7 @@
 import { rx } from "rextive/react";
 import { useTypingGame } from "../provider";
 import { GameIcon, getIconForWord } from "@/components/GameIcons";
+import { playTypingSound } from "@/hooks/useSound";
 
 export function PlayingScreen({
   inputRef,
@@ -69,8 +70,11 @@ export function PlayingScreen({
           </div>
         </div>
 
-        {/* Main Game Area */}
-        <div className="card bg-white text-center py-8">
+        {/* Main Game Area - Click anywhere to focus */}
+        <div 
+          className="card bg-white text-center py-8 cursor-text"
+          onClick={() => inputRef.current?.focus()}
+        >
           {/* Message */}
           <div className="h-8 mb-4">
             {message && (
@@ -125,31 +129,38 @@ export function PlayingScreen({
             onChange={() => {}}
             onKeyDown={(e) => {
               if (e.key === "Backspace") {
+                playTypingSound();
                 $game.handleBackspace();
               } else if (e.key === " " || e.key === "Enter") {
                 e.preventDefault();
                 $game.skipWord();
               } else if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                playTypingSound();
                 $game.handleKeyPress(e.key);
               }
             }}
+            onBlur={() => {
+              // Auto-refocus after a brief delay to allow button clicks to work
+              setTimeout(() => inputRef.current?.focus(), 100);
+            }}
             className="opacity-0 absolute -z-10"
             autoFocus
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
           />
 
           {/* Keyboard Hint */}
-          <p className="text-gray-500 text-sm">
+          <p className="text-gray-500 text-sm pointer-events-none">
             Type the word above! Press{" "}
             <kbd className="px-2 py-1 bg-gray-100 rounded">Space</kbd> to skip
           </p>
 
-          {/* Tap to Focus (Mobile) */}
-          <button
-            onClick={() => inputRef.current?.focus()}
-            className="mt-4 px-6 py-2 bg-primary-100 text-primary-700 rounded-full text-sm font-medium sm:hidden"
-          >
-            Tap to type ⌨️
-          </button>
+          {/* Tap to Focus hint (Mobile) */}
+          <p className="mt-4 text-primary-600 text-sm font-medium sm:hidden pointer-events-none">
+            Tap here to type ⌨️
+          </p>
         </div>
 
         {/* Accuracy */}

@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { signal } from "rextive";
 import { rx, useScope } from "rextive/react";
-import { energyLogic, selectedProfileLogic } from "@/logic";
+import { energyLogic, selectedProfileLogic, modalLogic } from "@/logic";
 import { gameProgressRepository } from "@/infrastructure/repositories";
 import { useEffect } from "react";
 import {
@@ -603,7 +603,8 @@ function MenuScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> }) {
           onClick={async () => {
             const started = await $game.startGame();
             if (!started) {
-              alert("No energy left! Come back tomorrow to play again.");
+              const $modal = modalLogic();
+              await $modal.warning("No energy left! Come back tomorrow to play again.", "No Energy");
             }
           }}
           disabled={!hasEnergy}
@@ -848,7 +849,8 @@ function FinishedScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> 
             onClick={async () => {
               const started = await $game.startGame();
               if (!started) {
-                alert("No energy left! Come back tomorrow to play again.");
+                const $modal = modalLogic();
+                await $modal.warning("No energy left! Come back tomorrow to play again.", "No Energy");
               }
             }}
             disabled={$game.energy() === 0}
