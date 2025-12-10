@@ -8,7 +8,8 @@ export type IconName =
   | "car" | "math" | "pencil" | "puzzle" | "palette" 
   | "clock" | "lock" | "check" | "arrow-left" | "baby" | "key"
   | "plus" | "trash" | "eye" | "eye-off" | "chart" | "download" 
-  | "upload" | "warning" | "x" | "gift" | "settings" | "refresh";
+  | "upload" | "warning" | "x" | "gift" | "settings" | "refresh"
+  | "back" | "power";
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   name?: IconName;
@@ -238,6 +239,17 @@ export const Icons: Record<IconName, React.FC<React.SVGProps<SVGSVGElement>>> = 
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M23 4v6h-6M1 20v-6h6" />
       <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
+  ),
+  back: (props) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path d="M20 11H7.83l4.88-4.88a1.5 1.5 0 0 0-2.12-2.12l-7.5 7.5a1.5 1.5 0 0 0 0 2.12l7.5 7.5a1.5 1.5 0 0 0 2.12-2.12L7.83 13H20a1.5 1.5 0 0 0 0-3z" />
+    </svg>
+  ),
+  power: (props) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" {...props}>
+      <path d="M12 3v9" />
+      <path d="M18.36 6.64A9 9 0 1 1 5.64 6.64" />
     </svg>
   ),
 };

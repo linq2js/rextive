@@ -1,47 +1,38 @@
 // Global logic for energy (Satima) management
-import { logic, signal } from "rextive";
+import { logic, signal, task } from "rextive";
 import { energyRepository } from "@/infrastructure/repositories";
-import { ENERGY_CONFIG } from "@/domain/types";
+import { ENERGY_CONFIG, type KidEnergy } from "@/domain/types";
 import { selectedProfileLogic } from "./selectedProfileLogic";
 
 export const energyLogic = logic("energyLogic", () => {
   const $selected = selectedProfileLogic();
 
-  const energy = signal<number>(ENERGY_CONFIG.maxEnergy, {
-    name: "energy.current",
-  });
-  const isLoading = signal(true, { name: "energy.isLoading" });
+  // Trigger for refresh
+  const [onRefresh, refresh] = signal<void>().tuple;
 
-  // Function to load energy for a kid
-  async function loadEnergy(kidId: number | null) {
-    if (kidId === null) {
-      energy.set(ENERGY_CONFIG.maxEnergy);
-      isLoading.set(false);
-      return;
-    }
+  // Energy record - fetches based on selected profile and refresh trigger
+  const energyRecord = signal(
+    { selectedId: $selected.selectedId, onRefresh },
+    async ({ deps }): Promise<KidEnergy | null> => {
+      void deps.onRefresh; // Access to establish dependency
+      if (deps.selectedId === null) return null;
+      return energyRepository.getEnergy(deps.selectedId);
+    },
+    { name: "energy.record" }
+  );
 
-    isLoading.set(true);
-    try {
-      const record = await energyRepository.getEnergy(kidId);
-      energy.set(record?.current ?? ENERGY_CONFIG.maxEnergy);
-    } finally {
-      isLoading.set(false);
-    }
-  }
+  // Task-wrapped for stale-while-revalidate access
+  const energyTask = energyRecord.pipe(task<KidEnergy | null>(null));
 
-  // Load energy immediately if there's already a selected kid (restored from localStorage)
-  const initialKidId = $selected.selectedId();
-  if (initialKidId !== null) {
-    loadEnergy(initialKidId);
-  } else {
-    isLoading.set(false);
-  }
+  // Derived: current energy value (sync computed from task)
+  const energy = signal(
+    { energyTask },
+    ({ deps }) => deps.energyTask.value?.current ?? ENERGY_CONFIG.maxEnergy,
+    { name: "energy.current" }
+  );
 
-  // Also load energy when profile changes
-  $selected.selectedId.on(() => {
-    loadEnergy($selected.selectedId());
-  });
-
+  // Action state for spend
+  const spendState = signal<Promise<boolean>>();
   async function spend(amount: number = ENERGY_CONFIG.costPerGame): Promise<boolean> {
     const kidId = $selected.selectedId();
     if (kidId === null) {
@@ -54,19 +45,16 @@ export const energyLogic = logic("energyLogic", () => {
       return false;
     }
 
-    const success = await energyRepository.spendEnergy(kidId, amount);
-    if (success) {
-      energy.set((prev) => prev - amount);
-    }
-    return success;
-  }
+    const promise = (async () => {
+      const success = await energyRepository.spendEnergy(kidId, amount);
+      if (success) {
+        refresh();
+      }
+      return success;
+    })();
 
-  async function refresh(): Promise<void> {
-    const kidId = $selected.selectedId();
-    if (kidId === null) return;
-
-    const record = await energyRepository.getEnergy(kidId);
-    energy.set(record?.current ?? ENERGY_CONFIG.maxEnergy);
+    spendState.set(promise);
+    return promise;
   }
 
   // Calculate time until next refill
@@ -98,12 +86,10 @@ export const energyLogic = logic("energyLogic", () => {
 
   return {
     energy,
-    isLoading,
+    energyTask,
     maxEnergy: ENERGY_CONFIG.maxEnergy,
     costPerGame: ENERGY_CONFIG.costPerGame,
-    spend,
-    refresh,
+    spend: Object.assign(spend, { state: spendState }),
     getTimeUntilRefill,
   };
 });
-

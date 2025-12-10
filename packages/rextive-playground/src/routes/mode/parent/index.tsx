@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Suspense, useRef } from "react";
 import { rx, useScope } from "rextive/react";
 import { kidProfilesLogic, appOverlaysLogic, modalLogic } from "@/logic";
 import { parentKidManagementLogic } from "@/logic/parentKidManagementLogic";
@@ -16,12 +17,12 @@ function kidsTabLogic() {
 
   return {
     profiles: $profiles.profiles,
-    isLoading: $profiles.isLoading,
+    profilesTask: $profiles.profilesTask,
     // Management
     selectedKidId: $mgmt.selectedKidId,
     selectedKid: $mgmt.selectedKid,
-    kidGameSettings: $mgmt.kidGameSettings,
-    mgmtIsLoading: $mgmt.isLoading,
+    gameSettings: $mgmt.gameSettings,
+    gameSettingsTask: $mgmt.gameSettingsTask,
     actionMessage: $mgmt.actionMessage,
     selectKid: $mgmt.selectKid,
     refillEnergy: $mgmt.refillEnergy,
@@ -34,111 +35,136 @@ function kidsTabLogic() {
   };
 }
 
+function LoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center py-8">
+      <div className="text-2xl animate-bounce text-gray-400">
+        <Icon name="refresh" size={32} />
+      </div>
+    </div>
+  );
+}
+
 function KidsTab() {
   const $tab = useScope(kidsTabLogic);
   const $overlays = appOverlaysLogic();
+  const kidActionsPanelRef = useRef<HTMLDivElement>(null);
 
-  return rx(() => {
-    if ($tab.isLoading()) {
-      return (
-        <div className="flex items-center justify-center py-8">
-          <div className="text-2xl animate-bounce text-gray-400"><Icon name="refresh" size={32} /></div>
-        </div>
-      );
-    }
+  const handleSelectKid = (kidId: number) => {
+    $tab.selectKid(kidId);
+    // Scroll to the actions panel after selection
+    setTimeout(() => {
+      kidActionsPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  };
 
-    const profiles = $tab.profiles();
-    const selectedKid = $tab.selectedKid();
-    const message = $tab.actionMessage();
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      {rx(() => {
+        // Use profilesTask for stale-while-revalidate pattern
+        const profilesState = $tab.profilesTask();
+        const profiles = profilesState.value;
+        const isLoading = profilesState.loading && profiles.length === 0;
 
-    return (
-      <div className="space-y-6">
-        {/* Action Message */}
-        {message && (
-          <div
-            className={`p-3 rounded-xl text-center font-medium animate-pop ${
-              message.type === "success"
-                ? "bg-green-100 text-green-800"
-                : "bg-red-100 text-red-800"
-            }`}
-          >
-            {message.text}
-          </div>
-        )}
+        if (isLoading) {
+          return <LoadingSpinner />;
+        }
 
-        {/* Quick Actions */}
-        <div className="card">
-          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Icon name="lightning" size={20} className="text-amber-500" /> Quick Actions
-          </h3>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={() => $overlays.openProfileForm()}
-              className="btn btn-primary flex-1 py-3"
-            >
-              <Icon name="plus" size={18} /> Add Kid Profile
-            </button>
-            <button
-              onClick={() => $tab.refillAllEnergy()}
-              disabled={$tab.mgmtIsLoading() || profiles.length === 0}
-              className="btn btn-outline flex-1 py-3"
-            >
-              <Icon name="lightning" size={18} /> Refill All Energy
-            </button>
-          </div>
-        </div>
+        const selectedKid = $tab.selectedKid();
+        const message = $tab.actionMessage();
 
-        {/* Kid Selection */}
-        <div className="card">
-          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Icon name="baby" size={20} className="text-pink-500" /> Select a Kid to Manage
-          </h3>
+        return (
+          <div className="space-y-6">
+            {/* Action Message */}
+            {message && (
+              <div
+                className={`p-3 rounded-xl text-center font-medium animate-pop ${
+                  message.type === "success"
+                    ? "bg-green-100 text-green-800"
+                    : "bg-red-100 text-red-800"
+                }`}
+              >
+                {message.text}
+              </div>
+            )}
 
-          {profiles.length === 0 ? (
-            <div className="text-center py-6">
-              <div className="text-primary-500 mb-4"><Icon name="baby" size={64} /></div>
-              <h4 className="font-display text-lg font-semibold text-gray-800">
-                No Kids Yet
-              </h4>
-              <p className="mt-2 text-gray-600">
-                Add your first kid profile to get started!
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {profiles.map((profile) => (
+            {/* Quick Actions */}
+            <div className="card">
+              <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Icon name="lightning" size={20} className="text-amber-500" /> Quick Actions
+              </h3>
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
-                  key={profile.id}
-                  onClick={() => $tab.selectKid(profile.id)}
-                  className={`p-3 rounded-xl text-center transition-all ${
-                    selectedKid?.id === profile.id
-                      ? "bg-primary-100 border-2 border-primary-500 scale-105"
-                      : "bg-gray-50 border-2 border-transparent hover:bg-gray-100"
-                  }`}
+                  onClick={() => $overlays.openProfileForm()}
+                  className="btn btn-primary flex-1 py-3"
                 >
-                  <div className="mx-auto h-12 w-12 mb-2">
-                    <Avatar avatar={profile.avatar} className="w-full h-full" />
-                  </div>
-                  <div className="mt-2 font-medium text-gray-800 truncate">
-                    {profile.name}
-                  </div>
-                  <div className="text-xs text-gray-500">{profile.age} yrs</div>
+                  <Icon name="plus" size={18} /> Add Kid Profile
                 </button>
-              ))}
+                <button
+                  onClick={() => $tab.refillAllEnergy()}
+                  disabled={profiles.length === 0}
+                  className="btn btn-outline flex-1 py-3"
+                >
+                  <Icon name="lightning" size={18} /> Refill All Energy
+                </button>
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Selected Kid Actions */}
-        {selectedKid && (
-          <KidActionsPanel
-            $tab={$tab}
-            onEditProfile={() => $overlays.openProfileForm(selectedKid)}
-          />
-        )}
-      </div>
-    );
-  });
+            {/* Kid Selection */}
+            <div className="card">
+              <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Icon name="baby" size={20} className="text-pink-500" /> Select a Kid to Manage
+              </h3>
+
+              {profiles.length === 0 ? (
+                <div className="text-center py-6">
+                  <div className="text-primary-500 mb-4"><Icon name="baby" size={64} /></div>
+                  <h4 className="font-display text-lg font-semibold text-gray-800">
+                    No Kids Yet
+                  </h4>
+                  <p className="mt-2 text-gray-600">
+                    Add your first kid profile to get started!
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {profiles.map((profile) => (
+                    <button
+                      key={profile.id}
+                      onClick={() => handleSelectKid(profile.id)}
+                      className={`p-3 rounded-xl text-center transition-all ${
+                        selectedKid?.id === profile.id
+                          ? "bg-primary-100 border-2 border-primary-500 scale-105"
+                          : "bg-gray-50 border-2 border-transparent hover:bg-gray-100"
+                      }`}
+                    >
+                      <div className="mx-auto h-12 w-12 mb-2">
+                        <Avatar avatar={profile.avatar} className="w-full h-full" />
+                      </div>
+                      <div className="mt-2 font-medium text-gray-800 truncate">
+                        {profile.name}
+                      </div>
+                      <div className="text-xs text-gray-500">{profile.age} yrs</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Selected Kid Actions */}
+            {selectedKid && (
+              <div ref={kidActionsPanelRef}>
+                <KidActionsPanel
+                  $tab={$tab}
+                  onEditProfile={() => $overlays.openProfileForm(selectedKid)}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </Suspense>
+  );
 }
 
 // ============================================================================
@@ -154,8 +180,10 @@ function KidActionsPanel({
 }) {
   return rx(() => {
     const kid = $tab.selectedKid();
-    const gameSettings = $tab.kidGameSettings();
-    const isLoading = $tab.mgmtIsLoading();
+    // Use gameSettingsTask for stale-while-revalidate
+    const settingsState = $tab.gameSettingsTask();
+    const gameSettings = settingsState.value;
+    const isLoading = settingsState.loading;
 
     if (!kid) return null;
 
@@ -261,9 +289,10 @@ function KidActionsPanel({
                     }
                   }}
                   disabled={isLoading}
-                  className="btn btn-outline py-2 text-sm"
+                  className="btn btn-outline py-2 text-sm truncate"
                 >
-                  <Icon name={game.icon as import("@/components/Icons").IconName} size={16} /> {game.name}
+                  <Icon name={game.icon as import("@/components/Icons").IconName} size={16} className="flex-shrink-0" />
+                  <span className="truncate">{game.name}</span>
                 </button>
               ))}
             </div>
@@ -304,9 +333,9 @@ function KidActionsPanel({
                   key={game.id}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl text-primary-500"><Icon name={game.icon as import("@/components/Icons").IconName} size={28} /></span>
-                    <span className="font-medium text-gray-800">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <span className="flex-shrink-0 text-primary-500"><Icon name={game.icon as import("@/components/Icons").IconName} size={24} /></span>
+                    <span className="font-medium text-gray-800 truncate">
                       {game.name}
                     </span>
                   </div>

@@ -8,6 +8,17 @@ export const Route = createFileRoute("/games/$gameName")({
   component: GamePage,
 });
 
+function LoadingSpinner() {
+  return (
+    <div className="text-center py-4">
+      <div className="text-2xl text-gray-400 animate-spin">
+        <Icon name="refresh" size={32} />
+      </div>
+      <p className="text-gray-500 mt-2">Loading stats...</p>
+    </div>
+  );
+}
+
 function GamePage() {
   const { gameName } = Route.useParams();
 
@@ -22,8 +33,10 @@ function GamePage() {
 
   return rx(() => {
     const profile = $profile.profile();
-    const stats = $stats.stats();
-    const isLoading = $stats.isLoading();
+    // Use statsTask for stale-while-revalidate pattern
+    const statsState = $stats.statsTask();
+    const stats = statsState.value;
+    const isLoading = statsState.loading;
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-400 via-purple-400 to-pink-400 p-4 safe-bottom">
@@ -34,7 +47,7 @@ function GamePage() {
               to="/"
               className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
             >
-              <span>←</span>
+              <Icon name="back" size={20} />
               <span className="text-sm font-medium hidden sm:inline">Back</span>
             </Link>
             <h1 className="font-display text-2xl font-bold text-white drop-shadow-lg flex items-center gap-2">
@@ -68,13 +81,8 @@ function GamePage() {
               <h3 className="font-display text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
                 <Icon name="chart" size={20} className="text-blue-500" /> Your Stats
               </h3>
-              {isLoading ? (
-                <div className="text-center py-4">
-                  <div className="text-2xl text-gray-400 animate-spin">
-                    <Icon name="refresh" size={32} />
-                  </div>
-                  <p className="text-gray-500 mt-2">Loading stats...</p>
-                </div>
+              {isLoading && !stats ? (
+                <LoadingSpinner />
               ) : stats ? (
                 <div className="grid grid-cols-2 gap-4">
                   <StatItem label="High Score" value={stats.highScore ?? 0} iconName="trophy" />

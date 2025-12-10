@@ -94,7 +94,7 @@ function dataTabLogic() {
       if (result.success) {
         showMessage("success", result.message);
         // Refresh profiles
-        await $profiles.refresh?.();
+        $profiles.refresh();
         // Reload page to ensure all data is fresh
         setTimeout(() => window.location.reload(), 1500);
       } else {

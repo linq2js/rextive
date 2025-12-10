@@ -14,12 +14,12 @@ export const selectedProfileLogic = logic("selectedProfileLogic", () => {
     name: "selectedProfile.id",
   });
 
-  // Derived: current profile
+  // Derived: current profile - uses profilesTask for stale-while-revalidate
   const profile = signal(
-    { selectedId, profiles: $profiles.profiles },
+    { selectedId, profiles: $profiles.profilesTask },
     ({ deps }): KidProfile | null => {
       if (deps.selectedId === null) return null;
-      return deps.profiles.find((p) => p.id === deps.selectedId) ?? null;
+      return deps.profiles.value.find((p) => p.id === deps.selectedId) ?? null;
     },
     { name: "selectedProfile.profile" }
   );
@@ -41,4 +41,3 @@ export const selectedProfileLogic = logic("selectedProfileLogic", () => {
     clear,
   };
 });
-

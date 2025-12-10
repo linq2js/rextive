@@ -339,6 +339,82 @@ const effectResult = signal({ refreshTrigger }, async ({ deps }) => {
 refreshTrigger.set(refreshTrigger() + 1);
 ```
 
+### Pattern 5b: Effect-like Signal in Logic
+
+Use a computed signal as an effect for side effects that need cleanup. Auto-disposes when the logic scope is disposed.
+
+```tsx
+function gameLogic() {
+  const gameState = signal<"menu" | "playing">("menu");
+  const timeLeft = signal(60);
+
+  // Effect-like signal - auto-disposed with the logic scope
+  signal(
+    { state: gameState },
+    ({ deps, onCleanup, safe }) => {
+      if (deps.state !== "playing") return;
+
+      const interval = setInterval(() => {
+        // safe() avoids execution if signal is disposed
+        safe(() => {
+          timeLeft.set((t) => t - 1);
+        });
+      }, 1000);
+
+      // onCleanup runs when deps change or signal disposes
+      onCleanup(() => clearInterval(interval));
+    },
+    { lazy: true, name: "game.timer" }
+  );
+
+  return { gameState, timeLeft };
+}
+```
+
+**Key takeaways:**
+1. Auto-disposed when the logic scope is disposed (no manual cleanup needed)
+2. Use `safe()` to avoid calling something if the effect-like signal is disposed
+3. Use `context.onCleanup()` to clean up intervals/subscriptions when dependencies change or signal disposes
+
+### Pattern 5c: Tuple Setter with Computed Derived Values
+
+Use `.tuple` to get both signal and setter, then compute derived values:
+
+```tsx
+function settingsLogic() {
+  // Tuple pattern: get signal + setter separately
+  const [difficulty, setDifficulty] = signal<"easy" | "medium" | "hard">("easy", {
+    name: "settings.difficulty",
+  }).tuple;
+
+  // Computed derived from the signal
+  const wordsToComplete = signal(
+    { difficulty },
+    ({ deps }) =>
+      deps.difficulty === "easy" ? 15 : deps.difficulty === "medium" ? 12 : 10,
+    { name: "settings.wordsToComplete" }
+  );
+
+  return {
+    difficulty,      // Read-only signal
+    setDifficulty,   // Setter function
+    wordsToComplete, // Auto-computed
+  };
+}
+
+// Usage
+const $settings = settingsLogic();
+$settings.difficulty();        // "easy"
+$settings.wordsToComplete();   // 15
+$settings.setDifficulty("hard");
+$settings.wordsToComplete();   // 10
+```
+
+**Benefits:**
+- Cleaner API: `setDifficulty("hard")` instead of `difficulty.set("hard")`
+- Derived values auto-update when source changes
+- Good for exposing controlled state in logic returns
+
 ### Pattern 6: Batch Persistence with localStorage
 
 ```tsx

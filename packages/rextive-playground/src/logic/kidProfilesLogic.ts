@@ -1,45 +1,61 @@
 // Global logic for kid profiles
-import { logic, signal } from "rextive";
+import { logic, signal, task } from "rextive";
 import { kidProfileRepository } from "@/infrastructure/repositories";
 import type { KidProfile, CreateKidProfile, UpdateKidProfile } from "@/domain/types";
 
 export const kidProfilesLogic = logic("kidProfilesLogic", () => {
-  const profiles = signal<KidProfile[]>([], { name: "kidProfiles.list" });
-  const isLoading = signal(true, { name: "kidProfiles.isLoading" });
+  // Trigger for refresh
+  const [onRefresh, refresh] = signal<void>().tuple;
 
-  // Load profiles on creation
-  async function refresh() {
-    isLoading.set(true);
-    const data = await kidProfileRepository.getAll();
-    profiles.set(data);
-    isLoading.set(false);
-  }
+  // Profiles - loads initially and on refresh
+  const profiles = signal({ onRefresh }, async ({ deps }) => {
+    void deps.onRefresh; // Access to establish dependency
+    return kidProfileRepository.getAll();
+  }, { name: "kidProfiles.list" });
 
-  refresh();
+  // Task-wrapped for stale-while-revalidate in computed signals
+  const profilesTask = profiles.pipe(task<KidProfile[]>([]));
 
+  // Action state for create
+  const createState = signal<Promise<number>>();
   async function create(profile: CreateKidProfile): Promise<number> {
-    const id = await kidProfileRepository.create(profile);
-    await refresh();
-    return id;
+    const promise = (async () => {
+      const id = await kidProfileRepository.create(profile);
+      refresh();
+      return id;
+    })();
+    createState.set(promise);
+    return promise;
   }
 
+  // Action state for update
+  const updateState = signal<Promise<void>>();
   async function update(id: number, profile: UpdateKidProfile): Promise<void> {
-    await kidProfileRepository.update(id, profile);
-    await refresh();
+    const promise = (async () => {
+      await kidProfileRepository.update(id, profile);
+      refresh();
+    })();
+    updateState.set(promise);
+    return promise;
   }
 
+  // Action state for remove
+  const removeState = signal<Promise<void>>();
   async function remove(id: number): Promise<void> {
-    await kidProfileRepository.delete(id);
-    await refresh();
+    const promise = (async () => {
+      await kidProfileRepository.delete(id);
+      refresh();
+    })();
+    removeState.set(promise);
+    return promise;
   }
 
   return {
     profiles,
-    isLoading,
+    profilesTask,
     refresh,
-    create,
-    update,
-    remove,
+    create: Object.assign(create, { state: createState }),
+    update: Object.assign(update, { state: updateState }),
+    remove: Object.assign(remove, { state: removeState }),
   };
 });
-

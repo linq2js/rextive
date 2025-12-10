@@ -5,6 +5,7 @@ import { rx, useScope } from "rextive/react";
 import { energyLogic, selectedProfileLogic, modalLogic } from "@/logic";
 import { gameProgressRepository } from "@/infrastructure/repositories";
 import { useEffect, useRef, useCallback } from "react";
+import { Icon } from "@/components/Icons";
 import {
   playCoinSound,
   playCollisionSound,
@@ -752,7 +753,7 @@ function RoadRacer() {
               to="/dashboard"
               className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
             >
-              <ArrowLeftIcon />
+              <Icon name="back" size={20} />
               <span className="text-sm font-medium hidden sm:inline">Back</span>
             </Link>
             <h1 className="font-display text-2xl font-bold text-white flex items-center gap-2">

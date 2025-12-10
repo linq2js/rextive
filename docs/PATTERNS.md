@@ -224,7 +224,152 @@ function Counter() {
 
 ---
 
-## Pattern 6: Data Polling with Auto-Refresh
+## Pattern 6: Effect-like Signal in Logic
+
+Use a computed signal as an effect for side effects that need cleanup. Auto-disposes when the logic scope is disposed.
+
+```tsx
+import { signal, useScope } from "rextive/react";
+
+function gameLogic() {
+  const gameState = signal<"menu" | "playing">("menu");
+  const timeLeft = signal(60);
+
+  // Effect-like signal - auto-disposed with the logic scope
+  signal(
+    { state: gameState },
+    ({ deps, onCleanup, safe }) => {
+      if (deps.state !== "playing") return;
+
+      const interval = setInterval(() => {
+        // safe() avoids execution if signal is disposed
+        safe(() => {
+          timeLeft.set((t) => {
+            if (t <= 1) {
+              gameState.set("menu"); // Game over
+              return 0;
+            }
+            return t - 1;
+          });
+        });
+      }, 1000);
+
+      // onCleanup runs when deps change or signal disposes
+      onCleanup(() => clearInterval(interval));
+    },
+    { lazy: true, name: "game.timer" }
+  );
+
+  return { gameState, timeLeft };
+}
+
+// Component - no manual cleanup needed!
+function Game() {
+  const $game = useScope(gameLogic);
+  // When component unmounts, all signals including the effect are disposed
+  return <div>Time: {rx($game.timeLeft)}</div>;
+}
+```
+
+### Key Takeaways
+
+| Aspect | Description |
+|--------|-------------|
+| **Auto-dispose** | Signal disposed when logic scope is disposed (no manual cleanup) |
+| **`safe()`** | Wrap state updates to avoid errors if signal is disposed mid-interval |
+| **`onCleanup()`** | Runs when dependencies change OR when signal disposes |
+| **`lazy: true`** | Effect only runs when accessed (recommended for effects) |
+
+### When to Use
+
+- ✅ Timers/intervals that depend on state
+- ✅ WebSocket subscriptions
+- ✅ Event listeners that need cleanup
+- ✅ Any side effect tied to signal lifecycle
+
+---
+
+## Pattern 7: Tuple Setter with Computed Derived Values
+
+Use `.tuple` to get both signal and setter separately, then compute derived values:
+
+```tsx
+import { signal } from "rextive";
+
+function settingsLogic() {
+  // Tuple pattern: get signal + setter separately
+  const [difficulty, setDifficulty] = signal<"easy" | "medium" | "hard">("easy", {
+    name: "settings.difficulty",
+  }).tuple;
+
+  // Computed derived from the signal - auto-updates when difficulty changes
+  const wordsToComplete = signal(
+    { difficulty },
+    ({ deps }) =>
+      deps.difficulty === "easy" ? 15 : deps.difficulty === "medium" ? 12 : 10,
+    { name: "settings.wordsToComplete" }
+  );
+
+  const timeLimit = signal(
+    { difficulty },
+    ({ deps }) =>
+      deps.difficulty === "easy" ? 120 : deps.difficulty === "medium" ? 90 : 60,
+    { name: "settings.timeLimit" }
+  );
+
+  return {
+    difficulty,      // Read-only signal
+    setDifficulty,   // Setter function
+    wordsToComplete, // Auto-computed from difficulty
+    timeLimit,       // Auto-computed from difficulty
+  };
+}
+```
+
+### Usage
+
+```tsx
+const $settings = settingsLogic();
+
+// Read values
+$settings.difficulty();        // "easy"
+$settings.wordsToComplete();   // 15
+$settings.timeLimit();         // 120
+
+// Change difficulty - derived values auto-update
+$settings.setDifficulty("hard");
+$settings.wordsToComplete();   // 10
+$settings.timeLimit();         // 60
+```
+
+### Benefits
+
+| Benefit | Description |
+|---------|-------------|
+| **Cleaner API** | `setDifficulty("hard")` instead of `difficulty.set("hard")` |
+| **Auto-derived** | Computed values update automatically when source changes |
+| **Controlled exposure** | Return read-only signal + setter separately |
+| **Type safety** | Setter is properly typed to the signal's value type |
+
+### Comparison
+
+```tsx
+// ❌ Without tuple - exposes full mutable signal
+return {
+  difficulty: signal("easy"),  // Consumer can call .set(), .reset(), etc.
+};
+
+// ✅ With tuple - controlled access
+const [difficulty, setDifficulty] = signal("easy").tuple;
+return {
+  difficulty,     // Read-only (no .set exposed)
+  setDifficulty,  // Controlled setter
+};
+```
+
+---
+
+## Pattern 8: Data Polling with Auto-Refresh
 
 Use `context.refresh()` to implement automatic data polling. The refresh triggers a recomputation, which cancels the previous request (via `abortSignal`) and starts a new one.
 
@@ -361,7 +506,7 @@ function Dashboard() {
 
 ---
 
-## Pattern 7: Logic Export Patterns
+## Pattern 9: Logic Export Patterns
 
 When creating logic modules, choose the appropriate export pattern based on consumer needs.
 
@@ -512,7 +657,7 @@ return {
 
 ---
 
-## Pattern 8: Async Action State
+## Pattern 10: Async Action State
 
 Handle async actions (form submit, API calls) with loading/error states.
 
@@ -653,7 +798,7 @@ function ContactForm() {
 
 ---
 
-## Pattern 9: Component Effects
+## Pattern 11: Component Effects
 
 **Component effects** allow logic to communicate with component-level concerns (refs, hooks, DOM, local state) while maintaining proper cleanup on unmount.
 
@@ -920,6 +1065,8 @@ function GameScreen() {
 | **Plugins** | Extend behavior | `{ use: [logger] }` |
 | **Async** | Data fetching | `signal(async () => ...)` |
 | **Polling** | Auto-refresh data | `signal(async ({ refresh }) => ...)` |
+| **Effect-like signal** | Timers/intervals in logic | `signal({ state }, ({ onCleanup, safe }) => ...)` |
+| **Tuple setter** | Controlled state + derived | `const [val, setVal] = signal(x).tuple` |
 | **Export signal** | Consumer controls access | `return { state }` |
 | **Export getters/setters** | Controlled access, easy mocking | `return { getName, setName }` |
 | **Async state (logic)** | Shared action state | `loginState` in logic |

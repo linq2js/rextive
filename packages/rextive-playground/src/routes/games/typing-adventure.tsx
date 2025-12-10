@@ -63,7 +63,7 @@ function TypingAdventureContent() {
               to="/dashboard"
               className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
             >
-              <span>←</span>
+              <Icon name="back" size={20} />
               <span className="text-sm font-medium hidden sm:inline">Back</span>
             </Link>
             <h1 className="font-display text-2xl font-bold text-white drop-shadow-lg flex items-center gap-2">

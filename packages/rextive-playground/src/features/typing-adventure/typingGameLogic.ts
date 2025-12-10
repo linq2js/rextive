@@ -109,12 +109,20 @@ export function typingGameLogic() {
   const $profile = selectedProfileLogic();
 
   const gameState = signal<GameState>("menu", { name: "typing.gameState" });
-  const difficulty = signal<Difficulty>("easy", { name: "typing.difficulty" });
+  const [difficulty, setDifficulty] = signal<Difficulty>("easy", {
+    name: "typing.difficulty",
+  }).tuple;
+  const wordsToComplete = signal(
+    { difficulty },
+    ({ deps }) =>
+      deps.difficulty === "easy" ? 15 : deps.difficulty === "medium" ? 12 : 10,
+    { name: "typing.wordsToComplete" }
+  );
+
   const currentWord = signal("", { name: "typing.currentWord" });
   const userInput = signal("", { name: "typing.userInput" });
   const message = signal("", { name: "typing.message" });
   const timeLeft = signal(60, { name: "typing.timeLeft" });
-  const wordsToComplete = signal(10, { name: "typing.wordsToComplete" });
 
   const stats = signal<GameStats>(
     {
@@ -130,21 +138,29 @@ export function typingGameLogic() {
   );
 
   // Timer side effect - managed in logic
-  let timerCleanup: (() => void) | null = null;
-  gameState.on(() => {
-    timerCleanup?.();
-    timerCleanup = null;
-
-    if (gameState() === "playing") {
-      const interval = setInterval(() => tick(), 1000);
-      timerCleanup = () => clearInterval(interval);
-    }
-  });
-
-  function setDifficulty(d: Difficulty) {
-    difficulty.set(d);
-    wordsToComplete.set(d === "easy" ? 15 : d === "medium" ? 12 : 10);
-  }
+  // this effect-like signal will be disposed if the logic is disposed
+  signal(
+    { state: gameState },
+    ({ deps, onCleanup, safe }) => {
+      if (deps.state !== "playing") {
+        return;
+      }
+      const interval = setInterval(() => {
+        // Safe execution of tick to avoid wasted work if the signal is disposed
+        safe(() => {
+          timeLeft.set((t) => {
+            if (t <= 1) {
+              finishGame();
+              return 0;
+            }
+            return t - 1;
+          });
+        });
+      }, 1000);
+      onCleanup(() => clearInterval(interval));
+    },
+    { lazy: true, name: "typing.timer" }
+  );
 
   async function startGame(): Promise<boolean> {
     const hasEnergy = await $energy.spend(1);
@@ -239,17 +255,6 @@ export function typingGameLogic() {
     userInput.set("");
     currentWord.set(getRandomWord(difficulty()));
     message.set("Skipped!");
-  }
-
-  function tick() {
-    if (gameState() !== "playing") return;
-    timeLeft.set((t) => {
-      if (t <= 1) {
-        finishGame();
-        return 0;
-      }
-      return t - 1;
-    });
   }
 
   async function finishGame() {
@@ -382,5 +387,6 @@ export function typingGameLogic() {
     onStateChange,
     onWordChange,
     onMessage,
+    // Cleanup
   };
 }
