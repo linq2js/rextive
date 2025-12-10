@@ -1921,37 +1921,33 @@ describe.each(wrappers)(
           return (
             <div>
               <Suspense fallback={<div data-testid="loading">Loading...</div>}>
-                <Child parentScope={parentScope} />
+                {rx(() => {
+                  const asyncData = wait(parentScope.asyncSignal());
+                  const count = parentScope.count();
+
+                  return (
+                    <div>
+                      <div data-testid="async-data">{asyncData}</div>
+                      <div data-testid="count">{count}</div>
+                      <button
+                        data-testid="increment"
+                        onClick={() => parentScope.count.set(count + 1)}
+                      >
+                        Increment
+                      </button>
+                    </div>
+                  );
+                })}
               </Suspense>
             </div>
           );
         };
 
-        const Child = ({ parentScope }: { parentScope: any }) => {
-          return rx(() => {
-            const asyncData = wait(parentScope.asyncSignal());
-            const count = parentScope.count();
-
-            return (
-              <div>
-                <div data-testid="async-data">{asyncData}</div>
-                <div data-testid="count">{count}</div>
-                <button
-                  data-testid="increment"
-                  onClick={() => parentScope.count.set(count + 1)}
-                >
-                  Increment
-                </button>
-              </div>
-            );
-          });
-        };
-
         renderWithWrapper(<Parent />);
-
         // Should show loading initially
         expect(screen.getByTestId("loading")).toBeInTheDocument();
-
+        await wait.delay(200);
+        expect(screen.getByTestId("loading")).toBeInTheDocument();
         // Resolve async signal
         await act(async () => {
           resolveAsync!("Async Data Loaded");
@@ -3589,6 +3585,272 @@ describe.each(wrappers)(
         rerender(<TestComponent filters={["a"]} />);
         expect(createCount).toBe(initialCount + 2);
         expect(screen.getByTestId("filters")).toHaveTextContent("a");
+      });
+    });
+
+    describe("useLayoutEffect entries deps edge cases", () => {
+      it("should handle entries array change where some entries are kept", async () => {
+        const disposeCallbacks: string[] = [];
+
+        const TestComponent = ({
+          useA,
+          useB,
+          useC,
+        }: {
+          useA: boolean;
+          useB: boolean;
+          useC: boolean;
+        }) => {
+          const scopes: any[] = [];
+
+          if (useA) {
+            scopes.push(
+              scope("scope-a", () => ({
+                value: signal("A"),
+                dispose: () => disposeCallbacks.push("a-disposed"),
+              }))
+            );
+          }
+          if (useB) {
+            scopes.push(
+              scope("scope-b", () => ({
+                value: signal("B"),
+                dispose: () => disposeCallbacks.push("b-disposed"),
+              }))
+            );
+          }
+          if (useC) {
+            scopes.push(
+              scope("scope-c", () => ({
+                value: signal("C"),
+                dispose: () => disposeCallbacks.push("c-disposed"),
+              }))
+            );
+          }
+
+          const results = scopes.length > 0 ? useScope(scopes) : [];
+
+          return (
+            <div data-testid="values">
+              {results.map((s: any, i: number) => s.value()).join(",")}
+            </div>
+          );
+        };
+
+        // Initial: A, B, C
+        const { rerender } = renderWithWrapper(
+          <TestComponent useA={true} useB={true} useC={true} />
+        );
+        expect(screen.getByTestId("values")).toHaveTextContent("A,B,C");
+        expect(disposeCallbacks).toEqual([]);
+
+        // Change to A, C (B removed)
+        rerender(<TestComponent useA={true} useB={false} useC={true} />);
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 20));
+        });
+
+        expect(screen.getByTestId("values")).toHaveTextContent("A,C");
+        // B should be disposed, A and C should survive
+        expect(disposeCallbacks).toContain("b-disposed");
+        expect(disposeCallbacks).not.toContain("a-disposed");
+        expect(disposeCallbacks).not.toContain("c-disposed");
+      });
+
+      it("should handle swapping order of entries", async () => {
+        const disposeCallbacks: string[] = [];
+
+        const TestComponent = ({ order }: { order: string[] }) => {
+          const scopes = order.map((key) =>
+            scope(`scope-${key}`, () => ({
+              value: signal(key),
+              dispose: () => disposeCallbacks.push(`${key}-disposed`),
+            }))
+          );
+
+          const results = useScope(scopes);
+
+          return (
+            <div data-testid="values">
+              {results.map((s: any) => s.value()).join(",")}
+            </div>
+          );
+        };
+
+        // Initial: A, B, C
+        const { rerender } = renderWithWrapper(
+          <TestComponent order={["A", "B", "C"]} />
+        );
+        expect(screen.getByTestId("values")).toHaveTextContent("A,B,C");
+
+        // Swap to: C, B, A (reverse order)
+        rerender(<TestComponent order={["C", "B", "A"]} />);
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 20));
+        });
+
+        expect(screen.getByTestId("values")).toHaveTextContent("C,B,A");
+        // All should survive - same keys, just different order
+        expect(disposeCallbacks).toEqual([]);
+      });
+
+      it("should handle rapid deps changes with overlapping entries", async () => {
+        const disposeCallbacks: string[] = [];
+        const createCallbacks: string[] = [];
+
+        const TestComponent = ({ keys }: { keys: string[] }) => {
+          const scopes = keys.map((key) =>
+            scope(`scope-${key}`, () => {
+              createCallbacks.push(`${key}-created`);
+              return {
+                value: signal(key),
+                dispose: () => disposeCallbacks.push(`${key}-disposed`),
+              };
+            })
+          );
+
+          const results = scopes.length > 0 ? useScope(scopes) : [];
+
+          return (
+            <div data-testid="values">
+              {results.map((s: any) => s.value()).join(",")}
+            </div>
+          );
+        };
+
+        const { rerender } = renderWithWrapper(
+          <TestComponent keys={["A", "B", "C"]} />
+        );
+
+        // Rapid changes
+        rerender(<TestComponent keys={["A", "C", "D"]} />);
+        rerender(<TestComponent keys={["A", "D", "E"]} />);
+        rerender(<TestComponent keys={["A", "E", "F"]} />);
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 20));
+        });
+
+        expect(screen.getByTestId("values")).toHaveTextContent("A,E,F");
+
+        // A should never be disposed (always present)
+        expect(disposeCallbacks).not.toContain("A-disposed");
+        // B, C, D should be disposed (no longer present)
+        expect(disposeCallbacks).toContain("B-disposed");
+        expect(disposeCallbacks).toContain("C-disposed");
+        expect(disposeCallbacks).toContain("D-disposed");
+      });
+
+      it("should handle uncommit then immediate commit of same entry", async () => {
+        let scopeARef: any;
+        const disposeCallbacks: string[] = [];
+
+        const TestComponent = ({ extra }: { extra: string | null }) => {
+          const scopeA = useScope("scope-a", () => {
+            return {
+              value: signal("A"),
+              dispose: () => disposeCallbacks.push("a-disposed"),
+            };
+          });
+          scopeARef = scopeA;
+
+          // Extra scope that changes
+          if (extra) {
+            useScope(`scope-${extra}`, () => ({
+              value: signal(extra),
+              dispose: () => disposeCallbacks.push(`${extra}-disposed`),
+            }));
+          }
+
+          return <div data-testid="a">{rx(() => scopeA.value())}</div>;
+        };
+
+        const { rerender } = renderWithWrapper(<TestComponent extra="B" />);
+        expect(screen.getByTestId("a")).toHaveTextContent("A");
+
+        // Change extra from B to C
+        // This triggers useLayoutEffect cleanup/setup, but scope-a should survive
+        rerender(<TestComponent extra="C" />);
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 20));
+        });
+
+        expect(screen.getByTestId("a")).toHaveTextContent("A");
+        expect(disposeCallbacks).toContain("B-disposed");
+        expect(disposeCallbacks).not.toContain("a-disposed");
+
+        // Verify scope A is still functional
+        act(() => {
+          scopeARef.value.set("A-updated");
+        });
+        expect(screen.getByTestId("a")).toHaveTextContent("A-updated");
+      });
+
+      it("should handle entries that temporarily go to refs=0 during deps change", async () => {
+        // This tests the microtask deferral pattern using multiple scopes mode
+        // where the array length/content changes
+        const disposeCallbacks: string[] = [];
+
+        const TestComponent = ({ keys }: { keys: string[] }) => {
+          const scopes = keys.map((key) =>
+            scope(`scope-${key}`, () => ({
+              id: signal(key),
+              dispose: () => disposeCallbacks.push(`${key}-disposed`),
+            }))
+          );
+
+          const results = scopes.length > 0 ? useScope(scopes) : [];
+
+          return (
+            <div data-testid="values">
+              {results.map((s: any, i: number) => (
+                <span key={keys[i]} data-testid={`s-${keys[i]}`}>
+                  {rx(() => s.id())}
+                </span>
+              ))}
+            </div>
+          );
+        };
+
+        const { rerender } = renderWithWrapper(
+          <TestComponent keys={["1", "2", "3"]} />
+        );
+        expect(screen.getByTestId("s-1")).toHaveTextContent("1");
+        expect(screen.getByTestId("s-2")).toHaveTextContent("2");
+        expect(screen.getByTestId("s-3")).toHaveTextContent("3");
+
+        // Remove s2 - s1 and s3 temporarily go to refs=0 during cleanup/setup
+        rerender(<TestComponent keys={["1", "3"]} />);
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 20));
+        });
+
+        // s1 and s3 should still work (survived refs=0 due to microtask deferral)
+        expect(screen.getByTestId("s-1")).toHaveTextContent("1");
+        expect(screen.queryByTestId("s-2")).toBeNull();
+        expect(screen.getByTestId("s-3")).toHaveTextContent("3");
+
+        // s2 should be disposed, s1 and s3 should not
+        expect(disposeCallbacks).toContain("2-disposed");
+        expect(disposeCallbacks).not.toContain("1-disposed");
+        expect(disposeCallbacks).not.toContain("3-disposed");
+
+        // Re-add s2 - should create new scope
+        disposeCallbacks.length = 0;
+        rerender(<TestComponent keys={["1", "2", "3"]} />);
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 20));
+        });
+
+        expect(screen.getByTestId("s-2")).toHaveTextContent("2");
+        // s1 and s3 should still not be disposed
+        expect(disposeCallbacks).not.toContain("1-disposed");
+        expect(disposeCallbacks).not.toContain("3-disposed");
       });
     });
 
