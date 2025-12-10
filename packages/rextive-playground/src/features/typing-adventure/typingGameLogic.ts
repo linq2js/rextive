@@ -1,6 +1,7 @@
 import { signal } from "rextive";
 import { patch } from "rextive/helpers";
-import { energyLogic } from "@/logic";
+import { energyLogic, selectedProfileLogic } from "@/logic";
+import { gameProgressRepository } from "@/infrastructure/repositories";
 
 // Types
 export type Difficulty = "easy" | "medium" | "hard";
@@ -98,6 +99,7 @@ export function getRandomMessage(correct: boolean): string {
 // Logic
 export function typingGameLogic() {
   const $energy = energyLogic();
+  const $profile = selectedProfileLogic();
 
   const gameState = signal<GameState>("menu", { name: "typing.gameState" });
   const difficulty = signal<Difficulty>("easy", { name: "typing.difficulty" });
@@ -240,8 +242,19 @@ export function typingGameLogic() {
     });
   }
 
-  function finishGame() {
+  async function finishGame() {
     gameState.set("finished");
+    
+    // Save game progress
+    const profile = $profile.profile();
+    if (profile) {
+      await gameProgressRepository.recordGameSession(
+        profile.id,
+        "typing-adventure",
+        stats().score,
+        1 // Can implement leveling later
+      );
+    }
   }
 
   function pauseGame() {

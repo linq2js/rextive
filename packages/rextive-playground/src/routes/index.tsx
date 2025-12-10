@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { rx } from "rextive/react";
 import { kidProfilesLogic, selectedProfileLogic } from "@/logic";
-import { AVATAR_COLORS, AVATAR_NAMES } from "@/domain/types";
+import { AVATAR_NAMES } from "@/domain/types";
 import { WELCOME_CHIME } from "@/hooks/useSound";
 import { Avatar } from "@/components/Avatar";
 

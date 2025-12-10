@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { signal } from "rextive";
 import { rx, useScope } from "rextive/react";
 import { energyLogic, selectedProfileLogic } from "@/logic";
+import { gameProgressRepository } from "@/infrastructure/repositories";
 import { useEffect } from "react";
 import {
   calculateAnswerPoints,
@@ -14,309 +15,18 @@ import {
   playWinSound,
   backgroundMusic,
 } from "@/hooks/useSound";
+import { GameIcon, type GameIconName } from "@/components/GameIcons";
 
 export const Route = createFileRoute("/games/memory-match")({
   component: MemoryMatch,
 });
 
 // =============================================================================
-// SVG Card Icons
-// =============================================================================
-
-function CatIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <circle cx="32" cy="36" r="20" fill="#f59e0b" />
-      <polygon points="16,20 22,36 10,30" fill="#f59e0b" />
-      <polygon points="48,20 42,36 54,30" fill="#f59e0b" />
-      <circle cx="24" cy="32" r="4" fill="#1f2937" />
-      <circle cx="40" cy="32" r="4" fill="#1f2937" />
-      <ellipse cx="32" cy="42" rx="4" ry="3" fill="#f472b6" />
-      <path d="M28 46 Q32 50 36 46" stroke="#1f2937" strokeWidth="2" fill="none" />
-      <line x1="16" y1="38" x2="8" y2="36" stroke="#1f2937" strokeWidth="1.5" />
-      <line x1="16" y1="42" x2="8" y2="44" stroke="#1f2937" strokeWidth="1.5" />
-      <line x1="48" y1="38" x2="56" y2="36" stroke="#1f2937" strokeWidth="1.5" />
-      <line x1="48" y1="42" x2="56" y2="44" stroke="#1f2937" strokeWidth="1.5" />
-    </svg>
-  );
-}
-
-function DogIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <ellipse cx="32" cy="38" rx="18" ry="16" fill="#92400e" />
-      <ellipse cx="14" cy="28" rx="8" ry="12" fill="#78350f" />
-      <ellipse cx="50" cy="28" rx="8" ry="12" fill="#78350f" />
-      <circle cx="24" cy="34" r="4" fill="#1f2937" />
-      <circle cx="40" cy="34" r="4" fill="#1f2937" />
-      <ellipse cx="32" cy="44" rx="6" ry="4" fill="#1f2937" />
-      <ellipse cx="32" cy="50" rx="4" ry="2" fill="#f472b6" />
-    </svg>
-  );
-}
-
-function RabbitIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <ellipse cx="32" cy="42" rx="16" ry="14" fill="#fecaca" />
-      <ellipse cx="22" cy="16" rx="6" ry="18" fill="#fecaca" />
-      <ellipse cx="42" cy="16" rx="6" ry="18" fill="#fecaca" />
-      <ellipse cx="22" cy="16" rx="3" ry="12" fill="#fda4af" />
-      <ellipse cx="42" cy="16" rx="3" ry="12" fill="#fda4af" />
-      <circle cx="26" cy="38" r="3" fill="#1f2937" />
-      <circle cx="38" cy="38" r="3" fill="#1f2937" />
-      <ellipse cx="32" cy="46" rx="3" ry="2" fill="#f472b6" />
-      <line x1="20" y1="44" x2="10" y2="42" stroke="#1f2937" strokeWidth="1.5" />
-      <line x1="44" y1="44" x2="54" y2="42" stroke="#1f2937" strokeWidth="1.5" />
-    </svg>
-  );
-}
-
-function BearIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <circle cx="32" cy="36" r="20" fill="#78350f" />
-      <circle cx="14" cy="20" r="8" fill="#78350f" />
-      <circle cx="50" cy="20" r="8" fill="#78350f" />
-      <circle cx="14" cy="20" r="4" fill="#92400e" />
-      <circle cx="50" cy="20" r="4" fill="#92400e" />
-      <circle cx="24" cy="32" r="4" fill="#1f2937" />
-      <circle cx="40" cy="32" r="4" fill="#1f2937" />
-      <ellipse cx="32" cy="42" rx="8" ry="6" fill="#d97706" />
-      <ellipse cx="32" cy="44" rx="4" ry="3" fill="#1f2937" />
-    </svg>
-  );
-}
-
-function AppleIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <ellipse cx="32" cy="38" rx="18" ry="20" fill="#ef4444" />
-      <ellipse cx="26" cy="30" rx="4" ry="6" fill="#fca5a5" opacity="0.5" />
-      <path d="M32 18 Q36 10 40 14" stroke="#78350f" strokeWidth="3" fill="none" />
-      <ellipse cx="40" cy="14" rx="6" ry="4" fill="#22c55e" />
-    </svg>
-  );
-}
-
-function BananaIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <path d="M20 50 Q10 30 30 12 Q40 20 50 35 Q45 45 30 50 Z" fill="#fbbf24" />
-      <path d="M30 12 Q35 8 40 10" stroke="#78350f" strokeWidth="3" fill="none" />
-      <path d="M25 45 Q20 35 35 20" stroke="#f59e0b" strokeWidth="2" fill="none" opacity="0.5" />
-    </svg>
-  );
-}
-
-function SunIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <circle cx="32" cy="32" r="14" fill="#fbbf24" />
-      {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
-        <line
-          key={i}
-          x1={32 + 18 * Math.cos((angle * Math.PI) / 180)}
-          y1={32 + 18 * Math.sin((angle * Math.PI) / 180)}
-          x2={32 + 26 * Math.cos((angle * Math.PI) / 180)}
-          y2={32 + 26 * Math.sin((angle * Math.PI) / 180)}
-          stroke="#fbbf24"
-          strokeWidth="4"
-          strokeLinecap="round"
-        />
-      ))}
-      <circle cx="28" cy="28" r="2" fill="#f59e0b" />
-      <circle cx="36" cy="28" r="2" fill="#f59e0b" />
-      <path d="M26 36 Q32 40 38 36" stroke="#f59e0b" strokeWidth="2" fill="none" />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <path
-        d="M40 12 A20 20 0 1 0 40 52 A15 15 0 1 1 40 12"
-        fill="#fef08a"
-      />
-      <circle cx="28" cy="28" r="2" fill="#fcd34d" />
-      <circle cx="22" cy="40" r="3" fill="#fcd34d" />
-      <circle cx="36" cy="36" r="1.5" fill="#fcd34d" />
-    </svg>
-  );
-}
-
-function StarIconCard() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <path
-        d="M32 8 L38 26 L56 26 L42 38 L48 56 L32 46 L16 56 L22 38 L8 26 L26 26 Z"
-        fill="#fbbf24"
-      />
-      <path
-        d="M32 14 L36 26 L32 24 L28 26 Z"
-        fill="#fef08a"
-        opacity="0.6"
-      />
-    </svg>
-  );
-}
-
-function RainbowIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <path d="M8 48 A24 24 0 0 1 56 48" fill="none" stroke="#ef4444" strokeWidth="4" />
-      <path d="M12 48 A20 20 0 0 1 52 48" fill="none" stroke="#f97316" strokeWidth="4" />
-      <path d="M16 48 A16 16 0 0 1 48 48" fill="none" stroke="#fbbf24" strokeWidth="4" />
-      <path d="M20 48 A12 12 0 0 1 44 48" fill="none" stroke="#22c55e" strokeWidth="4" />
-      <path d="M24 48 A8 8 0 0 1 40 48" fill="none" stroke="#3b82f6" strokeWidth="4" />
-      <path d="M28 48 A4 4 0 0 1 36 48" fill="none" stroke="#8b5cf6" strokeWidth="4" />
-    </svg>
-  );
-}
-
-function CarIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <rect x="8" y="28" width="48" height="20" rx="4" fill="#ef4444" />
-      <rect x="16" y="18" width="32" height="16" rx="4" fill="#dc2626" />
-      <rect x="20" y="20" width="10" height="10" rx="2" fill="#67e8f9" />
-      <rect x="34" y="20" width="10" height="10" rx="2" fill="#67e8f9" />
-      <circle cx="18" cy="48" r="6" fill="#1f2937" />
-      <circle cx="46" cy="48" r="6" fill="#1f2937" />
-      <circle cx="18" cy="48" r="3" fill="#6b7280" />
-      <circle cx="46" cy="48" r="3" fill="#6b7280" />
-    </svg>
-  );
-}
-
-function RocketIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <path d="M32 6 Q44 20 44 40 L32 50 L20 40 Q20 20 32 6" fill="#e5e7eb" />
-      <path d="M32 6 Q38 20 38 35 L32 42 L26 35 Q26 20 32 6" fill="#f3f4f6" />
-      <circle cx="32" cy="28" r="6" fill="#3b82f6" />
-      <path d="M20 40 L14 50 L20 45" fill="#ef4444" />
-      <path d="M44 40 L50 50 L44 45" fill="#ef4444" />
-      <path d="M26 50 L32 60 L38 50" fill="#f97316" />
-      <path d="M28 50 L32 56 L36 50" fill="#fbbf24" />
-    </svg>
-  );
-}
-
-function HeartIconCard() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <path
-        d="M32 56 C16 42 8 32 8 22 C8 14 14 8 22 8 C26 8 30 10 32 14 C34 10 38 8 42 8 C50 8 56 14 56 22 C56 32 48 42 32 56"
-        fill="#ef4444"
-      />
-      <path
-        d="M22 14 C18 14 14 18 14 22 C14 26 16 30 22 36"
-        fill="#fca5a5"
-        opacity="0.5"
-      />
-    </svg>
-  );
-}
-
-function GiftIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <rect x="10" y="26" width="44" height="30" rx="2" fill="#8b5cf6" />
-      <rect x="10" y="20" width="44" height="10" rx="2" fill="#a78bfa" />
-      <rect x="28" y="20" width="8" height="36" fill="#fbbf24" />
-      <rect x="10" y="22" width="44" height="6" fill="#fbbf24" />
-      <path d="M32 20 Q24 10 20 14 Q16 18 24 20" fill="#ef4444" stroke="#dc2626" strokeWidth="1" />
-      <path d="M32 20 Q40 10 44 14 Q48 18 40 20" fill="#ef4444" stroke="#dc2626" strokeWidth="1" />
-    </svg>
-  );
-}
-
-function BalloonIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <ellipse cx="32" cy="24" rx="16" ry="20" fill="#ef4444" />
-      <ellipse cx="26" cy="18" rx="4" ry="6" fill="#fca5a5" opacity="0.5" />
-      <path d="M32 44 L30 48 L34 48 Z" fill="#dc2626" />
-      <path d="M32 48 Q28 52 32 56 Q36 52 32 48" stroke="#1f2937" strokeWidth="1.5" fill="none" />
-    </svg>
-  );
-}
-
-function CrownIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <path d="M8 48 L8 24 L20 36 L32 16 L44 36 L56 24 L56 48 Z" fill="#fbbf24" />
-      <rect x="8" y="44" width="48" height="8" fill="#f59e0b" />
-      <circle cx="20" cy="48" r="3" fill="#ef4444" />
-      <circle cx="32" cy="48" r="3" fill="#3b82f6" />
-      <circle cx="44" cy="48" r="3" fill="#22c55e" />
-      <circle cx="8" cy="24" r="3" fill="#fbbf24" />
-      <circle cx="32" cy="16" r="3" fill="#fbbf24" />
-      <circle cx="56" cy="24" r="3" fill="#fbbf24" />
-    </svg>
-  );
-}
-
-function FlowerIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      {[0, 60, 120, 180, 240, 300].map((angle, i) => (
-        <ellipse
-          key={i}
-          cx={32 + 12 * Math.cos((angle * Math.PI) / 180)}
-          cy={32 + 12 * Math.sin((angle * Math.PI) / 180)}
-          rx="10"
-          ry="10"
-          fill="#f472b6"
-          transform={`rotate(${angle}, ${32 + 12 * Math.cos((angle * Math.PI) / 180)}, ${32 + 12 * Math.sin((angle * Math.PI) / 180)})`}
-        />
-      ))}
-      <circle cx="32" cy="32" r="8" fill="#fbbf24" />
-      <line x1="32" y1="42" x2="32" y2="58" stroke="#22c55e" strokeWidth="4" />
-    </svg>
-  );
-}
-
-function TreeIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-full h-full">
-      <rect x="28" y="44" width="8" height="16" fill="#78350f" />
-      <polygon points="32,8 52,44 12,44" fill="#22c55e" />
-      <polygon points="32,16 46,38 18,38" fill="#16a34a" />
-    </svg>
-  );
-}
-
-// Card icon map
-const CARD_ICONS: Record<string, React.FC> = {
-  cat: CatIcon,
-  dog: DogIcon,
-  rabbit: RabbitIcon,
-  bear: BearIcon,
-  apple: AppleIcon,
-  banana: BananaIcon,
-  sun: SunIcon,
-  moon: MoonIcon,
-  star: StarIconCard,
-  rainbow: RainbowIcon,
-  car: CarIcon,
-  rocket: RocketIcon,
-  heart: HeartIconCard,
-  gift: GiftIcon,
-  balloon: BalloonIcon,
-  crown: CrownIcon,
-  flower: FlowerIcon,
-  tree: TreeIcon,
-};
-
-// =============================================================================
-// Card Data
+// Card Data (using shared GameIcons)
 // =============================================================================
 
 interface CardItem {
-  id: string;
+  id: GameIconName;
   name: string;
   category: string;
 }
@@ -327,6 +37,20 @@ const CARD_CATEGORIES: Record<string, CardItem[]> = {
     { id: "dog", name: "Dog", category: "animals" },
     { id: "rabbit", name: "Rabbit", category: "animals" },
     { id: "bear", name: "Bear", category: "animals" },
+    { id: "mouse", name: "Mouse", category: "animals" },
+    { id: "elephant", name: "Elephant", category: "animals" },
+    { id: "lion", name: "Lion", category: "animals" },
+    { id: "tiger", name: "Tiger", category: "animals" },
+    { id: "monkey", name: "Monkey", category: "animals" },
+    { id: "penguin", name: "Penguin", category: "animals" },
+    { id: "owl", name: "Owl", category: "animals" },
+    { id: "fish", name: "Fish", category: "animals" },
+    { id: "turtle", name: "Turtle", category: "animals" },
+    { id: "frog", name: "Frog", category: "animals" },
+    { id: "bird", name: "Bird", category: "animals" },
+    { id: "butterfly", name: "Butterfly", category: "animals" },
+    { id: "bee", name: "Bee", category: "animals" },
+    { id: "duck", name: "Duck", category: "animals" },
   ],
   nature: [
     { id: "sun", name: "Sun", category: "nature" },
@@ -335,20 +59,58 @@ const CARD_CATEGORIES: Record<string, CardItem[]> = {
     { id: "rainbow", name: "Rainbow", category: "nature" },
     { id: "flower", name: "Flower", category: "nature" },
     { id: "tree", name: "Tree", category: "nature" },
+    { id: "leaf", name: "Leaf", category: "nature" },
+    { id: "cloud", name: "Cloud", category: "nature" },
+    { id: "water", name: "Water", category: "nature" },
+    { id: "fire", name: "Fire", category: "nature" },
+    { id: "snowflake", name: "Snowflake", category: "nature" },
+    { id: "mountain", name: "Mountain", category: "nature" },
   ],
   food: [
     { id: "apple", name: "Apple", category: "food" },
     { id: "banana", name: "Banana", category: "food" },
+    { id: "pizza", name: "Pizza", category: "food" },
+    { id: "cake", name: "Cake", category: "food" },
+    { id: "candy", name: "Candy", category: "food" },
+    { id: "ice-cream", name: "Ice Cream", category: "food" },
+    { id: "cookie", name: "Cookie", category: "food" },
+    { id: "carrot", name: "Carrot", category: "food" },
+    { id: "grape", name: "Grape", category: "food" },
+    { id: "orange", name: "Orange", category: "food" },
+    { id: "strawberry", name: "Strawberry", category: "food" },
+    { id: "watermelon", name: "Watermelon", category: "food" },
   ],
   transport: [
     { id: "car", name: "Car", category: "transport" },
     { id: "rocket", name: "Rocket", category: "transport" },
+    { id: "train", name: "Train", category: "transport" },
+    { id: "plane", name: "Plane", category: "transport" },
+    { id: "boat", name: "Boat", category: "transport" },
   ],
   objects: [
     { id: "heart", name: "Heart", category: "objects" },
     { id: "gift", name: "Gift", category: "objects" },
     { id: "balloon", name: "Balloon", category: "objects" },
     { id: "crown", name: "Crown", category: "objects" },
+    { id: "hat", name: "Hat", category: "objects" },
+    { id: "cup", name: "Cup", category: "objects" },
+    { id: "house", name: "House", category: "objects" },
+    { id: "ball", name: "Ball", category: "objects" },
+    { id: "key", name: "Key", category: "objects" },
+    { id: "bell", name: "Bell", category: "objects" },
+    { id: "clock", name: "Clock", category: "objects" },
+    { id: "book", name: "Book", category: "objects" },
+    { id: "umbrella", name: "Umbrella", category: "objects" },
+  ],
+  fun: [
+    { id: "smile", name: "Smile", category: "fun" },
+    { id: "robot", name: "Robot", category: "fun" },
+    { id: "teddy", name: "Teddy", category: "fun" },
+    { id: "kite", name: "Kite", category: "fun" },
+    { id: "dice", name: "Dice", category: "fun" },
+    { id: "puzzle", name: "Puzzle", category: "fun" },
+    { id: "guitar", name: "Guitar", category: "fun" },
+    { id: "drum", name: "Drum", category: "fun" },
   ],
 };
 
@@ -361,6 +123,7 @@ const CATEGORY_INFO: Record<string, { name: string; color: string }> = {
   food: { name: "Food", color: "from-red-400 to-rose-500" },
   transport: { name: "Transport", color: "from-blue-400 to-indigo-500" },
   objects: { name: "Objects", color: "from-purple-400 to-violet-500" },
+  fun: { name: "Fun", color: "from-cyan-400 to-teal-500" },
   mixed: { name: "Mixed", color: "from-pink-400 to-fuchsia-500" },
 };
 
@@ -628,9 +391,21 @@ function memoryMatchLogic() {
     });
   }
 
-  function finishGame() {
+  async function finishGame() {
     backgroundMusic.stop();
     gameState.set("finished");
+
+    // Save progress
+    const profile = $profile.profile();
+    if (profile) {
+      // Record this game session - accumulates stats
+      await gameProgressRepository.recordGameSession(
+        profile.id,
+        "memory-match",
+        score(),
+        1 // Can implement leveling later
+      );
+    }
   }
 
   function backToMenu() {
@@ -958,7 +733,6 @@ function GameCardComponent({
   onClick: () => void;
 }) {
   const isRevealed = card.isFlipped || card.isMatched;
-  const IconComponent = CARD_ICONS[card.item.id];
 
   return (
     <button
@@ -978,7 +752,7 @@ function GameCardComponent({
       {isRevealed ? (
         <div className="flex flex-col items-center justify-center h-full p-2">
           <div className="w-12 h-12 sm:w-16 sm:h-16">
-            {IconComponent ? <IconComponent /> : null}
+            <GameIcon name={card.item.id} size="100%" />
           </div>
           <span className="text-xs font-medium text-gray-700 mt-1 truncate w-full text-center">
             {card.item.name}

@@ -250,13 +250,12 @@ function roadRacerLogic() {
 
     const profile = $profile.profile();
     if (profile) {
-      await gameProgressRepository.upsert({
-        kidId: profile.id,
-        gameName: "road-racer",
-        score: finalScore,
-        level: 1,
-        lastPlayed: new Date(),
-      });
+      await gameProgressRepository.recordGameSession(
+        profile.id,
+        "road-racer",
+        finalScore,
+        1
+      );
     }
 
     state.set(patch<GameState>({ status: "gameOver", score: finalScore }));

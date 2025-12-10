@@ -4,11 +4,12 @@ import { patch } from "rextive/helpers";
 import { kidProfilesLogic } from "./kidProfilesLogic";
 import type { KidProfile, AvatarEmoji } from "@/domain/types";
 
-interface ProfileFormState {
+export interface ProfileFormState {
   name: string;
   avatar: AvatarEmoji;
   age: number;
   loading: boolean;
+  error: string;
   showDeleteConfirm: boolean;
 }
 
@@ -21,6 +22,7 @@ export function profileFormLogic(onClose: () => void, editProfile?: KidProfile) 
       avatar: editProfile?.avatar || "🐉",
       age: editProfile?.age || 5,
       loading: false,
+      error: "",
       showDeleteConfirm: false,
     },
     { name: "profileForm.state" }
@@ -28,9 +30,12 @@ export function profileFormLogic(onClose: () => void, editProfile?: KidProfile) 
 
   async function submit() {
     const { name, avatar, age } = state();
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      state.set(patch("error", "Name is required"));
+      return;
+    }
 
-    state.set(patch("loading", true));
+    state.set(patch({ loading: true, error: "" }));
 
     try {
       if (editProfile) {
@@ -39,6 +44,8 @@ export function profileFormLogic(onClose: () => void, editProfile?: KidProfile) 
         await $profiles.create({ name: name.trim(), avatar, age });
       }
       onClose();
+    } catch (e) {
+      state.set(patch("error", e instanceof Error ? e.message : "An error occurred"));
     } finally {
       state.set(patch("loading", false));
     }
@@ -47,20 +54,37 @@ export function profileFormLogic(onClose: () => void, editProfile?: KidProfile) 
   async function remove() {
     if (!editProfile) return;
 
-    state.set(patch("loading", true));
+    state.set(patch({ loading: true, error: "" }));
 
     try {
       await $profiles.remove(editProfile.id);
       onClose();
+    } catch (e) {
+      state.set(patch("error", e instanceof Error ? e.message : "Failed to delete profile"));
     } finally {
       state.set(patch("loading", false));
     }
+  }
+
+  function requestDelete() {
+    state.set(patch("showDeleteConfirm", true));
+  }
+
+  function cancelDelete() {
+    state.set(patch("showDeleteConfirm", false));
+  }
+
+  async function confirmDelete() {
+    await remove();
   }
 
   return {
     state,
     submit,
     remove,
+    requestDelete,
+    cancelDelete,
+    confirmDelete,
     isEditing: !!editProfile,
   };
 }

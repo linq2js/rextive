@@ -113,7 +113,7 @@ function ProfileFormModal({
 
         {/* Avatar Selection */}
         {rx(() => {
-          const [get, set] = focus.lens($form.state, "avatar").map(inputValue);
+          const [getAvatar, setAvatar] = focus.lens($form.state, "avatar");
           return (
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -124,9 +124,9 @@ function ProfileFormModal({
                   <button
                     key={emoji}
                     type="button"
-                    onClick={() => set({ target: { value: emoji } } as any)}
+                    onClick={() => setAvatar(emoji as import("@/domain/types").AvatarEmoji)}
                     className={`p-1 rounded-xl transition-all ${
-                      get() === emoji
+                      getAvatar() === emoji
                         ? "bg-purple-100 ring-2 ring-purple-500 scale-110 shadow-md z-10"
                         : "bg-gray-50 hover:bg-gray-100"
                     }`}

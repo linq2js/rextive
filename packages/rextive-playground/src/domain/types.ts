@@ -19,7 +19,12 @@ export interface GameProgress {
   id: number;
   kidId: number;
   gameName: string;
-  score: number;
+  // Best score for this game
+  highScore: number;
+  // Cumulative stats
+  totalScore: number;
+  timesPlayed: number;
+  // Level progress
   level: number;
   lastPlayed: Date;
 }

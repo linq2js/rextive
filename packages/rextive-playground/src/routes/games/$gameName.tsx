@@ -74,7 +74,7 @@ function GamePage() {
                 </div>
               ) : stats ? (
                 <div className="grid grid-cols-2 gap-4">
-                  <StatItem label="High Score" value={stats.score} icon="🏆" />
+                  <StatItem label="High Score" value={stats.highScore ?? 0} icon="🏆" />
                   <StatItem label="Level" value={stats.level} icon="⭐" />
                   <StatItem
                     label="Last Played"

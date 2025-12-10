@@ -55,8 +55,7 @@ export function playCoinSound() {
     oscillator.frequency.setValueAtTime(1318, ctx.currentTime + 0.1); // E6
 
     gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
-    gainNode.gain.exponentialDecayTo?.(0.01, ctx.currentTime + 0.2) ||
-      gainNode.gain.setValueAtTime(0.01, ctx.currentTime + 0.2);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
 
     oscillator.type = "square";
     oscillator.start(ctx.currentTime);

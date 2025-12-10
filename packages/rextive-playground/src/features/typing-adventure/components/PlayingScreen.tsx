@@ -1,5 +1,6 @@
 import { rx } from "rextive/react";
 import { useTypingGame } from "../provider";
+import { GameIcon, getIconForWord } from "@/components/GameIcons";
 
 export function PlayingScreen({
   inputRef,
@@ -15,6 +16,7 @@ export function PlayingScreen({
     const stats = $game.stats();
     const timeLeft = $game.timeLeft();
     const wordsToComplete = $game.wordsToComplete();
+    const wordIcon = getIconForWord(currentWord);
 
     return (
       <div className="space-y-4">
@@ -34,10 +36,10 @@ export function PlayingScreen({
                   {stats.wordsCompleted}/{wordsToComplete}
                 </span>
               </div>
-              <div>
+              <div className="flex items-center gap-1">
                 <span className="text-gray-500">Streak:</span>
-                <span className="ml-1 font-bold text-amber-600">
-                  🔥{stats.streak}
+                <span className="font-bold text-amber-600">
+                  {stats.streak}
                 </span>
               </div>
             </div>
@@ -45,13 +47,13 @@ export function PlayingScreen({
               <span
                 className={`text-2xl font-bold ${timeLeft <= 10 ? "text-red-500 animate-pulse" : "text-gray-800"}`}
               >
-                ⏱️ {timeLeft}s
+                {timeLeft}s
               </span>
               <button
                 onClick={() => $game.pauseGame()}
                 className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
               >
-                ⏸️
+                ||
               </button>
             </div>
           </div>
@@ -77,6 +79,15 @@ export function PlayingScreen({
               </span>
             )}
           </div>
+
+          {/* Word Image */}
+          {wordIcon && (
+            <div className="mb-6 flex justify-center">
+              <div className="p-4 bg-gradient-to-br from-primary-100 to-purple-100 rounded-2xl shadow-inner">
+                <GameIcon name={wordIcon} size={96} className="drop-shadow-lg" />
+              </div>
+            </div>
+          )}
 
           {/* Current Word Display */}
           <div className="mb-6">
