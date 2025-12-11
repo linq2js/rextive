@@ -885,27 +885,6 @@ function MathQuest() {
 
   return rx(() => {
     const state = $game.gameState();
-    const profile = $game.profile();
-
-    if (!profile) {
-      return (
-        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-500 to-cyan-600 p-4">
-          <div className="card text-center bg-white/95">
-            <MathIcon className="w-16 h-16 mx-auto text-blue-500" />
-            <h2 className="font-display text-xl font-bold text-gray-800 mt-4">
-              Please select a profile first
-            </h2>
-            <Link
-              to="/"
-              viewTransition
-              className="btn bg-blue-500 text-white mt-4 hover:bg-blue-600"
-            >
-              Go Home
-            </Link>
-          </div>
-        </div>
-      );
-    }
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-500 p-4 pb-12 safe-bottom">

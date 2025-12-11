@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { rx, useScope } from "rextive/react";
-import { energyLogic, selectedProfileLogic, modalLogic } from "@/logic";
+import { energyLogic, modalLogic } from "@/logic";
 import { useRef } from "react";
 import {
   typingGameLogic,
@@ -10,7 +10,6 @@ import {
   PlayingScreen,
   PausedScreen,
   FinishedScreen,
-  NoProfileScreen,
 } from "@/features/typing-adventure";
 import { Icon } from "@/components/Icons";
 
@@ -30,7 +29,6 @@ function TypingAdventure() {
 
 function TypingAdventureContent() {
   const $game = useTypingGame();
-  const $profile = selectedProfileLogic();
   const $energy = energyLogic();
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -63,12 +61,7 @@ function TypingAdventureContent() {
 
   return rx(() => {
     const state = $game.gameState();
-    const profile = $profile.profile();
     const energy = $energy.energy();
-
-    if (!profile) {
-      return <NoProfileScreen />;
-    }
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400 p-4 safe-bottom">

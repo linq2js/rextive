@@ -1,12 +1,16 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { signal } from "rextive";
 import { patch } from "rextive/helpers";
 import { rx, useScope } from "rextive/react";
 import { energyLogic, selectedProfileLogic, modalLogic } from "@/logic";
 import { gameProgressRepository } from "@/infrastructure/repositories";
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { Icon } from "@/components/Icons";
-import { GameMenu, type Difficulty, type DifficultyOption } from "@/components/GameMenu";
+import {
+  GameMenu,
+  type Difficulty,
+  type DifficultyOption,
+} from "@/components/GameMenu";
 import {
   playCoinSound,
   playCollisionSound,
@@ -23,7 +27,8 @@ export const Route = createFileRoute("/games/road-racer")({
 // =============================================================================
 
 const GAME_WIDTH = 300;
-const GAME_HEIGHT = 500;
+const GAME_HEIGHT_MIN = 400; // Minimum height
+const GAME_HEIGHT_DEFAULT = 500; // Default/fallback height
 const CAR_WIDTH = 40;
 const CAR_HEIGHT = 60;
 const OBSTACLE_WIDTH = 40;
@@ -43,6 +48,9 @@ interface DifficultySettings {
   lives: number;
   scoreMultiplier: number;
   color: string;
+  // Progressive difficulty: how much to increase per 10 seconds
+  speedIncreasePerPhase: number; // Speed increase every 10 seconds
+  coinRateIncreasePerPhase: number; // Coin spawn rate increase every 10 seconds
 }
 
 const DIFFICULTY_CONFIG: Record<Difficulty, DifficultySettings> = {
@@ -50,34 +58,40 @@ const DIFFICULTY_CONFIG: Record<Difficulty, DifficultySettings> = {
     name: "Easy",
     description: "Slower traffic, more lives",
     baseSpeed: 3,
-    maxSpeed: 6,
+    maxSpeed: 7,
     obstacleSpawnRate: 0.004,
-    coinSpawnRate: 0.008,
+    coinSpawnRate: 0.006,
     lives: 5,
     scoreMultiplier: 1,
     color: "from-emerald-400 to-emerald-600",
+    speedIncreasePerPhase: 0.5, // +0.5 speed every 10s
+    coinRateIncreasePerPhase: 0.003, // +0.3% coin rate every 10s
   },
   medium: {
     name: "Medium",
     description: "Balanced challenge",
     baseSpeed: 4,
-    maxSpeed: 8,
+    maxSpeed: 10,
     obstacleSpawnRate: 0.006,
-    coinSpawnRate: 0.006,
+    coinSpawnRate: 0.005,
     lives: 3,
     scoreMultiplier: 1.5,
     color: "from-amber-400 to-orange-500",
+    speedIncreasePerPhase: 0.8, // +0.8 speed every 10s
+    coinRateIncreasePerPhase: 0.004, // +0.4% coin rate every 10s
   },
   hard: {
     name: "Hard",
     description: "Fast traffic, fewer lives",
     baseSpeed: 5,
-    maxSpeed: 12,
-    obstacleSpawnRate: 0.01,
-    coinSpawnRate: 0.005,
+    maxSpeed: 14,
+    obstacleSpawnRate: 0.008,
+    coinSpawnRate: 0.004,
     lives: 2,
     scoreMultiplier: 2,
     color: "from-red-500 to-rose-600",
+    speedIncreasePerPhase: 1.2, // +1.2 speed every 10s
+    coinRateIncreasePerPhase: 0.005, // +0.5% coin rate every 10s
   },
 };
 
@@ -147,6 +161,7 @@ interface GameState {
   highScore: number;
   lastCollisionTime: number;
   timeLeft: number; // 60 second time limit
+  gameHeight: number; // Dynamic game area height
 }
 
 // Time limit for all games: 60 seconds
@@ -171,6 +186,7 @@ function roadRacerLogic() {
       highScore: 0,
       lastCollisionTime: 0,
       timeLeft: TIME_LIMIT,
+      gameHeight: GAME_HEIGHT_DEFAULT,
     },
     { name: "roadRacer.state" }
   );
@@ -180,7 +196,7 @@ function roadRacerLogic() {
   let gameLoopId: number | null = null;
   let timerId: ReturnType<typeof setInterval> | null = null;
   let lastFrameTime = 0;
-  
+
   // Road Racer costs 2 energy per game
   const ENERGY_COST = 2;
 
@@ -190,6 +206,10 @@ function roadRacerLogic() {
 
   function setDifficulty(difficulty: Difficulty) {
     state.set(patch("difficulty", difficulty));
+  }
+
+  function setGameHeight(height: number) {
+    state.set(patch("gameHeight", height));
   }
 
   async function startGame(): Promise<boolean> {
@@ -237,7 +257,7 @@ function roadRacerLogic() {
           timerId = null;
           return;
         }
-        
+
         if (currentState.timeLeft <= 1) {
           state.set(patch("timeLeft", 0));
           endGame();
@@ -278,7 +298,7 @@ function roadRacerLogic() {
     state.set(patch("status", "playing"));
     lastFrameTime = performance.now();
     backgroundMusic.playRacingMusic();
-    
+
     // Restart the timer
     if (timerId) clearInterval(timerId);
     timerId = setInterval(() => {
@@ -288,7 +308,7 @@ function roadRacerLogic() {
         timerId = null;
         return;
       }
-      
+
       if (currentState.timeLeft <= 1) {
         state.set(patch("timeLeft", 0));
         endGame();
@@ -296,7 +316,7 @@ function roadRacerLogic() {
         state.set(patch("timeLeft", (t) => t - 1));
       }
     }, 1000);
-    
+
     gameLoop();
   }
 
@@ -360,24 +380,37 @@ function roadRacerLogic() {
       let newScore = s.score;
       let newLives = s.lives;
       let newDistance = s.distance + s.speed * deltaTime * 10;
-      let newSpeed = Math.min(
-        config.maxSpeed,
-        config.baseSpeed + Math.floor(newDistance / 500)
-      );
       let lastCollision = s.lastCollisionTime;
+
+      // Calculate time-based progressive difficulty
+      // Phase increases every 10 seconds (0, 1, 2, 3, 4, 5 for 60s game)
+      const timeElapsed = TIME_LIMIT - s.timeLeft;
+      const phase = Math.floor(timeElapsed / 10);
+
+      // Progressive speed: base + time-based increase, capped at maxSpeed
+      const timeBasedSpeed =
+        config.baseSpeed + phase * config.speedIncreasePerPhase;
+      const newSpeed = Math.min(config.maxSpeed, timeBasedSpeed);
+
+      // Progressive coin spawn rate: increases over time for more scoring opportunities
+      const currentCoinRate =
+        config.coinSpawnRate + phase * config.coinRateIncreasePerPhase;
+
+      // Progressive obstacle spawn rate: slightly increases over time
+      const currentObstacleRate = config.obstacleSpawnRate + phase * 0.001;
 
       // Move obstacles
       newObstacles = newObstacles
         .map((obs) => ({ ...obs, y: obs.y + s.speed * deltaTime * 60 }))
-        .filter((obs) => obs.y < GAME_HEIGHT + 100);
+        .filter((obs) => obs.y < s.gameHeight + 100);
 
       // Move coins
       newCoins = newCoins
         .map((coin) => ({ ...coin, y: coin.y + s.speed * deltaTime * 60 }))
-        .filter((coin) => coin.y < GAME_HEIGHT + 100);
+        .filter((coin) => coin.y < s.gameHeight + 100);
 
       // Spawn obstacles (with minimum gap of 150px between any obstacles)
-      if (Math.random() < config.obstacleSpawnRate) {
+      if (Math.random() < currentObstacleRate) {
         const lane = Math.floor(Math.random() * LANE_COUNT);
         const hasNearbyObstacle = newObstacles.some(
           (obs) => obs.y < 150 // Ensure minimum gap
@@ -394,12 +427,15 @@ function roadRacerLogic() {
       }
 
       // Spawn coins (don't spawn if there's already a coin nearby)
-      if (Math.random() < config.coinSpawnRate) {
+      // Increased spawn rate over time gives more scoring opportunities
+      if (Math.random() < currentCoinRate) {
         const lane = Math.floor(Math.random() * LANE_COUNT);
         const hasNearbyObstacle = newObstacles.some(
           (obs) => obs.lane === lane && obs.y < 100
         );
-        const hasNearbyCoin = newCoins.some((c) => c.y < 200);
+        // Reduce nearby coin check distance in later phases to allow more coins
+        const coinGapDistance = Math.max(100, 200 - phase * 20);
+        const hasNearbyCoin = newCoins.some((c) => c.y < coinGapDistance);
         if (!hasNearbyObstacle && !hasNearbyCoin) {
           newCoins.push({
             id: nextCoinId++,
@@ -411,7 +447,7 @@ function roadRacerLogic() {
 
       // Collision detection
       const playerX = s.playerLane * LANE_WIDTH + (LANE_WIDTH - CAR_WIDTH) / 2;
-      const playerY = GAME_HEIGHT - CAR_HEIGHT - 20;
+      const playerY = s.gameHeight - CAR_HEIGHT - 20;
 
       for (const obs of newObstacles) {
         const obsX = obs.lane * LANE_WIDTH + (LANE_WIDTH - OBSTACLE_WIDTH) / 2;
@@ -493,6 +529,7 @@ function roadRacerLogic() {
     energy: $energy.energy,
     profile: $profile.profile,
     setDifficulty,
+    setGameHeight,
     startGame,
     pauseGame,
     resumeGame,
@@ -652,21 +689,6 @@ function StarIcon({ filled }: { filled: boolean }) {
   );
 }
 
-function TrophyIcon() {
-  return (
-    <svg viewBox="0 0 48 48" className="w-16 h-16">
-      <path
-        d="M38 8H34V6C34 4.9 33.1 4 32 4H16C14.9 4 14 4.9 14 6V8H10C7.79 8 6 9.79 6 12V14C6 18.42 9.58 22 14 22C14.36 22 14.71 21.97 15.06 21.92C16.59 25.15 19.5 27.52 23 28.28V34H18C16.9 34 16 34.9 16 36V42C16 43.1 16.9 44 18 44H30C31.1 44 32 43.1 32 42V36C32 34.9 31.1 34 30 34H25V28.28C28.5 27.52 31.41 25.15 32.94 21.92C33.29 21.97 33.64 22 34 22C38.42 22 42 18.42 42 14V12C42 9.79 40.21 8 38 8Z"
-        fill="#fbbf24"
-      />
-      <path
-        d="M14 18C11.79 18 10 16.21 10 14V12H14V18ZM34 12H38V14C38 16.21 36.21 18 34 18V12Z"
-        fill="#f59e0b"
-      />
-    </svg>
-  );
-}
-
 function PauseIcon() {
   return (
     <svg viewBox="0 0 48 48" className="w-12 h-12">
@@ -744,6 +766,35 @@ function RoadRacer() {
   const gameRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
+  // Dynamic game height based on available viewport space
+  const [gameHeight, setGameHeightLocal] = useState(GAME_HEIGHT_DEFAULT);
+
+  // Calculate available height for game area
+  useEffect(() => {
+    const calculateHeight = () => {
+      // Get viewport height
+      const viewportHeight = window.innerHeight;
+      // Reserve space for header (~60px) + status bar (~80px) + mobile controls (~100px) + margins
+      const headerAndStatusHeight = 160;
+      const bottomReserve = window.innerWidth < 640 ? 120 : 40; // More space for mobile controls
+      const availableHeight =
+        viewportHeight - headerAndStatusHeight - bottomReserve;
+
+      // Clamp between min and a reasonable max
+      const newHeight = Math.max(
+        GAME_HEIGHT_MIN,
+        Math.min(availableHeight, 700)
+      );
+      setGameHeightLocal(newHeight);
+      // Also update game logic state for collision detection
+      $game.setGameHeight(newHeight);
+    };
+
+    calculateHeight();
+    window.addEventListener("resize", calculateHeight);
+    return () => window.removeEventListener("resize", calculateHeight);
+  }, [$game]);
+
   // Handle back button with confirmation during gameplay
   const handleBack = async () => {
     const status = $game.state().status;
@@ -806,14 +857,13 @@ function RoadRacer() {
   );
 
   return rx(() => {
-    const profile = $game.profile();
     const gameState = $game.state();
     const energy = $game.energy();
     const isHit = Date.now() - gameState.lastCollisionTime < 1000;
 
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 p-4 safe-bottom">
-        <div className="mx-auto max-w-lg">
+      <div className="min-h-screen bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 p-4 pb-2 safe-bottom flex flex-col">
+        <div className="mx-auto max-w-lg w-full flex flex-col flex-1">
           {/* Header */}
           <header className="mb-4 flex items-center justify-between">
             <button
@@ -856,76 +906,111 @@ function RoadRacer() {
             </div>
           </header>
 
-          {/* No Profile Warning */}
-          {!profile && (
-            <div className="card text-center mb-4 bg-slate-800 border border-slate-700">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-700 flex items-center justify-center">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-8 h-8 text-slate-400"
-                  fill="currentColor"
-                >
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                </svg>
-              </div>
-              <h2 className="font-display text-xl font-bold text-white">
-                Select a Profile First
-              </h2>
-              <p className="mt-2 text-slate-400">
-                Go back home and select a kid profile to play!
-              </p>
-              <Link
-                to="/"
-                viewTransition
-                className="btn bg-emerald-500 text-white mt-4 inline-block hover:bg-emerald-600"
-              >
-                Go Home
-              </Link>
-            </div>
-          )}
-
           {/* Game Status Bar */}
-          {profile && gameState.status === "playing" && (
-            <div className="mb-4 card bg-slate-800/90 backdrop-blur border border-slate-700">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-4">
-                  <span className="font-bold text-amber-400 flex items-center gap-1">
-                    <TrophyIcon />
-                    <span className="text-lg">{gameState.score}</span>
-                  </span>
-                  {/* Timer */}
-                  <span className={`font-bold flex items-center gap-1 ${gameState.timeLeft <= 10 ? "text-red-400 animate-pulse" : "text-cyan-400"}`}>
-                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-                      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z" />
-                    </svg>
-                    {gameState.timeLeft}s
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex">
-                    {Array.from({ length: gameState.maxLives }).map((_, i) => (
-                      <HeartIcon key={i} filled={i < gameState.lives} />
-                    ))}
+          {gameState.status === "playing" &&
+            (() => {
+              // Calculate current phase for display
+              const timeElapsed = TIME_LIMIT - gameState.timeLeft;
+              const phase = Math.floor(timeElapsed / 10);
+              const speedPercent = Math.min(
+                100,
+                Math.floor(
+                  (gameState.speed /
+                    DIFFICULTY_CONFIG[gameState.difficulty].maxSpeed) *
+                    100
+                )
+              );
+
+              return (
+                <div className="mb-3 card bg-slate-800/90 backdrop-blur border border-slate-700 py-2 px-3">
+                  <div className="flex items-stretch gap-3">
+                    {/* Left: Stats (2 rows) */}
+                    <div className="flex-1 flex flex-col justify-between gap-1.5">
+                      {/* Row 1: Score, Lives */}
+                      <div className="flex items-center justify-between">
+                        {/* Score */}
+                        <span className="font-bold text-amber-400 flex items-center gap-1">
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="w-5 h-5"
+                            fill="currentColor"
+                          >
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                          </svg>
+                          <span className="text-xl tabular-nums">
+                            {gameState.score}
+                          </span>
+                        </span>
+                        {/* Lives */}
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: gameState.maxLives }).map(
+                            (_, i) => (
+                              <HeartIcon key={i} filled={i < gameState.lives} />
+                            )
+                          )}
+                        </div>
+                      </div>
+                      {/* Row 2: Timer, Speed */}
+                      <div className="flex items-center justify-between text-sm">
+                        {/* Timer */}
+                        <span
+                          className={`font-bold flex items-center gap-1.5 ${gameState.timeLeft <= 10 ? "text-red-400 animate-pulse" : "text-cyan-400"}`}
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="w-4 h-4"
+                            fill="currentColor"
+                          >
+                            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z" />
+                          </svg>
+                          <span className="tabular-nums">
+                            {gameState.timeLeft}s
+                          </span>
+                        </span>
+                        {/* Speed indicator */}
+                        <span
+                          className={`font-bold flex items-center gap-1.5 ${phase >= 4 ? "text-red-400" : phase >= 2 ? "text-orange-400" : "text-emerald-400"}`}
+                          title={`Speed: ${gameState.speed.toFixed(1)}`}
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="w-4 h-4"
+                            fill="currentColor"
+                          >
+                            <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm-1-5h2v2h-2zm0-8h2v6h-2z" />
+                          </svg>
+                          <span className="tabular-nums">{speedPercent}%</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Right: Pause button (spans both rows) */}
+                    <button
+                      onClick={() => $game.pauseGame()}
+                      className="px-3 bg-slate-700 rounded-lg hover:bg-slate-600 transition-colors flex items-center justify-center"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="w-6 h-6"
+                        fill="currentColor"
+                      >
+                        <rect x="6" y="4" width="4" height="16" rx="1" />
+                        <rect x="14" y="4" width="4" height="16" rx="1" />
+                      </svg>
+                    </button>
                   </div>
-                  <button
-                    onClick={() => $game.pauseGame()}
-                    className="p-1 bg-slate-700 rounded hover:bg-slate-600 transition-colors"
-                  >
-                    <PauseIcon />
-                  </button>
                 </div>
-              </div>
-            </div>
-          )}
+              );
+            })()}
 
           {/* Game Area - only show during gameplay, not on menu */}
-          {profile && gameState.status !== "menu" && (
+          {gameState.status !== "menu" && (
             <div
               ref={gameRef}
               className="relative mx-auto overflow-hidden rounded-2xl shadow-2xl border-4 border-slate-600"
               style={{
                 width: GAME_WIDTH,
-                height: GAME_HEIGHT,
+                height: gameHeight,
                 background: "linear-gradient(to bottom, #374151, #1f2937)",
               }}
               onTouchStart={handleTouchStart}
@@ -1079,19 +1164,19 @@ function RoadRacer() {
                   <p className="text-sm opacity-70 mb-4">
                     Distance: {Math.floor(gameState.distance)}m
                   </p>
-                    <button
+                  <button
                     onClick={() => $game.backToMenu()}
-                      className="btn bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-8 py-3 font-bold hover:from-emerald-600 hover:to-teal-600"
-                    >
+                    className="btn bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-8 py-3 font-bold hover:from-emerald-600 hover:to-teal-600"
+                  >
                     Continue
-                    </button>
+                  </button>
                 </div>
               )}
             </div>
           )}
 
           {/* Touch Controls (visible on mobile) */}
-          {profile && gameState.status === "playing" && (
+          {gameState.status === "playing" && (
             <div className="mt-4 flex gap-4 justify-center sm:hidden">
               <button
                 onTouchStart={() => $game.moveLeft()}
@@ -1109,7 +1194,7 @@ function RoadRacer() {
           )}
 
           {/* Game Menu - shown in menu state */}
-          {profile && gameState.status === "menu" && (
+          {gameState.status === "menu" && (
             <GameMenu
               title="Road Racer"
               description="Dodge traffic and collect coins! Use arrow keys or tap to move."
@@ -1125,18 +1210,15 @@ function RoadRacer() {
                 const started = await $game.startGame();
                 if (!started) {
                   const $modal = modalLogic();
-                  if (!$game.profile()) {
+                  if ($game.energy() < 2) {
                     await $modal.warning(
-                      "Please select a kid profile first from the home page!",
-                      "No Profile"
-                    );
-                  } else if ($game.energy() <= 0) {
-                    await $modal.warning(
-                      "No energy left! Come back tomorrow to play again.",
+                      "Not enough energy! Come back tomorrow to play again.",
                       "No Energy"
                     );
                   } else {
-                    await $modal.error("Could not start game. Please try again.");
+                    await $modal.error(
+                      "Could not start game. Please try again."
+                    );
                   }
                 }
               }}

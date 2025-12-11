@@ -6,3 +6,6 @@ export { energyLogic } from "./energy.logic";
 export { gameStatsLogic } from "./gameStats.logic";
 export { appOverlaysLogic } from "./appOverlays.logic";
 export { modalLogic } from "./modal.logic";
+
+// Route guards
+export { guards } from "./routeGuards";

@@ -468,23 +468,6 @@ function MemoryMatch() {
 
   return rx(() => {
     const state = $game.gameState();
-    const profile = $game.profile();
-
-    if (!profile) {
-      return (
-        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-500 to-pink-600 p-4">
-          <div className="card text-center bg-white/95">
-            <BrainIcon />
-            <h2 className="font-display text-xl font-bold text-gray-800 mt-4">
-              Please select a profile first
-            </h2>
-            <Link to="/" viewTransition className="btn bg-purple-500 text-white mt-4 hover:bg-purple-600">
-              Go Home
-            </Link>
-          </div>
-        </div>
-      );
-    }
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 p-4 pb-12 safe-bottom">
