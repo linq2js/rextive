@@ -369,8 +369,10 @@ export function syncLogic() {
         // Simple replace - use existing import function
         const result = await dataExportRepository.importAll(remoteData);
         if (result.success) {
-          progress.set(result.message);
+          progress.set(result.message + " Reloading...");
           state.set("success");
+          // Reload page after short delay to show success message
+          setTimeout(() => window.location.replace("/"), 1500);
         } else {
           errorMessage.set(result.message);
           state.set("error");
@@ -380,8 +382,10 @@ export function syncLogic() {
         // For now, just replace. Merge logic can be added later.
         const result = await dataExportRepository.importAll(remoteData);
         if (result.success) {
-          progress.set(result.message);
+          progress.set(result.message + " Reloading...");
           state.set("success");
+          // Reload page after short delay to show success message
+          setTimeout(() => window.location.replace("/"), 1500);
         } else {
           errorMessage.set(result.message);
           state.set("error");
