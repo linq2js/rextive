@@ -1,9 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { signal } from "rextive";
 import { rx, useScope } from "rextive/react";
 import { energyLogic, selectedProfileLogic, modalLogic } from "@/logic";
 import { gameProgressRepository } from "@/infrastructure/repositories";
 import { useEffect } from "react";
+import { gameTickLogic } from "@/utils";
 import {
   calculateAnswerPoints,
   calculateStarRating,
@@ -380,9 +381,8 @@ function memoryMatchLogic() {
     }, 800);
   }
 
-  function tick() {
-    if (gameState() !== "playing") return;
-    
+  // Game tick effect - auto-managed timer that cleans up when logic disposes
+  gameTickLogic(gameState, () => {
     timeLeft.set((t) => {
       if (t <= 1) {
         finishGame();
@@ -390,7 +390,7 @@ function memoryMatchLogic() {
       }
       return t - 1;
     });
-  }
+  }, { name: "memory" });
 
   async function finishGame() {
     backgroundMusic.stop();
@@ -432,7 +432,6 @@ function memoryMatchLogic() {
     setCategory: (c: Category) => category.set(c),
     startGame,
     flipCard,
-    tick,
     backToMenu,
   };
 }
@@ -443,16 +442,24 @@ function memoryMatchLogic() {
 
 function MemoryMatch() {
   const $game = useScope(memoryMatchLogic);
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    const unsub = $game.gameState.on(() => {
-      if ($game.gameState() === "playing") {
-        const interval = setInterval(() => $game.tick(), 1000);
-        return () => clearInterval(interval);
-      }
-    });
-    return unsub;
-  }, [$game]);
+  // Handle back button with confirmation during gameplay
+  const handleBack = async () => {
+    if ($game.gameState() === "playing") {
+      const $modal = modalLogic();
+      const confirmed = await $modal.confirm(
+        "Are you sure you want to quit? Your progress will be lost!",
+        "Leave Game?"
+      );
+      if (!confirmed) return;
+      $game.backToMenu();
+    }
+    navigate({ to: "/dashboard", viewTransition: true });
+  };
+
+  // Timer is now handled by gameTickLogic inside memoryMatchLogic
+  // No useEffect needed for tick!
 
   // Cleanup on unmount
   useEffect(() => {
@@ -484,14 +491,13 @@ function MemoryMatch() {
         {/* Header */}
         <header className="mb-4">
           <div className="mx-auto max-w-3xl flex items-center justify-between">
-            <Link
-              to="/dashboard"
-              viewTransition
+            <button
+              onClick={handleBack}
               className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
             >
               <Icon name="back" size={20} />
               <span className="text-sm font-medium hidden sm:inline">Back</span>
-            </Link>
+            </button>
             <h1 className="font-display text-2xl font-bold text-white drop-shadow-lg flex items-center gap-2">
               <span className="w-8 h-8"><BrainIcon /></span>
               Memory Match

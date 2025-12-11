@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { signal } from "rextive";
 import { patch } from "rextive/helpers";
 import { rx, useScope } from "rextive/react";
@@ -742,6 +742,22 @@ function getStarRating(score: number): number {
 function RoadRacer() {
   const $game = useScope(roadRacerLogic);
   const gameRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  // Handle back button with confirmation during gameplay
+  const handleBack = async () => {
+    const status = $game.state().status;
+    if (status === "playing" || status === "paused") {
+      const $modal = modalLogic();
+      const confirmed = await $modal.confirm(
+        "Are you sure you want to quit? Your progress will be lost!",
+        "Leave Game?"
+      );
+      if (!confirmed) return;
+      $game.cleanup();
+    }
+    navigate({ to: "/dashboard", viewTransition: true });
+  };
 
   // Keyboard controls
   useEffect(() => {
@@ -800,14 +816,13 @@ function RoadRacer() {
         <div className="mx-auto max-w-lg">
           {/* Header */}
           <header className="mb-4 flex items-center justify-between">
-            <Link
-              to="/dashboard"
-              viewTransition
+            <button
+              onClick={handleBack}
               className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
             >
               <Icon name="back" size={20} />
               <span className="text-sm font-medium hidden sm:inline">Back</span>
-            </Link>
+            </button>
             <h1 className="font-display text-2xl font-bold text-white flex items-center gap-2">
               <span className="w-8 h-8">
                 <svg viewBox="0 0 32 32" className="w-full h-full">

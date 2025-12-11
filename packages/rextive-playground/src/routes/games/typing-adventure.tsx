@@ -1,6 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { rx, useScope } from "rextive/react";
-import { energyLogic, selectedProfileLogic } from "@/logic";
+import { energyLogic, selectedProfileLogic, modalLogic } from "@/logic";
 import { useRef } from "react";
 import {
   typingGameLogic,
@@ -33,6 +33,22 @@ function TypingAdventureContent() {
   const $profile = selectedProfileLogic();
   const $energy = energyLogic();
   const inputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+
+  // Handle back button with confirmation during gameplay
+  const handleBack = async () => {
+    const state = $game.gameState();
+    if (state === "playing" || state === "paused") {
+      const $modal = modalLogic();
+      const confirmed = await $modal.confirm(
+        "Are you sure you want to quit? Your progress will be lost!",
+        "Leave Game?"
+      );
+      if (!confirmed) return;
+      $game.backToMenu();
+    }
+    navigate({ to: "/dashboard", viewTransition: true });
+  };
 
   // Component Effect: Auto-focus input when playing
   // - Logic emits state changes, component handles DOM concerns
@@ -59,14 +75,13 @@ function TypingAdventureContent() {
         {/* Header */}
         <header className="mb-4">
           <div className="mx-auto max-w-2xl flex items-center justify-between">
-            <Link
-              to="/dashboard"
-              viewTransition
+            <button
+              onClick={handleBack}
               className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
             >
               <Icon name="back" size={20} />
               <span className="text-sm font-medium hidden sm:inline">Back</span>
-            </Link>
+            </button>
             <h1 className="font-display text-2xl font-bold text-white drop-shadow-lg flex items-center gap-2">
               <Icon name="keyboard" size={28} /> Typing Adventure
             </h1>
