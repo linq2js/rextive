@@ -3,7 +3,6 @@ import { signal } from "rextive";
 import { rx, useScope } from "rextive/react";
 import { energyLogic, selectedProfileLogic, modalLogic } from "@/logic";
 import { gameProgressRepository } from "@/infrastructure/repositories";
-import { useEffect } from "react";
 import { calculateAnswerPoints, calculateStarRating } from "@/domain/scoring";
 import {
   playCorrectSound,
@@ -791,7 +790,6 @@ function mathQuestLogic() {
   }
 
   // Game tick effect - auto-managed timer that cleans up when logic disposes
-  // No need for useEffect in component!
   gameTickLogic(
     gameState,
     () => {
@@ -851,6 +849,10 @@ function mathQuestLogic() {
     addToSortOrder,
     clearSortOrder,
     backToMenu,
+
+    dispose() {
+      backgroundMusic.stop();
+    },
   };
 }
 
@@ -861,13 +863,6 @@ function mathQuestLogic() {
 function MathQuest() {
   const $game = useScope(mathQuestLogic);
   const navigate = useNavigate();
-
-  // Timer is now handled by gameTickLogic inside mathQuestLogic
-  // No useEffect needed for tick!
-
-  useEffect(() => {
-    return () => backgroundMusic.stop();
-  }, []);
 
   // Handle back button with confirmation during gameplay
   const handleBack = async () => {

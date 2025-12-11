@@ -99,6 +99,10 @@ export type {
 } from "./disposable";
 export { validate } from "./validate";
 
+// Setup utility
+export { setup } from "./setup";
+export type { Setup, SetupFn, TriggerFn } from "./setup";
+
 // Logic module
 export { logic, NotImplementedError, LogicCreateError } from "./logic";
 export type { Logic, AbstractLogic, AbstractLogicInstance, Instance } from "./types";

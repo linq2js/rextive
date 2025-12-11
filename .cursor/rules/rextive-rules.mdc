@@ -16,12 +16,14 @@ A signal-based reactive state management library with explicit dependencies.
 4. [Signal API](#-signal-api)
 5. [React Integration](#-react-integration)
 6. [Operators](#-operators)
-7. [Async Utilities](#-async-utilities)
-8. [Logic System](#-logic-system)
-9. [Plugins & Extensions](#-plugins--extensions)
-10. [Naming Conventions](#-naming-conventions)
-11. [Critical Rules](#-critical-rules)
-12. [Internal Architecture](#-internal-architecture)
+7. [Helpers](#-helpers)
+8. [Setup Utility](#-setup-utility)
+9. [Async Utilities](#-async-utilities)
+10. [Logic System](#-logic-system)
+11. [Plugins & Extensions](#-plugins--extensions)
+12. [Naming Conventions](#-naming-conventions)
+13. [Critical Rules](#-critical-rules)
+14. [Internal Architecture](#-internal-architecture)
 
 ---
 
@@ -609,6 +611,147 @@ person.set(prev => ({ ...prev, name: "Jane" }));
 | `patch()` | Simple property updates, one-off changes |
 | `focus.lens()` | Repeated access to same property |
 | `immer` | Complex nested mutations |
+
+---
+
+## 🔧 Setup Utility
+
+A chainable builder for collecting and running effects with cleanup. Useful for managing multiple setup/teardown lifecycles in logic or components.
+
+Import from `rextive`:
+
+```tsx
+import { setup } from "rextive";
+```
+
+### Basic Usage
+
+```tsx
+// Immediate run - returns cleanup function
+const stop = setup()
+  .add(() => {
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);  // Cleanup
+  })
+  .add(() => signal.on(handleChange))  // Returns unsub automatically
+  .run();
+
+// Later: cleanup all effects
+stop();
+```
+
+### Chaining Pattern
+
+```tsx
+// Chain multiple add() calls
+const stop = setup()
+  .add(startTimer)
+  .add(startSubscription)
+  .add([playMusic, startAnimation])  // Array of functions
+  .run();
+```
+
+### Delayed/Triggered Run
+
+Use a trigger function to control when effects execute:
+
+```tsx
+// Run after 100ms delay
+const stop = setup()
+  .add(startGame)
+  .run((emit) => {
+    const id = setTimeout(emit, 100);
+    return () => clearTimeout(id);  // Trigger cleanup
+  });
+
+// Run on next animation frame
+const stop = setup()
+  .add(startAnimation)
+  .run((emit) => {
+    const id = requestAnimationFrame(emit);
+    return () => cancelAnimationFrame(id);
+  });
+
+// Run on event (once)
+const stop = setup()
+  .add(handleClick)
+  .run((emit) => {
+    document.addEventListener("click", emit, { once: true });
+    return () => document.removeEventListener("click", emit);
+  });
+```
+
+### Logic Integration
+
+```tsx
+function gameLogic() {
+  const score = signal(0);
+  const tick = () => score.set(s => s + 1);
+  
+  return {
+    score,
+    // Use setup for dispose
+    dispose: setup()
+      .add(() => {
+        const id = setInterval(tick, 1000);
+        return () => clearInterval(id);
+      })
+      .add(() => score.on(playSound))
+      .run(),
+  };
+}
+
+// In component
+const $game = useScope(gameLogic);  // Auto-disposed on unmount
+```
+
+### Cleanup Behavior
+
+**Immediate run:**
+- `run()` executes all effects immediately
+- Returns cleanup that disposes all effects
+
+**Triggered run:**
+- `run(trigger)` waits for trigger to call `emit`
+- If `stop()` called before emit: trigger cleanup runs, effects never run
+- If `stop()` called after emit: both trigger and effects cleanup run
+
+```tsx
+const stop = setup()
+  .add(() => effectCleanup)
+  .run((emit) => {
+    const id = setTimeout(emit, 1000);
+    return () => clearTimeout(id);  // triggerCleanup
+  });
+
+// Before 1000ms: only clearTimeout runs
+// After 1000ms: both clearTimeout and effectCleanup run
+stop();
+```
+
+### API Reference
+
+```tsx
+interface Setup {
+  // Add single function
+  add(fn: SetupFn): Setup;
+  
+  // Add array of functions
+  add(fns: SetupFn[]): Setup;
+  
+  // Run immediately
+  run(): () => void;
+  
+  // Run via trigger
+  run<TArgs extends unknown[]>(
+    trigger: TriggerFn<TArgs>,
+    ...args: TArgs
+  ): () => void;
+}
+
+type SetupFn = () => (() => void) | void;
+type TriggerFn<TArgs> = (emit: () => void, ...args: TArgs) => void | (() => void);
+```
 
 ---
 
@@ -1298,6 +1441,7 @@ wait, awaited                // Async utilities
 logic                        // Logic system
 emitter                      // Event emitter
 disposable, wrapDispose      // Disposal utilities
+setup                        // Setup/cleanup builder
 is                           // Type guards
 compose, dev, producer       // Utilities
 validate                     // Validation helpers

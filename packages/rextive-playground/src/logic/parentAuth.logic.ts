@@ -1,30 +1,30 @@
 /**
  * @file parentAuthLogic.ts
  * @description Global logic for parent authentication.
- * 
+ *
  * Manages the parent password system that protects access to the parent dashboard.
  * Parents can set up a password, login, logout, and change their password.
- * 
+ *
  * Sessions are stored in sessionStorage (cleared when browser closes).
- * 
+ *
  * @example
  * ```ts
  * const $auth = parentAuthLogic();
- * 
+ *
  * // Check if password is set up
  * if (!wait($auth.isSetup())) {
  *   // Show setup form
  *   await $auth.setup("1234");
  * }
- * 
+ *
  * // Login
  * const success = await $auth.login("1234");
- * 
+ *
  * // Check if authenticated
  * if ($auth.isAuthenticated()) {
  *   // Show parent dashboard
  * }
- * 
+ *
  * // Logout
  * $auth.logout();
  * ```
@@ -73,10 +73,14 @@ export const parentAuthLogic = logic("parentAuthLogic", () => {
    * Async signal that checks if parent password has been set up.
    * Re-fetches when refresh is triggered (e.g., after setup).
    */
-  const isSetup = signal({ onRefresh }, async ({ deps }) => {
-    void deps.onRefresh; // Access to establish dependency
-    return parentAuthRepository.isSetup();
-  }, { name: "parentAuth.isSetup" });
+  const isSetup = signal(
+    { onRefresh },
+    async ({ deps }) => {
+      void deps.onRefresh; // Access to establish dependency
+      return parentAuthRepository.isSetup();
+    },
+    { name: "parentAuth.isSetup" }
+  );
 
   /**
    * Task-wrapped version for sync access to setup status.
@@ -115,15 +119,15 @@ export const parentAuthLogic = logic("parentAuthLogic", () => {
   /**
    * Sets up the parent password for the first time.
    * Automatically logs in after successful setup.
-   * 
+   *
    * @param password - Password to set (should be validated beforehand)
    */
   async function setup(password: string) {
     const promise = (async () => {
-    await parentAuthRepository.setup(password);
+      await parentAuthRepository.setup(password);
       refresh(); // Update isSetup status
-    isAuthenticated.set(true);
-    saveSession();
+      isAuthenticated.set(true);
+      saveSession();
     })();
     setupState.set(promise);
     return promise;
@@ -138,18 +142,18 @@ export const parentAuthLogic = logic("parentAuthLogic", () => {
 
   /**
    * Attempts to authenticate with the given password.
-   * 
+   *
    * @param password - Password to verify
    * @returns Promise resolving to true if successful, false otherwise
    */
   async function login(password: string): Promise<boolean> {
     const promise = (async () => {
-    const success = await parentAuthRepository.authenticate(password);
-    if (success) {
-      isAuthenticated.set(true);
-      saveSession();
-    }
-    return success;
+      const success = await parentAuthRepository.authenticate(password);
+      if (success) {
+        isAuthenticated.set(true);
+        saveSession();
+      }
+      return success;
     })();
     loginState.set(promise);
     return promise;
@@ -178,7 +182,7 @@ export const parentAuthLogic = logic("parentAuthLogic", () => {
   /**
    * Changes the parent password.
    * Requires current password for verification.
-   * 
+   *
    * @param currentPassword - Current password for verification
    * @param newPassword - New password to set
    * @returns Promise resolving to true if successful, false if current password wrong
@@ -187,7 +191,10 @@ export const parentAuthLogic = logic("parentAuthLogic", () => {
     currentPassword: string,
     newPassword: string
   ): Promise<boolean> {
-    const promise = parentAuthRepository.changePassword(currentPassword, newPassword);
+    const promise = parentAuthRepository.changePassword(
+      currentPassword,
+      newPassword
+    );
     changePasswordState.set(promise);
     return promise;
   }
@@ -196,16 +203,26 @@ export const parentAuthLogic = logic("parentAuthLogic", () => {
   // EXPORTS
   // ============================================================================
 
+  function autoLogoutLogic() {
+    return {
+      dispose: logout,
+    };
+  }
+
   return {
     // State
     isSetup,
     isSetupTask,
     isAuthenticated,
-    
+
     // Actions with state tracking
     setup: Object.assign(setup, { state: setupState }),
     login: Object.assign(login, { state: loginState }),
     logout,
-    changePassword: Object.assign(changePassword, { state: changePasswordState }),
+    changePassword: Object.assign(changePassword, {
+      state: changePasswordState,
+    }),
+
+    autoLogoutLogic,
   };
 });

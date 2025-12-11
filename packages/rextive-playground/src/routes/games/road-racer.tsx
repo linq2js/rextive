@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { signal } from "rextive";
+import { setup, signal } from "rextive";
 import { patch } from "rextive/helpers";
 import { rx, useScope } from "rextive/react";
 import { energyLogic, selectedProfileLogic, modalLogic } from "@/logic";
 import { gameProgressRepository } from "@/infrastructure/repositories";
-import { useEffect, useRef, useCallback, useState } from "react";
+import { createRef, useCallback } from "react";
 import { Icon } from "@/components/Icons";
 import {
   GameMenu,
@@ -168,6 +168,7 @@ interface GameState {
 const TIME_LIMIT = 60;
 
 function roadRacerLogic() {
+  const gameRef = createRef<HTMLDivElement>();
   const $energy = energyLogic();
   const $profile = selectedProfileLogic();
 
@@ -355,14 +356,14 @@ function roadRacerLogic() {
     state.set(patch<GameState>({ status: "gameOver", score: finalScore }));
   }
 
-  function moveLeft() {
-    state.set(patch("playerLane", (lane) => Math.max(0, lane - 1)));
-  }
-
-  function moveRight() {
-    state.set(
-      patch("playerLane", (lane) => Math.min(LANE_COUNT - 1, lane + 1))
-    );
+  function move(direction: "left" | "right") {
+    if (direction === "left") {
+      state.set(patch("playerLane", (lane) => Math.max(0, lane - 1)));
+    } else {
+      state.set(
+        patch("playerLane", (lane) => Math.min(LANE_COUNT - 1, lane + 1))
+      );
+    }
   }
 
   function gameLoop() {
@@ -506,7 +507,51 @@ function roadRacerLogic() {
     gameLoopId = requestAnimationFrame(gameLoop);
   }
 
-  function cleanup() {
+  // Setup effects run immediately, return cleanup function
+  const cleanupEffects = setup()
+    .add(() => {
+      // Keyboard controls
+      const handleKeyDown = (e: KeyboardEvent) => {
+        const status = state().status;
+        if (status !== "playing") return;
+
+        if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
+          e.preventDefault();
+          move("left");
+        } else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
+          e.preventDefault();
+          move("right");
+        } else if (e.key === "Escape" || e.key === "p" || e.key === "P") {
+          e.preventDefault();
+          pauseGame();
+        }
+      };
+
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    })
+    .add(() => {
+      // Dynamic game height based on viewport
+      const calculateHeight = () => {
+        const viewportHeight = window.innerHeight;
+        const headerAndStatusHeight = 160;
+        const bottomReserve = window.innerWidth < 640 ? 120 : 40;
+        const availableHeight =
+          viewportHeight - headerAndStatusHeight - bottomReserve;
+
+        // Use all available space, with minimum of GAME_HEIGHT_MIN
+        const newHeight = Math.max(GAME_HEIGHT_MIN, availableHeight);
+        setGameHeight(newHeight);
+      };
+
+      calculateHeight();
+      window.addEventListener("resize", calculateHeight);
+      return () => window.removeEventListener("resize", calculateHeight);
+    })
+    .run();
+
+  // Cleanup game resources (timers, music)
+  function cleanupGame() {
     backgroundMusic.stop();
     if (gameLoopId) {
       cancelAnimationFrame(gameLoopId);
@@ -518,26 +563,31 @@ function roadRacerLogic() {
     }
   }
 
+  // Full cleanup: game + effects (called on dispose)
+  function cleanup() {
+    cleanupGame();
+    cleanupEffects();
+  }
+
   function backToMenu() {
-    cleanup();
+    cleanupGame();
     state.set(patch("status", "menu"));
   }
 
   return {
     state,
+    gameRef,
     canPlay,
     energy: $energy.energy,
     profile: $profile.profile,
     setDifficulty,
-    setGameHeight,
     startGame,
     pauseGame,
     resumeGame,
     endGame,
-    moveLeft,
-    moveRight,
-    cleanup,
+    move,
     backToMenu,
+    dispose: cleanup,
   };
 }
 
@@ -762,38 +812,8 @@ function getStarRating(score: number): number {
 // =============================================================================
 
 function RoadRacer() {
-  const $game = useScope(roadRacerLogic);
-  const gameRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-
-  // Dynamic game height based on available viewport space
-  const [gameHeight, setGameHeightLocal] = useState(GAME_HEIGHT_DEFAULT);
-
-  // Calculate available height for game area
-  useEffect(() => {
-    const calculateHeight = () => {
-      // Get viewport height
-      const viewportHeight = window.innerHeight;
-      // Reserve space for header (~60px) + status bar (~80px) + mobile controls (~100px) + margins
-      const headerAndStatusHeight = 160;
-      const bottomReserve = window.innerWidth < 640 ? 120 : 40; // More space for mobile controls
-      const availableHeight =
-        viewportHeight - headerAndStatusHeight - bottomReserve;
-
-      // Clamp between min and a reasonable max
-      const newHeight = Math.max(
-        GAME_HEIGHT_MIN,
-        Math.min(availableHeight, 700)
-      );
-      setGameHeightLocal(newHeight);
-      // Also update game logic state for collision detection
-      $game.setGameHeight(newHeight);
-    };
-
-    calculateHeight();
-    window.addEventListener("resize", calculateHeight);
-    return () => window.removeEventListener("resize", calculateHeight);
-  }, [$game]);
+  const $game = useScope(roadRacerLogic);
 
   // Handle back button with confirmation during gameplay
   const handleBack = async () => {
@@ -805,53 +825,23 @@ function RoadRacer() {
         "Leave Game?"
       );
       if (!confirmed) return;
-      $game.cleanup();
     }
+    // Cleanup happens automatically via useScope dispose on unmount
     navigate({ to: "/dashboard", viewTransition: true });
   };
-
-  // Keyboard controls
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const status = $game.state().status;
-      if (status !== "playing") return;
-
-      if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
-        e.preventDefault();
-        $game.moveLeft();
-      } else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
-        e.preventDefault();
-        $game.moveRight();
-      } else if (e.key === "Escape" || e.key === "p" || e.key === "P") {
-        e.preventDefault();
-        $game.pauseGame();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [$game]);
-
-  useEffect(() => {
-    return () => $game.cleanup();
-  }, [$game]);
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
       if ($game.state().status !== "playing") return;
 
       const touch = e.touches[0];
-      const rect = gameRef.current?.getBoundingClientRect();
+      const rect = $game.gameRef.current?.getBoundingClientRect();
       if (!rect) return;
 
       const touchX = touch.clientX - rect.left;
       const midPoint = rect.width / 2;
 
-      if (touchX < midPoint) {
-        $game.moveLeft();
-      } else {
-        $game.moveRight();
-      }
+      $game.move(touchX < midPoint ? "left" : "right");
     },
     [$game]
   );
@@ -1006,11 +996,11 @@ function RoadRacer() {
           {/* Game Area - only show during gameplay, not on menu */}
           {gameState.status !== "menu" && (
             <div
-              ref={gameRef}
+              ref={$game.gameRef}
               className="relative mx-auto overflow-hidden rounded-2xl shadow-2xl border-4 border-slate-600"
               style={{
                 width: GAME_WIDTH,
-                height: gameHeight,
+                height: gameState.gameHeight,
                 background: "linear-gradient(to bottom, #374151, #1f2937)",
               }}
               onTouchStart={handleTouchStart}
@@ -1179,13 +1169,13 @@ function RoadRacer() {
           {gameState.status === "playing" && (
             <div className="mt-4 flex gap-4 justify-center sm:hidden">
               <button
-                onTouchStart={() => $game.moveLeft()}
+                onTouchStart={() => $game.move("left")}
                 className="w-20 h-20 rounded-full bg-slate-700/80 text-white flex items-center justify-center active:bg-slate-600 transition-colors border-2 border-slate-500"
               >
                 <ArrowLeftIcon />
               </button>
               <button
-                onTouchStart={() => $game.moveRight()}
+                onTouchStart={() => $game.move("right")}
                 className="w-20 h-20 rounded-full bg-slate-700/80 text-white flex items-center justify-center active:bg-slate-600 transition-colors border-2 border-slate-500"
               >
                 <ArrowRightIcon />

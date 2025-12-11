@@ -12,16 +12,43 @@ export const Route = createFileRoute("/")({
 });
 
 const FUN_QUOTES: { icon: IconName; text: string }[] = [
-  { icon: "map", text: "Ready for an adventure? Ask your parent to create your profile!" },
-  { icon: "star", text: "Every star was once just a little spark. Let's get started!" },
-  { icon: "palette", text: "A blank canvas is full of possibilities. Create your profile!" },
+  {
+    icon: "map",
+    text: "Ready for an adventure? Ask your parent to create your profile!",
+  },
+  {
+    icon: "star",
+    text: "Every star was once just a little spark. Let's get started!",
+  },
+  {
+    icon: "palette",
+    text: "A blank canvas is full of possibilities. Create your profile!",
+  },
   { icon: "trophy", text: "Every hero needs an origin story. What's yours?" },
-  { icon: "target", text: "The journey of a thousand games begins with a single profile!" },
-  { icon: "baby", text: "Every great gamer started small. Let's get you set up!" },
-  { icon: "controller", text: "Player 1, we're waiting for you! Get your profile set up!" },
-  { icon: "brain", text: "A great mind is never late... but your profile might be!" },
-  { icon: "puzzle", text: "Every puzzle starts with a single piece. Time to begin!" },
-  { icon: "fire", text: "The show can't start without the star performer - you!" },
+  {
+    icon: "target",
+    text: "The journey of a thousand games begins with a single profile!",
+  },
+  {
+    icon: "baby",
+    text: "Every great gamer started small. Let's get you set up!",
+  },
+  {
+    icon: "controller",
+    text: "Player 1, we're waiting for you! Get your profile set up!",
+  },
+  {
+    icon: "brain",
+    text: "A great mind is never late... but your profile might be!",
+  },
+  {
+    icon: "puzzle",
+    text: "Every puzzle starts with a single piece. Time to begin!",
+  },
+  {
+    icon: "fire",
+    text: "The show can't start without the star performer - you!",
+  },
 ];
 
 function getRandomQuote() {
@@ -57,44 +84,50 @@ function HomePage() {
     return unsub;
   }, [$profiles.profilesTask]);
 
-      return (
+  return (
     <Suspense fallback={<LoadingSpinner />}>
       {rx(() => {
         // Use wait() to read async data - will suspend if loading
         const profiles = wait($profiles.profiles());
 
-    return (
-      <div className="min-h-screen p-4 safe-bottom">
-        <div className="mx-auto max-w-4xl">
-          <header className="mb-8 text-center">
-            <h1 className="font-display text-3xl font-bold text-gray-800 sm:text-4xl flex items-center justify-center gap-2">
-              <Icon name="controller" size={36} className="text-primary-500" />
-              Ging
-              <span className="text-gradient-kid"> Playground</span>
-            </h1>
-            <p className="mt-2 text-gray-600">Fun learning games for kids!</p>
-          </header>
+        return (
+          <div className="min-h-screen p-4 safe-bottom">
+            <div className="mx-auto max-w-4xl">
+              <header className="mb-8 text-center">
+                <h1 className="font-display text-3xl font-bold text-gray-800 sm:text-4xl flex items-center justify-center gap-2">
+                  <Icon
+                    name="controller"
+                    size={36}
+                    className="text-primary-500"
+                  />
+                  Ging
+                  <span className="text-gradient-kid"> Playground</span>
+                </h1>
+                <p className="mt-2 text-gray-600">
+                  Fun learning games for kids!
+                </p>
+              </header>
 
-          {profiles.length === 0 ? (
-            <NoProfiles quote={quote} />
-          ) : (
-            <ProfileSelector profiles={profiles} />
-          )}
+              {profiles.length === 0 ? (
+                <NoProfiles quote={quote} />
+              ) : (
+                <ProfileSelector profiles={profiles} />
+              )}
 
-          {/* Parent Mode Link */}
-          <div className="mt-12 text-center">
-            <Link
-              to="/mode/parent"
-              viewTransition
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              <Icon name="lock" size={16} />
-              <span>Parent Mode</span>
-            </Link>
+              {/* Parent Mode Link */}
+              <div className="mt-12 text-center">
+                <Link
+                  to="/mode/parent"
+                  viewTransition
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  <Icon name="lock" size={16} />
+                  <span>Parent Mode</span>
+                </Link>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    );
+        );
       })}
     </Suspense>
   );

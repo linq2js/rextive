@@ -45,14 +45,62 @@ function statsPageLogic() {
       currentStreak: 0,
       bestStreak: 0,
       achievements: [
-        { id: "first-game", name: "First Steps", icon: "baby", unlocked: false, description: "Play your first game" },
-        { id: "unlock-2", name: "Game Collector", icon: "lock", unlocked: false, description: "Unlock 2 games" },
-        { id: "unlock-all", name: "Master Unlocker", icon: "key", unlocked: false, description: "Unlock all games" },
-        { id: "streak-3", name: "On Fire", icon: "fire", unlocked: false, description: "3 day streak" },
-        { id: "streak-7", name: "Week Warrior", icon: "swords", unlocked: false, description: "7 day streak" },
-        { id: "score-1000", name: "High Scorer", icon: "trophy", unlocked: false, description: "Score 1000 points" },
-        { id: "level-5", name: "Rising Star", icon: "star", unlocked: false, description: "Reach level 5" },
-        { id: "all-games", name: "Explorer", icon: "map", unlocked: false, description: "Try all games" },
+        {
+          id: "first-game",
+          name: "First Steps",
+          icon: "baby",
+          unlocked: false,
+          description: "Play your first game",
+        },
+        {
+          id: "unlock-2",
+          name: "Game Collector",
+          icon: "lock",
+          unlocked: false,
+          description: "Unlock 2 games",
+        },
+        {
+          id: "unlock-all",
+          name: "Master Unlocker",
+          icon: "key",
+          unlocked: false,
+          description: "Unlock all games",
+        },
+        {
+          id: "streak-3",
+          name: "On Fire",
+          icon: "fire",
+          unlocked: false,
+          description: "3 day streak",
+        },
+        {
+          id: "streak-7",
+          name: "Week Warrior",
+          icon: "swords",
+          unlocked: false,
+          description: "7 day streak",
+        },
+        {
+          id: "score-1000",
+          name: "High Scorer",
+          icon: "trophy",
+          unlocked: false,
+          description: "Score 1000 points",
+        },
+        {
+          id: "level-5",
+          name: "Rising Star",
+          icon: "star",
+          unlocked: false,
+          description: "Reach level 5",
+        },
+        {
+          id: "all-games",
+          name: "Explorer",
+          icon: "map",
+          unlocked: false,
+          description: "Try all games",
+        },
       ],
     },
     { name: "statsPage.stats" }
@@ -63,28 +111,38 @@ function statsPageLogic() {
     if (!profile) return;
 
     const allProgress = await gameProgressRepository.getByKid(profile.id);
-    const totalGames = allProgress.reduce((sum: number, p) => sum + p.timesPlayed, 0);
-    const totalScore = allProgress.reduce((sum: number, p) => sum + p.totalScore, 0);
+    const totalGames = allProgress.reduce(
+      (sum: number, p) => sum + p.timesPlayed,
+      0
+    );
+    const totalScore = allProgress.reduce(
+      (sum: number, p) => sum + p.totalScore,
+      0
+    );
     // Streaks not stored in DB yet, use 0 as default
     const currentStreak = 0;
     const bestStreak = 0;
     const level = Math.floor(totalScore / 1000) + 1;
     const xp = totalScore % 1000;
-    
+
     // Calculate unlocked games
-    const unlockedGamesCount = AVAILABLE_GAMES.filter(g => isGameUnlocked(g.id, totalScore)).length;
+    const unlockedGamesCount = AVAILABLE_GAMES.filter((g) =>
+      isGameUnlocked(g.id, totalScore)
+    ).length;
     const gamesPlayedSet = new Set(allProgress.map((p) => p.gameName));
-    
-    const achievements = stats().achievements.map(a => {
+
+    const achievements = stats().achievements.map((a) => {
       let unlocked = a.unlocked;
       if (a.id === "first-game" && totalGames > 0) unlocked = true;
       if (a.id === "unlock-2" && unlockedGamesCount >= 2) unlocked = true;
-      if (a.id === "unlock-all" && unlockedGamesCount >= AVAILABLE_GAMES.length) unlocked = true;
+      if (a.id === "unlock-all" && unlockedGamesCount >= AVAILABLE_GAMES.length)
+        unlocked = true;
       if (a.id === "streak-3" && bestStreak >= 3) unlocked = true;
       if (a.id === "streak-7" && bestStreak >= 7) unlocked = true;
       if (a.id === "score-1000" && totalScore >= 1000) unlocked = true;
       if (a.id === "level-5" && level >= 5) unlocked = true;
-      if (a.id === "all-games" && gamesPlayedSet.size >= AVAILABLE_GAMES.length) unlocked = true;
+      if (a.id === "all-games" && gamesPlayedSet.size >= AVAILABLE_GAMES.length)
+        unlocked = true;
       return { ...a, unlocked };
     });
 
@@ -100,19 +158,16 @@ function statsPageLogic() {
     });
   }
 
+  loadStats();
+
   return {
     profile: $selected.profile,
     stats,
-    loadStats,
   };
 }
 
 function StatsPage() {
   const $page = useScope(statsPageLogic);
-
-  useEffect(() => {
-    $page.loadStats();
-  }, []);
 
   return (
     <Suspense fallback={<LoadingSpinner />}>
@@ -122,7 +177,9 @@ function StatsPage() {
 
         const stats = $page.stats();
         const avatarName = AVATAR_NAMES[profile.avatar] || "";
-        const unlockedCount = stats.achievements.filter(a => a.unlocked).length;
+        const unlockedCount = stats.achievements.filter(
+          (a) => a.unlocked
+        ).length;
 
         return (
           <div className="min-h-screen bg-pattern-kid pb-8 safe-bottom">
@@ -138,11 +195,9 @@ function StatsPage() {
                     <Icon name="back" size={20} />
                     <span className="text-sm font-medium">Back</span>
                   </Link>
-
                   <h1 className="font-display font-bold text-gray-800">
                     Stats & Achievements
                   </h1>
-
                   <div className="w-16" /> {/* Spacer for centering */}
                 </div>
               </div>
@@ -156,7 +211,9 @@ function StatsPage() {
                     <Avatar avatar={profile.avatar} className="w-full h-full" />
                   </div>
                   <div>
-                    <h2 className="font-display text-xl font-bold">{profile.name}</h2>
+                    <h2 className="font-display text-xl font-bold">
+                      {profile.name}
+                    </h2>
                     <p className="text-white/80">
                       Level {stats.level} • {avatarName}
                     </p>
@@ -173,16 +230,36 @@ function StatsPage() {
                   Your Stats
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
-                  <StatCard icon="controller" value={stats.totalGames} label="Total Games" />
-                  <StatCard icon="star" value={stats.totalScore.toLocaleString()} label="Total Score" />
-                  <StatCard icon="fire" value={stats.currentStreak} label="Current Streak" suffix=" days" />
-                  <StatCard icon="trophy" value={stats.bestStreak} label="Best Streak" suffix=" days" />
+                  <StatCard
+                    icon="controller"
+                    value={stats.totalGames}
+                    label="Total Games"
+                  />
+                  <StatCard
+                    icon="star"
+                    value={stats.totalScore.toLocaleString()}
+                    label="Total Score"
+                  />
+                  <StatCard
+                    icon="fire"
+                    value={stats.currentStreak}
+                    label="Current Streak"
+                    suffix=" days"
+                  />
+                  <StatCard
+                    icon="trophy"
+                    value={stats.bestStreak}
+                    label="Best Streak"
+                    suffix=" days"
+                  />
                 </div>
               </section>
 
               {/* Level Progress */}
               <section className="card">
-                <h3 className="font-display font-semibold text-gray-700 mb-3">Level Progress</h3>
+                <h3 className="font-display font-semibold text-gray-700 mb-3">
+                  Level Progress
+                </h3>
                 <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
                   <span>Level {stats.level}</span>
                   <span>Level {stats.level + 1}</span>
@@ -190,7 +267,9 @@ function StatsPage() {
                 <div className="h-4 rounded-full bg-gray-100 overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-primary-500 to-purple-500 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.round((stats.xp / stats.xpToNextLevel) * 100)}%` }}
+                    style={{
+                      width: `${Math.round((stats.xp / stats.xpToNextLevel) * 100)}%`,
+                    }}
                   />
                 </div>
                 <p className="text-center text-sm text-gray-500 mt-2">
@@ -211,7 +290,10 @@ function StatsPage() {
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
                   {stats.achievements.map((achievement) => (
-                    <AchievementCard key={achievement.id} achievement={achievement} />
+                    <AchievementCard
+                      key={achievement.id}
+                      achievement={achievement}
+                    />
                   ))}
                 </div>
               </section>
@@ -250,7 +332,8 @@ function StatCard({
         <Icon name={icon} size={36} />
       </span>
       <span className="mt-2 text-2xl font-bold text-gray-800">
-        {value}{suffix}
+        {value}
+        {suffix}
       </span>
       <span className="text-sm text-gray-500">{label}</span>
     </div>
@@ -279,7 +362,9 @@ function AchievementCard({ achievement }: { achievement: Achievement }) {
         <div className="font-display font-semibold text-gray-800 text-sm leading-tight">
           {achievement.name}
         </div>
-        <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">{achievement.description}</div>
+        <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+          {achievement.description}
+        </div>
       </div>
       {achievement.unlocked && (
         <div className="mt-1 text-green-500">
@@ -289,4 +374,3 @@ function AchievementCard({ achievement }: { achievement: Achievement }) {
     </div>
   );
 }
-

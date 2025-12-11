@@ -3,12 +3,8 @@ import { signal } from "rextive";
 import { rx, useScope } from "rextive/react";
 import { energyLogic, selectedProfileLogic, modalLogic } from "@/logic";
 import { gameProgressRepository } from "@/infrastructure/repositories";
-import { useEffect } from "react";
 import { gameTickLogic } from "@/utils";
-import {
-  calculateAnswerPoints,
-  calculateStarRating,
-} from "@/domain/scoring";
+import { calculateAnswerPoints, calculateStarRating } from "@/domain/scoring";
 import {
   playFlipSound,
   playMatchSound,
@@ -172,11 +168,36 @@ function BrainIcon() {
     <svg viewBox="0 0 64 64" className="w-full h-full">
       <ellipse cx="24" cy="32" rx="16" ry="20" fill="#f472b6" />
       <ellipse cx="40" cy="32" rx="16" ry="20" fill="#ec4899" />
-      <path d="M24 16 Q32 12 40 16" stroke="#db2777" strokeWidth="2" fill="none" />
-      <path d="M20 24 Q32 20 44 24" stroke="#db2777" strokeWidth="2" fill="none" />
-      <path d="M18 32 Q32 28 46 32" stroke="#db2777" strokeWidth="2" fill="none" />
-      <path d="M20 40 Q32 36 44 40" stroke="#db2777" strokeWidth="2" fill="none" />
-      <path d="M24 48 Q32 44 40 48" stroke="#db2777" strokeWidth="2" fill="none" />
+      <path
+        d="M24 16 Q32 12 40 16"
+        stroke="#db2777"
+        strokeWidth="2"
+        fill="none"
+      />
+      <path
+        d="M20 24 Q32 20 44 24"
+        stroke="#db2777"
+        strokeWidth="2"
+        fill="none"
+      />
+      <path
+        d="M18 32 Q32 28 46 32"
+        stroke="#db2777"
+        strokeWidth="2"
+        fill="none"
+      />
+      <path
+        d="M20 40 Q32 36 44 40"
+        stroke="#db2777"
+        strokeWidth="2"
+        fill="none"
+      />
+      <path
+        d="M24 48 Q32 44 40 48"
+        stroke="#db2777"
+        strokeWidth="2"
+        fill="none"
+      />
     </svg>
   );
 }
@@ -259,7 +280,7 @@ function memoryMatchLogic() {
   function generateCards(): GameCard[] {
     const config = DIFFICULTY_CONFIG[difficulty()];
     const cat = category();
-    
+
     // Get items based on category
     let availableItems: CardItem[];
     if (cat === "mixed") {
@@ -267,19 +288,19 @@ function memoryMatchLogic() {
     } else {
       availableItems = CARD_CATEGORIES[cat] || ALL_ITEMS;
     }
-    
+
     // Select random items for pairs
     const selectedItems = shuffleArray(availableItems).slice(0, config.pairs);
-    
+
     // Create pairs
     const cardPairs: GameCard[] = [];
     let uid = 0;
-    
+
     for (const item of selectedItems) {
       cardPairs.push({ uid: uid++, item, isFlipped: false, isMatched: false });
       cardPairs.push({ uid: uid++, item, isFlipped: false, isMatched: false });
     }
-    
+
     return shuffleArray(cardPairs);
   }
 
@@ -289,7 +310,7 @@ function memoryMatchLogic() {
     if (!hasEnergy) return false;
 
     const config = DIFFICULTY_CONFIG[difficulty()];
-    
+
     cards.set(generateCards());
     flippedIndices.set([]);
     isChecking.set(false);
@@ -301,32 +322,30 @@ function memoryMatchLogic() {
     bestStreak.set(0);
     gameState.set("playing");
     backgroundMusic.playMemoryMusic();
-    
+
     return true;
   }
 
   function flipCard(index: number) {
     if (isChecking()) return;
-    
+
     const currentCards = cards();
     const card = currentCards[index];
-    
+
     if (card.isMatched || card.isFlipped) return;
-    
+
     const currentFlipped = flippedIndices();
     if (currentFlipped.length >= 2) return;
-    
+
     playFlipSound();
-    
+
     cards.set(
-      currentCards.map((c, i) =>
-        i === index ? { ...c, isFlipped: true } : c
-      )
+      currentCards.map((c, i) => (i === index ? { ...c, isFlipped: true } : c))
     );
-    
+
     const newFlipped = [...currentFlipped, index];
     flippedIndices.set(newFlipped);
-    
+
     if (newFlipped.length === 2) {
       checkMatch(newFlipped[0], newFlipped[1]);
     }
@@ -335,13 +354,13 @@ function memoryMatchLogic() {
   function checkMatch(index1: number, index2: number) {
     isChecking.set(true);
     moves.set((m) => m + 1);
-    
+
     const currentCards = cards();
     const card1 = currentCards[index1];
     const card2 = currentCards[index2];
-    
+
     const isMatch = card1.item.id === card2.item.id;
-    
+
     setTimeout(() => {
       if (isMatch) {
         playMatchSound();
@@ -350,17 +369,17 @@ function memoryMatchLogic() {
             i === index1 || i === index2 ? { ...c, isMatched: true } : c
           )
         );
-        
+
         const newStreak = streak() + 1;
         streak.set(newStreak);
         bestStreak.set(Math.max(bestStreak(), newStreak));
-        
+
         const points = calculateAnswerPoints(difficulty(), newStreak - 1);
         score.set((s) => s + points);
-        
+
         const newMatches = matches() + 1;
         matches.set(newMatches);
-        
+
         const config = DIFFICULTY_CONFIG[difficulty()];
         if (newMatches >= config.pairs) {
           playWinSound();
@@ -375,22 +394,26 @@ function memoryMatchLogic() {
         );
         streak.set(0);
       }
-      
+
       flippedIndices.set([]);
       isChecking.set(false);
     }, 800);
   }
 
   // Game tick effect - auto-managed timer that cleans up when logic disposes
-  gameTickLogic(gameState, () => {
-    timeLeft.set((t) => {
-      if (t <= 1) {
-        finishGame();
-        return 0;
-      }
-      return t - 1;
-    });
-  }, { name: "memory" });
+  gameTickLogic(
+    gameState,
+    () => {
+      timeLeft.set((t) => {
+        if (t <= 1) {
+          finishGame();
+          return 0;
+        }
+        return t - 1;
+      });
+    },
+    { name: "memory" }
+  );
 
   async function finishGame() {
     backgroundMusic.stop();
@@ -433,6 +456,9 @@ function memoryMatchLogic() {
     startGame,
     flipCard,
     backToMenu,
+    dispose() {
+      backgroundMusic.stop();
+    },
   };
 }
 
@@ -458,14 +484,6 @@ function MemoryMatch() {
     navigate({ to: "/dashboard", viewTransition: true });
   };
 
-  // Timer is now handled by gameTickLogic inside memoryMatchLogic
-  // No useEffect needed for tick!
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => backgroundMusic.stop();
-  }, []);
-
   return rx(() => {
     const state = $game.gameState();
 
@@ -482,7 +500,9 @@ function MemoryMatch() {
               <span className="text-sm font-medium hidden sm:inline">Back</span>
             </button>
             <h1 className="font-display text-2xl font-bold text-white drop-shadow-lg flex items-center gap-2">
-              <span className="w-8 h-8"><BrainIcon /></span>
+              <span className="w-8 h-8">
+                <BrainIcon />
+              </span>
               Memory Match
             </h1>
             <div className="flex items-center gap-1 text-amber-300 font-bold">
@@ -559,15 +579,15 @@ function MenuScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> }) {
         energy={energy}
         energyCost={2}
         onPlay={async () => {
-            const started = await $game.startGame();
-            if (!started) {
-              const $modal = modalLogic();
+          const started = await $game.startGame();
+          if (!started) {
+            const $modal = modalLogic();
             await $modal.warning(
               "No energy left! Come back tomorrow to play again.",
               "No Energy"
             );
-            }
-          }}
+          }
+        }}
         howToPlay={HOW_TO_PLAY}
         howToPlayColor="bg-purple-100/80"
       >
@@ -582,7 +602,11 @@ function MenuScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> }) {
   });
 }
 
-function PlayingScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> }) {
+function PlayingScreen({
+  $game,
+}: {
+  $game: ReturnType<typeof memoryMatchLogic>;
+}) {
   return rx(() => {
     const cards = $game.cards();
     const difficulty = $game.difficulty();
@@ -605,7 +629,9 @@ function PlayingScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> }
               </div>
               <div>
                 <span className="text-gray-500">Pairs:</span>
-                <span className="ml-1 font-bold">{matches}/{config.pairs}</span>
+                <span className="ml-1 font-bold">
+                  {matches}/{config.pairs}
+                </span>
               </div>
               <div>
                 <span className="text-gray-500">Moves:</span>
@@ -617,7 +643,9 @@ function PlayingScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> }
                 </div>
               )}
             </div>
-            <div className={`text-2xl font-bold flex items-center gap-1 ${timeLeft <= 10 ? "text-red-500 animate-pulse" : "text-gray-800"}`}>
+            <div
+              className={`text-2xl font-bold flex items-center gap-1 ${timeLeft <= 10 ? "text-red-500 animate-pulse" : "text-gray-800"}`}
+            >
               <TimerIcon /> {timeLeft}s
             </div>
           </div>
@@ -670,9 +698,9 @@ function GameCardComponent({
       <div
         className={`relative w-full h-full transition-transform duration-500 ease-in-out ${
           card.isMatched ? "cursor-default" : "cursor-pointer"
-      }`}
-      style={{
-        transformStyle: "preserve-3d",
+        }`}
+        style={{
+          transformStyle: "preserve-3d",
           transform: isRevealed ? "rotateY(180deg)" : "rotateY(0deg)",
         }}
       >
@@ -685,9 +713,21 @@ function GameCardComponent({
           } transition-transform`}
           style={{ backfaceVisibility: "hidden" }}
         >
-          <svg viewBox="0 0 24 24" className="w-8 h-8 sm:w-10 sm:h-10 text-white/60">
+          <svg
+            viewBox="0 0 24 24"
+            className="w-8 h-8 sm:w-10 sm:h-10 text-white/60"
+          >
             <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.3" />
-            <text x="12" y="16" textAnchor="middle" fontSize="12" fill="white" fontWeight="bold">?</text>
+            <text
+              x="12"
+              y="16"
+              textAnchor="middle"
+              fontSize="12"
+              fill="white"
+              fontWeight="bold"
+            >
+              ?
+            </text>
           </svg>
         </div>
 
@@ -706,25 +746,34 @@ function GameCardComponent({
           <div className="w-3/4 aspect-square max-w-20">
             <GameIcon name={card.item.id} size="100%" />
           </div>
-          <span className={`text-[10px] sm:text-xs font-medium mt-0.5 truncate w-full text-center ${
-            card.isMatched ? "text-green-700" : "text-gray-700"
-          }`}>
+          <span
+            className={`text-[10px] sm:text-xs font-medium mt-0.5 truncate w-full text-center ${
+              card.isMatched ? "text-green-700" : "text-gray-700"
+            }`}
+          >
             {card.item.name}
           </span>
           {card.isMatched && (
             <div className="absolute top-1 right-1">
               <svg viewBox="0 0 24 24" className="w-4 h-4 text-green-500">
-                <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-          </svg>
-        </div>
-      )}
+                <path
+                  fill="currentColor"
+                  d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
+                />
+              </svg>
+            </div>
+          )}
         </div>
       </div>
     </button>
   );
 }
 
-function FinishedScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> }) {
+function FinishedScreen({
+  $game,
+}: {
+  $game: ReturnType<typeof memoryMatchLogic>;
+}) {
   return rx(() => {
     const score = $game.score();
     const matches = $game.matches();
@@ -736,7 +785,7 @@ function FinishedScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> 
 
     const won = matches >= config.pairs;
     const accuracy = moves > 0 ? Math.round((matches / moves) * 100) : 0;
-    
+
     const stars = calculateStarRating(
       matches,
       config.pairs,
@@ -778,16 +827,25 @@ function FinishedScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> 
 
           {/* Stats Grid */}
           <div className="mt-6 grid grid-cols-2 gap-4 text-left">
-            <StatItem label="Pairs Found" value={`${matches}/${config.pairs}`} />
+            <StatItem
+              label="Pairs Found"
+              value={`${matches}/${config.pairs}`}
+            />
             <StatItem label="Moves" value={moves} />
-            <StatItem label="Best Streak" value={bestStreak} icon={<FireIcon />} />
+            <StatItem
+              label="Best Streak"
+              value={bestStreak}
+              icon={<FireIcon />}
+            />
             <StatItem label="Accuracy" value={`${accuracy}%`} />
           </div>
 
           {/* XP Earned */}
           <div className="mt-6 p-4 bg-amber-50 rounded-xl">
             <div className="text-sm text-amber-700">XP Earned</div>
-            <div className="text-2xl font-bold text-amber-600">+{totalXP} XP</div>
+            <div className="text-2xl font-bold text-amber-600">
+              +{totalXP} XP
+            </div>
             {timeBonus > 0 && (
               <div className="text-xs text-amber-600">
                 (includes +{timeBonus} time bonus)
@@ -803,7 +861,10 @@ function FinishedScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> 
               const started = await $game.startGame();
               if (!started) {
                 const $modal = modalLogic();
-                await $modal.warning("No energy left! Come back tomorrow to play again.", "No Energy");
+                await $modal.warning(
+                  "No energy left! Come back tomorrow to play again.",
+                  "No Energy"
+                );
               }
             }}
             disabled={$game.energy() === 0}
@@ -821,7 +882,11 @@ function FinishedScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> 
               "No Energy Left"
             )}
           </button>
-          <Link to="/dashboard" viewTransition className="btn bg-gray-200 text-gray-700 py-3 text-center hover:bg-gray-300">
+          <Link
+            to="/dashboard"
+            viewTransition
+            className="btn bg-gray-200 text-gray-700 py-3 text-center hover:bg-gray-300"
+          >
             Back to Dashboard
           </Link>
         </div>
@@ -830,12 +895,12 @@ function FinishedScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> 
   });
 }
 
-function StatItem({ 
-  label, 
-  value, 
-  icon 
-}: { 
-  label: string; 
+function StatItem({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
   value: string | number;
   icon?: React.ReactNode;
 }) {
