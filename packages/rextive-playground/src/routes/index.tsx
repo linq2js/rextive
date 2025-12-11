@@ -69,7 +69,7 @@ function HomePage() {
           <header className="mb-8 text-center">
             <h1 className="font-display text-3xl font-bold text-gray-800 sm:text-4xl flex items-center justify-center gap-2">
               <Icon name="controller" size={36} className="text-primary-500" />
-              Rextive
+              Ging
               <span className="text-gradient-kid"> Playground</span>
             </h1>
             <p className="mt-2 text-gray-600">Fun learning games for kids!</p>
