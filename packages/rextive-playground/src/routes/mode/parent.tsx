@@ -18,12 +18,12 @@ export const Route = createFileRoute("/mode/parent")({
 });
 
 function LoadingSpinner() {
-      return (
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-2xl">Loading...</div>
-        </div>
-      );
-    }
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="text-2xl">Loading...</div>
+    </div>
+  );
+}
 
 function ParentLayout() {
   const $auth = parentAuthLogic();
@@ -49,15 +49,15 @@ function ParentLayout() {
 
         // Not set up yet
         if (!setupState?.value) {
-      return <SetupPassword />;
-    }
+          return <SetupPassword />;
+        }
 
         // Not authenticated
-    if (!$auth.isAuthenticated()) {
-      return <LoginScreen />;
-    }
+        if (!$auth.isAuthenticated()) {
+          return <LoginScreen />;
+        }
 
-    return <ParentDashboardLayout />;
+        return <ParentDashboardLayout />;
       })}
     </Suspense>
   );
@@ -161,6 +161,9 @@ function SetupPassword() {
 function LoginScreen() {
   const $form = useScope(loginFormLogic);
 
+  // Create input-mapped lens for password field
+  const passwordLens = focus.lens($form.state, "password").map(inputValue);
+
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="card w-full max-w-md">
@@ -179,29 +182,24 @@ function LoginScreen() {
           }}
           className="mt-6 space-y-4"
         >
-          {rx(() => {
-            const [get, set] = focus
-              .lens($form.state, "password")
-              .map(inputValue);
-            return (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={get()}
-                  onChange={set}
-                  className="input"
-                  placeholder="Enter password"
-                  autoComplete="current-password"
-                />
-              </div>
-            );
-          })}
+          {rx(() => (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <input
+                type="password"
+                value={passwordLens[0]()}
+                onChange={passwordLens[1]}
+                className="input"
+                placeholder="Enter password"
+                autoComplete="current-password"
+              />
+            </div>
+          ))}
 
           {rx(() => {
-            const error = $form.state().error;
+            const error = $form.getError();
             return error ? (
               <p className="text-sm text-red-500">{error}</p>
             ) : null;
@@ -210,10 +208,10 @@ function LoginScreen() {
           {rx(() => (
             <button
               type="submit"
-              disabled={$form.state().loading}
+              disabled={$form.getLoading()}
               className="btn btn-primary w-full py-3"
             >
-              {$form.state().loading ? "Verifying..." : "Enter"}
+              {$form.getLoading() ? "Verifying..." : "Enter"}
             </button>
           ))}
         </form>
@@ -236,12 +234,12 @@ function ParentDashboardLayout() {
   const activeTab = pathname.endsWith("/data")
     ? "data"
     : pathname.endsWith("/sync")
-    ? "sync"
-    : pathname.endsWith("/settings")
-    ? "settings"
-    : "kids";
+      ? "sync"
+      : pathname.endsWith("/settings")
+        ? "settings"
+        : "kids";
 
-      return (
+  return (
     <Suspense fallback={<LoadingSpinner />}>
       {rx(() => {
         // Use task.from to check loading state
@@ -249,80 +247,80 @@ function ParentDashboardLayout() {
 
         if (profilesState?.loading) {
           return <LoadingSpinner />;
-    }
+        }
 
-    return (
-      <div className="min-h-screen safe-bottom">
-        {/* Navigation Bar */}
-        <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200">
-          <div className="mx-auto max-w-2xl px-4">
-            <div className="flex h-14 items-center justify-between">
-              <Link
-                to="/"
-                viewTransition
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <span className="text-xl">←</span>
-                <span className="text-sm font-medium hidden sm:inline">
-                  Home
-                </span>
-              </Link>
+        return (
+          <div className="min-h-screen safe-bottom">
+            {/* Navigation Bar */}
+            <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200">
+              <div className="mx-auto max-w-2xl px-4">
+                <div className="flex h-14 items-center justify-between">
+                  <Link
+                    to="/"
+                    viewTransition
+                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    <span className="text-xl">←</span>
+                    <span className="text-sm font-medium hidden sm:inline">
+                      Home
+                    </span>
+                  </Link>
 
-              <h1 className="font-display text-lg font-bold text-gray-800 flex items-center gap-2">
-                <Icon name="settings" size={20} /> Parent Dashboard
-              </h1>
+                  <h1 className="font-display text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <Icon name="settings" size={20} /> Parent Dashboard
+                  </h1>
 
-              <button
-                onClick={() => $auth.logout()}
-                className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors"
-              >
-                <span className="text-sm font-medium hidden sm:inline">
-                  Logout
-                </span>
+                  <button
+                    onClick={() => $auth.logout()}
+                    className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors"
+                  >
+                    <span className="text-sm font-medium hidden sm:inline">
+                      Logout
+                    </span>
                     <Icon name="power" size={20} />
-              </button>
+                  </button>
+                </div>
+              </div>
+            </nav>
+
+            {/* Tabs */}
+            <div className="border-b border-gray-200 bg-white">
+              <div className="mx-auto max-w-2xl px-4">
+                <div className="flex gap-4">
+                  <TabLink
+                    to="/mode/parent"
+                    active={activeTab === "kids"}
+                    icon="baby"
+                    label="Kids"
+                  />
+                  <TabLink
+                    to="/mode/parent/sync"
+                    active={activeTab === "sync"}
+                    icon="refresh"
+                    label="Sync"
+                  />
+                  <TabLink
+                    to="/mode/parent/data"
+                    active={activeTab === "data"}
+                    icon="download"
+                    label="Backup"
+                  />
+                  <TabLink
+                    to="/mode/parent/settings"
+                    active={activeTab === "settings"}
+                    icon="settings"
+                    label="Settings"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Content - Rendered by child routes */}
+            <div className="mx-auto max-w-2xl p-4">
+              <Outlet />
             </div>
           </div>
-        </nav>
-
-        {/* Tabs */}
-        <div className="border-b border-gray-200 bg-white">
-          <div className="mx-auto max-w-2xl px-4">
-            <div className="flex gap-4">
-              <TabLink
-                to="/mode/parent"
-                active={activeTab === "kids"}
-                icon="baby"
-                label="Kids"
-              />
-              <TabLink
-                to="/mode/parent/sync"
-                active={activeTab === "sync"}
-                icon="refresh"
-                label="Sync"
-              />
-              <TabLink
-                to="/mode/parent/data"
-                active={activeTab === "data"}
-                icon="download"
-                label="Backup"
-              />
-              <TabLink
-                to="/mode/parent/settings"
-                active={activeTab === "settings"}
-                icon="settings"
-                label="Settings"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Content - Rendered by child routes */}
-        <div className="mx-auto max-w-2xl p-4">
-          <Outlet />
-        </div>
-      </div>
-    );
+        );
       })}
     </Suspense>
   );

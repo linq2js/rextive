@@ -1,30 +1,33 @@
 /**
  * @file profileFormLogic.ts
  * @description Local logic for the profile form (add/edit kid profile).
- * 
+ *
  * This is a LOCAL logic factory - each form instance gets its own state.
  * Handles form state, validation, submission, and deletion.
- * 
+ *
+ * Uses focus.lens multi-lens for typed getter/setter access to form fields.
+ *
  * @param onClose - Callback to close the form (called on success)
  * @param editProfile - Optional profile to edit (if undefined, creates new)
- * 
+ *
  * @example
  * ```ts
  * // Create mode
  * const $form = useScope(() => profileFormLogic(closeForm));
- * 
+ *
  * // Edit mode
  * const $form = useScope(() => profileFormLogic(closeForm, existingProfile));
- * 
- * // Update form state
- * $form.state.set(patch({ name: "Emma" }));
- * 
+ *
+ * // Update form fields with typed setters
+ * $form.setName("Emma");
+ * $form.setAge(8);
+ *
  * // Submit the form
  * await $form.submit();
  * ```
  */
 import { signal } from "rextive";
-import { patch } from "rextive/helpers";
+import { focus } from "rextive/op";
 import { kidProfilesLogic } from "./kidProfiles.logic";
 import type { KidProfile, AvatarEmoji } from "@/domain/types";
 
@@ -48,12 +51,15 @@ export interface ProfileFormState {
 
 /**
  * Creates a logic instance for the profile form.
- * 
+ *
  * @param onClose - Callback invoked when form should close (after success)
  * @param editProfile - Profile to edit (undefined for create mode)
  * @returns Form logic object
  */
-export function profileFormLogic(onClose: () => void, editProfile?: KidProfile) {
+export function profileFormLogic(
+  onClose: () => void,
+  editProfile?: KidProfile
+) {
   // ============================================================================
   // DEPENDENCIES
   // ============================================================================
@@ -80,6 +86,16 @@ export function profileFormLogic(onClose: () => void, editProfile?: KidProfile) 
     { name: "profileForm.state" }
   );
 
+  // Create typed accessors for all form fields using multi-lens
+  const fields = focus.lens(state, {
+    name: "name",
+    avatar: "avatar",
+    age: "age",
+    loading: "loading",
+    error: "error",
+    showDeleteConfirm: "showDeleteConfirm",
+  });
+
   // ============================================================================
   // ACTIONS
   // ============================================================================
@@ -89,21 +105,28 @@ export function profileFormLogic(onClose: () => void, editProfile?: KidProfile) 
    * Creates new profile or updates existing based on editProfile.
    */
   async function submit() {
-    const { name, avatar, age } = state();
-    
+    const name = fields.getName();
+    const avatar = fields.getAvatar();
+    const age = fields.getAge();
+
     // Validation: Name is required
     if (!name.trim()) {
-      state.set(patch("error", "Name is required"));
+      fields.setError("Name is required");
       return;
     }
 
     // Set loading state and clear any previous error
-    state.set(patch({ loading: true, error: "" }));
+    fields.setLoading(true);
+    fields.setError("");
 
     try {
       if (editProfile) {
         // Edit mode: Update existing profile
-        await $profiles.update(editProfile.id, { name: name.trim(), avatar, age });
+        await $profiles.update(editProfile.id, {
+          name: name.trim(),
+          avatar,
+          age,
+        });
       } else {
         // Create mode: Create new profile
         await $profiles.create({ name: name.trim(), avatar, age });
@@ -112,9 +135,9 @@ export function profileFormLogic(onClose: () => void, editProfile?: KidProfile) 
       onClose();
     } catch (e) {
       // Show error message
-      state.set(patch("error", e instanceof Error ? e.message : "An error occurred"));
+      fields.setError(e instanceof Error ? e.message : "An error occurred");
     } finally {
-      state.set(patch("loading", false));
+      fields.setLoading(false);
     }
   }
 
@@ -125,15 +148,18 @@ export function profileFormLogic(onClose: () => void, editProfile?: KidProfile) 
   async function remove() {
     if (!editProfile) return;
 
-    state.set(patch({ loading: true, error: "" }));
+    fields.setLoading(true);
+    fields.setError("");
 
     try {
       await $profiles.remove(editProfile.id);
       onClose();
     } catch (e) {
-      state.set(patch("error", e instanceof Error ? e.message : "Failed to delete profile"));
+      fields.setError(
+        e instanceof Error ? e.message : "Failed to delete profile"
+      );
     } finally {
-      state.set(patch("loading", false));
+      fields.setLoading(false);
     }
   }
 
@@ -141,14 +167,14 @@ export function profileFormLogic(onClose: () => void, editProfile?: KidProfile) 
    * Shows the delete confirmation UI.
    */
   function requestDelete() {
-    state.set(patch("showDeleteConfirm", true));
+    fields.setShowDeleteConfirm(true);
   }
 
   /**
    * Hides the delete confirmation UI without deleting.
    */
   function cancelDelete() {
-    state.set(patch("showDeleteConfirm", false));
+    fields.setShowDeleteConfirm(false);
   }
 
   /**
@@ -163,8 +189,23 @@ export function profileFormLogic(onClose: () => void, editProfile?: KidProfile) 
   // ============================================================================
 
   return {
-    /** Form state signal */
+    /** Form state signal (for full state access) */
     state,
+    /** Get/set name */
+    getName: fields.getName,
+    setName: fields.setName,
+    /** Get/set avatar */
+    getAvatar: fields.getAvatar,
+    setAvatar: fields.setAvatar,
+    /** Get/set age */
+    getAge: fields.getAge,
+    setAge: fields.setAge,
+    /** Get/set error */
+    getError: fields.getError,
+    /** Get/set loading */
+    getLoading: fields.getLoading,
+    /** Get/set showDeleteConfirm */
+    getShowDeleteConfirm: fields.getShowDeleteConfirm,
     /** Submit the form (create or update) */
     submit,
     /** Delete the profile */

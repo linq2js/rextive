@@ -1,28 +1,30 @@
 /**
  * @file loginFormLogic.ts
  * @description Local logic for the parent login form.
- * 
+ *
  * This is a LOCAL logic factory - each form instance gets its own state.
  * Handles password input and authentication submission.
- * 
+ *
+ * Uses focus.lens multi-lens for typed getter/setter access to form fields.
+ *
  * @example
  * ```ts
  * const $form = useScope(loginFormLogic);
- * 
- * // Update password
- * $form.state.set(patch({ password: "1234" }));
- * 
+ *
+ * // Update password with typed setter
+ * $form.setPassword("1234");
+ *
  * // Submit login
  * await $form.submit();
- * 
- * // Check for errors
- * if ($form.state().error) {
+ *
+ * // Check for errors with typed getter
+ * if ($form.getError()) {
  *   // Show error message
  * }
  * ```
  */
 import { signal } from "rextive";
-import { patch } from "rextive/helpers";
+import { focus } from "rextive/op";
 import { parentAuthLogic } from "./parentAuth.logic";
 
 /**
@@ -39,7 +41,7 @@ interface LoginFormState {
 
 /**
  * Creates a logic instance for the login form.
- * 
+ *
  * @returns Form logic object with state and submit action
  */
 export function loginFormLogic() {
@@ -66,6 +68,13 @@ export function loginFormLogic() {
     { name: "loginForm.state" }
   );
 
+  // Create typed accessors for all form fields using multi-lens
+  const fields = focus.lens(state, {
+    password: "password",
+    error: "error",
+    loading: "loading",
+  });
+
   // ============================================================================
   // ACTIONS
   // ============================================================================
@@ -76,20 +85,23 @@ export function loginFormLogic() {
    */
   async function submit() {
     // Set loading state and clear any previous error
-    state.set(patch<LoginFormState>({ loading: true, error: "" }));
+    fields.setLoading(true);
+    fields.setError("");
 
     try {
-      const success = await $auth.login(state().password);
-      
+      const success = await $auth.login(fields.getPassword());
+
       if (!success) {
         // Authentication failed - show error
-        state.set(patch<LoginFormState>({ error: "Incorrect password", loading: false }));
+        fields.setError("Incorrect password");
+        fields.setLoading(false);
       }
       // If successful, parentAuthLogic will update isAuthenticated
       // and the UI will react accordingly
     } catch {
       // Unexpected error
-      state.set(patch<LoginFormState>({ error: "Authentication failed", loading: false }));
+      fields.setError("Authentication failed");
+      fields.setLoading(false);
     }
   }
 
@@ -98,8 +110,16 @@ export function loginFormLogic() {
   // ============================================================================
 
   return {
-    /** Form state signal */
+    /** Form state signal (for full state access) */
     state,
+    /** Get password value */
+    getPassword: fields.getPassword,
+    /** Set password value */
+    setPassword: fields.setPassword,
+    /** Get error message */
+    getError: fields.getError,
+    /** Get loading state */
+    getLoading: fields.getLoading,
     /** Submit login attempt */
     submit,
   };

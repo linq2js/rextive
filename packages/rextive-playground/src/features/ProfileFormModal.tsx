@@ -7,6 +7,8 @@
  * - Avatar selection grid
  * - Edit mode with delete functionality
  * - Responsive button layout (stacked on mobile)
+ *
+ * Uses the typed accessors from profileFormLogic for cleaner code.
  */
 import { rx, useScope, inputValue, inputNumber } from "rextive/react";
 import { focus } from "rextive/op";
@@ -26,6 +28,10 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
   // Initialize form logic with close callback and optional profile for edit mode
   const $form = useScope(profileFormLogic, [onClose, profile]);
 
+  // Create input-mapped lenses for form fields
+  const nameLens = focus.lens($form.state, "name").map(inputValue);
+  const ageLens = focus.lens($form.state, "age").map(inputNumber);
+
   return (
     <div
       className="card w-full max-w-md max-h-[90vh] overflow-y-auto animate-pop"
@@ -44,49 +50,43 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
         className="mt-4 space-y-4"
       >
         {/* Name Input */}
-        {rx(() => {
-          const [get, set] = focus.lens($form.state, "name").map(inputValue);
-          return (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Name
-              </label>
-              <input
-                type="text"
-                value={get()}
-                onChange={set}
-                className="input"
-                placeholder="Kid's name"
-                required
-              />
-            </div>
-          );
-        })}
+        {rx(() => (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Name
+            </label>
+            <input
+              type="text"
+              value={nameLens[0]()}
+              onChange={nameLens[1]}
+              className="input"
+              placeholder="Kid's name"
+              required
+            />
+          </div>
+        ))}
 
         {/* Age Input */}
-        {rx(() => {
-          const [get, set] = focus.lens($form.state, "age").map(inputNumber);
-          return (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Age
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={18}
-                value={get()}
-                onChange={set}
-                className="input"
-                required
-              />
-            </div>
-          );
-        })}
+        {rx(() => (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Age
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={18}
+              value={ageLens[0]()}
+              onChange={ageLens[1]}
+              className="input"
+              required
+            />
+          </div>
+        ))}
 
         {/* Avatar Selection Grid */}
         {rx(() => {
-          const [getAvatar, setAvatar] = focus.lens($form.state, "avatar");
+          const avatar = $form.getAvatar();
           return (
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -98,10 +98,12 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
                     key={emoji}
                     type="button"
                     onClick={() =>
-                      setAvatar(emoji as import("@/domain/types").AvatarEmoji)
+                      $form.setAvatar(
+                        emoji as import("@/domain/types").AvatarEmoji
+                      )
                     }
                     className={`p-1 rounded-xl transition-all ${
-                      getAvatar() === emoji
+                      avatar === emoji
                         ? "bg-purple-100 ring-2 ring-purple-500 scale-110 shadow-md z-10"
                         : "bg-gray-50 hover:bg-gray-100"
                     }`}
@@ -119,7 +121,7 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
 
         {/* Error Message */}
         {rx(() => {
-          const error = $form.state().error;
+          const error = $form.getError();
           return error ? (
             <div className="p-3 bg-red-50 text-red-700 rounded-xl text-sm">
               {error}
@@ -129,9 +131,9 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
 
         {/* Action Buttons */}
         {rx(() => {
-          const loading = $form.state().loading;
+          const loading = $form.getLoading();
           const isEditing = $form.isEditing;
-          const showDeleteConfirm = $form.state().showDeleteConfirm;
+          const showDeleteConfirm = $form.getShowDeleteConfirm();
 
           // Delete confirmation UI
           if (showDeleteConfirm && isEditing) {
