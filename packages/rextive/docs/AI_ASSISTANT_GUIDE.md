@@ -497,7 +497,7 @@ function createTodoMutation() {
     if (!deps.payload) return null;
     // No abortSignal - mutations should complete
     return fetch("/todos", { method: "POST", body: JSON.stringify(deps.payload) });
-  });
+});
 
   return { payload, result };
 }

@@ -6,10 +6,12 @@ import { energyLogic, selectedProfileLogic, modalLogic } from "@/logic";
 import { gameProgressRepository } from "@/infrastructure/repositories";
 import { useEffect, useRef, useCallback } from "react";
 import { Icon } from "@/components/Icons";
+import { GameMenu, type Difficulty, type DifficultyOption } from "@/components/GameMenu";
 import {
   playCoinSound,
   playCollisionSound,
   backgroundMusic,
+  playClickSound,
 } from "@/hooks/useSound";
 
 export const Route = createFileRoute("/games/road-racer")({
@@ -30,9 +32,7 @@ const LANE_COUNT = 3;
 const LANE_WIDTH = GAME_WIDTH / LANE_COUNT;
 const COIN_SIZE = 24;
 
-// Difficulty settings
-type Difficulty = "easy" | "medium" | "hard";
-
+// Difficulty settings configuration
 interface DifficultySettings {
   name: string;
   description: string;
@@ -81,6 +81,28 @@ const DIFFICULTY_CONFIG: Record<Difficulty, DifficultySettings> = {
   },
 };
 
+// Difficulty options for the GameMenu component
+const ROAD_RACER_DIFFICULTY_OPTIONS: DifficultyOption[] = [
+  {
+    value: "easy",
+    label: "Easy",
+    description: "5 lives, slower traffic",
+    color: "from-emerald-400 to-green-500",
+  },
+  {
+    value: "medium",
+    label: "Medium",
+    description: "3 lives, 1.5× score",
+    color: "from-amber-400 to-orange-500",
+  },
+  {
+    value: "hard",
+    label: "Hard",
+    description: "2 lives, 2× score",
+    color: "from-red-400 to-rose-500",
+  },
+];
+
 // Obstacle car colors (CSS classes)
 const OBSTACLE_COLORS = [
   { body: "#ef4444", accent: "#dc2626" }, // Red
@@ -112,7 +134,7 @@ interface Coin {
 }
 
 interface GameState {
-  status: "idle" | "selecting" | "playing" | "paused" | "gameOver";
+  status: "menu" | "playing" | "paused" | "gameOver";
   difficulty: Difficulty;
   playerLane: number;
   obstacles: Obstacle[];
@@ -124,7 +146,11 @@ interface GameState {
   maxLives: number;
   highScore: number;
   lastCollisionTime: number;
+  timeLeft: number; // 60 second time limit
 }
+
+// Time limit for all games: 60 seconds
+const TIME_LIMIT = 60;
 
 function roadRacerLogic() {
   const $energy = energyLogic();
@@ -132,7 +158,7 @@ function roadRacerLogic() {
 
   const state = signal<GameState>(
     {
-      status: "idle",
+      status: "menu",
       difficulty: "medium",
       playerLane: 1,
       obstacles: [],
@@ -144,6 +170,7 @@ function roadRacerLogic() {
       maxLives: 3,
       highScore: 0,
       lastCollisionTime: 0,
+      timeLeft: TIME_LIMIT,
     },
     { name: "roadRacer.state" }
   );
@@ -151,26 +178,26 @@ function roadRacerLogic() {
   let nextObstacleId = 0;
   let nextCoinId = 0;
   let gameLoopId: number | null = null;
+  let timerId: ReturnType<typeof setInterval> | null = null;
   let lastFrameTime = 0;
+  
+  // Road Racer costs 2 energy per game
+  const ENERGY_COST = 2;
 
   function canPlay(): boolean {
-    return $energy.energy() >= $energy.costPerGame;
+    return $energy.energy() >= ENERGY_COST;
   }
 
-  function showDifficultySelect() {
-    state.set(patch("status", "selecting"));
-  }
-
-  function selectDifficulty(difficulty: Difficulty) {
+  function setDifficulty(difficulty: Difficulty) {
     state.set(patch("difficulty", difficulty));
   }
 
   async function startGame(): Promise<boolean> {
     try {
       console.log("Road Racer: Starting game...");
-      console.log("Energy:", $energy.energy(), "Cost:", $energy.costPerGame);
+      console.log("Energy:", $energy.energy(), "Cost:", ENERGY_COST);
 
-      const hasEnergy = await $energy.spend($energy.costPerGame);
+      const hasEnergy = await $energy.spend(ENERGY_COST);
       console.log("Energy spent result:", hasEnergy);
 
       if (!hasEnergy) {
@@ -194,11 +221,30 @@ function roadRacerLogic() {
         lives: config.lives,
         maxLives: config.lives,
         lastCollisionTime: 0,
+        timeLeft: TIME_LIMIT,
       }));
 
       nextObstacleId = 0;
       nextCoinId = 0;
       lastFrameTime = performance.now();
+
+      // Start the 60-second timer
+      if (timerId) clearInterval(timerId);
+      timerId = setInterval(() => {
+        const currentState = state();
+        if (currentState.status !== "playing") {
+          if (timerId) clearInterval(timerId);
+          timerId = null;
+          return;
+        }
+        
+        if (currentState.timeLeft <= 1) {
+          state.set(patch("timeLeft", 0));
+          endGame();
+        } else {
+          state.set(patch("timeLeft", (t) => t - 1));
+        }
+      }, 1000);
 
       try {
         backgroundMusic.playRacingMusic();
@@ -222,12 +268,35 @@ function roadRacerLogic() {
       cancelAnimationFrame(gameLoopId);
       gameLoopId = null;
     }
+    if (timerId) {
+      clearInterval(timerId);
+      timerId = null;
+    }
   }
 
   function resumeGame() {
     state.set(patch("status", "playing"));
     lastFrameTime = performance.now();
     backgroundMusic.playRacingMusic();
+    
+    // Restart the timer
+    if (timerId) clearInterval(timerId);
+    timerId = setInterval(() => {
+      const currentState = state();
+      if (currentState.status !== "playing") {
+        if (timerId) clearInterval(timerId);
+        timerId = null;
+        return;
+      }
+      
+      if (currentState.timeLeft <= 1) {
+        state.set(patch("timeLeft", 0));
+        endGame();
+      } else {
+        state.set(patch("timeLeft", (t) => t - 1));
+      }
+    }, 1000);
+    
     gameLoop();
   }
 
@@ -236,6 +305,10 @@ function roadRacerLogic() {
     if (gameLoopId) {
       cancelAnimationFrame(gameLoopId);
       gameLoopId = null;
+    }
+    if (timerId) {
+      clearInterval(timerId);
+      timerId = null;
     }
 
     const currentState = state();
@@ -403,11 +476,15 @@ function roadRacerLogic() {
       cancelAnimationFrame(gameLoopId);
       gameLoopId = null;
     }
+    if (timerId) {
+      clearInterval(timerId);
+      timerId = null;
+    }
   }
 
   function backToMenu() {
     cleanup();
-    state.set(patch("status", "idle"));
+    state.set(patch("status", "menu"));
   }
 
   return {
@@ -415,8 +492,7 @@ function roadRacerLogic() {
     canPlay,
     energy: $energy.energy,
     profile: $profile.profile,
-    showDifficultySelect,
-    selectDifficulty,
+    setDifficulty,
     startGame,
     pauseGame,
     resumeGame,
@@ -591,32 +667,6 @@ function TrophyIcon() {
   );
 }
 
-function RacingCarIcon() {
-  return (
-    <svg viewBox="0 0 64 64" className="w-20 h-20">
-      {/* Track */}
-      <ellipse cx="32" cy="40" rx="28" ry="16" fill="#374151" />
-      <ellipse cx="32" cy="40" rx="20" ry="10" fill="#1f2937" />
-      {/* Racing car */}
-      <g transform="translate(20, 28)">
-        <rect x="4" y="4" width="16" height="10" rx="3" fill="#ef4444" />
-        <rect x="6" y="6" width="6" height="4" rx="1" fill="#67e8f9" />
-        <circle cx="6" cy="14" r="3" fill="#1f2937" />
-        <circle cx="18" cy="14" r="3" fill="#1f2937" />
-        <rect x="10" y="2" width="4" height="12" fill="#fef08a" opacity="0.6" />
-      </g>
-      {/* Checkered flag */}
-      <g transform="translate(44, 12)">
-        <rect x="0" y="0" width="4" height="20" fill="#92400e" />
-        <rect x="4" y="0" width="12" height="10" fill="#fff" />
-        <rect x="4" y="0" width="4" height="5" fill="#1f2937" />
-        <rect x="12" y="0" width="4" height="5" fill="#1f2937" />
-        <rect x="8" y="5" width="4" height="5" fill="#1f2937" />
-      </g>
-    </svg>
-  );
-}
-
 function PauseIcon() {
   return (
     <svg viewBox="0 0 48 48" className="w-12 h-12">
@@ -742,9 +792,7 @@ function RoadRacer() {
   return rx(() => {
     const profile = $game.profile();
     const gameState = $game.state();
-    const playerCanPlay = $game.canPlay();
     const energy = $game.energy();
-    const difficultyConfig = DIFFICULTY_CONFIG[gameState.difficulty];
     const isHit = Date.now() - gameState.lastCollisionTime < 1000;
 
     return (
@@ -830,15 +878,12 @@ function RoadRacer() {
                     <TrophyIcon />
                     <span className="text-lg">{gameState.score}</span>
                   </span>
-                  <span className="text-slate-400 flex items-center gap-1">
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="w-4 h-4"
-                      fill="currentColor"
-                    >
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                  {/* Timer */}
+                  <span className={`font-bold flex items-center gap-1 ${gameState.timeLeft <= 10 ? "text-red-400 animate-pulse" : "text-cyan-400"}`}>
+                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+                      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z" />
                     </svg>
-                    {Math.floor(gameState.distance)}m
+                    {gameState.timeLeft}s
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -858,8 +903,8 @@ function RoadRacer() {
             </div>
           )}
 
-          {/* Game Area */}
-          {profile && (
+          {/* Game Area - only show during gameplay, not on menu */}
+          {profile && gameState.status !== "menu" && (
             <div
               ref={gameRef}
               className="relative mx-auto overflow-hidden rounded-2xl shadow-2xl border-4 border-slate-600"
@@ -971,112 +1016,6 @@ function RoadRacer() {
                 </div>
               )}
 
-              {/* Idle State */}
-              {gameState.status === "idle" && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-white p-4">
-                  <RacingCarIcon />
-                  <h2 className="font-display text-2xl font-bold mb-2 mt-4">
-                    Road Racer
-                  </h2>
-                  <p className="text-sm text-center mb-6 opacity-80">
-                    Dodge traffic and collect coins!
-                  </p>
-                  {playerCanPlay ? (
-                    <button
-                      onClick={() => $game.showDifficultySelect()}
-                      className="btn bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-8 py-3 text-lg font-bold hover:from-emerald-600 hover:to-teal-600 transition-all transform hover:scale-105"
-                    >
-                      <PlayIcon /> Start Game
-                    </button>
-                  ) : (
-                    <div className="text-center">
-                      <p className="text-amber-400 mb-2 flex items-center gap-2 justify-center">
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="w-5 h-5"
-                          fill="currentColor"
-                        >
-                          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                        </svg>
-                        No energy left!
-                      </p>
-                      <p className="text-sm opacity-70">Come back tomorrow</p>
-                    </div>
-                  )}
-                  {gameState.highScore > 0 && (
-                    <p className="mt-4 text-sm opacity-70 flex items-center gap-2">
-                      <TrophyIcon /> Best: {gameState.highScore}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Difficulty Selection */}
-              {gameState.status === "selecting" && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-4">
-                  <h2 className="font-display text-xl font-bold mb-4">
-                    Select Difficulty
-                  </h2>
-                  <div className="space-y-3 w-full max-w-xs">
-                    {(Object.keys(DIFFICULTY_CONFIG) as Difficulty[]).map(
-                      (diff) => {
-                        const config = DIFFICULTY_CONFIG[diff];
-                        const isSelected = gameState.difficulty === diff;
-                        return (
-                          <button
-                            key={diff}
-                            onClick={() => $game.selectDifficulty(diff)}
-                            className={`w-full p-3 rounded-xl transition-all transform ${
-                              isSelected
-                                ? `bg-gradient-to-r ${config.color} scale-105 shadow-lg`
-                                : "bg-slate-700 hover:bg-slate-600"
-                            }`}
-                          >
-                            <div className="font-bold text-lg">
-                              {config.name}
-                            </div>
-                            <div className="text-xs opacity-80">
-                              {config.description}
-                            </div>
-                            <div className="flex justify-center gap-1 mt-2">
-                              {Array.from({ length: config.lives }).map(
-                                (_, i) => (
-                                  <HeartIcon key={i} filled={true} />
-                                )
-                              )}
-                            </div>
-                          </button>
-                        );
-                      }
-                    )}
-                  </div>
-                  <button
-                    onClick={async () => {
-                      const started = await $game.startGame();
-                      if (!started) {
-                        const $modal = modalLogic();
-                        if (!$game.profile()) {
-                          await $modal.warning(
-                            "Please select a kid profile first from the home page!",
-                            "No Profile"
-                          );
-                        } else if ($game.energy() <= 0) {
-                          await $modal.warning(
-                            "No energy left! Come back tomorrow to play again.",
-                            "No Energy"
-                          );
-                        } else {
-                          await $modal.error("Could not start game. Please try again.");
-                        }
-                      }
-                    }}
-                    className={`mt-6 btn bg-gradient-to-r ${difficultyConfig.color} text-white px-8 py-3 text-lg font-bold hover:opacity-90 transition-all transform hover:scale-105`}
-                  >
-                    <PlayIcon /> Play
-                  </button>
-                </div>
-              )}
-
               {/* Paused State */}
               {gameState.status === "paused" && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white">
@@ -1125,36 +1064,12 @@ function RoadRacer() {
                   <p className="text-sm opacity-70 mb-4">
                     Distance: {Math.floor(gameState.distance)}m
                   </p>
-                  {playerCanPlay ? (
                     <button
-                      onClick={() => {
-                        $game.showDifficultySelect();
-                      }}
+                    onClick={() => $game.backToMenu()}
                       className="btn bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-8 py-3 font-bold hover:from-emerald-600 hover:to-teal-600"
                     >
-                      Play Again
+                    Continue
                     </button>
-                  ) : (
-                    <div className="text-center">
-                      <p className="text-amber-400 mb-2 flex items-center gap-2 justify-center">
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="w-5 h-5"
-                          fill="currentColor"
-                        >
-                          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                        </svg>
-                        No energy left!
-                      </p>
-                      <Link
-                        to="/dashboard"
-                        viewTransition
-                        className="btn bg-slate-600 text-white mt-2 hover:bg-slate-500"
-                      >
-                        Go to Dashboard
-                      </Link>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -1178,46 +1093,45 @@ function RoadRacer() {
             </div>
           )}
 
-          {/* Instructions */}
-          {profile && gameState.status === "idle" && (
-            <div className="mt-4 card bg-slate-800/90 backdrop-blur border border-slate-700">
-              <h3 className="font-display font-semibold text-white mb-3 flex items-center gap-2">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-5 h-5 text-emerald-400"
-                  fill="currentColor"
-                >
-                  <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
-                </svg>
-                How to Play
-              </h3>
-              <ul className="text-sm text-slate-300 space-y-2">
-                <li className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-xs">
-                    ←→
-                  </span>
-                  Use arrow keys to move
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="#fbbf24">
-                      <circle cx="12" cy="12" r="10" />
-                    </svg>
-                  </span>
-                  Collect coins for +10 points
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-red-400">
-                    !
-                  </span>
-                  Avoid cars! Collision = -20 points
-                </li>
-                <li className="flex items-center gap-2">
-                  <HeartIcon filled={true} />
-                  Lives depend on difficulty
-                </li>
-              </ul>
-            </div>
+          {/* Game Menu - shown in menu state */}
+          {profile && gameState.status === "menu" && (
+            <GameMenu
+              title="Road Racer"
+              description="Dodge traffic and collect coins! Use arrow keys or tap to move."
+              icon="car"
+              themeColor="from-emerald-500 to-teal-500"
+              difficulty={gameState.difficulty}
+              onDifficultyChange={$game.setDifficulty}
+              difficultyOptions={ROAD_RACER_DIFFICULTY_OPTIONS}
+              energy={energy}
+              energyCost={2}
+              onPlay={async () => {
+                playClickSound();
+                const started = await $game.startGame();
+                if (!started) {
+                  const $modal = modalLogic();
+                  if (!$game.profile()) {
+                    await $modal.warning(
+                      "Please select a kid profile first from the home page!",
+                      "No Profile"
+                    );
+                  } else if ($game.energy() <= 0) {
+                    await $modal.warning(
+                      "No energy left! Come back tomorrow to play again.",
+                      "No Energy"
+                    );
+                  } else {
+                    await $modal.error("Could not start game. Please try again.");
+                  }
+                }
+              }}
+              howToPlay={[
+                "Use arrow keys or tap sides to move",
+                "Collect coins for +10 points",
+                "Avoid cars! Collision = -20 points",
+                "Lives depend on difficulty",
+              ]}
+            />
           )}
         </div>
 

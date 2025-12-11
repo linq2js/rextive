@@ -20,6 +20,7 @@ import { Icon } from "@/components/Icons";
 import {
   GameMenu,
   ThemeSelector,
+  ThemeIcons,
   type DifficultyOption,
   type ThemeOption,
 } from "@/components/GameMenu";
@@ -219,8 +220,8 @@ interface GameCard {
 }
 
 const DIFFICULTY_CONFIG = {
-  easy: { pairs: 6, cols: 4, rows: 3, timeLimit: 120 },
-  medium: { pairs: 8, cols: 4, rows: 4, timeLimit: 90 },
+  easy: { pairs: 6, cols: 4, rows: 3, timeLimit: 60 },
+  medium: { pairs: 8, cols: 4, rows: 4, timeLimit: 60 },
   hard: { pairs: 10, cols: 5, rows: 4, timeLimit: 60 },
 };
 
@@ -282,7 +283,8 @@ function memoryMatchLogic() {
   }
 
   async function startGame(): Promise<boolean> {
-    const hasEnergy = await $energy.spend(1);
+    // Memory Match costs 2 energy per game
+    const hasEnergy = await $energy.spend(2);
     if (!hasEnergy) return false;
 
     const config = DIFFICULTY_CONFIG[difficulty()];
@@ -533,12 +535,13 @@ const MEMORY_DIFFICULTY_OPTIONS: DifficultyOption[] = [
   },
 ];
 
-// Convert CATEGORY_INFO to ThemeOption format
+// Convert CATEGORY_INFO to ThemeOption format with icons
 const THEME_OPTIONS: ThemeOption[] = Object.entries(CATEGORY_INFO).map(
   ([key, info]) => ({
     value: key,
     label: info.name,
     color: info.color,
+    icon: ThemeIcons[key as keyof typeof ThemeIcons],
   })
 );
 
@@ -565,17 +568,17 @@ function MenuScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> }) {
         onDifficultyChange={(d) => $game.setDifficulty(d)}
         difficultyOptions={MEMORY_DIFFICULTY_OPTIONS}
         energy={energy}
-        energyCost={1}
+        energyCost={2}
         onPlay={async () => {
-          const started = await $game.startGame();
-          if (!started) {
-            const $modal = modalLogic();
+            const started = await $game.startGame();
+            if (!started) {
+              const $modal = modalLogic();
             await $modal.warning(
               "No energy left! Come back tomorrow to play again.",
               "No Energy"
             );
-          }
-        }}
+            }
+          }}
         howToPlay={HOW_TO_PLAY}
         howToPlayColor="bg-purple-100/80"
       >
@@ -678,9 +681,9 @@ function GameCardComponent({
       <div
         className={`relative w-full h-full transition-transform duration-500 ease-in-out ${
           card.isMatched ? "cursor-default" : "cursor-pointer"
-        }`}
-        style={{
-          transformStyle: "preserve-3d",
+      }`}
+      style={{
+        transformStyle: "preserve-3d",
           transform: isRevealed ? "rotateY(180deg)" : "rotateY(0deg)",
         }}
       >
@@ -723,9 +726,9 @@ function GameCardComponent({
             <div className="absolute top-1 right-1">
               <svg viewBox="0 0 24 24" className="w-4 h-4 text-green-500">
                 <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-              </svg>
-            </div>
-          )}
+          </svg>
+        </div>
+      )}
         </div>
       </div>
     </button>

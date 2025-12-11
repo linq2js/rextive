@@ -54,6 +54,7 @@ interface Game {
   implemented: boolean; // Game code exists
   unlocked: boolean; // Player has enough XP
   xpRequired: number; // XP needed to unlock
+  energyCost: number; // Energy required to play (0 = free)
 }
 
 function dashboardLogic() {
@@ -223,9 +224,16 @@ function dashboardLogic() {
 
   // Game metadata (static info)
   // Colors match actual game screen backgrounds for visual consistency
+  // energyCost: 0 = free, 2 = premium games
   const GAME_META: Record<
     string,
-    { icon: IconName; description: string; color: string; textColor: string }
+    {
+      icon: IconName;
+      description: string;
+      color: string;
+      textColor: string;
+      energyCost: number;
+    }
   > = {
     "typing-adventure": {
       icon: "keyboard",
@@ -233,6 +241,7 @@ function dashboardLogic() {
       // Matches: from-blue-400 via-purple-400 to-pink-400
       color: "bg-gradient-to-br from-blue-200 via-purple-200 to-pink-200",
       textColor: "text-purple-700",
+      energyCost: 1, // Starter game (unlocked from start)
     },
     "memory-match": {
       icon: "brain",
@@ -240,6 +249,7 @@ function dashboardLogic() {
       // Matches: from-purple-500 via-pink-500 to-rose-500
       color: "bg-gradient-to-br from-purple-200 via-pink-200 to-rose-200",
       textColor: "text-purple-700",
+      energyCost: 2, // Unlockable game
     },
     "road-racer": {
       icon: "car",
@@ -247,41 +257,48 @@ function dashboardLogic() {
       // Matches: from-slate-800 via-slate-900 to-slate-950 (dark theme)
       color: "bg-gradient-to-br from-slate-300 via-slate-200 to-slate-300",
       textColor: "text-slate-700",
+      energyCost: 2, // Unlockable game
     },
     "math-quest": {
       icon: "math",
       description: "Fun with numbers!",
       color: "bg-gradient-to-br from-blue-200 via-cyan-200 to-teal-200",
       textColor: "text-blue-700",
+      energyCost: 1, // Starter game (unlocked from start)
     },
     "word-builder": {
       icon: "pencil",
       description: "Build cool words!",
       color: "bg-gradient-to-br from-green-200 via-emerald-200 to-teal-200",
       textColor: "text-green-700",
+      energyCost: 1, // Default
     },
     "puzzle-time": {
       icon: "puzzle",
       description: "Solve puzzles!",
       color: "bg-gradient-to-br from-amber-200 via-orange-200 to-yellow-200",
       textColor: "text-amber-700",
+      energyCost: 1, // Default
     },
     "color-fun": {
       icon: "palette",
       description: "Learn colors!",
       color: "bg-gradient-to-br from-pink-200 via-rose-200 to-red-200",
       textColor: "text-pink-700",
+      energyCost: 1, // Default
     },
   };
 
   // Build games list based on current XP/totalScore
+  // Sort order: 1) Starter games (unlocked by default), 2) Unlocked by XP, 3) Locked
   function buildGamesList(totalXp: number): Game[] {
-    return AVAILABLE_GAMES.map((gameConfig) => {
+    const games = AVAILABLE_GAMES.map((gameConfig) => {
       const meta = GAME_META[gameConfig.id] || {
         icon: "controller" as IconName,
         description: "Play now!",
         color: "bg-gray-100",
         textColor: "text-gray-700",
+        energyCost: 1, // Default cost
       };
       return {
         id: gameConfig.id,
@@ -293,7 +310,25 @@ function dashboardLogic() {
         implemented: gameConfig.implemented,
         unlocked: isGameUnlocked(gameConfig.id, totalXp),
         xpRequired: gameConfig.xpRequired,
+        energyCost: meta.energyCost,
       };
+    });
+
+    // Sort: 1) Starter (xpRequired=0), 2) Unlocked by XP, 3) Locked
+    return games.sort((a, b) => {
+      const aIsStarter = a.xpRequired === 0;
+      const bIsStarter = b.xpRequired === 0;
+
+      // Starter games first
+      if (aIsStarter && !bIsStarter) return -1;
+      if (!aIsStarter && bIsStarter) return 1;
+
+      // Then unlocked games
+      if (a.unlocked && !b.unlocked) return -1;
+      if (!a.unlocked && b.unlocked) return 1;
+
+      // Within same category, sort by xpRequired
+      return a.xpRequired - b.xpRequired;
     });
   }
 
@@ -512,7 +547,7 @@ function Dashboard() {
                     <GameCard
                       key={game.id}
                       game={game}
-                      hasEnergy={energy > 0}
+                      energy={energy}
                       totalXp={stats.totalScore}
                     />
                   ))}
@@ -574,13 +609,16 @@ function ProgressCard({
 
 function GameCard({
   game,
-  hasEnergy,
+  energy,
   totalXp,
 }: {
   game: Game;
-  hasEnergy: boolean;
+  energy: number;
   totalXp: number;
 }) {
+  // Check if user has enough energy for this game (free games always playable)
+  const hasEnoughEnergy = game.energyCost === 0 || energy >= game.energyCost;
+
   // Locked game (not enough XP)
   if (!game.unlocked) {
     const xpNeeded = game.xpRequired - totalXp;
@@ -639,14 +677,15 @@ function GameCard({
     );
   }
 
-  // No energy - disabled state
-  if (!hasEnergy) {
+  // No energy - disabled state (only for non-free games)
+  if (!hasEnoughEnergy) {
     return (
       <div
         className={`card relative flex flex-col items-center p-4 ${game.color} opacity-50`}
       >
         <div className="absolute -top-2 -right-2 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white flex items-center gap-1">
-          <Icon name="lightning" size={10} fill="currentColor" /> 0
+          <Icon name="lightning" size={10} fill="currentColor" />{" "}
+          {game.energyCost}
         </div>
         <span className={`text-4xl ${game.textColor} opacity-50`}>
           <Icon name={game.icon} size={48} />
@@ -656,7 +695,9 @@ function GameCard({
         >
           {game.name}
         </h3>
-        <p className="text-xs text-gray-500 text-center">No energy left!</p>
+        <p className="text-xs text-gray-500 text-center">
+          Need {game.energyCost} energy
+        </p>
       </div>
     );
   }
@@ -694,8 +735,10 @@ function GameCard({
         <div className="absolute inset-0 rounded-2xl bg-white/30 animate-pulse" />
       )}
 
-      <div className="absolute -top-2 -right-2 rounded-full bg-amber-400 px-2 py-0.5 text-xs font-bold text-amber-900 flex items-center gap-1">
-        <Icon name="lightning" size={10} fill="currentColor" /> 1
+      {/* Energy cost badge */}
+      <div className="absolute -top-2 -right-2 rounded-full px-2 py-0.5 text-xs font-bold flex items-center gap-1 bg-amber-400 text-amber-900">
+        <Icon name="lightning" size={10} fill="currentColor" />{" "}
+        {game.energyCost}
       </div>
       <span
         className={`text-4xl ${game.textColor} ${isLaunching ? "animate-bounce" : ""}`}
