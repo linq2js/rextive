@@ -227,6 +227,8 @@ function ParentDashboardLayout() {
   const pathname = location.pathname;
   const activeTab = pathname.endsWith("/data")
     ? "data"
+    : pathname.endsWith("/sync")
+    ? "sync"
     : pathname.endsWith("/settings")
     ? "settings"
     : "kids";
@@ -286,10 +288,16 @@ function ParentDashboardLayout() {
                 label="Kids"
               />
               <TabLink
+                to="/mode/parent/sync"
+                active={activeTab === "sync"}
+                icon="refresh"
+                label="Sync"
+              />
+              <TabLink
                 to="/mode/parent/data"
                 active={activeTab === "data"}
                 icon="download"
-                label="Data"
+                label="Backup"
               />
               <TabLink
                 to="/mode/parent/settings"
