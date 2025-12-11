@@ -6,7 +6,10 @@ import { once } from "./utils/once";
  * Contains all errors that occurred during disposal.
  */
 export class DisposalAggregateError extends Error {
-  constructor(public errors: Error[], message: string) {
+  constructor(
+    public errors: Error[],
+    message: string
+  ) {
     super(message);
     this.name = "DisposalAggregateError";
   }
@@ -35,16 +38,16 @@ const protectedSingletonDisposes = new WeakSet<VoidFunction>();
 /**
  * Register a dispose method as a protected singleton.
  * Protected disposes will throw SingletonDisposeError when tryDispose() is called.
- * 
+ *
  * Use this for global logic singletons that should not be disposed by local scopes.
- * 
+ *
  * @param dispose - The dispose method to protect
- * 
+ *
  * @example
  * ```ts
  * const singleton = create();
  * registerSingletonDispose(singleton.dispose);
- * 
+ *
  * tryDispose(singleton); // ❌ Throws SingletonDisposeError
  * ```
  */
@@ -55,11 +58,11 @@ export function registerSingletonDispose(dispose: VoidFunction): void {
 /**
  * Unregister a dispose method from singleton protection.
  * After unregistering, the dispose can be called normally.
- * 
+ *
  * Call this before disposing singletons in logic.clear() for test cleanup.
- * 
+ *
  * @param dispose - The dispose method to unprotect
- * 
+ *
  * @example
  * ```ts
  * // In logic.clear():
@@ -73,7 +76,7 @@ export function unregisterSingletonDispose(dispose: VoidFunction): void {
 
 /**
  * Check if a dispose method is registered as a protected singleton.
- * 
+ *
  * @param dispose - The dispose method to check
  * @returns true if the dispose is protected
  */
@@ -179,7 +182,7 @@ export function disposable<const T extends object>(
 
 // Implementation
 export function disposable<
-  T extends Record<string, any>[] | Record<string, any>
+  T extends Record<string, any>[] | Record<string, any>,
 >(disposables: T, options?: CombineDisposablesOptions): any {
   const { merge = "overwrite", onBefore, onAfter } = options || {};
 
@@ -380,6 +383,20 @@ export function wrapDispose<T extends { dispose?: VoidFunction }>(
 export const noop: VoidFunction = () => {};
 
 /**
+ * Options for tryDispose behavior.
+ */
+export interface TryDisposeOptions {
+  /**
+   * If true, silently skips protected singletons instead of throwing.
+   * Use this in cleanup code (like useScope unmount) where you want to
+   * protect singletons from accidental disposal.
+   *
+   * Default: false (throws SingletonDisposeError on protected singletons)
+   */
+  skipSingletons?: boolean;
+}
+
+/**
  * Safely attempts to dispose a value if it has a dispose mechanism.
  *
  * Handles multiple dispose patterns:
@@ -388,14 +405,18 @@ export const noop: VoidFunction = () => {};
  * - `{ dispose: Disposable }` - Recursively disposes the nested disposable
  *
  * **Singleton Protection**: If a dispose method was registered via
- * `registerSingletonDispose()`, this will throw `SingletonDisposeError`.
+ * `registerSingletonDispose()`:
+ * - Default: Throws `SingletonDisposeError`
+ * - With `{ skipSingletons: true }`: Silently skips (used by useScope cleanup)
+ *
  * Use `unregisterSingletonDispose()` first if you need to dispose it
  * (e.g., in `logic.clear()` for test cleanup).
  *
  * Does nothing if the value is not disposable (no errors thrown).
  *
  * @param disposable - Any value that might be disposable
- * @throws SingletonDisposeError if trying to dispose a protected singleton
+ * @param options - Optional behavior configuration
+ * @returns Array of all objects that were disposed
  *
  * @example
  * ```ts
@@ -412,14 +433,22 @@ export const noop: VoidFunction = () => {};
  * tryDispose(null);
  * tryDispose(42);
  * tryDispose({ name: 'not disposable' });
- * 
- * // Protected singleton - throws error
+ *
+ * // Protected singleton - throws by default
  * registerSingletonDispose(singleton.dispose);
  * tryDispose(singleton); // ❌ SingletonDisposeError
+ *
+ * // Protected singleton - skip explicitly (used by useScope)
+ * tryDispose(singleton, { skipSingletons: true }); // ✅ Silently skipped
  * ```
  */
-export function tryDispose(disposable: unknown) {
+export function tryDispose(
+  disposable: unknown,
+  options?: TryDisposeOptions
+): object[] {
   const disposedObjects = new Set<object>();
+  const skipSingletons = options?.skipSingletons ?? false;
+
   const dispose = (d: unknown) => {
     if (
       (typeof d === "object" || typeof d === "function") &&
@@ -429,10 +458,14 @@ export function tryDispose(disposable: unknown) {
       if (typeof d.dispose === "function") {
         // Check if this is a protected singleton
         if (protectedSingletonDisposes.has(d.dispose as VoidFunction)) {
+          if (skipSingletons) {
+            return; // Silently skip - caller knows what they're doing
+          }
+          // Default: throw error to catch accidental singleton disposal
           throw new SingletonDisposeError(
             "Cannot dispose a singleton logic instance. " +
-            "Singletons are shared globally and should not be disposed by local scopes. " +
-            "If you need to reset state, use logic.clear() in tests."
+              "Singletons are shared globally and should not be disposed by local scopes. " +
+              "If you need to reset state, use logic.clear() in tests."
           );
         }
         // Pattern: { dispose(): void }

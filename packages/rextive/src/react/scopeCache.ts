@@ -108,7 +108,8 @@ export class ScopeEntry {
 
     const doDispose = () => {
       this.onDispose(); // Dispose tracked signals
-      tryDispose(this.scope); // Dispose scope's own dispose method
+      // Skip singletons during cleanup - they're global and shouldn't be disposed by local scopes
+      tryDispose(this.scope, { skipSingletons: true });
     };
 
     if (dev()) {

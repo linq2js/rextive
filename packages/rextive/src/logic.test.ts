@@ -105,11 +105,29 @@ describe("logic", () => {
 
       const singleton = counter();
 
-      // Trying to dispose singleton should throw
+      // Trying to dispose singleton should throw by default
       expect(() => tryDispose(singleton)).toThrow(SingletonDisposeError);
       expect(() => tryDispose(singleton)).toThrow("Cannot dispose a singleton logic instance");
       
       // Singleton should still be functional after failed dispose attempt
+      singleton.count.set(42);
+      expect(singleton.count()).toBe(42);
+    });
+
+    it("should silently skip singleton disposal when skipSingletons option is true", async () => {
+      const { tryDispose } = await import("./disposable");
+      
+      const counter = logic("counter", () => {
+        const count = signal(0);
+        return { count };
+      });
+
+      const singleton = counter();
+
+      // Trying to dispose singleton should NOT throw with skipSingletons
+      expect(() => tryDispose(singleton, { skipSingletons: true })).not.toThrow();
+      
+      // Singleton should still be functional (dispose was skipped)
       singleton.count.set(42);
       expect(singleton.count()).toBe(42);
     });

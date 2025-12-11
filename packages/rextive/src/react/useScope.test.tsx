@@ -1,7 +1,7 @@
 import React, { act, Suspense } from "react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { screen } from "@testing-library/react";
-import { useScope, __clearCache, scope, Scope } from "./useScope";
+import { useScope, __clearCache, scope } from "./useScope";
 import { signal } from "../signal";
 import { logic } from "../logic";
 import { wrappers } from "../test/strictModeTests";
@@ -649,7 +649,7 @@ describe.each(wrappers)(
         expect(dispose2).toHaveBeenCalled();
       });
 
-      it("should throw SingletonDisposeError when dispose function is singleton's dispose", async () => {
+      it("should silently skip singleton dispose when dispose function is singleton's dispose", async () => {
         const globalLogic = logic("globalLogic", () => {
           const count = signal(0, { name: "global.count" });
           return { count };
@@ -657,23 +657,28 @@ describe.each(wrappers)(
 
         // Get singleton to register its dispose
         const singleton = globalLogic();
+        singleton.count.set(42);
 
         const TestComponent = () => {
           // BAD PATTERN: returning singleton's dispose as local dispose
+          // (will be silently skipped with dev warning)
           useScope("singletonDispose", () => ({
             value: signal(1),
-            dispose: singleton.dispose, // This should throw on unmount
+            dispose: singleton.dispose,
           }));
           return <div data-testid="content">Content</div>;
         };
 
         const { unmount } = renderWithWrapper(<TestComponent />);
 
-        // Unmount should throw because it tries to dispose singleton
-        expect(() => unmount()).toThrow(/Cannot dispose a singleton logic instance/);
+        // Unmount should NOT throw (singleton disposal is silently skipped)
+        expect(() => unmount()).not.toThrow();
+
+        // Singleton should still be functional (wasn't disposed)
+        expect(singleton.count()).toBe(42);
       });
 
-      it("should throw SingletonDisposeError when dispose array contains singleton", async () => {
+      it("should silently skip singleton and dispose other items in dispose array", async () => {
         const globalLogic = logic("globalLogic", () => {
           const count = signal(0, { name: "global.count" });
           return { count };
@@ -681,23 +686,36 @@ describe.each(wrappers)(
 
         // Get singleton to register its dispose
         const singleton = globalLogic();
+        singleton.count.set(100);
+        const localDisposeTracker = vi.fn();
 
         const TestComponent = () => {
           // BAD PATTERN: including singleton in dispose array
+          // (singleton will be skipped, but other items will be disposed)
           useScope("singletonDisposeArray", () => ({
             value: signal(1),
-            dispose: [singleton], // Array includes singleton
+            // Note: dispose array expects objects with dispose methods
+            dispose: [singleton, { dispose: localDisposeTracker }],
           }));
           return <div data-testid="content">Content</div>;
         };
 
         const { unmount } = renderWithWrapper(<TestComponent />);
+        unmount();
 
-        // Unmount should throw because it tries to dispose singleton
-        expect(() => unmount()).toThrow(/Cannot dispose a singleton logic instance/);
+        // Wait for microtask disposal
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // Local dispose should have been called
+        expect(localDisposeTracker).toHaveBeenCalled();
+
+        // Singleton should still be functional
+        expect(singleton.count()).toBe(100);
       });
 
-      it("should throw SingletonDisposeError when dispose object is singleton", async () => {
+      it("should silently skip singleton when dispose object is singleton", async () => {
         const globalLogic = logic("globalLogic", () => {
           const count = signal(0, { name: "global.count" });
           return { count };
@@ -705,23 +723,28 @@ describe.each(wrappers)(
 
         // Get singleton to register its dispose
         const singleton = globalLogic();
+        singleton.count.set(55);
 
         const TestComponent = () => {
           // BAD PATTERN: returning singleton as dispose object
+          // (will be silently skipped)
           useScope("singletonDisposeObj", () => ({
             value: signal(1),
-            dispose: singleton, // Object with dispose method
+            dispose: singleton,
           }));
           return <div data-testid="content">Content</div>;
         };
 
         const { unmount } = renderWithWrapper(<TestComponent />);
 
-        // Unmount should throw because it tries to dispose singleton
-        expect(() => unmount()).toThrow(/Cannot dispose a singleton logic instance/);
+        // Unmount should NOT throw
+        expect(() => unmount()).not.toThrow();
+
+        // Singleton should still be functional
+        expect(singleton.count()).toBe(55);
       });
 
-      it("should NOT throw when dispose contains local instances (not singletons)", async () => {
+      it("should dispose local instances normally (not singletons)", async () => {
         const localLogic = logic("localLogic", () => {
           const count = signal(0, { name: "local.count" });
           return { count };
@@ -734,15 +757,21 @@ describe.each(wrappers)(
           const localInstance = localLogic.create();
           useScope("localDispose", () => ({
             value: signal(1),
-            dispose: [localInstance, disposeTracker],
+            // Note: dispose array expects objects with dispose methods
+            dispose: [localInstance, { dispose: disposeTracker }],
           }));
           return <div data-testid="content">Content</div>;
         };
 
         const { unmount } = renderWithWrapper(<TestComponent />);
+        unmount();
 
-        // Should NOT throw - local instances can be disposed
-        expect(() => unmount()).not.toThrow();
+        // Wait for microtask disposal
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 10));
+        });
+
+        // Local instances and dispose tracker should have been called
         expect(disposeTracker).toHaveBeenCalled();
       });
 

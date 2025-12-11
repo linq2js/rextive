@@ -86,6 +86,7 @@ export {
   SingletonDisposeError,
   wrapDispose,
   noop,
+  tryDispose,
   registerSingletonDispose,
   unregisterSingletonDispose,
   isSingletonDispose,
@@ -94,6 +95,7 @@ export type {
   PropertyMergeStrategy,
   CombineDisposablesOptions,
   WrapDisposeWhen,
+  TryDisposeOptions,
 } from "./disposable";
 export { validate } from "./validate";
 
