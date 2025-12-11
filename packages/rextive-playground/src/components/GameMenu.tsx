@@ -8,7 +8,7 @@
  * - How to Play instructions
  * - Play button with energy cost display
  */
-import { Icon, type IconName } from "./Icons";
+import type { IconName } from "./Icons";
 
 // =============================================================================
 // Types
@@ -103,13 +103,13 @@ function DifficultyButton({
   return (
     <button
       onClick={onClick}
-      className={`p-3 rounded-xl text-center transition-all ${
+      className={`px-2 py-2.5 rounded-xl text-center transition-all ${
         selected
           ? `bg-gradient-to-br ${option.color} text-white scale-105 shadow-lg`
           : "bg-gray-100 hover:bg-gray-200"
       }`}
     >
-      <div className="font-display font-semibold">{option.label}</div>
+      <div className="font-display font-semibold text-sm">{option.label}</div>
       <div
         className={`text-xs ${selected ? "text-white/80" : "text-gray-500"}`}
       >
@@ -139,32 +139,29 @@ export function GameMenu({
   howToPlay,
   howToPlayColor = "bg-blue-50",
 }: GameMenuProps) {
+  // Suppress unused variable warnings - these are kept for future use/flexibility
+  void title;
+  void icon;
+  void themeColor;
+
   const hasEnergy = energy >= energyCost;
 
   return (
-    <div className="space-y-6">
-      {/* Game Info Card */}
-      <div className="card text-center bg-white/95">
-        <div
-          className={`mb-4 flex justify-center text-transparent bg-clip-text bg-gradient-to-r ${themeColor}`}
-        >
-          <Icon name={icon} size={64} className={`text-current`} />
-        </div>
-        <h2 className="font-display text-2xl font-bold text-gray-800">
-          {title}
-        </h2>
-        <p className="mt-2 text-gray-600">{description}</p>
+    <div className="space-y-4">
+      {/* Game Description */}
+      <div className="card text-center bg-white/95 py-4">
+        <p className="text-gray-600">{description}</p>
       </div>
 
       {/* Custom Content (e.g., Theme Selection) */}
       {children}
 
       {/* Difficulty Selection */}
-      <div className="card bg-white/95">
-        <h3 className="font-display text-lg font-semibold text-gray-700 mb-3">
+      <div className="card bg-white/95 py-4">
+        <h3 className="font-display text-base font-semibold text-gray-700 mb-2">
           Choose Difficulty
         </h3>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           {difficultyOptions.map((option) => (
             <DifficultyButton
               key={option.value}
@@ -177,11 +174,11 @@ export function GameMenu({
       </div>
 
       {/* How to Play */}
-      <div className={`card ${howToPlayColor}`}>
-        <h3 className="font-display text-lg font-semibold text-gray-700 mb-2">
+      <div className={`card py-4 ${howToPlayColor}`}>
+        <h3 className="font-display text-base font-semibold text-gray-700 mb-2">
           How to Play
         </h3>
-        <ul className="text-sm text-gray-600 space-y-1">
+        <ul className="text-sm text-gray-600 space-y-0.5">
           {howToPlay.map((instruction, i) => (
             <li key={i}>• {instruction}</li>
           ))}
@@ -192,7 +189,7 @@ export function GameMenu({
       <button
         onClick={onPlay}
         disabled={!hasEnergy || isLoading}
-        className={`w-full py-4 rounded-2xl font-display text-xl font-bold transition-all ${
+        className={`w-full py-3 rounded-2xl font-display text-lg font-bold transition-all ${
           hasEnergy && !isLoading
             ? "bg-gradient-to-r from-green-400 to-emerald-500 text-white hover:scale-105 active:scale-95 shadow-lg"
             : "bg-gray-300 text-gray-500 cursor-not-allowed"

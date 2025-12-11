@@ -223,6 +223,195 @@ return {
 | **B: Getters/Setters** | `getFoo`, `setFoo` | Calls functions | Mock functions | Controlled access, easy mocking |
 | **❌ Lens** | Lens tuples | Destructure | Hard to mock | **Don't use** |
 
+## Reactive Data Patterns
+
+In reality, we usually need to compute data from other data sources. Rextive provides three approaches with different characteristics:
+
+1. **Computed Signals** - Declarative derived data
+2. **Effect-like Signals** - Side effects that update mutable signals
+3. **`.on()` Subscriptions** - Manual dependency listening
+
+### Computed Signals
+
+Computed signals derive new values from dependencies. The result type is whatever the compute function returns.
+
+```tsx
+// Sync computed
+const fullName = signal(
+  { firstName, lastName },
+  ({ deps }) => `${deps.firstName} ${deps.lastName}`
+);
+
+// Async computed
+const userData = signal(
+  { userId },
+  async ({ deps, abortSignal }) => {
+    const res = await fetch(`/api/users/${deps.userId}`, { signal: abortSignal });
+    return res.json();
+  }
+);
+```
+
+**Characteristics:**
+
+| Aspect | Description |
+|--------|-------------|
+| **Dependencies** | Multiple dependencies declared explicitly |
+| **Return type** | Any type - sync or async (Promise) |
+| **Initial value** | None - consumer must handle loading/error states |
+| **Error handling** | Consumer-side via `task.from()` or try-catch |
+| **Cleanup** | Automatic when signal disposed |
+
+**Consumer patterns for async computed:**
+
+```tsx
+// Pattern 1: task.from() - always returns task object with loading/error/value
+const { loading, error, value } = task.from(userData);
+
+// Pattern 2: wait() in rx() - throws if loading/error (Suspense-like)
+rx(() => {
+  const user = wait(userData());  // Throws if loading
+  return <div>{user.name}</div>;
+});
+
+// Pattern 3: pipe(task) - creates new signal with stale-while-revalidate
+const userTask = userData.pipe(task({ name: "Guest" }));  // Has fallback
+const { loading, value } = userTask();  // value is ALWAYS defined
+```
+
+**When to use computed signals:**
+- ✅ Deriving data from other signals
+- ✅ Fetching data based on dependencies
+- ✅ When consumer needs to control loading/error UI
+- ✅ When you need `abortSignal` for cancellation
+
+### Effect-like Signals
+
+Effect-like signals react to dependencies and update mutable signals. They don't return meaningful data - they produce side effects.
+
+```tsx
+function dashboardLogic() {
+  const $profile = profileLogic();
+  
+  // Mutable signal to store the result
+  const stats = signal<Stats>(initialStats, { name: "dashboard.stats" });
+
+  // Effect-like signal - reacts to profile changes
+  signal(
+    { profile: $profile.profile },
+    ({ deps, safe }) => {
+      if (!deps.profile) return;
+      
+      // Fetch and update the mutable signal
+      fetchStats(deps.profile.id).then(data => {
+        safe(() => stats.set(data));  // safe() prevents update if disposed
+      });
+    },
+    { lazy: false, name: "dashboard.statsLoader" }
+  );
+
+  return { stats };  // Consumer only sees the mutable signal
+}
+```
+
+**Characteristics:**
+
+| Aspect | Description |
+|--------|-------------|
+| **Signals needed** | At least 2: mutable signal (data) + effect signal (reactor) |
+| **Dependencies** | Multiple dependencies declared explicitly |
+| **Initial value** | ✅ Yes - set on the mutable signal |
+| **Async interface** | None - consumer reads mutable signal directly |
+| **Loading/error states** | Not exposed - consumer doesn't know about them |
+| **Error handling** | Signal owner handles errors (not consumer) |
+| **Cleanup** | Automatic when logic/scope disposed |
+| **Context utilities** | `safe()`, `onCleanup()`, `aborted()` available |
+
+**When to use effect-like signals:**
+- ✅ When consumer shouldn't see loading states
+- ✅ When you want initial/fallback data always available
+- ✅ When errors should be handled internally
+- ✅ Side effects in response to dependency changes
+- ✅ When auto-cleanup on scope disposal is needed
+
+### `.on()` Subscriptions
+
+Direct subscription to a single signal's changes. Lightweight but requires manual cleanup.
+
+```tsx
+function authLogic() {
+  const token = signal<string | null>(null);
+  const user = signal<User | null>(null);
+
+  // Listen to token changes and update user
+  token.on(() => {
+    const t = token();
+    if (t) {
+      fetchUser(t).then(u => user.set(u));
+    } else {
+      user.set(null);
+    }
+  });
+
+  return { token, user };
+}
+```
+
+**Characteristics:**
+
+| Aspect | Description |
+|--------|-------------|
+| **Dependencies** | Single dependency only |
+| **Cleanup** | ❌ Must unsubscribe manually |
+| **Context utilities** | ❌ No `safe()`, `onCleanup()`, etc. |
+| **Memory** | Lighter - no extra signal created |
+| **Use case** | Long-lived singletons, simple 1:1 reactions |
+
+**When to use `.on()`:**
+- ✅ Long-lived singleton logic (global stores)
+- ✅ Simple one-to-one dependency
+- ✅ When you need manual control over subscription
+- ⚠️ Must remember to unsubscribe to avoid leaks
+
+### Comparison Table
+
+| Aspect | Computed Signal | Effect-like Signal | `.on()` Subscription |
+|--------|----------------|-------------------|---------------------|
+| **Purpose** | Derive data | Side effects | React to changes |
+| **Dependencies** | Multiple | Multiple | Single |
+| **Initial value** | ❌ None | ✅ Yes (mutable signal) | N/A |
+| **Async support** | ✅ Returns Promise | Via internal fetch | Via callback |
+| **Loading state** | ✅ Consumer handles | ❌ Hidden | ❌ Hidden |
+| **Error handling** | Consumer | Signal owner | Signal owner |
+| **Auto cleanup** | ✅ Yes | ✅ Yes | ❌ Manual |
+| **Context utils** | ✅ `safe()`, `onCleanup()` | ✅ `safe()`, `onCleanup()` | ❌ None |
+| **Memory overhead** | 1 signal | 2+ signals | None |
+
+### Choosing the Right Pattern
+
+```
+Need derived data visible to consumer?
+├─ Yes → Computed Signal
+│   └─ Consumer handles loading/error with task.from() or wait()
+│
+└─ No → Need to react to changes and update internal state?
+    ├─ Yes → Multiple dependencies or need cleanup?
+    │   ├─ Yes → Effect-like Signal
+    │   └─ No → .on() Subscription (simpler, but manual cleanup)
+    │
+    └─ No → Just use computed signal
+```
+
+**Quick decision guide:**
+
+| Scenario | Pattern |
+|----------|---------|
+| Fetch user data when userId changes | **Computed** (consumer shows loading) |
+| Update internal cache when data changes | **Effect-like** (consumer sees cached data) |
+| Analytics tracking on state changes | **Effect-like** or **`.on()`** |
+| Sync localStorage on value change | **`.on()`** (simple, global singleton) |
+| Complex multi-step data pipeline | **Effect-like** (intermediate state hidden) |
+
 ## Common Patterns
 
 ### Pattern 1: Component-Scoped Signals
@@ -364,7 +553,7 @@ function gameLogic() {
       // onCleanup runs when deps change or signal disposes
       onCleanup(() => clearInterval(interval));
     },
-    { lazy: true, name: "game.timer" }
+    { lazy: false, name: "game.timer" }  // lazy: false to run immediately
   );
 
   return { gameState, timeLeft };
@@ -375,6 +564,110 @@ function gameLogic() {
 1. Auto-disposed when the logic scope is disposed (no manual cleanup needed)
 2. Use `safe()` to avoid calling something if the effect-like signal is disposed
 3. Use `context.onCleanup()` to clean up intervals/subscriptions when dependencies change or signal disposes
+4. Use `lazy: false` so the effect runs immediately when the logic is initialized
+
+### Pattern 5b-2: Effect-like Signal vs `.on()` - When to Use Which
+
+Both approaches handle reactive side effects, but have different trade-offs:
+
+**Effect-like Signal:**
+```tsx
+function dashboardLogic() {
+  const $profile = profileLogic();
+  const stats = signal<Stats>(initialStats);
+
+  // ✅ Effect-like signal - auto-disposed, handles multiple deps
+  signal(
+    { profile: $profile.profile },
+    ({ deps, safe }) => {
+      if (!deps.profile) return;
+      
+      fetchStats(deps.profile.id).then(data => {
+        safe(() => stats.set(data));  // safe() prevents update if disposed
+      });
+    },
+    { lazy: false, name: "dashboard.statsLoader" }
+  );
+
+  return { stats };
+}
+```
+
+**`.on()` Method:**
+```tsx
+function globalAuthLogic() {
+  const token = signal<string | null>(null);
+
+  // ✅ .on() - lightweight for long-lived singletons
+  token.on(() => {
+    if (token()) {
+      analytics.identify(token());
+    }
+  });
+
+  return { token };
+}
+```
+
+**Comparison:**
+
+| Aspect | Effect-like Signal | `.on()` Method |
+|--------|-------------------|----------------|
+| **Auto-disposal** | ✅ Yes - disposes with logic scope | ❌ No - must manually unsubscribe |
+| **Multiple deps** | ✅ Easy - declare in deps object | ❌ Harder - must coordinate multiple `.on()` calls |
+| **Memory** | ❌ Higher - creates new signal | ✅ Lower - no extra signal |
+| **`safe()` helper** | ✅ Built-in | ❌ Must handle manually |
+| **Cleanup handler** | ✅ `onCleanup()` available | ❌ Must track manually |
+
+**When to use Effect-like Signal:**
+- ✅ Logic that gets disposed (component scopes, `useScope`)
+- ✅ Multiple dependencies that should trigger the effect
+- ✅ Side effects that need cleanup (intervals, subscriptions)
+- ✅ Async operations that update other signals
+
+**When to use `.on()` Method:**
+- ✅ Long-lived singletons where manual control is acceptable
+- ✅ Simple one-to-one subscription (one signal → one action)
+- ✅ Performance-critical code where every signal counts
+- ✅ Global event handlers that never need cleanup
+
+**Common Mistake - Forgetting to Unsubscribe `.on()`:**
+```tsx
+// ❌ BAD - subscription leaks when logic is disposed
+function badLogic() {
+  const $profile = profileLogic();
+  const stats = signal<Stats>(initialStats);
+
+  // This subscription is never cleaned up!
+  $profile.profile.on(() => {
+    const p = $profile.profile();
+    if (p) fetchAndUpdateStats(p.id);  // Will fail after dispose
+  });
+
+  return { stats };
+}
+
+// ✅ GOOD - use effect-like signal instead
+function goodLogic() {
+  const $profile = profileLogic();
+  const stats = signal<Stats>(initialStats);
+
+  signal(
+    { profile: $profile.profile },
+    ({ deps, safe }) => {
+      if (!deps.profile) return;
+      fetchStats(deps.profile.id).then(data => {
+        safe(() => stats.set(data));
+      });
+    },
+    { lazy: false, name: "statsLoader" }
+  );
+
+  return { stats };
+}
+```
+
+**Rule of thumb:** For scoped logic (components, `useScope`), prefer effect-like signals. The memory cost is negligible for short-lived scopes, and you get automatic cleanup.
 
 ### Pattern 5c: Tuple Setter with Computed Derived Values
 

@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { task } from "rextive";
 import { rx, useScope } from "rextive/react";
 import { gameStatsLogic, selectedProfileLogic } from "@/logic";
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/Icons";
+import { formatLastPlayed } from "@/utils";
 
 export const Route = createFileRoute("/games/$gameName")({
   component: GamePage,
@@ -33,10 +35,8 @@ function GamePage() {
 
   return rx(() => {
     const profile = $profile.profile();
-    // Use statsTask for stale-while-revalidate pattern
-    const statsState = $stats.statsTask();
-    const stats = statsState.value;
-    const isLoading = statsState.loading;
+    // Use task.from for loading/error/value state handling
+    const { value: stats, loading: isLoading, error } = task.from($stats.stats);
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-400 via-purple-400 to-pink-400 p-4 safe-bottom">
@@ -45,6 +45,7 @@ function GamePage() {
           <header className="mb-6 flex items-center justify-between">
             <Link
               to="/"
+              viewTransition
               className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
             >
               <Icon name="back" size={20} />
@@ -79,13 +80,37 @@ function GamePage() {
           {profile && (
             <div className="card mb-6">
               <h3 className="font-display text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                <Icon name="chart" size={20} className="text-blue-500" /> Your Stats
+                <Icon name="chart" size={20} className="text-blue-500" /> Your
+                Stats
               </h3>
+              {/* Loading state */}
               {isLoading && !stats ? (
                 <LoadingSpinner />
-              ) : stats ? (
+              ) : /* Error state - show message with retry option */
+              error ? (
+                <div className="text-center py-4">
+                  <div className="text-red-400 mb-2">
+                    <Icon name="warning" size={40} />
+                  </div>
+                  <p className="text-gray-600 mb-3">
+                    Failed to load stats. Please try again.
+                  </p>
+                  <button
+                    onClick={() => $stats.refresh()}
+                    className="btn btn-outline text-sm py-2 px-4"
+                  >
+                    <Icon name="refresh" size={16} className="mr-1" />
+                    Retry
+                  </button>
+                </div>
+              ) : /* Success state with stats */
+              stats ? (
                 <div className="grid grid-cols-2 gap-4">
-                  <StatItem label="High Score" value={stats.highScore ?? 0} iconName="trophy" />
+                  <StatItem
+                    label="High Score"
+                    value={stats.highScore ?? 0}
+                    iconName="trophy"
+                  />
                   <StatItem label="Level" value={stats.level} iconName="star" />
                   <StatItem
                     label="Last Played"
@@ -99,6 +124,7 @@ function GamePage() {
                   />
                 </div>
               ) : (
+                /* Empty state - no stats yet */
                 <div className="text-center py-4">
                   <div className="text-4xl mb-2 text-amber-400">
                     <Icon name="star" size={48} />
@@ -125,7 +151,11 @@ function GamePage() {
               Check back soon for exciting gameplay!
             </p>
 
-            <Link to="/" className="btn btn-kid mt-6 inline-block">
+            <Link
+              to="/"
+              viewTransition
+              className="btn btn-kid mt-6 inline-block"
+            >
               Back to Home
             </Link>
           </div>
@@ -155,18 +185,4 @@ function StatItem({
       </div>
     </div>
   );
-}
-
-function formatLastPlayed(date: Date): string {
-  const now = new Date();
-  const lastPlayed = new Date(date);
-  const diffDays = Math.floor(
-    (now.getTime() - lastPlayed.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-  return lastPlayed.toLocaleDateString();
 }

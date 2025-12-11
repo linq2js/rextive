@@ -32,6 +32,9 @@ function kidsTabLogic() {
     setMaxXp: $mgmt.setMaxXp,
     toggleGameVisibility: $mgmt.toggleGameVisibility,
     setAllGamesVisibility: $mgmt.setAllGamesVisibility,
+    // Testing utilities
+    generateSampleStats: $mgmt.generateSampleStats,
+    generateAllSampleStats: $mgmt.generateAllSampleStats,
   };
 }
 
@@ -54,11 +57,14 @@ function KidsTab() {
     $tab.selectKid(kidId);
     // Scroll to the actions panel after selection
     setTimeout(() => {
-      kidActionsPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      kidActionsPanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }, 100);
   };
 
-      return (
+  return (
     <Suspense fallback={<LoadingSpinner />}>
       {rx(() => {
         // Use profilesTask for stale-while-revalidate pattern
@@ -70,98 +76,136 @@ function KidsTab() {
           return <LoadingSpinner />;
         }
 
-    const selectedKid = $tab.selectedKid();
-    const message = $tab.actionMessage();
+        const selectedKid = $tab.selectedKid();
+        const message = $tab.actionMessage();
 
-    return (
-      <div className="space-y-6">
-        {/* Action Message */}
-        {message && (
-          <div
-            className={`p-3 rounded-xl text-center font-medium animate-pop ${
-              message.type === "success"
-                ? "bg-green-100 text-green-800"
-                : "bg-red-100 text-red-800"
-            }`}
-          >
-            {message.text}
-          </div>
-        )}
-
-        {/* Quick Actions */}
-        <div className="card">
-          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Icon name="lightning" size={20} className="text-amber-500" /> Quick Actions
-          </h3>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-                  onClick={() => $overlays.open({ type: "profileForm" })}
-              className="btn btn-primary flex-1 py-3"
-            >
-              <Icon name="plus" size={18} /> Add Kid Profile
-            </button>
-            <button
-              onClick={() => $tab.refillAllEnergy()}
-                  disabled={profiles.length === 0}
-              className="btn btn-outline flex-1 py-3"
-            >
-              <Icon name="lightning" size={18} /> Refill All Energy
-            </button>
-          </div>
-        </div>
-
-        {/* Kid Selection */}
-        <div className="card">
-          <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Icon name="baby" size={20} className="text-pink-500" /> Select a Kid to Manage
-          </h3>
-
-          {profiles.length === 0 ? (
-            <div className="text-center py-6">
-              <div className="text-primary-500 mb-4"><Icon name="baby" size={64} /></div>
-              <h4 className="font-display text-lg font-semibold text-gray-800">
-                No Kids Yet
-              </h4>
-              <p className="mt-2 text-gray-600">
-                Add your first kid profile to get started!
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {profiles.map((profile) => (
-                <button
-                  key={profile.id}
-                      onClick={() => handleSelectKid(profile.id)}
-                  className={`p-3 rounded-xl text-center transition-all ${
-                    selectedKid?.id === profile.id
-                      ? "bg-primary-100 border-2 border-primary-500 scale-105"
-                      : "bg-gray-50 border-2 border-transparent hover:bg-gray-100"
-                  }`}
-                >
-                  <div className="mx-auto h-12 w-12 mb-2">
-                    <Avatar avatar={profile.avatar} className="w-full h-full" />
-                  </div>
-                  <div className="mt-2 font-medium text-gray-800 truncate">
-                    {profile.name}
-                  </div>
-                  <div className="text-xs text-gray-500">{profile.age} yrs</div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Selected Kid Actions */}
-        {selectedKid && (
-              <div ref={kidActionsPanelRef}>
-          <KidActionsPanel
-            $tab={$tab}
-                  onEditProfile={() => $overlays.open({ type: "profileForm", editProfile: selectedKid })}
-          />
+        return (
+          <div className="space-y-6">
+            {/* Action Message */}
+            {message && (
+              <div
+                className={`p-3 rounded-xl text-center font-medium animate-pop ${
+                  message.type === "success"
+                    ? "bg-green-100 text-green-800"
+                    : "bg-red-100 text-red-800"
+                }`}
+              >
+                {message.text}
               </div>
-        )}
-      </div>
-    );
+            )}
+
+            {/* Quick Actions */}
+            <div className="card">
+              <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Icon name="lightning" size={20} className="text-amber-500" />{" "}
+                Quick Actions
+              </h3>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => $overlays.open({ type: "profileForm" })}
+                  className="btn btn-primary flex-1 py-3"
+                >
+                  <Icon name="plus" size={18} /> Add Kid Profile
+                </button>
+                <button
+                  onClick={() => $tab.refillAllEnergy()}
+                  disabled={profiles.length === 0}
+                  className="btn btn-outline flex-1 py-3"
+                >
+                  <Icon name="lightning" size={18} /> Refill All Energy
+                </button>
+              </div>
+            </div>
+
+            {/* ============================================================================
+            TESTING SECTION - Global Actions
+            This section is for testing/demo purposes only.
+            Remove this entire section when deploying to production.
+            ============================================================================ */}
+            <div className="card border-2 border-dashed border-orange-300 bg-orange-50">
+              <h3 className="font-display text-lg font-semibold text-orange-700 mb-3 flex items-center gap-2">
+                <Icon name="warning" size={20} className="text-orange-500" />{" "}
+                Testing Tools
+              </h3>
+              <p className="text-xs text-orange-600 mb-3">
+                ⚠️ Dev only - these tools generate fake data for testing the UI
+              </p>
+              <button
+                onClick={() => $tab.generateAllSampleStats()}
+                disabled={profiles.length === 0}
+                className="btn btn-outline w-full py-3 text-orange-600 border-orange-300 hover:bg-orange-100"
+              >
+                <Icon name="chart" size={18} /> Generate Sample Stats for All
+                Kids
+              </button>
+            </div>
+            {/* END TESTING SECTION */}
+
+            {/* Kid Selection */}
+            <div className="card">
+              <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Icon name="baby" size={20} className="text-pink-500" /> Select
+                a Kid to Manage
+              </h3>
+
+              {profiles.length === 0 ? (
+                <div className="text-center py-6">
+                  <div className="text-primary-500 mb-4">
+                    <Icon name="baby" size={64} />
+                  </div>
+                  <h4 className="font-display text-lg font-semibold text-gray-800">
+                    No Kids Yet
+                  </h4>
+                  <p className="mt-2 text-gray-600">
+                    Add your first kid profile to get started!
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {profiles.map((profile) => (
+                    <button
+                      key={profile.id}
+                      onClick={() => handleSelectKid(profile.id)}
+                      className={`p-3 rounded-xl text-center transition-all ${
+                        selectedKid?.id === profile.id
+                          ? "bg-primary-100 border-2 border-primary-500 scale-105"
+                          : "bg-gray-50 border-2 border-transparent hover:bg-gray-100"
+                      }`}
+                    >
+                      <div className="mx-auto h-12 w-12 mb-2">
+                        <Avatar
+                          avatar={profile.avatar}
+                          className="w-full h-full"
+                        />
+                      </div>
+                      <div className="mt-2 font-medium text-gray-800 truncate">
+                        {profile.name}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {profile.age} yrs
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Selected Kid Actions */}
+            {selectedKid && (
+              <div ref={kidActionsPanelRef}>
+                <KidActionsPanel
+                  $tab={$tab}
+                  onEditProfile={() =>
+                    $overlays.open({
+                      type: "profileForm",
+                      editProfile: selectedKid,
+                    })
+                  }
+                />
+              </div>
+            )}
+          </div>
+        );
       })}
     </Suspense>
   );
@@ -213,7 +257,8 @@ function KidActionsPanel({
         {/* Energy Actions */}
         <div className="card">
           <h4 className="font-display font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Icon name="lightning" size={18} className="text-amber-500" /> Energy
+            <Icon name="lightning" size={18} className="text-amber-500" />{" "}
+            Energy
           </h4>
           <button
             onClick={() => $tab.refillEnergy(kid.id)}
@@ -227,7 +272,8 @@ function KidActionsPanel({
         {/* XP & Unlocks */}
         <div className="card">
           <h4 className="font-display font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Icon name="star" size={18} className="text-purple-500" /> XP & Unlocks
+            <Icon name="star" size={18} className="text-purple-500" /> XP &
+            Unlocks
           </h4>
           <button
             onClick={async () => {
@@ -291,7 +337,11 @@ function KidActionsPanel({
                   disabled={isLoading}
                   className="btn btn-outline py-2 text-sm truncate"
                 >
-                  <Icon name={game.icon as import("@/components/Icons").IconName} size={16} className="flex-shrink-0" />
+                  <Icon
+                    name={game.icon as import("@/components/Icons").IconName}
+                    size={16}
+                    className="flex-shrink-0"
+                  />
                   <span className="truncate">{game.name}</span>
                 </button>
               ))}
@@ -303,7 +353,8 @@ function KidActionsPanel({
         <div className="card">
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-display font-semibold text-gray-800 flex items-center gap-2">
-              <Icon name="controller" size={18} className="text-indigo-500" /> Game Visibility
+              <Icon name="controller" size={18} className="text-indigo-500" />{" "}
+              Game Visibility
             </h4>
             <div className="flex gap-2">
               <button
@@ -334,7 +385,14 @@ function KidActionsPanel({
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <span className="flex-shrink-0 text-primary-500"><Icon name={game.icon as import("@/components/Icons").IconName} size={24} /></span>
+                    <span className="flex-shrink-0 text-primary-500">
+                      <Icon
+                        name={
+                          game.icon as import("@/components/Icons").IconName
+                        }
+                        size={24}
+                      />
+                    </span>
                     <span className="font-medium text-gray-800 truncate">
                       {game.name}
                     </span>
@@ -348,13 +406,47 @@ function KidActionsPanel({
                         : "bg-gray-200 text-gray-500"
                     }`}
                   >
-                    {isVisible ? <><Icon name="eye" size={14} /> Visible</> : <><Icon name="eye-off" size={14} /> Hidden</>}
+                    {isVisible ? (
+                      <>
+                        <Icon name="eye" size={14} /> Visible
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="eye-off" size={14} /> Hidden
+                      </>
+                    )}
                   </button>
                 </div>
               );
             })}
           </div>
         </div>
+
+        {/* ============================================================================
+            TESTING SECTION
+            This section is for testing/demo purposes only.
+            Remove this entire section when deploying to production.
+            ============================================================================ */}
+        <div className="card border-2 border-dashed border-orange-300 bg-orange-50">
+          <h4 className="font-display font-semibold text-orange-700 mb-3 flex items-center gap-2">
+            <Icon name="warning" size={18} className="text-orange-500" />{" "}
+            Testing Tools
+          </h4>
+          <p className="text-xs text-orange-600 mb-3">
+            ⚠️ Dev only - generates fake data for testing UI
+          </p>
+          <button
+            onClick={() => $tab.generateSampleStats(kid.id)}
+            disabled={isLoading}
+            className="btn btn-outline w-full py-2 text-orange-600 border-orange-300 hover:bg-orange-100"
+          >
+            <Icon name="chart" size={16} /> Generate Sample Stats
+          </button>
+          <p className="mt-2 text-xs text-orange-500 text-center">
+            Creates random high scores, play counts, and levels for all games
+          </p>
+        </div>
+        {/* END TESTING SECTION */}
       </div>
     );
   });

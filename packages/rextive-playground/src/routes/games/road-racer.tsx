@@ -754,6 +754,7 @@ function RoadRacer() {
           <header className="mb-4 flex items-center justify-between">
             <Link
               to="/dashboard"
+              viewTransition
               className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
             >
               <Icon name="back" size={20} />
@@ -812,6 +813,7 @@ function RoadRacer() {
               </p>
               <Link
                 to="/"
+                viewTransition
                 className="btn bg-emerald-500 text-white mt-4 inline-block hover:bg-emerald-600"
               >
                 Go Home
@@ -1146,6 +1148,7 @@ function RoadRacer() {
                       </p>
                       <Link
                         to="/dashboard"
+                        viewTransition
                         className="btn bg-slate-600 text-white mt-2 hover:bg-slate-500"
                       >
                         Go to Dashboard

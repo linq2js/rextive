@@ -85,6 +85,7 @@ function HomePage() {
           <div className="mt-12 text-center">
             <Link
               to="/mode/parent"
+              viewTransition
               className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
               <Icon name="lock" size={16} />
@@ -122,7 +123,7 @@ function ProfileSelector({
 
   const handleSelect = (profileId: number) => {
     $selected.select(profileId);
-    navigate({ to: "/dashboard" });
+    navigate({ to: "/dashboard", viewTransition: true });
   };
 
   return (

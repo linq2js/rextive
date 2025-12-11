@@ -61,6 +61,7 @@ function TypingAdventureContent() {
           <div className="mx-auto max-w-2xl flex items-center justify-between">
             <Link
               to="/dashboard"
+              viewTransition
               className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
             >
               <Icon name="back" size={20} />

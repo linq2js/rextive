@@ -65,7 +65,7 @@ export const productDetailsLogic = logic("productDetailsLogic", () => {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     },
-    { name: "productDetails.effect", lazy: false }
+    { name: "productDetails.routeChangeEffect", lazy: false }
   );
 
   return {

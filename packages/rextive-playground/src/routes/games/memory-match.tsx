@@ -167,7 +167,7 @@ function StarRatingIcon({ filled }: { filled: boolean }) {
 
 function BrainIcon() {
   return (
-    <svg viewBox="0 0 64 64" className="w-20 h-20">
+    <svg viewBox="0 0 64 64" className="w-full h-full">
       <ellipse cx="24" cy="32" rx="16" ry="20" fill="#f472b6" />
       <ellipse cx="40" cy="32" rx="16" ry="20" fill="#ec4899" />
       <path d="M24 16 Q32 12 40 16" stroke="#db2777" strokeWidth="2" fill="none" />
@@ -469,7 +469,7 @@ function MemoryMatch() {
             <h2 className="font-display text-xl font-bold text-gray-800 mt-4">
               Please select a profile first
             </h2>
-            <Link to="/" className="btn bg-purple-500 text-white mt-4 hover:bg-purple-600">
+            <Link to="/" viewTransition className="btn bg-purple-500 text-white mt-4 hover:bg-purple-600">
               Go Home
             </Link>
           </div>
@@ -484,6 +484,7 @@ function MemoryMatch() {
           <div className="mx-auto max-w-3xl flex items-center justify-between">
             <Link
               to="/dashboard"
+              viewTransition
               className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
             >
               <Icon name="back" size={20} />
@@ -828,7 +829,7 @@ function FinishedScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> 
               "No Energy Left"
             )}
           </button>
-          <Link to="/dashboard" className="btn bg-gray-200 text-gray-700 py-3 text-center hover:bg-gray-300">
+          <Link to="/dashboard" viewTransition className="btn bg-gray-200 text-gray-700 py-3 text-center hover:bg-gray-300">
             Back to Dashboard
           </Link>
         </div>

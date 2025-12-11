@@ -27,6 +27,14 @@ export interface ParentManagementRepository {
   getGameSettings(kidId: number): Promise<KidGameSettings[]>;
   setGameVisibility(kidId: number, gameId: string, visible: boolean): Promise<void>;
   setAllGamesVisibility(kidId: number, visible: boolean): Promise<void>;
+
+  // ============================================================================
+  // TESTING UTILITIES
+  // These functions are for testing/demo purposes only.
+  // Remove this section when deploying to production.
+  // ============================================================================
+  generateSampleStats(kidId: number): Promise<void>;
+  generateSampleStatsForAll(): Promise<void>;
 }
 
 export const parentManagementRepository: ParentManagementRepository = {
@@ -172,6 +180,76 @@ export const parentManagementRepository: ParentManagementRepository = {
   async setAllGamesVisibility(kidId: number, visible: boolean): Promise<void> {
     for (const game of AVAILABLE_GAMES) {
       await this.setGameVisibility(kidId, game.id, visible);
+    }
+  },
+
+  // ============================================================================
+  // TESTING UTILITIES
+  // These functions are for testing/demo purposes only.
+  // Remove this section when deploying to production.
+  // ============================================================================
+
+  /**
+   * Generates sample/mock stats for a specific kid.
+   * Creates realistic-looking game progress data for all available games.
+   * Useful for testing the UI without playing actual games.
+   * 
+   * @param kidId - ID of the kid to generate stats for
+   */
+  async generateSampleStats(kidId: number): Promise<void> {
+    // Generate random stats for each game
+    for (const game of AVAILABLE_GAMES) {
+      // Random values to make stats look realistic
+      const timesPlayed = Math.floor(Math.random() * 50) + 5; // 5-55 plays
+      const highScore = Math.floor(Math.random() * 500) + 100; // 100-600
+      const totalScore = highScore * Math.floor(Math.random() * 3 + 1); // 1-3x high score
+      const level = Math.floor(Math.random() * 10) + 1; // 1-10
+
+      // Random last played date within last 14 days
+      const daysAgo = Math.floor(Math.random() * 14);
+      const lastPlayed = new Date();
+      lastPlayed.setDate(lastPlayed.getDate() - daysAgo);
+
+      // Check if record exists
+      const existing = await db.gameProgress
+        .where("[kidId+gameName]")
+        .equals([kidId, game.id])
+        .first();
+
+      if (existing?.id) {
+        // Update existing
+        await db.gameProgress.update(existing.id, {
+          highScore,
+          totalScore,
+          timesPlayed,
+          level,
+          lastPlayed,
+        });
+      } else {
+        // Create new
+        await db.gameProgress.add({
+          kidId,
+          gameName: game.id,
+          highScore,
+          totalScore,
+          timesPlayed,
+          level,
+          lastPlayed,
+        });
+      }
+    }
+  },
+
+  /**
+   * Generates sample stats for ALL kids.
+   * Useful for quickly populating the entire app with test data.
+   */
+  async generateSampleStatsForAll(): Promise<void> {
+    const kids = await db.kidProfiles.toArray();
+    for (const kid of kids) {
+      if (kid.id) {
+        await this.generateSampleStats(kid.id);
+      }
     }
   },
 };

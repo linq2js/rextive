@@ -125,13 +125,14 @@ function StatsPage() {
         const unlockedCount = stats.achievements.filter(a => a.unlocked).length;
 
         return (
-          <div className="min-h-screen bg-pattern-kid pb-8 pt-14 safe-bottom">
+          <div className="min-h-screen bg-pattern-kid pb-8 safe-bottom">
             {/* Header */}
-            <header className="fixed top-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-200">
+            <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-200">
               <div className="mx-auto max-w-3xl px-4">
                 <div className="flex h-14 items-center justify-between">
                   <Link
                     to="/dashboard"
+                    viewTransition
                     className="flex items-center gap-1 text-gray-600 hover:text-gray-900 transition-colors"
                   >
                     <Icon name="back" size={20} />

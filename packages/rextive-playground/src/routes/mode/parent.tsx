@@ -65,7 +65,7 @@ function SetupPassword() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="card w-full max-w-md">
-        <Link to="/" className="mb-4 inline-block text-2xl">
+        <Link to="/" viewTransition className="mb-4 inline-block text-2xl">
           ←
         </Link>
         <h1 className="font-display text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
@@ -156,7 +156,7 @@ function LoginScreen() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="card w-full max-w-md">
-        <Link to="/" className="mb-4 inline-block text-2xl">
+        <Link to="/" viewTransition className="mb-4 inline-block text-2xl">
           ←
         </Link>
         <h1 className="font-display text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
@@ -249,6 +249,7 @@ function ParentDashboardLayout() {
             <div className="flex h-14 items-center justify-between">
               <Link
                 to="/"
+                viewTransition
                 className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
               >
                 <span className="text-xl">←</span>
@@ -325,6 +326,7 @@ function TabLink({
   return (
     <Link
       to={to}
+      viewTransition
       className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-1.5 ${
         active
           ? "border-primary-500 text-primary-600"

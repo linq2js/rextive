@@ -285,6 +285,45 @@ export function parentKidManagementLogic() {
   }
 
   // ============================================================================
+  // TESTING UTILITIES
+  // These functions are for testing/demo purposes only.
+  // Remove this section when deploying to production.
+  // ============================================================================
+
+  const generateSampleStatsState = signal<Promise<void>>();
+
+  /**
+   * [TESTING] Generates sample/mock stats for a specific kid.
+   * Creates realistic-looking game progress data for testing the UI.
+   * 
+   * @param kidId - ID of the kid to generate stats for
+   */
+  async function generateSampleStats(kidId: number) {
+    const promise = (async () => {
+      await parentManagementRepository.generateSampleStats(kidId);
+      refreshKidData(); // Update displayed stats
+      showMessage("success", "Sample stats generated!");
+    })();
+    generateSampleStatsState.set(promise);
+    return promise.catch(() => showMessage("error", "Failed to generate stats"));
+  }
+
+  const generateAllSampleStatsState = signal<Promise<void>>();
+
+  /**
+   * [TESTING] Generates sample stats for ALL kids.
+   */
+  async function generateAllSampleStats() {
+    const promise = (async () => {
+      await parentManagementRepository.generateSampleStatsForAll();
+      refreshKidData(); // Update displayed stats
+      showMessage("success", "Sample stats generated for all kids!");
+    })();
+    generateAllSampleStatsState.set(promise);
+    return promise.catch(() => showMessage("error", "Failed to generate stats"));
+  }
+
+  // ============================================================================
   // EXPORTS
   // ============================================================================
 
@@ -308,5 +347,11 @@ export function parentKidManagementLogic() {
     setMaxXp: Object.assign(setMaxXp, { state: setMaxXpState }),
     toggleGameVisibility: Object.assign(toggleGameVisibility, { state: toggleGameVisibilityState }),
     setAllGamesVisibility: Object.assign(setAllGamesVisibility, { state: setAllGamesVisibilityState }),
+
+    // ============================================================================
+    // TESTING UTILITIES - Remove in production
+    // ============================================================================
+    generateSampleStats: Object.assign(generateSampleStats, { state: generateSampleStatsState }),
+    generateAllSampleStats: Object.assign(generateAllSampleStats, { state: generateAllSampleStatsState }),
   };
 }

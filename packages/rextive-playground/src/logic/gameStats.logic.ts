@@ -1,5 +1,5 @@
 /**
- * @file gameStatsLogic.ts
+ * @file gameStats.logic.ts
  * @description Local logic factory for fetching game-specific stats.
  *
  * This is a LOCAL logic factory (not a singleton) - each game page creates its own instance.
@@ -12,17 +12,20 @@
  * // In a game component
  * const $stats = useScope(() => gameStatsLogic("typing-adventure"));
  *
- * // Access stats (async)
+ * // Access stats with Suspense (throws while loading)
  * const stats = wait($stats.stats());
  *
- * // Or use task for loading state
- * const { value, loading } = $stats.statsTask();
+ * // Or use task.from for manual loading/error handling
+ * const state = task.from($stats.stats());
+ * if (state?.loading) return <Spinner />;
+ * if (state?.error) return <Error />;
+ * const stats = state?.value;
  *
  * // Refresh after recording a game
  * $stats.refresh();
  * ```
  */
-import { signal, task } from "rextive";
+import { signal } from "rextive";
 import { selectedProfileLogic } from "./selectedProfile.logic";
 import { gameProgressRepository } from "@/infrastructure/repositories";
 import type { GameProgress } from "@/domain/types";
@@ -31,7 +34,7 @@ import type { GameProgress } from "@/domain/types";
  * Creates a logic instance for managing stats for a specific game.
  *
  * @param gameName - Unique game identifier (e.g., "typing-adventure", "memory-match")
- * @returns Logic object with stats signals and refresh action
+ * @returns Logic object with stats signal and refresh action
  */
 export function gameStatsLogic(gameName: string) {
   // ============================================================================
@@ -41,39 +44,28 @@ export function gameStatsLogic(gameName: string) {
   const $profile = selectedProfileLogic();
 
   // ============================================================================
-  // REFRESH TRIGGER
-  // Used to manually refresh stats after recording a game session
-  // ============================================================================
-
-  const [onRefresh, refresh] = signal<void>().tuple;
-
-  // ============================================================================
   // STATE: GAME STATS
   // ============================================================================
 
   /**
    * Async computed signal that fetches stats for this game.
-   * Re-fetches when:
-   * - Selected profile changes
-   * - Manual refresh is triggered
+   * Re-fetches when selected profile changes.
    *
    * Returns null if no profile is selected or no stats exist yet.
+   *
+   * Usage:
+   * - `wait($stats.stats())` - For Suspense-based loading
+   * - `task.from($stats.stats())` - For manual loading/error state handling
+   * - `$stats.refresh()` - Force re-fetch after recording a game
    */
   const stats = signal(
-    { profile: $profile.profile, onRefresh },
+    { profile: $profile.profile },
     async ({ deps }): Promise<GameProgress | null> => {
-      void deps.onRefresh; // Access to establish dependency
       if (!deps.profile) return null;
       return gameProgressRepository.getByKidAndGame(deps.profile.id, gameName);
     },
     { name: `gameStats.${gameName}` }
   );
-
-  /**
-   * Task-wrapped version for stale-while-revalidate pattern.
-   * Provides sync access to last known stats while loading.
-   */
-  const statsTask = stats.pipe(task<GameProgress | null>(null));
 
   // ============================================================================
   // EXPORTS
@@ -82,9 +74,7 @@ export function gameStatsLogic(gameName: string) {
   return {
     /** Async signal for game stats */
     stats,
-    /** Task-wrapped stats for sync access */
-    statsTask,
-    /** Trigger to refresh stats (call after recording a game) */
-    refresh,
+    /** Force re-fetch stats (call after recording a game) */
+    refresh: stats.refresh,
   };
 }
