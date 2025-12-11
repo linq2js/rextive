@@ -9,6 +9,7 @@ import {
   SignalContext,
   SignalOptions,
   Computed,
+  StaleWhileRevalidateTask,
 } from "../types";
 import { getHooks } from "../hooks";
 import { is } from "../is";
@@ -119,12 +120,13 @@ function createErrorTask<TValue = any>(
  * // On refresh: t.value = { id: 1, name: "Alice" } (stale, while loading new data)
  * ```
  */
+
 export function task<TValue>(
   initial: NoInfer<TValue>,
-  options?: SignalOptions<Task<TValue> & { value: TValue }>
+  options?: SignalOptions<StaleWhileRevalidateTask<TValue>>
 ): (
   source: Signal<PromiseLike<TValue>>
-) => Computed<Task<TValue> & { value: TValue }> {
+) => Computed<StaleWhileRevalidateTask<TValue>> {
   // Generate unique operator ID once per task() call
   const opId = operatorId("task");
 
@@ -258,10 +260,10 @@ export namespace task {
   ): TValue extends Signal<infer T>
     ? Task<Awaited<T>>
     : TValue extends Task<any>
-    ? TValue
-    : TValue extends PromiseLike<infer T>
-    ? Task<T>
-    : Task<TValue> {
+      ? TValue
+      : TValue extends PromiseLike<infer T>
+        ? Task<T>
+        : Task<TValue> {
     if (is(value)) {
       if (value.error()) {
         return createErrorTask(value.error()) as any;

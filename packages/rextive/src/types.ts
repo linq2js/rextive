@@ -2261,6 +2261,13 @@ export type ErrorTask<TValue> = {
 export type Task<T> = LoadingTask<T> | SuccessTask<T> | ErrorTask<T>;
 
 /**
+ * A task that always has a value, even during loading/error states.
+ *
+ * @template T - The type of data when operation succeeds
+ */
+export type StaleWhileRevalidateTask<T> = Task<T> & { value: T };
+
+/**
  * A lazy factory that produces and manages a single instance at a time.
  *
  * @template T - The type of value produced by the factory

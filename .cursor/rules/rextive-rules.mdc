@@ -6,6 +6,8 @@ alwaysApply: true
 
 A signal-based reactive state management library with explicit dependencies.
 
+> **📖 For advanced patterns, comparisons, and decision guides:** See `/packages/rextive/docs/AI_ASSISTANT_GUIDE.md`
+
 ## Table of Contents
 
 1. [Core Philosophy](#-core-philosophy)
