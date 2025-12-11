@@ -4,7 +4,7 @@ import {
   Outlet,
   useLocation,
 } from "@tanstack/react-router";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { rx, useScope, inputValue } from "rextive/react";
 import { focus } from "rextive/op";
 import { task } from "rextive";
@@ -27,6 +27,14 @@ function LoadingSpinner() {
 
 function ParentLayout() {
   const $auth = parentAuthLogic();
+
+  // Auto-logout when leaving parent area (component unmounts)
+  useEffect(() => {
+    return () => {
+      // Logout when navigating away from /mode/parent/*
+      $auth.logout();
+    };
+  }, [$auth]);
 
   return (
     <Suspense fallback={<LoadingSpinner />}>

@@ -279,28 +279,12 @@ function GuestView({ $page, state }: { $page: ReturnType<typeof syncPageLogic>; 
     if (state === "idle") {
       return (
         <div className="space-y-6">
-          <div className="card text-center py-6">
-            <p className="text-sm text-gray-500 mb-4">
+          <div className="card py-6">
+            <label className="block text-sm text-gray-500 mb-2">
               Enter the 6-digit code from the other device
-            </p>
+            </label>
             
-            {/* Code Input */}
-            <div className="flex justify-center gap-2 mb-6">
-              {[0, 1, 2, 3, 4, 5].map((i) => (
-                <div
-                  key={i}
-                  className={`w-12 h-14 rounded-xl flex items-center justify-center text-2xl font-bold shadow-inner transition-all ${
-                    codeInput[i]
-                      ? "bg-gradient-to-br from-purple-400 to-pink-500 text-white"
-                      : "bg-gray-100 text-gray-300"
-                  }`}
-                >
-                  {codeInput[i] || "•"}
-                </div>
-              ))}
-            </div>
-            
-            {/* Hidden input for mobile keyboard */}
+            {/* Simple text input */}
             <input
               type="text"
               inputMode="numeric"
@@ -308,36 +292,10 @@ function GuestView({ $page, state }: { $page: ReturnType<typeof syncPageLogic>; 
               maxLength={6}
               value={codeInput}
               onChange={(e) => $page.setCodeInput(e.target.value)}
-              className="sr-only"
+              placeholder="000000"
               autoFocus
-              id="code-input"
+              className="input text-center text-2xl font-bold tracking-widest"
             />
-            
-            {/* Visible number pad for easier input */}
-            <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, "⌫"].map((key, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    if (key === "⌫") {
-                      $page.setCodeInput(codeInput.slice(0, -1));
-                    } else if (key !== null) {
-                      $page.setCodeInput(codeInput + key);
-                    }
-                  }}
-                  disabled={key === null}
-                  className={`h-12 rounded-xl font-bold text-xl transition-all ${
-                    key === null
-                      ? "invisible"
-                      : key === "⌫"
-                        ? "bg-gray-200 text-gray-600 hover:bg-gray-300 active:scale-95"
-                        : "bg-gray-100 text-gray-800 hover:bg-gray-200 active:scale-95"
-                  }`}
-                >
-                  {key}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Connect Button */}
