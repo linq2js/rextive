@@ -940,4 +940,123 @@ describe("focus.lens", () => {
       expect(settings().volume).toBe(75);
     });
   });
+
+  describe("multi-lens config object", () => {
+    it("should create multiple lenses from config object", () => {
+      const gameState = signal({
+        game: { status: "menu" as string, timeLeft: 60 },
+        stats: { score: 0, level: 1 },
+      });
+
+      const accessors = focus.lens(gameState, {
+        status: "game.status",
+        timeLeft: "game.timeLeft",
+        score: "stats.score",
+      });
+
+      // Test getters
+      expect(accessors.getStatus()).toBe("menu");
+      expect(accessors.getTimeLeft()).toBe(60);
+      expect(accessors.getScore()).toBe(0);
+
+      // Test setters
+      accessors.setStatus("playing");
+      expect(accessors.getStatus()).toBe("playing");
+      expect(gameState().game.status).toBe("playing");
+
+      accessors.setTimeLeft(55);
+      expect(accessors.getTimeLeft()).toBe(55);
+      expect(gameState().game.timeLeft).toBe(55);
+
+      accessors.setScore(100);
+      expect(accessors.getScore()).toBe(100);
+      expect(gameState().stats.score).toBe(100);
+    });
+
+    it("should support updater functions in setters", () => {
+      const state = signal({
+        counter: { value: 10 },
+      });
+
+      const accessors = focus.lens(state, {
+        value: "counter.value",
+      });
+
+      accessors.setValue((prev) => prev + 5);
+      expect(accessors.getValue()).toBe(15);
+
+      accessors.setValue((prev) => prev * 2);
+      expect(accessors.getValue()).toBe(30);
+    });
+
+    it("should support fallback in config object", () => {
+      const user = signal<{
+        profile: { name?: string; nickname?: string };
+      }>({
+        profile: { name: "Alice" },
+      });
+
+      const accessors = focus.lens(user, {
+        name: "profile.name",
+        nickname: { path: "profile.nickname", fallback: () => "Anonymous" },
+      });
+
+      expect(accessors.getName()).toBe("Alice");
+      expect(accessors.getNickname()).toBe("Anonymous"); // Fallback
+
+      // Set the nickname
+      accessors.setNickname("Ali");
+      expect(accessors.getNickname()).toBe("Ali");
+    });
+
+    it("should work with deeply nested paths", () => {
+      const data = signal({
+        level1: {
+          level2: {
+            level3: {
+              value: "deep",
+              count: 42,
+            },
+          },
+        },
+      });
+
+      const accessors = focus.lens(data, {
+        deepValue: "level1.level2.level3.value",
+        deepCount: "level1.level2.level3.count",
+      });
+
+      expect(accessors.getDeepValue()).toBe("deep");
+      expect(accessors.getDeepCount()).toBe(42);
+
+      accessors.setDeepValue("deeper");
+      accessors.setDeepCount(100);
+
+      expect(data().level1.level2.level3.value).toBe("deeper");
+      expect(data().level1.level2.level3.count).toBe(100);
+    });
+
+    it("should maintain immutability", () => {
+      const original = {
+        user: { name: "Alice", settings: { theme: "dark" } },
+      };
+      const state = signal(original);
+
+      const accessors = focus.lens(state, {
+        name: "user.name",
+        theme: "user.settings.theme",
+      });
+
+      accessors.setName("Bob");
+
+      // Original should be unchanged
+      expect(original.user.name).toBe("Alice");
+      // Signal should have new value
+      expect(state().user.name).toBe("Bob");
+      // Root object should be different (immutable update)
+      expect(state()).not.toBe(original);
+      // User object should be different (parent of changed path)
+      expect(state().user).not.toBe(original.user);
+    });
+  });
 });

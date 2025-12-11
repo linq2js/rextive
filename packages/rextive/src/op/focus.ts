@@ -435,6 +435,64 @@ function isLens<T>(value: unknown): value is Lens<T, unknown> {
   );
 }
 
+// =============================================================================
+// MULTI-LENS TYPES
+// =============================================================================
+
+/**
+ * Config entry for multi-lens: either a path string or object with path + fallback
+ */
+type LensConfigEntry<T extends object> =
+  | Path<T>
+  | { path: Path<T>; fallback?: () => unknown };
+
+/**
+ * Config object for creating multiple lenses at once
+ */
+type LensConfig<T extends object> = Record<string, LensConfigEntry<T>>;
+
+/**
+ * Helper to extract the path from a config entry
+ */
+type ExtractPath<T extends object, E> =
+  E extends Path<T>
+    ? E
+    : E extends { path: infer P }
+      ? P extends Path<T>
+        ? P
+        : never
+      : never;
+
+/**
+ * Helper to get the value type for a config entry
+ */
+type LensValueType<T extends object, E> = E extends { fallback: () => infer F }
+  ? NonNullable<F>
+  : PathValue<T, ExtractPath<T, E>>;
+
+/**
+ * Capitalize first letter of a string type
+ */
+type Capitalize<S extends string> = S extends `${infer F}${infer R}`
+  ? `${Uppercase<F>}${R}`
+  : S;
+
+/**
+ * Result type for multi-lens: getters and setters for each key
+ */
+type MultiLensResult<T extends object, C extends LensConfig<T>> = {
+  [K in keyof C as `get${Capitalize<K & string>}`]: () => LensValueType<
+    T,
+    C[K]
+  >;
+} & {
+  [K in keyof C as `set${Capitalize<K & string>}`]: (
+    value:
+      | LensValueType<T, C[K]>
+      | ((prev: LensValueType<T, C[K]>) => LensValueType<T, C[K]>)
+  ) => void;
+};
+
 /**
  * Create a lightweight lens (getter/setter) for a path in a signal or another lens.
  * Unlike focus(), this doesn't create a reactive signal - just on-demand read/write.
@@ -477,12 +535,42 @@ export function lens<
   fallback: FocusFallback<F>
 ): Lens<F>;
 
+// Overload 3: Multi-lens config object
+/**
+ * Create multiple lenses at once from a config object.
+ *
+ * @example
+ * ```ts
+ * const accessors = focus.lens(gameState, {
+ *   status: 'game.status',
+ *   timeLeft: { path: 'game.timeLeft', fallback: () => 60 },
+ *   score: 'stats.score',
+ * });
+ *
+ * // Use typed getters/setters
+ * accessors.getStatus();           // "playing"
+ * accessors.setStatus("paused");
+ * accessors.setTimeLeft(t => t - 1);
+ * accessors.getScore();            // 100
+ * ```
+ */
+export function lens<T extends object, C extends LensConfig<T>>(
+  source: Mutable<T> | Lens<T, unknown>,
+  config: C
+): MultiLensResult<T, C>;
+
 // Implementation
 export function lens<T extends object, P extends Path<T>>(
   source: Mutable<T> | Lens<T, unknown>,
-  path: P,
+  pathOrConfig: P | LensConfig<T>,
   fallback?: () => PathValue<T, P>
-): Lens<PathValue<T, P>> {
+): Lens<PathValue<T, P>> | MultiLensResult<T, LensConfig<T>> {
+  // Handle multi-lens config object
+  if (typeof pathOrConfig === "object" && !Array.isArray(pathOrConfig)) {
+    return createMultiLens(source, pathOrConfig as LensConfig<T>);
+  }
+
+  const path = pathOrConfig as P;
   type V = PathValue<T, P>;
 
   // Memoize fallback if provided
@@ -518,6 +606,89 @@ export function lens<T extends object, P extends Path<T>>(
     } else {
       // Update signal directly
       (source as Mutable<T>).set((root: T) => setAtPath(root, path, value));
+    }
+  };
+
+  return createLens(getter, setter);
+}
+
+/**
+ * Create multiple lenses from a config object.
+ * Returns an object with get{Key} and set{Key} methods for each config entry.
+ */
+function createMultiLens<T extends object>(
+  source: Mutable<T> | Lens<T, unknown>,
+  config: LensConfig<T>
+): MultiLensResult<T, LensConfig<T>> {
+  const result: Record<string, unknown> = {};
+
+  for (const key of Object.keys(config)) {
+    const entry = config[key];
+
+    // Extract path and fallback from entry
+    const path =
+      typeof entry === "string" ? entry : (entry as { path: string }).path;
+    const fallbackFn =
+      typeof entry === "object" && "fallback" in entry
+        ? (entry as { fallback: () => unknown }).fallback
+        : undefined;
+
+    // Create the single lens using internal implementation
+    const singleLens = createSingleLens(source, path, fallbackFn);
+
+    // Capitalize key for method names
+    const capitalizedKey = key.charAt(0).toUpperCase() + key.slice(1);
+
+    // Add getter and setter to result
+    result[`get${capitalizedKey}`] = singleLens[0];
+    result[`set${capitalizedKey}`] = singleLens[1];
+  }
+
+  return result as MultiLensResult<T, LensConfig<T>>;
+}
+
+/**
+ * Internal implementation for creating a single lens.
+ * Separated to avoid type union issues with the public overloaded function.
+ */
+function createSingleLens<T extends object>(
+  source: Mutable<T> | Lens<T, unknown>,
+  path: string,
+  fallback?: () => unknown
+): Lens<unknown> {
+  // Memoize fallback if provided
+  const getFallbackValue = fallback ? memoize(fallback) : undefined;
+
+  // Determine if source is a lens or a mutable signal
+  const isSourceLens = isLens(source);
+
+  const getter = (): unknown => {
+    const rootValue = isSourceLens ? source[0]() : (source as Mutable<T>)();
+    const value = get(rootValue, path);
+
+    // Return fallback if value is nullish
+    if ((value === null || value === undefined) && getFallbackValue) {
+      return getFallbackValue();
+    }
+
+    return value;
+  };
+
+  const setter = (valueOrUpdater: unknown): void => {
+    // Resolve updater function if provided
+    const value =
+      typeof valueOrUpdater === "function"
+        ? (valueOrUpdater as (prev: unknown) => unknown)(getter())
+        : valueOrUpdater;
+
+    if (isSourceLens) {
+      // Update through parent lens
+      const rootGetter = source[0] as () => T;
+      const rootSetter = source[1] as (value: T) => void;
+      rootSetter(fpSet(path, value, rootGetter()) as T);
+    } else {
+      // Update signal directly
+      (source as Mutable<T>).set((root: T) => fpSet(path, value, root) as T);
     }
   };
 
