@@ -3,7 +3,7 @@ import { signal } from "rextive";
 import { rx, useScope } from "rextive/react";
 import { selectedProfileLogic } from "@/logic";
 import { AVATAR_NAMES, AVAILABLE_GAMES, isGameUnlocked } from "@/domain/types";
-import { useEffect, Suspense } from "react";
+import { Suspense } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Icon, type IconName } from "@/components/Icons";
 import { gameProgressRepository } from "@/infrastructure/repositories";
