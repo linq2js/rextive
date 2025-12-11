@@ -1,12 +1,13 @@
 import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { screen, waitFor, fireEvent } from "@testing-library/react";
 import { act, Suspense } from "react";
 import { rx } from "./rx";
 import { signal } from "../signal";
 import "@testing-library/jest-dom/vitest";
+import { wrappers } from "../test/strictModeTests";
 
-describe("rx", () => {
+describe.each(wrappers)("rx ($mode mode)", ({ render }) => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

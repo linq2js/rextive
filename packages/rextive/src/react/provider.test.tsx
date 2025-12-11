@@ -1,5 +1,5 @@
-import React, { StrictMode } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import React from "react";
+import { screen, waitFor } from "@testing-library/react";
 import { act } from "react";
 import { provider } from "./provider";
 import { describe, it, expect, vi } from "vitest";
@@ -12,12 +12,7 @@ import { Mutable } from "../types";
 import { wrappers } from "../test/strictModeTests";
 
 // Run all tests in both normal and StrictMode
-describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
-  // Helper to wrap render with the current mode's wrapper
-  const renderWithWrapper = (ui: React.ReactElement) => {
-    return render(<Wrapper>{ui}</Wrapper>);
-  };
-
+describe.each(wrappers)("provider ($mode mode)", ({ Wrapper, render }) => {
   describe("basic functionality", () => {
     it("should create a provider and hook", () => {
       const [useTheme, ThemeProvider] = provider<
@@ -58,7 +53,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         return <div data-testid="count">{rx(count)}</div>;
       }
 
-      renderWithWrapper(
+      render(
         <CountProvider value={42}>
           <Consumer />
         </CountProvider>
@@ -86,7 +81,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
 
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      expect(() => renderWithWrapper(<Consumer />)).toThrow(
+      expect(() => render(<Consumer />)).toThrow(
         "Theme context not found. Make sure you're using the component within <ThemeProvider>."
       );
 
@@ -123,7 +118,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         );
       }
 
-      renderWithWrapper(<WrapperComponent />);
+      render(<WrapperComponent />);
 
       expect(screen.getByTestId("count")).toHaveTextContent("0");
 
@@ -158,7 +153,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         return <div data-testid="name">{rx(user, (u) => u.name)}</div>;
       }
 
-      renderWithWrapper(
+      render(
         <UserProvider value={{ name: "Alice" }}>
           <Consumer />
         </UserProvider>
@@ -192,7 +187,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         return <div data-testid="item">{rx(item, (i) => i.name)}</div>;
       }
 
-      renderWithWrapper(
+      render(
         <ItemProvider value={{ id: 1, name: "New Item" }}>
           <Consumer />
         </ItemProvider>
@@ -224,7 +219,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         return <div data-testid="count">{rx(data, (d) => d.count)}</div>;
       }
 
-      renderWithWrapper(
+      render(
         <DataProvider value={{ count: 5 }}>
           <Consumer />
         </DataProvider>
@@ -267,7 +262,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         );
       }
 
-      renderWithWrapper(
+      render(
         <ThemeProvider value="light">
           <Outer />
         </ThemeProvider>
@@ -317,7 +312,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         );
       }
 
-      renderWithWrapper(
+      render(
         <ThemeProvider value="dark">
           <UserProvider value={{ name: "Alice" }}>
             <Consumer />
@@ -344,7 +339,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
       });
 
       // This should compile
-      renderWithWrapper(<CountProvider value={42}>Content</CountProvider>);
+      render(<CountProvider value={42}>Content</CountProvider>);
     });
 
     it("should return correct context types", () => {
@@ -414,7 +409,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
       }
 
       const increment = vi.fn();
-      renderWithWrapper(
+      render(
         <CounterProvider value={{ count: 5, increment, decrement: vi.fn() }}>
           <Consumer />
         </CounterProvider>
@@ -457,7 +452,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         ));
       }
 
-      renderWithWrapper(
+      render(
         <ItemsProvider value={["Apple", "Banana", "Cherry"]}>
           <Consumer />
         </ItemsProvider>
@@ -530,7 +525,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
 
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      expect(() => renderWithWrapper(<Consumer />)).toThrow(/CustomName/);
+      expect(() => render(<Consumer />)).toThrow(/CustomName/);
 
       spy.mockRestore();
     });
@@ -554,7 +549,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
 
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      expect(() => renderWithWrapper(<Consumer />)).toThrow(
+      expect(() => render(<Consumer />)).toThrow(
         /Make sure you're using the component within/
       );
 
@@ -599,7 +594,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         );
       }
 
-      renderWithWrapper(<WrapperComponent />);
+      render(<WrapperComponent />);
 
       // In StrictMode, create is called twice but only one context is kept
       // So we check that after clicking, no new context is created
@@ -638,7 +633,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         );
       }
 
-      renderWithWrapper(
+      render(
         <StoreProvider value={store}>
           <Consumer />
         </StoreProvider>
@@ -681,7 +676,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         },
       };
 
-      renderWithWrapper(
+      render(
         <LogicProvider value={logicInstance}>
           <Consumer />
         </LogicProvider>
@@ -704,7 +699,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
 
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      expect(() => renderWithWrapper(<Consumer />)).toThrow(
+      expect(() => render(<Consumer />)).toThrow(
         "Store context not found. Make sure you're using the component within <StoreProvider>."
       );
 
@@ -723,7 +718,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         return <div data-testid="theme">{rx(theme)}</div>;
       }
 
-      renderWithWrapper(
+      render(
         <ThemeProvider value="dark">
           <Consumer />
         </ThemeProvider>
@@ -752,7 +747,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         );
       }
 
-      renderWithWrapper(<WrapperComponent />);
+      render(<WrapperComponent />);
 
       expect(screen.getByTestId("count")).toHaveTextContent("0");
 
@@ -780,7 +775,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         );
       }
 
-      renderWithWrapper(
+      render(
         <ThemeProvider value="dark">
           <Consumer />
         </ThemeProvider>
@@ -812,7 +807,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         );
       }
 
-      renderWithWrapper(
+      render(
         <UserProvider value={{ name: "Alice", age: 30 }}>
           <Consumer />
         </UserProvider>
@@ -840,7 +835,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         ));
       }
 
-      renderWithWrapper(
+      render(
         <ItemsProvider value={["Apple", "Banana"]}>
           <Consumer />
         </ItemsProvider>
@@ -860,7 +855,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         return <div data-testid="value">{rx(value, (v) => v ?? "empty")}</div>;
       }
 
-      renderWithWrapper(
+      render(
         <OptionalProvider value={null}>
           <Consumer />
         </OptionalProvider>
@@ -881,7 +876,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
 
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      expect(() => renderWithWrapper(<Consumer />)).toThrow(
+      expect(() => render(<Consumer />)).toThrow(
         "Theme context not found. Make sure you're using the component within <ThemeProvider>."
       );
 
@@ -910,7 +905,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         );
       }
 
-      renderWithWrapper(
+      render(
         <ThemeProvider value="light">
           <Outer />
         </ThemeProvider>
@@ -954,7 +949,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         );
       }
 
-      renderWithWrapper(
+      render(
         <ThemeProvider value={{ theme: "dark", fontSize: 16 }}>
           <Consumer />
         </ThemeProvider>
@@ -999,7 +994,7 @@ describe.each(wrappers)("provider ($mode mode)", ({ Wrapper }) => {
         );
       }
 
-      renderWithWrapper(
+      render(
         <StoreProvider value={0}>
           <Consumer />
         </StoreProvider>

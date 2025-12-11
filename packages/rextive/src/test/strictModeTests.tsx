@@ -1,6 +1,6 @@
 import React from "react";
 import { PropsWithChildren, StrictMode } from "react";
-import { render } from "@testing-library/react";
+import { render, renderHook } from "@testing-library/react";
 
 const DefaultWrapper = ({
   children,
@@ -9,14 +9,16 @@ const DefaultWrapper = ({
 export const wrappers: {
   mode: "normal" | "strict";
   Wrapper: React.FC<{ children: React.ReactNode }>;
-  renderWithWrapper: (ui: React.ReactElement) => ReturnType<typeof render>;
+  render: (ui: React.ReactElement) => ReturnType<typeof render>;
+  renderHook: typeof renderHook;
 }[] = [
   {
     mode: "normal" as const,
     Wrapper: DefaultWrapper,
-    renderWithWrapper: (ui: React.ReactElement) => {
+    render: (ui: React.ReactElement) => {
       return render(ui, { wrapper: DefaultWrapper });
     },
+    renderHook,
   },
   {
     mode: "strict" as const,
@@ -25,8 +27,11 @@ export const wrappers: {
     }: PropsWithChildren<{ children: React.ReactNode }>) => (
       <StrictMode>{children}</StrictMode>
     ),
-    renderWithWrapper: (ui: React.ReactElement) => {
+    render: (ui: React.ReactElement) => {
       return render(ui, { wrapper: StrictMode });
+    },
+    renderHook(...args: any[]): any {
+      return renderHook(args[0], { ...args[1], wrapper: StrictMode });
     },
   },
 ] as const;
