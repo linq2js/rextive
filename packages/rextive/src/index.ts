@@ -83,8 +83,12 @@ export { is } from "./is";
 export {
   disposable,
   DisposalAggregateError,
+  SingletonDisposeError,
   wrapDispose,
   noop,
+  registerSingletonDispose,
+  unregisterSingletonDispose,
+  isSingletonDispose,
 } from "./disposable";
 export type {
   PropertyMergeStrategy,

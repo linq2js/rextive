@@ -648,6 +648,137 @@ describe.each(wrappers)(
         expect(dispose1).toHaveBeenCalled();
         expect(dispose2).toHaveBeenCalled();
       });
+
+      it("should throw SingletonDisposeError when dispose function is singleton's dispose", async () => {
+        const globalLogic = logic("globalLogic", () => {
+          const count = signal(0, { name: "global.count" });
+          return { count };
+        });
+
+        // Get singleton to register its dispose
+        const singleton = globalLogic();
+
+        const TestComponent = () => {
+          // BAD PATTERN: returning singleton's dispose as local dispose
+          useScope("singletonDispose", () => ({
+            value: signal(1),
+            dispose: singleton.dispose, // This should throw on unmount
+          }));
+          return <div data-testid="content">Content</div>;
+        };
+
+        const { unmount } = renderWithWrapper(<TestComponent />);
+
+        // Unmount should throw because it tries to dispose singleton
+        expect(() => unmount()).toThrow(/Cannot dispose a singleton logic instance/);
+      });
+
+      it("should throw SingletonDisposeError when dispose array contains singleton", async () => {
+        const globalLogic = logic("globalLogic", () => {
+          const count = signal(0, { name: "global.count" });
+          return { count };
+        });
+
+        // Get singleton to register its dispose
+        const singleton = globalLogic();
+
+        const TestComponent = () => {
+          // BAD PATTERN: including singleton in dispose array
+          useScope("singletonDisposeArray", () => ({
+            value: signal(1),
+            dispose: [singleton], // Array includes singleton
+          }));
+          return <div data-testid="content">Content</div>;
+        };
+
+        const { unmount } = renderWithWrapper(<TestComponent />);
+
+        // Unmount should throw because it tries to dispose singleton
+        expect(() => unmount()).toThrow(/Cannot dispose a singleton logic instance/);
+      });
+
+      it("should throw SingletonDisposeError when dispose object is singleton", async () => {
+        const globalLogic = logic("globalLogic", () => {
+          const count = signal(0, { name: "global.count" });
+          return { count };
+        });
+
+        // Get singleton to register its dispose
+        const singleton = globalLogic();
+
+        const TestComponent = () => {
+          // BAD PATTERN: returning singleton as dispose object
+          useScope("singletonDisposeObj", () => ({
+            value: signal(1),
+            dispose: singleton, // Object with dispose method
+          }));
+          return <div data-testid="content">Content</div>;
+        };
+
+        const { unmount } = renderWithWrapper(<TestComponent />);
+
+        // Unmount should throw because it tries to dispose singleton
+        expect(() => unmount()).toThrow(/Cannot dispose a singleton logic instance/);
+      });
+
+      it("should NOT throw when dispose contains local instances (not singletons)", async () => {
+        const localLogic = logic("localLogic", () => {
+          const count = signal(0, { name: "local.count" });
+          return { count };
+        });
+
+        const disposeTracker = vi.fn();
+
+        const TestComponent = () => {
+          // GOOD PATTERN: using .create() for owned instances
+          const localInstance = localLogic.create();
+          useScope("localDispose", () => ({
+            value: signal(1),
+            dispose: [localInstance, disposeTracker],
+          }));
+          return <div data-testid="content">Content</div>;
+        };
+
+        const { unmount } = renderWithWrapper(<TestComponent />);
+
+        // Should NOT throw - local instances can be disposed
+        expect(() => unmount()).not.toThrow();
+        expect(disposeTracker).toHaveBeenCalled();
+      });
+
+      it("should allow using singleton for reading without disposing", async () => {
+        const globalLogic = logic("globalLogic", () => {
+          const count = signal(0, { name: "global.count" });
+          const increment = () => count.set((x) => x + 1);
+          return { count, increment };
+        });
+
+        // Get singleton
+        const singleton = globalLogic();
+
+        const TestComponent = () => {
+          // GOOD PATTERN: use singleton for reading, don't try to dispose it
+          useScope("useSingleton", () => ({
+            // Just reference singleton's values, don't include in dispose
+            globalCount: singleton.count,
+            increment: singleton.increment,
+            // Local cleanup only
+            dispose: () => {},
+          }));
+          return <div data-testid="value">{singleton.count()}</div>;
+        };
+
+        const { unmount } = renderWithWrapper(<TestComponent />);
+
+        expect(screen.getByTestId("value")).toHaveTextContent("0");
+
+        // Should NOT throw
+        expect(() => unmount()).not.toThrow();
+
+        // Singleton should still be functional
+        singleton.increment();
+        expect(singleton.count()).toBe(1);
+      });
     });
 
     describe("local mode (auto-key, void return)", () => {

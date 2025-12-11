@@ -13,6 +13,75 @@ export class DisposalAggregateError extends Error {
 }
 
 /**
+ * Error thrown when trying to dispose a protected singleton.
+ */
+export class SingletonDisposeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SingletonDisposeError";
+  }
+}
+
+// ============================================================================
+// Singleton Dispose Protection
+// ============================================================================
+
+/**
+ * WeakSet of protected singleton dispose methods.
+ * These cannot be disposed via tryDispose() - only via unregisterSingletonDispose().
+ */
+const protectedSingletonDisposes = new WeakSet<VoidFunction>();
+
+/**
+ * Register a dispose method as a protected singleton.
+ * Protected disposes will throw SingletonDisposeError when tryDispose() is called.
+ * 
+ * Use this for global logic singletons that should not be disposed by local scopes.
+ * 
+ * @param dispose - The dispose method to protect
+ * 
+ * @example
+ * ```ts
+ * const singleton = create();
+ * registerSingletonDispose(singleton.dispose);
+ * 
+ * tryDispose(singleton); // ❌ Throws SingletonDisposeError
+ * ```
+ */
+export function registerSingletonDispose(dispose: VoidFunction): void {
+  protectedSingletonDisposes.add(dispose);
+}
+
+/**
+ * Unregister a dispose method from singleton protection.
+ * After unregistering, the dispose can be called normally.
+ * 
+ * Call this before disposing singletons in logic.clear() for test cleanup.
+ * 
+ * @param dispose - The dispose method to unprotect
+ * 
+ * @example
+ * ```ts
+ * // In logic.clear():
+ * unregisterSingletonDispose(singleton.dispose);
+ * singleton.dispose(); // ✅ Now allowed
+ * ```
+ */
+export function unregisterSingletonDispose(dispose: VoidFunction): void {
+  protectedSingletonDisposes.delete(dispose);
+}
+
+/**
+ * Check if a dispose method is registered as a protected singleton.
+ * 
+ * @param dispose - The dispose method to check
+ * @returns true if the dispose is protected
+ */
+export function isSingletonDispose(dispose: VoidFunction): boolean {
+  return protectedSingletonDisposes.has(dispose);
+}
+
+/**
  * Property merge strategy for combining disposables.
  * - "overwrite": Later services overwrite earlier ones (default)
  * - "error": Throw error if properties conflict
@@ -318,9 +387,15 @@ export const noop: VoidFunction = () => {};
  * - `{ dispose: Disposable[] }` - Recursively disposes each item
  * - `{ dispose: Disposable }` - Recursively disposes the nested disposable
  *
+ * **Singleton Protection**: If a dispose method was registered via
+ * `registerSingletonDispose()`, this will throw `SingletonDisposeError`.
+ * Use `unregisterSingletonDispose()` first if you need to dispose it
+ * (e.g., in `logic.clear()` for test cleanup).
+ *
  * Does nothing if the value is not disposable (no errors thrown).
  *
  * @param disposable - Any value that might be disposable
+ * @throws SingletonDisposeError if trying to dispose a protected singleton
  *
  * @example
  * ```ts
@@ -337,6 +412,10 @@ export const noop: VoidFunction = () => {};
  * tryDispose(null);
  * tryDispose(42);
  * tryDispose({ name: 'not disposable' });
+ * 
+ * // Protected singleton - throws error
+ * registerSingletonDispose(singleton.dispose);
+ * tryDispose(singleton); // ❌ SingletonDisposeError
  * ```
  */
 export function tryDispose(disposable: unknown) {
@@ -348,6 +427,14 @@ export function tryDispose(disposable: unknown) {
       "dispose" in d
     ) {
       if (typeof d.dispose === "function") {
+        // Check if this is a protected singleton
+        if (protectedSingletonDisposes.has(d.dispose as VoidFunction)) {
+          throw new SingletonDisposeError(
+            "Cannot dispose a singleton logic instance. " +
+            "Singletons are shared globally and should not be disposed by local scopes. " +
+            "If you need to reset state, use logic.clear() in tests."
+          );
+        }
         // Pattern: { dispose(): void }
         d.dispose();
         disposedObjects.add(d);

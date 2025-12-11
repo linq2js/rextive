@@ -3,6 +3,11 @@ import {
   DisposalAggregateError,
   wrapDispose,
   noop,
+  tryDispose,
+  registerSingletonDispose,
+  unregisterSingletonDispose,
+  isSingletonDispose,
+  SingletonDisposeError,
 } from "./disposable";
 import { describe, it, expect, vi } from "vitest";
 
@@ -966,5 +971,139 @@ describe("noop", () => {
   it("should be a function that does nothing", () => {
     expect(typeof noop).toBe("function");
     expect(noop()).toBeUndefined();
+  });
+});
+
+describe("singleton dispose protection", () => {
+
+  describe("registerSingletonDispose", () => {
+    it("should register a dispose function as protected", () => {
+      const dispose = vi.fn();
+      
+      expect(isSingletonDispose(dispose)).toBe(false);
+      
+      registerSingletonDispose(dispose);
+      
+      expect(isSingletonDispose(dispose)).toBe(true);
+    });
+  });
+
+  describe("unregisterSingletonDispose", () => {
+    it("should remove protection from a dispose function", () => {
+      const dispose = vi.fn();
+      
+      registerSingletonDispose(dispose);
+      expect(isSingletonDispose(dispose)).toBe(true);
+      
+      unregisterSingletonDispose(dispose);
+      expect(isSingletonDispose(dispose)).toBe(false);
+    });
+
+    it("should be safe to call on non-registered dispose", () => {
+      const dispose = vi.fn();
+      
+      // Should not throw
+      expect(() => unregisterSingletonDispose(dispose)).not.toThrow();
+    });
+  });
+
+  describe("tryDispose with singleton protection", () => {
+    it("should throw SingletonDisposeError when trying to dispose protected singleton", () => {
+      const dispose = vi.fn();
+      const obj = { dispose };
+      
+      registerSingletonDispose(dispose);
+      
+      expect(() => tryDispose(obj)).toThrow(SingletonDisposeError);
+      expect(() => tryDispose(obj)).toThrow(/Cannot dispose a singleton logic instance/);
+      
+      // Dispose should NOT have been called
+      expect(dispose).not.toHaveBeenCalled();
+      
+      // Cleanup
+      unregisterSingletonDispose(dispose);
+    });
+
+    it("should allow disposing non-protected objects", () => {
+      const dispose = vi.fn();
+      const obj = { dispose };
+      
+      // Not registered as singleton
+      expect(() => tryDispose(obj)).not.toThrow();
+      expect(dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it("should allow disposing after unregistering protection", () => {
+      const dispose = vi.fn();
+      const obj = { dispose };
+      
+      registerSingletonDispose(dispose);
+      
+      // Protected - should throw
+      expect(() => tryDispose(obj)).toThrow(SingletonDisposeError);
+      expect(dispose).not.toHaveBeenCalled();
+      
+      // Unregister protection
+      unregisterSingletonDispose(dispose);
+      
+      // Now should work
+      expect(() => tryDispose(obj)).not.toThrow();
+      expect(dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it("should throw when singleton is in dispose array", () => {
+      const singletonDispose = vi.fn();
+      const singleton = { dispose: singletonDispose };
+      const localDispose = vi.fn();
+      
+      registerSingletonDispose(singletonDispose);
+      
+      const obj = {
+        dispose: [singleton, { dispose: localDispose }],
+      };
+      
+      expect(() => tryDispose(obj)).toThrow(SingletonDisposeError);
+      
+      // Singleton should not have been called
+      expect(singletonDispose).not.toHaveBeenCalled();
+      // Local was also not called (because we threw before getting to it)
+      
+      // Cleanup
+      unregisterSingletonDispose(singletonDispose);
+    });
+
+    it("should throw when singleton is nested dispose object", () => {
+      const singletonDispose = vi.fn();
+      const singleton = { dispose: singletonDispose };
+      
+      registerSingletonDispose(singletonDispose);
+      
+      const obj = {
+        dispose: singleton, // Nested object pattern
+      };
+      
+      expect(() => tryDispose(obj)).toThrow(SingletonDisposeError);
+      expect(singletonDispose).not.toHaveBeenCalled();
+      
+      // Cleanup
+      unregisterSingletonDispose(singletonDispose);
+    });
+  });
+
+  describe("isSingletonDispose", () => {
+    it("should return false for non-registered dispose", () => {
+      const dispose = vi.fn();
+      expect(isSingletonDispose(dispose)).toBe(false);
+    });
+
+    it("should return true for registered dispose", () => {
+      const dispose = vi.fn();
+      registerSingletonDispose(dispose);
+      
+      expect(isSingletonDispose(dispose)).toBe(true);
+      
+      // Cleanup
+      unregisterSingletonDispose(dispose);
+    });
   });
 });

@@ -1,4 +1,8 @@
-import { tryDispose } from "./disposable";
+import {
+  tryDispose,
+  registerSingletonDispose,
+  unregisterSingletonDispose,
+} from "./disposable";
 import { noop } from "./utils/noop";
 import { once } from "./utils/once";
 import { withHooks } from "./hooks";
@@ -32,7 +36,10 @@ export class NotImplementedError extends Error {
  * Wraps the original error with logic context.
  */
 export class LogicCreateError extends Error {
-  constructor(logicName: string, public readonly cause: unknown) {
+  constructor(
+    logicName: string,
+    public readonly cause: unknown
+  ) {
     const message = cause instanceof Error ? cause.message : String(cause);
     super(`Failed to create logic "${logicName}": ${message}`);
     this.name = "LogicCreateError";
@@ -278,12 +285,21 @@ export function logic<T extends object>(name: string, fn: () => T): Logic<T> {
     }
   };
 
-  const getSingletonPro = once(create);
+  // Production singleton - created once, protected from disposal
+  const getSingletonPro = once(() => {
+    const singleton = create();
+    // Protect singleton from being disposed by local scopes
+    registerSingletonDispose(singleton.dispose);
+    return singleton;
+  });
 
+  // Dev singleton - can be cleared via logic.clear()
   const getSingletonDev = () => {
     let singleton = singletonDev.get(lg);
     if (!singleton) {
       singleton = create();
+      // Protect singleton from being disposed by local scopes
+      registerSingletonDispose(singleton.dispose);
       singletonDev.set(lg, singleton);
     }
     return singleton;
@@ -372,7 +388,7 @@ export namespace logic {
    */
   export function provide<
     TInstance extends object,
-    TLogic extends Logic<TInstance> | AbstractLogic<TInstance>
+    TLogic extends Logic<TInstance> | AbstractLogic<TInstance>,
   >(targetLogic: TLogic, factory: () => TInstance): TLogic {
     globalResolvers.set(targetLogic, factory);
     return targetLogic;
@@ -402,12 +418,18 @@ export namespace logic {
     // Dispose all tracked instances
     for (const instance of trackedInstances) {
       try {
+        // Unregister singleton protection before disposing
+        // This allows logic.clear() to dispose singletons for test cleanup
+        unregisterSingletonDispose(instance.dispose);
         instance.dispose();
       } catch {
         // Ignore disposal errors during cleanup
       }
     }
     trackedInstances.clear();
+
+    // Clear singleton cache (dev mode only)
+    singletonDev = new WeakMap();
 
     // Clear global overrides
     globalResolvers = new WeakMap();

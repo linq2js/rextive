@@ -94,6 +94,52 @@ describe("logic", () => {
       // Singleton persists - same instance
       expect(counter().count()).toBe(100);
     });
+
+    it("should throw SingletonDisposeError when trying to dispose singleton via tryDispose", async () => {
+      const { tryDispose, SingletonDisposeError } = await import("./disposable");
+      
+      const counter = logic("counter", () => {
+        const count = signal(0);
+        return { count };
+      });
+
+      const singleton = counter();
+
+      // Trying to dispose singleton should throw
+      expect(() => tryDispose(singleton)).toThrow(SingletonDisposeError);
+      expect(() => tryDispose(singleton)).toThrow("Cannot dispose a singleton logic instance");
+      
+      // Singleton should still be functional after failed dispose attempt
+      singleton.count.set(42);
+      expect(singleton.count()).toBe(42);
+    });
+
+    it("should allow disposing singleton after logic.clear()", async () => {
+      const counter = logic("counter", () => {
+        const count = signal(0);
+        return { count };
+      });
+
+      const singleton = counter();
+      singleton.count.set(100);
+
+      // Clear should work without throwing
+      expect(() => logic.clear()).not.toThrow();
+    });
+
+    it("should NOT protect instances created via .create()", async () => {
+      const { tryDispose, SingletonDisposeError } = await import("./disposable");
+      
+      const counter = logic("counter", () => {
+        const count = signal(0);
+        return { count };
+      });
+
+      const instance = counter.create();
+
+      // Disposing a created instance should NOT throw
+      expect(() => tryDispose(instance)).not.toThrow();
+    });
   });
 
   describe("create() - instance creation", () => {
