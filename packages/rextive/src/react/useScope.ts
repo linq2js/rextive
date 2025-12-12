@@ -88,13 +88,6 @@ function parseEquals(options: OptionsOrEquals | undefined): EqualsFn<any> {
   return Object.is;
 }
 
-/**
- * @internal - Exposed for testing
- */
-export function __clearCache() {
-  scopeCache.clear();
-}
-
 // ============================================================================
 // useScope Hook
 // ============================================================================

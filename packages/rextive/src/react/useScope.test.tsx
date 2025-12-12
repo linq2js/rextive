@@ -1,7 +1,7 @@
 import React, { act, Suspense } from "react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { screen } from "@testing-library/react";
-import { useScope, __clearCache, scope } from "./useScope";
+import { useScope, scope } from "./useScope";
 import { signal } from "../signal";
 import { logic } from "../logic";
 import { wrappers } from "../test/strictModeTests";
@@ -10,6 +10,7 @@ import { AnySignal } from "../types";
 import { rx } from "./rx";
 import { wait } from "../wait";
 import { batch } from "../batch";
+import { scopeCache } from "./scopeCache";
 
 // Simple ErrorBoundary for testing
 class ErrorBoundary extends React.Component<
@@ -35,7 +36,7 @@ describe.each(wrappers)("useScope ($mode mode)", ({ mode, render }) => {
   });
 
   afterEach(() => {
-    __clearCache();
+    scopeCache.clear();
     logic.clear();
   });
 
