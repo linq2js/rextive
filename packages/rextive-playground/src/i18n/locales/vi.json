@@ -573,6 +573,7 @@
     "starting": "Đang bắt đầu..."
   },
   "language": {
+    "selectLanguage": "Chọn ngôn ngữ",
     "english": "English",
     "vietnamese": "Tiếng Việt",
     "switchLanguage": "Chuyển đổi Ngôn ngữ"

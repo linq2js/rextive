@@ -571,6 +571,7 @@
     "starting": "Starting..."
   },
   "language": {
+    "selectLanguage": "Select Language",
     "english": "English",
     "vietnamese": "Tiếng Việt",
     "switchLanguage": "Switch Language"
