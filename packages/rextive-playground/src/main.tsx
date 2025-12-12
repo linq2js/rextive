@@ -1,17 +1,12 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import { DevToolsPanel } from "rextive/devtools-panel";
 import "./index.css";
 
-if (import.meta.env.DEV) {
-  import("rextive/devtools").then(({ enableDevTools }) => {
-    enableDevTools({ name: "rextive-playground", logToConsole: false });
-  });
-}
-
 // Dynamic import to ensure devtools is enabled before signals/logics are created
-async function bootstrap() {
+async function bootstrap(preSetup?: () => void | Promise<void>) {
+  await preSetup?.();
+
   const { RouterProvider, createRouter } =
     await import("@tanstack/react-router");
   const { routeTree } = await import("./routeTree.gen");
@@ -24,14 +19,19 @@ async function bootstrap() {
       <RouterProvider router={router} />
     </StrictMode>
   );
-
-  // Render DevToolsPanel in a SEPARATE root (only in dev mode)
-  if (import.meta.env.DEV) {
-    const devtoolsRoot = document.createElement("div");
-    devtoolsRoot.id = "rextive-devtools-root";
-    document.body.appendChild(devtoolsRoot);
-    createRoot(devtoolsRoot).render(<DevToolsPanel />);
-  }
 }
 
-bootstrap();
+bootstrap(
+  import.meta.env.DEV
+    ? async () => {
+        const { enableDevTools } = await import("rextive/devtools");
+        const { DevToolsPanel } = await import("rextive/devtools-panel");
+
+        enableDevTools({ name: "rextive-playground", logToConsole: false });
+        const devtoolsRoot = document.createElement("div");
+        devtoolsRoot.id = "rextive-devtools-root";
+        document.body.appendChild(devtoolsRoot);
+        createRoot(devtoolsRoot).render(<DevToolsPanel />);
+      }
+    : undefined
+);

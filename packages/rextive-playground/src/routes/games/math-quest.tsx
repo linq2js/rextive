@@ -109,13 +109,13 @@ const DIFFICULTY_CONFIG = {
     problemCount: 12,
   },
   medium: {
-    operations: ["+", "-", "×"] as Operation[],
+    operations: ["+", "-"] as Operation[],
     numRange: { min: 1, max: 20 },
     timeLimit: 60,
     problemCount: 10,
   },
   hard: {
-    operations: ["+", "-", "×", "÷"] as Operation[],
+    operations: ["+", "-"] as Operation[],
     numRange: { min: 5, max: 50 },
     timeLimit: 60,
     problemCount: 8,
@@ -239,20 +239,11 @@ function generateQuizProblem(difficulty: Difficulty): QuizProblem {
       );
       answer = num1 - num2;
       break;
-    case "×":
-      num1 = randomInt(1, Math.min(12, config.numRange.max));
-      num2 = randomInt(1, Math.min(12, config.numRange.max));
-      answer = num1 * num2;
-      break;
-    case "÷":
-      num2 = randomInt(2, 10);
-      answer = randomInt(1, 10);
-      num1 = num2 * answer;
-      break;
     default:
-      num1 = 1;
-      num2 = 1;
-      answer = 2;
+      // Fallback to addition if operation is not + or -
+      num1 = randomInt(config.numRange.min, config.numRange.max);
+      num2 = randomInt(config.numRange.min, config.numRange.max);
+      answer = num1 + num2;
   }
 
   return {
@@ -293,12 +284,8 @@ function generateCompareProblem(difficulty: Difficulty): CompareProblem {
       );
       leftValue = leftNum1 - leftNum2;
       break;
-    case "×":
-      leftNum1 = randomInt(1, Math.min(10, config.numRange.max));
-      leftNum2 = randomInt(1, Math.min(10, config.numRange.max));
-      leftValue = leftNum1 * leftNum2;
-      break;
     default:
+      // Fallback to addition if operation is not + or -
       leftNum1 = randomInt(config.numRange.min, config.numRange.max);
       leftNum2 = randomInt(config.numRange.min, config.numRange.max);
       leftValue = leftNum1 + leftNum2;
@@ -457,41 +444,13 @@ function generateFillBlankProblem(difficulty: Difficulty): FillBlankProblem {
         expression = `${num1} - ${num2} = _`;
       }
       break;
-    case "×":
-      num1 = randomInt(1, Math.min(10, config.numRange.max));
-      num2 = randomInt(1, Math.min(10, config.numRange.max));
-      result = num1 * num2;
-      blankPosition = randomInt(0, 2);
-      if (blankPosition === 0) {
-        answer = num1;
-        expression = `_ × ${num2} = ${result}`;
-      } else if (blankPosition === 1) {
-        answer = num2;
-        expression = `${num1} × _ = ${result}`;
-      } else {
-        answer = result;
-        expression = `${num1} × ${num2} = _`;
-      }
-      break;
-    case "÷":
-      num2 = randomInt(2, 10);
-      result = randomInt(1, 10);
-      num1 = num2 * result;
-      blankPosition = randomInt(0, 2);
-      if (blankPosition === 0) {
-        answer = num1;
-        expression = `_ ÷ ${num2} = ${result}`;
-      } else if (blankPosition === 1) {
-        answer = num2;
-        expression = `${num1} ÷ _ = ${result}`;
-      } else {
-        answer = result;
-        expression = `${num1} ÷ ${num2} = _`;
-      }
-      break;
     default:
-      answer = 5;
-      expression = "2 + _ = 7";
+      // Fallback to addition if operation is not + or -
+      num1 = randomInt(config.numRange.min, config.numRange.max);
+      num2 = randomInt(config.numRange.min, config.numRange.max);
+      result = num1 + num2;
+      answer = result;
+      expression = `${num1} + ${num2} = _`;
   }
 
   return {
@@ -538,8 +497,8 @@ function generateChainProblem(difficulty: Difficulty): ChainProblem {
   let expression = String(current);
 
   for (let i = 0; i < stepCount; i++) {
-    // Pick operation (avoid division for simplicity)
-    const ops = ["+", "-", "×"] as Operation[];
+    // Pick operation (only addition and subtraction)
+    const ops = ["+", "-"] as Operation[];
     const op = ops[randomInt(0, ops.length - 1)];
 
     let operand: number;
@@ -552,12 +511,10 @@ function generateChainProblem(difficulty: Difficulty): ChainProblem {
         operand = randomInt(1, Math.min(current, 10));
         current = current - operand;
         break;
-      case "×":
-        operand = randomInt(2, 5);
-        current = current * operand;
-        break;
       default:
-        operand = 1;
+        // Fallback to addition
+        operand = randomInt(1, Math.min(10, config.numRange.max));
+        current = current + operand;
     }
     expression += ` ${op} ${operand}`;
   }
