@@ -18,13 +18,13 @@ const useIsomorphicLayoutEffect =
  */
 export type UseScopeOptions = {
   /**
-   * Custom equality function for comparing args.
+   * Custom equality function for comparing deps.
    * Default: Object.is (strict reference equality)
    *
    * @example
    * ```tsx
    * // Deep compare objects
-   * useScope("data", factory, [filters], {
+   * useScope(factory, [filters], {
    *   equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
    * });
    * ```

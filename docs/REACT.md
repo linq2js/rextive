@@ -143,7 +143,7 @@ useScope(key, factory, args, options);
 
 ```tsx
 function TodoList() {
-  const scope = useScope("todoList", () => {
+  const scope = useScope(() => {
     const todos = signal([]);
     const filter = signal("all");
 
@@ -185,7 +185,7 @@ function UserProfile({ userId }: { userId: string }) {
 ```tsx
 function Tab({ tabId }: { tabId: string }) {
   // Each tab gets its own scope
-  const scope = useScope(`tab:${tabId}`, () => {
+  const scope = useScope(() => {
     const content = signal("");
     return { content };
   });
@@ -204,7 +204,7 @@ const counterLogic = logic("counterLogic", () => {
 
 function Counter() {
   // Automatically uses logic.create()
-  const { count, increment } = useScope("counter", counterLogic);
+  const { count, increment } = useScope(counterLogic);
   return <button onClick={increment}>{rx(count)}</button>;
 }
 ```
@@ -213,32 +213,32 @@ function Counter() {
 
 ```tsx
 // Options object
-useScope("data", factory, [filters], {
+useScope(factory, [filters], {
   equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
 });
 
 // Strategy shorthand
-useScope("data", factory, [obj], "shallow");
-useScope("data", factory, [obj], "deep");
+useScope(factory, [obj], "shallow");
+useScope(factory, [obj], "deep");
 
 // Custom function
-useScope("data", factory, [obj], (a, b) => a.id === b.id);
+useScope(factory, [obj], (a, b) => a.id === b.id);
 ```
 
 ### Key Features
 
 | Feature             | Description                                             |
 | ------------------- | ------------------------------------------------------- |
-| **Keyed caching**   | Same key = same instance (handles StrictMode)           |
-| **Args comparison** | Recreates scope when args change                        |
+| **Deps comparison** | Recreates scope when deps change                        |
 | **Auto-dispose**    | Signals inside factory are automatically disposed       |
+| **StrictMode safe** | Handles React double-invoke correctly                   |
 | **Logic support**   | Automatically uses `logic.create()` for Logic factories |
 
 ### Additional Cleanup
 
 ```tsx
 // Add dispose method for non-signal cleanup
-const scope = useScope("myScope", () => {
+const scope = useScope(() => {
   const data = signal([]);
   const subscription = service.subscribe();
 
@@ -294,7 +294,7 @@ const [useProduct, ProductProvider] = provider<ProductInstance>({
 
 // Parent - create scope and provide
 function ProductPage() {
-  const $product = useScope("product", productLogic);
+  const $product = useScope(productLogic);
   return (
     <ProductProvider value={$product}>
       <ProductContent />
@@ -379,7 +379,7 @@ function App() {
 <div>Count: {rx(count)}</div>;
 
 // Use useScope for component-scoped signals
-const { count } = useScope("myComponent", () => ({ count: signal(0) }));
+const { count } = useScope(() => ({ count: signal(0) }));
 
 // Wrap async values with wait() or task.from()
 rx(() => <div>{wait(asyncSignal()).name}</div>);

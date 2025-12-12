@@ -79,7 +79,7 @@ export type ProviderResult<TContext, TValue> = [
  * @example Raw mode
  * ```tsx
  * const [useStore, StoreProvider] = provider<StoreType>({ name: "Store", raw: true });
- * <StoreProvider value={useScope("store", storeLogic)}><App /></StoreProvider>
+ * <StoreProvider value={useScope(storeLogic)}><App /></StoreProvider>
  * const $store = useStore();  // StoreType directly
  * ```
  *

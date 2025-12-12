@@ -1925,7 +1925,7 @@ import { useScope, rx } from "rextive/react";
 
 function TodoApp() {
   // Creates instance on mount, disposes on unmount
-  const store = useScope("todoApp", todoStore);
+  const store = useScope(todoStore);
 
   return (
     <div>
@@ -1952,7 +1952,7 @@ function GlobalCounter() {
 
 // Component-scoped - each component gets its own
 function LocalCounter() {
-  const { count, increment } = useScope("localCounter", counter); // Fresh per component
+  const { count, increment } = useScope(counter); // Fresh per component
   return <button onClick={increment}>{rx(count)}</button>;
 }
 ```
@@ -2431,7 +2431,7 @@ const instance = myLogic.create(); // Fresh instance (manual disposal)
 
 // ✅ In React - use useScope (auto-disposes on unmount)
 function MyComponent() {
-  const instance = useScope("myComponent", myLogic);
+  const instance = useScope(myLogic);
   // ...
 }
 ```

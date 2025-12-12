@@ -193,7 +193,7 @@ function maybeSet<T>(s: AnySignal<T>, value: T) {
 import { signal, useScope, rx } from "rextive/react";
 
 function Counter() {
-  const scope = useScope("counter", () => {
+  const scope = useScope(() => {
     const count = signal(0);
     const doubled = count.to((x) => x * 2);
     
@@ -466,7 +466,7 @@ Combine auto-polling with manual refresh:
 import { signal, useScope, rx, task } from "rextive/react";
 
 function Dashboard() {
-  const scope = useScope("dashboard", () => {
+  const scope = useScope(() => {
     const data = signal(async ({ abortSignal, refresh }) => {
       setTimeout(refresh, 60 * 1000); // Auto-refresh every minute
 

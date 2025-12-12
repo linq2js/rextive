@@ -60,7 +60,7 @@ const [useProduct, ProductProvider] = provider<ProductInstance>({
 
 // Parent creates scope and provides it
 function ProductPage() {
-  const $product = useScope("product", productLogic);
+  const $product = useScope(productLogic);
   return (
     <ProductProvider value={$product}>
       <ProductContent />
@@ -185,7 +185,7 @@ export const authService = createAuthService();
 // OPTION 2: Scoped instance - created per component
 // Automatically disposed when component unmounts
 function LoginPage() {
-  const auth = useScope("loginPage", createAuthService);
+  const auth = useScope(createAuthService);
   // auth is a fresh instance, disposed on unmount
 }
 ```

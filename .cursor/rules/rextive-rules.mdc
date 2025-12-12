@@ -59,19 +59,20 @@ rextive/test      Testing utilities (mockLogic)
 
 ```tsx
 // Mutable signals
-const count = signal(0);                    // Simple value
-const user = signal({ name: "John" });      // Object
-const items = signal<Item[]>([]);           // Typed array
-const selected = signal<User>();            // Empty (notifier pattern)
+const count = signal(0); // Simple value
+const user = signal({ name: "John" }); // Object
+const items = signal<Item[]>([]); // Typed array
+const selected = signal<User>(); // Empty (notifier pattern)
 
 // Computed signals (explicit deps)
 const doubled = signal({ count }, ({ deps }) => deps.count * 2);
-const fullName = signal({ firstName, lastName }, ({ deps }) => 
-  `${deps.firstName} ${deps.lastName}`
+const fullName = signal(
+  { firstName, lastName },
+  ({ deps }) => `${deps.firstName} ${deps.lastName}`
 );
 
 // Single dependency transform (shorthand)
-const doubled = count.to(x => x * 2);
+const doubled = count.to((x) => x * 2);
 
 // Async computed
 const userData = signal({ userId }, async ({ deps, abortSignal }) => {
@@ -84,11 +85,21 @@ const userData = signal({ userId }, async ({ deps, abortSignal }) => {
 
 ```tsx
 // Reactive rendering
-{rx(count)}                              // Direct value
-{rx(user, "name")}                       // Property access
-{rx(user, u => u.age + 5)}               // Selector
-{rx(() => <div>{count()}</div>)}         // Reactive function
-{rx("div", { children: count })}         // Component form
+{
+  rx(count);
+} // Direct value
+{
+  rx(user, "name");
+} // Property access
+{
+  rx(user, (u) => u.age + 5);
+} // Selector
+{
+  rx(() => <div>{count()}</div>);
+} // Reactive function
+{
+  rx("div", { children: count });
+} // Component form
 
 // Scoped state (auto-disposed)
 const { input, results } = useScope(() => ({
@@ -107,19 +118,19 @@ rx(() => {
 
 ### Key Methods
 
-| Method | Description |
-|--------|-------------|
-| `signal()` / `.get()` | Read value (triggers tracking in rx) |
-| `.peek()` | Read without tracking |
-| `.set(value)` | Update value (mutable only) |
-| `.reset()` | Reset to initial (mutable only) |
-| `.on(fn)` | Subscribe to changes |
-| `.to(fn)` | Transform (creates computed) |
-| `.pipe(...ops)` | Chain operators |
-| `.dispose()` | Clean up signal |
-| `.refresh()` | Force recomputation |
-| `.stale()` | Mark for lazy recomputation |
-| `.when(notifier, action)` | React to other signals |
+| Method                    | Description                          |
+| ------------------------- | ------------------------------------ |
+| `signal()` / `.get()`     | Read value (triggers tracking in rx) |
+| `.peek()`                 | Read without tracking                |
+| `.set(value)`             | Update value (mutable only)          |
+| `.reset()`                | Reset to initial (mutable only)      |
+| `.on(fn)`                 | Subscribe to changes                 |
+| `.to(fn)`                 | Transform (creates computed)         |
+| `.pipe(...ops)`           | Chain operators                      |
+| `.dispose()`              | Clean up signal                      |
+| `.refresh()`              | Force recomputation                  |
+| `.stale()`                | Mark for lazy recomputation          |
+| `.when(notifier, action)` | React to other signals               |
 
 ---
 
@@ -141,11 +152,11 @@ const user = signal<User>();
 
 ```tsx
 const count = signal(0);
-const user = signal({ name: "John" }, "shallow");  // Equality shortcut
-const data = signal(complexObj, { 
+const user = signal({ name: "John" }, "shallow"); // Equality shortcut
+const data = signal(complexObj, {
   equals: "deep",
   name: "appData",
-  onChange: (v) => console.log(v)
+  onChange: (v) => console.log(v),
 });
 ```
 
@@ -160,7 +171,7 @@ const doubled = signal({ count }, ({ deps }) => deps.count * 2);
 const result = signal({ a, b }, ({ deps }) => deps.a + deps.b, {
   name: "result",
   equals: "shallow",
-  lazy: false,  // Compute immediately
+  lazy: false, // Compute immediately
 });
 ```
 
@@ -191,54 +202,57 @@ interface SignalOptions<T> {
 
 ```tsx
 // Properties
-signal.uid          // Unique ID (auto-generated, immutable)
-signal.displayName  // Debug name
+signal.uid; // Unique ID (auto-generated, immutable)
+signal.displayName; // Debug name
 
 // Reading
-signal()            // Read value (triggers tracking)
-signal.get()        // Same as signal()
-signal.peek()       // Read without tracking
-signal.tryGet()     // Get value or undefined (never throws)
-signal.error()      // Get sync error without throwing
+signal(); // Read value (triggers tracking)
+signal.get(); // Same as signal()
+signal.peek(); // Read without tracking
+signal.tryGet(); // Get value or undefined (never throws)
+signal.error(); // Get sync error without throwing
 
 // Writing (mutable only)
-signal.set(value)   // Update value
-signal.set(prev => prev + 1)  // Update with function
-signal.reset()      // Reset to initial value
+signal.set(value); // Update value
+signal.set((prev) => prev + 1); // Update with function
+signal.reset(); // Reset to initial value
 
 // Subscribing
-const unsub = signal.on(() => console.log(signal()))
+const unsub = signal.on(() => console.log(signal()));
 
 // Transforming
-const doubled = signal.to(x => x * 2, "shallow");
-const result = signal.pipe(filter(x => x > 0), to(x => x * 2));
+const doubled = signal.to((x) => x * 2, "shallow");
+const result = signal.pipe(
+  filter((x) => x > 0),
+  to((x) => x * 2)
+);
 
 // Control (computed only)
-signal.refresh()    // Force immediate recomputation
-signal.stale()      // Mark for lazy recomputation
-signal.pause()      // Stop recomputing
-signal.resume()     // Resume recomputing
-signal.paused()     // Check if paused
+signal.refresh(); // Force immediate recomputation
+signal.stale(); // Mark for lazy recomputation
+signal.pause(); // Stop recomputing
+signal.resume(); // Resume recomputing
+signal.paused(); // Check if paused
 
 // Cleanup
-signal.dispose()    // Clean up signal
+signal.dispose(); // Clean up signal
 ```
 
 ### 4. Computed Context
 
 ```tsx
 signal({ userId }, async (context) => {
-  context.deps           // Dependency values
-  context.abortSignal    // AbortSignal for cancellation
-  context.nth            // Computation number (0, 1, 2...)
-  
-  context.safe(fn)       // Execute safely (throws if aborted)
-  context.safe(promise)  // Safe promise (never resolves if aborted)
-  context.aborted()      // Check if aborted
-  context.onCleanup(fn)  // Register cleanup callback
-  context.use(fn, args)  // Reuse logic with context
-  context.refresh()      // Schedule recomputation
-  context.stale()        // Mark stale
+  context.deps; // Dependency values
+  context.abortSignal; // AbortSignal for cancellation
+  context.nth; // Computation number (0, 1, 2...)
+
+  context.safe(fn); // Execute safely (throws if aborted)
+  context.safe(promise); // Safe promise (never resolves if aborted)
+  context.aborted(); // Check if aborted
+  context.onCleanup(fn); // Register cleanup callback
+  context.use(fn, args); // Reuse logic with context
+  context.refresh(); // Schedule recomputation
+  context.stale(); // Mark stale
 });
 ```
 
@@ -262,11 +276,11 @@ control.dispose();
 // Create tag for grouping
 const formTag = signal.tag();
 const name = signal("", { use: [formTag] });
-formTag.forEach(s => s.reset());
+formTag.forEach((s) => s.reset());
 
 // Combine signals
-const user = signal.from({ name, age });  // Record
-const coords = signal.from([x, y]);       // Tuple
+const user = signal.from({ name, age }); // Record
+const coords = signal.from([x, y]); // Tuple
 
 // Error tracing
 const traces = signal.trace(error);
@@ -276,16 +290,16 @@ const traces = signal.trace(error);
 
 ```tsx
 // Action string
-userData.when(refreshTrigger, "refresh");  // Force recomputation
-userData.when(resetTrigger, "reset");      // Reset (mutable only)
-userData.when(cacheInvalidate, "stale");   // Mark stale
+userData.when(refreshTrigger, "refresh"); // Force recomputation
+userData.when(resetTrigger, "reset"); // Reset (mutable only)
+userData.when(cacheInvalidate, "stale"); // Mark stale
 
 // With filter
 userData.when(trigger, "refresh", (notifier, self) => notifier() > 5);
 
 // Action callback
 counter.when(increment, (notifier, self) => {
-  self.set(prev => prev + notifier());
+  self.set((prev) => prev + notifier());
 });
 
 // Multiple notifiers
@@ -303,31 +317,47 @@ userData.when(refreshTrigger, "refresh").when(resetTrigger, "reset");
 
 ```tsx
 // Direct signal value
-{rx(count)}                    // Renders: 42
+{
+  rx(count);
+} // Renders: 42
 
 // Property access
-{rx(user, "name")}             // Renders: "Alice"
+{
+  rx(user, "name");
+} // Renders: "Alice"
 
 // Selector function
-{rx(user, u => u.age + 5)}     // Renders: 35
+{
+  rx(user, (u) => u.age + 5);
+} // Renders: 35
 
 // Reactive function (auto-tracking)
-{rx(() => <div>Count: {count()}</div>)}
+{
+  rx(() => <div>Count: {count()}</div>);
+}
 
 // Component with reactive props
-{rx(Component, { prop1: signal1, prop2: "static" })}
-{rx("div", { children: count, className: "counter" })}
+{
+  rx(Component, { prop1: signal1, prop2: "static" });
+}
+{
+  rx("div", { children: count, className: "counter" });
+}
 ```
 
 **⚠️ Never use rx() in attributes!**
 
 ```tsx
 // ❌ WRONG
-<input value={rx(signal)} />
+<input value={rx(signal)} />;
 
 // ✅ CORRECT
-{rx(() => <input value={signal()} />)}
-{rx("input", { value: signal })}
+{
+  rx(() => <input value={signal()} />);
+}
+{
+  rx("input", { value: signal });
+}
 ```
 
 ### `rx.use()` - Reactive Hook
@@ -345,16 +375,16 @@ function Component() {
 
 ### `useScope()` - Scoped State Management
 
-**Local Mode** (each component gets own scope):
+Each component gets its own scope with automatic disposal on unmount.
 
 ```tsx
 // Basic
 const { count, doubled } = useScope(() => ({
   count: signal(0),
-  doubled: count.to(x => x * 2),
+  doubled: count.to((x) => x * 2),
 }));
 
-// With deps
+// With deps (scope recreates when deps change)
 const { user } = useScope(
   (id) => ({ user: signal(async () => fetchUser(id)) }),
   [userId]
@@ -362,15 +392,6 @@ const { user } = useScope(
 
 // With logic
 const { count, increment } = useScope(counterLogic);
-```
-
-**Shared Mode** (multiple components share scope):
-
-```tsx
-const { input } = useScope("searchBar", searchBarLogic);
-const { content } = useScope(`tab:${tabId}`, () => ({
-  content: signal(""),
-}));
 ```
 
 **Multiple Scopes Mode** (returns tuple):
@@ -383,19 +404,11 @@ const [counter, form] = useScope([
 ]);
 
 // With scope() helper
-const [counter, form] = useScope([
-  scope(counterLogic),
-  scope(formLogic),
-]);
-
-// Mixed: shared and local
-const [shared, local] = useScope([
-  scope("shared-key", sharedLogic),
-  () => ({ value: signal("local") }),
-]);
+const [counter, form] = useScope([scope(counterLogic), scope(formLogic)]);
 ```
 
 **Features:**
+
 - Auto-dispose on unmount
 - Deps comparison (recreates scope when deps change)
 - StrictMode safe
@@ -427,16 +440,16 @@ const handlers = stable({
 const [useTheme, ThemeProvider] = provider<"dark" | "light">({ name: "Theme" });
 
 // Raw mode (for logic instances)
-const [useProduct, ProductProvider] = provider<ProductInstance>({ 
-  name: "Product", 
-  raw: true 
+const [useProduct, ProductProvider] = provider<ProductInstance>({
+  name: "Product",
+  raw: true,
 });
 
 // Factory mode
 const [useAuth, AuthProvider] = provider<AuthContext, User | null>({
   name: "Auth",
   create: (user) => ({ user: signal(user), login: async () => {} }),
-  update: (ctx, value) => ctx.user.set(value)
+  update: (ctx, value) => ctx.user.set(value),
 });
 ```
 
@@ -454,16 +467,16 @@ import { to, filter, scan, focus, debounce, throttle, task } from "rextive/op";
 
 ```tsx
 // to() - Transform values
-const doubled = count.pipe(to(x => x * 2));
+const doubled = count.pipe(to((x) => x * 2));
 
 // filter() - Filter values
-const positiveOnly = count.pipe(filter(x => x > 0));
+const positiveOnly = count.pipe(filter((x) => x > 0));
 
 // scan() - Accumulate values
 const total = count.pipe(scan((acc, curr) => acc + curr, 0));
 
 // distinct() - Filter duplicates
-const unique = count.pipe(distinct());           // Consecutive mode
+const unique = count.pipe(distinct()); // Consecutive mode
 const allUnique = count.pipe(distinct({ mode: "all" }));
 ```
 
@@ -472,16 +485,18 @@ const allUnique = count.pipe(distinct({ mode: "all" }));
 ```tsx
 // Basic path access
 const userName = form.pipe(focus("user.name"));
-userName.set("Bob");  // Updates source immutably
+userName.set("Bob"); // Updates source immutably
 
 // With fallback
 const nickname = user.pipe(focus("nickname", () => "Guest"));
 
 // With options
-const price = form.pipe(focus("price", {
-  get: v => v * 1.1,    // Transform on read
-  set: v => v / 1.1,    // Transform on write
-}));
+const price = form.pipe(
+  focus("price", {
+    get: (v) => v * 1.1, // Transform on read
+    set: (v) => v / 1.1, // Transform on write
+  })
+);
 
 // Lightweight lens (no signal created)
 const [getName, setName] = focus.lens(form, "user.name");
@@ -510,7 +525,7 @@ const delayed = source.pipe(delay(500));
 const first3 = source.pipe(take(3));
 
 // takeWhile() - Take while predicate is true
-const whilePositive = source.pipe(takeWhile(x => x > 0));
+const whilePositive = source.pipe(takeWhile((x) => x > 0));
 
 // takeUntil() - Take until notifier emits
 const untilClick = source.pipe(takeUntil(clickSignal));
@@ -519,7 +534,7 @@ const untilClick = source.pipe(takeUntil(clickSignal));
 const afterFirst3 = source.pipe(skip(3));
 
 // skipWhile() - Skip while predicate is true
-const afterNegatives = source.pipe(skipWhile(x => x < 0));
+const afterNegatives = source.pipe(skipWhile((x) => x < 0));
 
 // skipUntil() - Skip until notifier emits
 const afterStart = source.pipe(skipUntil(startSignal));
@@ -563,7 +578,7 @@ rx(() => {
   return (
     <div>
       {loading && <Spinner />}
-      <h2>{value.name}</h2>  {/* Safe - never undefined */}
+      <h2>{value.name}</h2> {/* Safe - never undefined */}
     </div>
   );
 });
@@ -590,15 +605,16 @@ const person = signal({ name: "John", age: 30, city: "NYC" });
 person.set(patch({ name: "Jane" }));
 person.set(patch({ name: "Jane", age: 25 }));
 
-// Key-value update  
+// Key-value update
 person.set(patch("name", "Jane"));
 person.set(patch("age", 25));
 
 // Equivalent to (but shorter):
-person.set(prev => ({ ...prev, name: "Jane" }));
+person.set((prev) => ({ ...prev, name: "Jane" }));
 ```
 
 **Features:**
+
 - Type-safe with `Partial<T>` for partial objects
 - Type-safe key-value with inferred value type
 - Immutable - creates new object reference
@@ -606,11 +622,11 @@ person.set(prev => ({ ...prev, name: "Jane" }));
 
 **When to use `patch()` vs alternatives:**
 
-| Method | Use Case |
-|--------|----------|
-| `patch()` | Simple property updates, one-off changes |
-| `focus.lens()` | Repeated access to same property |
-| `immer` | Complex nested mutations |
+| Method         | Use Case                                 |
+| -------------- | ---------------------------------------- |
+| `patch()`      | Simple property updates, one-off changes |
+| `focus.lens()` | Repeated access to same property         |
+| `immer`        | Complex nested mutations                 |
 
 ---
 
@@ -631,9 +647,9 @@ import { setup } from "rextive";
 const stop = setup()
   .add(() => {
     const id = setInterval(tick, 1000);
-    return () => clearInterval(id);  // Cleanup
+    return () => clearInterval(id); // Cleanup
   })
-  .add(() => signal.on(handleChange))  // Returns unsub automatically
+  .add(() => signal.on(handleChange)) // Returns unsub automatically
   .run();
 
 // Later: cleanup all effects
@@ -647,7 +663,7 @@ stop();
 const stop = setup()
   .add(startTimer)
   .add(startSubscription)
-  .add([playMusic, startAnimation])  // Array of functions
+  .add([playMusic, startAnimation]) // Array of functions
   .run();
 ```
 
@@ -661,7 +677,7 @@ const stop = setup()
   .add(startGame)
   .run((emit) => {
     const id = setTimeout(emit, 100);
-    return () => clearTimeout(id);  // Trigger cleanup
+    return () => clearTimeout(id); // Trigger cleanup
   });
 
 // Run on next animation frame
@@ -686,8 +702,8 @@ const stop = setup()
 ```tsx
 function gameLogic() {
   const score = signal(0);
-  const tick = () => score.set(s => s + 1);
-  
+  const tick = () => score.set((s) => s + 1);
+
   return {
     score,
     // Use setup for dispose
@@ -702,16 +718,18 @@ function gameLogic() {
 }
 
 // In component
-const $game = useScope(gameLogic);  // Auto-disposed on unmount
+const $game = useScope(gameLogic); // Auto-disposed on unmount
 ```
 
 ### Cleanup Behavior
 
 **Immediate run:**
+
 - `run()` executes all effects immediately
 - Returns cleanup that disposes all effects
 
 **Triggered run:**
+
 - `run(trigger)` waits for trigger to call `emit`
 - If `stop()` called before emit: trigger cleanup runs, effects never run
 - If `stop()` called after emit: both trigger and effects cleanup run
@@ -721,7 +739,7 @@ const stop = setup()
   .add(() => effectCleanup)
   .run((emit) => {
     const id = setTimeout(emit, 1000);
-    return () => clearTimeout(id);  // triggerCleanup
+    return () => clearTimeout(id); // triggerCleanup
   });
 
 // Before 1000ms: only clearTimeout runs
@@ -735,13 +753,13 @@ stop();
 interface Setup {
   // Add single function
   add(fn: SetupFn): Setup;
-  
+
   // Add array of functions
   add(fns: SetupFn[]): Setup;
-  
+
   // Run immediately
   run(): () => void;
-  
+
   // Run via trigger
   run<TArgs extends unknown[]>(
     trigger: TriggerFn<TArgs>,
@@ -750,7 +768,10 @@ interface Setup {
 }
 
 type SetupFn = () => (() => void) | void;
-type TriggerFn<TArgs> = (emit: () => void, ...args: TArgs) => void | (() => void);
+type TriggerFn<TArgs> = (
+  emit: () => void,
+  ...args: TArgs
+) => void | (() => void);
 ```
 
 ---
@@ -763,18 +784,18 @@ type TriggerFn<TArgs> = (emit: () => void, ...args: TArgs) => void | (() => void
 const promise = asyncSignal();
 const state = task.from(promise);
 
-state.status  // "loading" | "success" | "error"
-state.loading // boolean
-state.value   // resolved value
-state.error   // error if rejected
+state.status; // "loading" | "success" | "error"
+state.loading; // boolean
+state.value; // resolved value
+state.error; // error if rejected
 ```
 
 ### `task` Factory Methods
 
 ```tsx
-task.loading(promise)    // Create loading state
-task.success(value)      // Create success state
-task.error(error)        // Create error state
+task.loading(promise); // Create loading state
+task.success(value); // Create success state
+task.error(error); // Create error state
 ```
 
 ### `wait()` - Suspense Integration
@@ -813,20 +834,20 @@ await wait.delay(1000);
 export const counterLogic = logic("counterLogic", () => {
   // 1. DEPENDENCIES
   const $auth = authLogic();
-  
+
   // 2. STATE
   const count = signal(0, { name: "counter.count" });
-  const doubled = count.to(x => x * 2);
-  
+  const doubled = count.to((x) => x * 2);
+
   // 3. SIDE EFFECTS
   $auth.user.on(() => {
     if (!$auth.user()) count.reset();
   });
-  
+
   // 4. METHODS
-  const increment = () => count.set(x => x + 1);
-  const decrement = () => count.set(x => x - 1);
-  
+  const increment = () => count.set((x) => x + 1);
+  const decrement = () => count.set((x) => x - 1);
+
   // 5. RETURN
   return {
     count,
@@ -845,7 +866,7 @@ const $counter = counterLogic();
 const { count, increment } = useScope(counterLogic);
 
 // As singleton
-const $auth = authLogic();  // Same instance everywhere
+const $auth = authLogic(); // Same instance everywhere
 ```
 
 ### Testing Logic
@@ -855,16 +876,16 @@ import { mockLogic } from "rextive/test";
 
 describe("UserMenu", () => {
   const $auth = mockLogic(authLogic);
-  
+
   beforeEach(() => {
     $auth.default({
       user: signal(null),
       logout: vi.fn(),
     });
   });
-  
+
   afterEach(() => $auth.clear());
-  
+
   it("should show Sign In when not authenticated", () => {
     $auth.provide({ user: signal(null) });
     render(<UserMenu />);
@@ -890,10 +911,12 @@ function formLogic() {
     error: "",
   });
 
-  async function submit() { /* ... */ }
+  async function submit() {
+    /* ... */
+  }
 
   return {
-    state,  // Consumer controls read/write
+    state, // Consumer controls read/write
     submit,
   };
 }
@@ -915,6 +938,7 @@ function LoginForm() {
 ```
 
 **When to use:**
+
 - Consumer needs full control over read/write
 - State is complex and benefits from `focus.lens()` for partial updates
 - Simple API surface (just expose state)
@@ -932,11 +956,11 @@ function userLogic() {
     // Controlled read
     getName: () => state().name,
     getEmail: () => state().email,
-    
+
     // Controlled write
     setName: (v: string) => state.set((s) => ({ ...s, name: v })),
     setEmail: (v: string) => state.set((s) => ({ ...s, email: v })),
-    
+
     // Derived read-only
     getDisplayName: () => state().name || state().email,
   };
@@ -953,6 +977,7 @@ const mockUser = {
 ```
 
 **When to use:**
+
 - Logic needs to validate/transform on read or write
 - Better testability with mockable functions
 - Want to hide internal state structure
@@ -964,7 +989,7 @@ const mockUser = {
 function formLogic() {
   const state = signal({ username: "" });
   return {
-    username: focus.lens(state, "username"),  // Hard to mock!
+    username: focus.lens(state, "username"), // Hard to mock!
   };
 }
 
@@ -980,11 +1005,11 @@ return {
 
 #### Summary Table
 
-| Pattern | Export | Consumer | Testability | Use Case |
-|---------|--------|----------|-------------|----------|
-| **A: Signal** | `state` signal | Uses `focus.lens()` | Mock signal | Full control, large states |
-| **B: Getters/Setters** | `getFoo`, `setFoo` | Calls functions | Mock functions | Controlled access, easy mocking |
-| **❌ Lens** | Lens tuples | Destructure | Hard to mock | **Don't use** |
+| Pattern                | Export             | Consumer            | Testability    | Use Case                        |
+| ---------------------- | ------------------ | ------------------- | -------------- | ------------------------------- |
+| **A: Signal**          | `state` signal     | Uses `focus.lens()` | Mock signal    | Full control, large states      |
+| **B: Getters/Setters** | `getFoo`, `setFoo` | Calls functions     | Mock functions | Controlled access, easy mocking |
+| **❌ Lens**            | Lens tuples        | Destructure         | Hard to mock   | **Don't use**                   |
 
 ### Async Action State Pattern
 
@@ -995,7 +1020,7 @@ const loginState = useScope(() => signal<Promise<void>>());
 const submitState = useScope(() => signal<Promise<Result>>());
 ```
 
-#### Pattern A: Logic-Level State (Shared)
+#### Pattern A: Logic-Level State
 
 When multiple components need to react to the same action:
 
@@ -1003,7 +1028,7 @@ When multiple components need to react to the same action:
 // Logic exposes action state
 export const authLogic = logic("authLogic", () => {
   const loginState = signal<Promise<void>>();
-  
+
   async function login(credentials: Credentials) {
     const promise = authApi.login(credentials);
     loginState.set(promise);
@@ -1023,7 +1048,7 @@ function LoginForm() {
 }
 ```
 
-#### Pattern B: Component-Level State (Local)
+#### Pattern B: Component-Level State
 
 When only one component handles the action:
 
@@ -1051,10 +1076,10 @@ function ContactForm() {
 }
 ```
 
-| Aspect | Logic-Level | Component-Level |
-|--------|-------------|-----------------|
-| Sharing | ✅ Multiple consumers | ❌ Single component |
-| Use case | Global actions | UI-specific actions |
+| Aspect   | Logic-Level           | Component-Level     |
+| -------- | --------------------- | ------------------- |
+| Sharing  | ✅ Multiple consumers | ❌ Single component |
+| Use case | Global actions        | UI-specific actions |
 
 ### Component Effects Pattern
 
@@ -1133,6 +1158,7 @@ function TypingGame() {
 ```
 
 **Benefits:**
+
 - Logic stays pure and framework-agnostic
 - Component handles DOM/UI concerns (refs, hooks, animations, sounds)
 - Auto-cleanup when component unmounts
@@ -1142,6 +1168,7 @@ function TypingGame() {
 **Naming convention:** Event-style names (`onStateChange`, `onMessage`, `onScoreIncrease`)
 
 **When to use:**
+
 - ✅ Auto-focus input
 - ✅ Play sounds/animations
 - ✅ Show modals/toasts
@@ -1161,7 +1188,10 @@ const persist = persistor<{ theme: string; fontSize: number }>({
   load: () => JSON.parse(localStorage.getItem("settings") || "{}"),
   save: (args) => {
     const existing = JSON.parse(localStorage.getItem("settings") || "{}");
-    localStorage.setItem("settings", JSON.stringify({ ...existing, ...args.values }));
+    localStorage.setItem(
+      "settings",
+      JSON.stringify({ ...existing, ...args.values })
+    );
   },
 });
 
@@ -1175,10 +1205,12 @@ import { produce } from "rextive/immer";
 
 const state = signal({ count: 0, user: { name: "John" } });
 
-state.set(produce((draft) => {
-  draft.count++;
-  draft.user.name = "Jane";
-}));
+state.set(
+  produce((draft) => {
+    draft.count++;
+    draft.user.name = "Jane";
+  })
+);
 ```
 
 ### DevTools
@@ -1204,12 +1236,12 @@ function App() {
 
 ### Signal Naming
 
-| Type | Postfix | Example |
-|------|---------|---------|
-| Primitive | None | `count`, `filter`, `selectedId` |
-| Boolean | `is`/`has` prefix | `isOpen`, `isLoading`, `hasError` |
-| Async | None | `user`, `products` |
-| Task-wrapped | `Task` | `userTask`, `productsTask` |
+| Type         | Postfix           | Example                           |
+| ------------ | ----------------- | --------------------------------- |
+| Primitive    | None              | `count`, `filter`, `selectedId`   |
+| Boolean      | `is`/`has` prefix | `isOpen`, `isLoading`, `hasError` |
+| Async        | None              | `user`, `products`                |
+| Task-wrapped | `Task`            | `userTask`, `productsTask`        |
 
 ### Logic Naming
 
@@ -1247,15 +1279,17 @@ export const loginResultTask = loginAction.result.pipe(task(null));
 ### ✅ Always Do
 
 1. **Declare dependencies explicitly**
+
    ```tsx
    // ✅ GOOD
    signal({ a, b }, ({ deps }) => deps.a + deps.b);
-   
+
    // ❌ BAD - won't work!
    signal(() => a() + b());
    ```
 
 2. **Use `abortSignal` for queries**
+
    ```tsx
    signal({ searchTerm }, async ({ deps, abortSignal }) => {
      return fetch(`/search?q=${deps.searchTerm}`, { signal: abortSignal });
@@ -1263,13 +1297,15 @@ export const loginResultTask = loginAction.result.pipe(task(null));
    ```
 
 3. **Use `useScope` for signals in components**
+
    ```tsx
    const { count } = useScope(() => ({ count: signal(0) }));
    ```
 
 4. **Use `.to()` for single transforms**
+
    ```tsx
-   const doubled = count.to(x => x * 2);
+   const doubled = count.to((x) => x * 2);
    ```
 
 5. **Use `Logic` postfix and `$` prefix**
@@ -1281,21 +1317,24 @@ export const loginResultTask = loginAction.result.pipe(task(null));
 ### ❌ Never Do
 
 1. **Never try auto-tracking**
+
    ```tsx
    // ❌ Won't work
    const doubled = signal(() => count() * 2);
    ```
 
 2. **Never pass Promises directly**
+
    ```tsx
    // ❌ Wrong
    const data = signal(Promise.resolve(42));
-   
+
    // ✅ Correct
    const data = signal(async () => 42);
    ```
 
 3. **Never use `abortSignal` for mutations**
+
    ```tsx
    // ❌ Bad - mutations should complete
    signal({ payload }, async ({ deps, abortSignal }) => {
@@ -1304,23 +1343,27 @@ export const loginResultTask = loginAction.result.pipe(task(null));
    ```
 
 4. **Never create signals in render without useScope**
+
    ```tsx
    function Component() {
      // ❌ Bad - memory leak
      const count = signal(0);
-     
+
      // ✅ Good
      const { count } = useScope(() => ({ count: signal(0) }));
    }
    ```
 
 5. **Never use `rx()` in attributes**
+
    ```tsx
    // ❌ Bad
-   <input value={rx(signal)} />
-   
+   <input value={rx(signal)} />;
+
    // ✅ Good
-   {rx(() => <input value={signal()} />)}
+   {
+     rx(() => <input value={signal()} />);
+   }
    ```
 
 ---
@@ -1330,6 +1373,7 @@ export const loginResultTask = loginAction.result.pipe(task(null));
 ### Unified Hooks System (`src/hooks.ts`)
 
 The hooks system provides centralized integration for:
+
 - Render-time tracking (scoped via `withHooks`)
 - DevTools/monitoring (global via `setHooks`)
 
@@ -1344,9 +1388,13 @@ interface Hooks {
   // Render-time tracking (scoped via withHooks)
   onSignalAccess: (signal: AnySignal<any>) => void;
   onTaskAccess: (task: Task<any>) => void;
-  
+
   // Lifecycle monitoring (global via setHooks)
-  onSignalCreate?: (signal: AnySignal<any>, deps?: SignalMap, disposalHandled?: boolean) => void;
+  onSignalCreate?: (
+    signal: AnySignal<any>,
+    deps?: SignalMap,
+    disposalHandled?: boolean
+  ) => void;
   onSignalChange?: (signal: AnySignal<any>, value: unknown) => void;
   onSignalError?: (signal: AnySignal<any>, error: unknown) => void;
   onSignalDispose?: (signal: AnySignal<any>) => void;
@@ -1355,7 +1403,7 @@ interface Hooks {
   onTagCreate?: (tag: Tag<any, any>) => void;
   onTagAdd?: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
   onTagRemove?: (tag: Tag<any, any>, signal: AnySignal<any>) => void;
-  
+
   // Utility
   hasDevTools: () => boolean;
 }
@@ -1402,16 +1450,16 @@ emit.forgetDisposedSignals(() => {
 
 ```tsx
 // Use getHooks() instead
-getRenderHooks()
+getRenderHooks();
 
 // Use withHooks() instead
-withRenderHooks(hooks, fn)
+withRenderHooks(hooks, fn);
 
 // Use setHooks() or resetHooks() instead
-setDevToolsHooks(hooks)
+setDevToolsHooks(hooks);
 
 // Use getHooks().hasDevTools() instead
-hasDevTools()
+hasDevTools();
 ```
 
 ### Type Guards
@@ -1419,13 +1467,13 @@ hasDevTools()
 ```tsx
 import { is } from "rextive";
 
-is(value)              // Any Signal
-is(value, "mutable")   // Mutable signal
-is(value, "computed")  // Computed signal
-is(value, "task")      // Task
-is(value, "tag")       // Tag
-is(value, "accessor")  // Accessor (function with on)
-is(value, "observable") // Observable (object with on)
+is(value); // Any Signal
+is(value, "mutable"); // Mutable signal
+is(value, "computed"); // Computed signal
+is(value, "task"); // Task
+is(value, "tag"); // Tag
+is(value, "accessor"); // Accessor (function with on)
+is(value, "observable"); // Observable (object with on)
 ```
 
 ---
@@ -1435,26 +1483,26 @@ is(value, "observable") // Observable (object with on)
 ### Core Exports (`rextive`)
 
 ```tsx
-signal, $                    // Signal creation
-task                         // Task utilities
-wait, awaited                // Async utilities
-logic                        // Logic system
-emitter                      // Event emitter
-disposable, wrapDispose      // Disposal utilities
-setup                        // Setup/cleanup builder
-is                           // Type guards
-compose, dev, producer       // Utilities
-validate                     // Validation helpers
+(signal, $); // Signal creation
+task; // Task utilities
+(wait, awaited); // Async utilities
+logic; // Logic system
+emitter; // Event emitter
+(disposable, wrapDispose); // Disposal utilities
+setup; // Setup/cleanup builder
+is; // Type guards
+(compose, dev, producer); // Utilities
+validate; // Validation helpers
 ```
 
 ### React Exports (`rextive/react`)
 
 ```tsx
 // Re-exports all from rextive, plus:
-rx                           // Reactive rendering
-useScope                     // Scoped state
-useStable                    // Stable references
-provider                     // Context creation
+rx; // Reactive rendering
+useScope; // Scoped state
+useStable; // Stable references
+provider; // Context creation
 ```
 
 ### Operator Exports (`rextive/op`)
@@ -1483,25 +1531,25 @@ task (operator version)
 ### Helper Exports (`rextive/helpers`)
 
 ```tsx
-patch                        // Partial object updates
+patch; // Partial object updates
 ```
 
 ### Plugin Exports
 
 ```tsx
 // rextive/plugins
-persistor
+persistor;
 
 // rextive/immer
-produce
+produce;
 
 // rextive/devtools
-enableDevTools, disableDevTools, DevToolsPanel
-getSignals, getTags, getStats, onDevToolsEvent
+(enableDevTools, disableDevTools, DevToolsPanel);
+(getSignals, getTags, getStats, onDevToolsEvent);
 
 // rextive/test
-mockLogic
+mockLogic;
 
 // rextive/cache
-cache, staleOn, evictOn, lru
+(cache, staleOn, evictOn, lru);
 ```

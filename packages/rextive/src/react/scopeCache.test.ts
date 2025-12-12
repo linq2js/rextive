@@ -218,51 +218,52 @@ describe("ScopeCache", () => {
     });
   });
 
-  describe("reference counting", () => {
-    it("should start with refs=0", () => {
+  describe("commit/uncommit behavior", () => {
+    it("should start with committed=false", () => {
       const entry = cache.get("test", () => ({}), [], Object.is);
-      expect(entry.refs).toBe(0);
+      expect(entry.committed).toBe(false);
     });
 
-    it("should increment refs on commit", () => {
+    it("should set committed=true on commit", () => {
       const entry = cache.get("test", () => ({}), [], Object.is);
 
       entry.commit();
-      expect(entry.refs).toBe(1);
+      expect(entry.committed).toBe(true);
 
+      // Calling commit again should still be true
       entry.commit();
-      expect(entry.refs).toBe(2);
+      expect(entry.committed).toBe(true);
     });
 
-    it("should decrement refs on uncommit", () => {
+    it("should set committed=false on uncommit", () => {
       const entry = cache.get("test", () => ({}), [], Object.is);
 
       entry.commit();
-      entry.commit();
-      expect(entry.refs).toBe(2);
+      expect(entry.committed).toBe(true);
 
       entry.uncommit();
-      expect(entry.refs).toBe(1);
+      expect(entry.committed).toBe(false);
     });
 
-    it("should not decrement refs below 0", () => {
+    it("should handle uncommit when never committed", () => {
       const entry = cache.get("test", () => ({}), [], Object.is);
 
+      // Should not throw, just sets committed=false (already false)
       entry.uncommit();
-      expect(entry.refs).toBe(-1); // Actually decrements, dispose check happens separately
+      expect(entry.committed).toBe(false);
     });
 
-    it("should not modify refs after disposal", () => {
+    it("should not modify committed after disposal", () => {
       const entry = cache.get("test", () => ({}), [], Object.is);
 
       entry.dispose();
       expect(entry.disposed).toBe(true);
 
       entry.commit();
-      expect(entry.refs).toBe(0); // No change
+      expect(entry.committed).toBe(false); // No change
 
       entry.uncommit();
-      expect(entry.refs).toBe(0); // No change
+      expect(entry.committed).toBe(false); // No change
     });
   });
 
@@ -542,7 +543,7 @@ describe("ScopeCache", () => {
 
       // Entry should survive
       expect(entry2.disposed).toBe(false);
-      expect(entry2.refs).toBe(1);
+      expect(entry2.committed).toBe(true);
     });
 
     it("should handle double mount (commit twice, uncommit twice)", async () => {
@@ -558,9 +559,9 @@ describe("ScopeCache", () => {
       // Wait for microtask from first uncommit
       await Promise.resolve();
 
-      // Entry should survive because refs=1
+      // Entry should survive because committed=true
       expect(entry.disposed).toBe(false);
-      expect(entry.refs).toBe(1);
+      expect(entry.committed).toBe(true);
     });
 
     it("should dispose if never committed (error/suspense)", async () => {

@@ -9,39 +9,39 @@ import { stableEquals } from "../utils/stableEquals";
  * A cache entry that manages the lifecycle of a scope instance.
  *
  * Handles:
- * - Reference counting via commit/uncommit
- * - Automatic disposal when refs reach 0
- * - Deferred disposal via microtask (for StrictMode compatibility)
+ * - Automatic disposal via microtask (for StrictMode compatibility)
  * - Signal cleanup on dispose
+ * - Mount event callback
  *
  * ## Lifecycle
  *
- * 1. Entry is created with refs=0
- * 2. `scheduleDisposal()` schedules a microtask to check refs
- * 3. `commit()` is called from useLayoutEffect, incrementing refs
- * 4. Microtask runs - if refs > 0, entry survives
- * 5. On unmount, `uncommit()` decrements refs and schedules disposal if refs=0
+ * 1. Entry is created with committed=false
+ * 2. `scheduleDisposal()` schedules a microtask to check if committed
+ * 3. `commit()` is called from useLayoutEffect, marking as committed
+ * 4. Microtask runs - if committed, entry survives
+ * 5. On unmount, `uncommit()` schedules disposal
  *
  * ## StrictMode Handling
  *
  * In React StrictMode, components render twice but only commit once:
  * - Render 1: creates entry, schedules microtask
  * - Render 2: reuses entry (same key)
- * - Commit: useLayoutEffect calls commit(), refs=1
- * - Microtask: refs=1, entry survives ✅
+ * - Commit: useLayoutEffect calls commit(), committed=true
+ * - Microtask: committed=true, entry survives ✅
  *
  * If component never commits (error/suspense):
  * - Render: creates entry, schedules microtask
  * - No commit (error thrown)
- * - Microtask: refs=0, entry disposed ✅
+ * - Microtask: committed=false, entry disposed ✅
  */
 export class ScopeEntry {
-  /** Number of components currently using this entry */
-  refs = 0;
+  /** Whether this entry has been committed (mounted) */
+  committed = false;
 
   /** Whether this entry has been disposed */
   disposed = false;
 
+  /** Whether mount() has been called */
   mounted = false;
 
   /**
@@ -68,22 +68,22 @@ export class ScopeEntry {
   };
 
   /**
-   * Dispose if no active references.
+   * Dispose if not committed.
    * Called by microtask after scheduleDisposal().
    */
   tryDispose = () => {
-    // there are still refs, so we don't dispose
-    if (this.refs) return;
+    // Entry was committed, don't dispose
+    if (this.committed) return;
     this.dispose();
   };
 
   /**
    * Called from useLayoutEffect to mark entry as committed.
-   * Increments reference count to prevent disposal.
+   * Prevents disposal and triggers mount event.
    */
   commit = () => {
     if (this.disposed) return;
-    this.refs++;
+    this.committed = true;
     if (!this.mounted) {
       this.mounted = true;
       if (typeof this.scope?.mount === "function") {
@@ -94,14 +94,12 @@ export class ScopeEntry {
 
   /**
    * Called from useLayoutEffect cleanup when component unmounts
-   * or key changes. Decrements refs and schedules disposal if refs=0.
+   * or deps change. Schedules disposal.
    */
   uncommit = () => {
     if (this.disposed) return;
-    this.refs--;
-    if (this.refs === 0) {
-      this.scheduleDisposal();
-    }
+    this.committed = false;
+    this.scheduleDisposal();
   };
 
   /**

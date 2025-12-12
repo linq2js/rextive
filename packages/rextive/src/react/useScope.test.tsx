@@ -328,6 +328,146 @@ describe.each(wrappers)("useScope ($mode mode)", ({ mode, render }) => {
     });
   });
 
+  describe("lifecycle events - mount", () => {
+    it("should call mount() on component mount", () => {
+      const mountFn = vi.fn();
+
+      const TestComponent = () => {
+        useScope(() => ({
+          value: signal(0),
+          mount: mountFn,
+        }));
+
+        return <div>Test</div>;
+      };
+
+      render(<TestComponent />);
+
+      // mount() should be called on commit (useLayoutEffect)
+      expect(mountFn).toHaveBeenCalled();
+    });
+
+    it("should call mount() only once across re-renders", () => {
+      const mountFn = vi.fn();
+
+      const TestComponent = ({ value }: { value: number }) => {
+        useScope(() => ({
+          count: signal(value),
+          mount: mountFn,
+        }));
+
+        return <div>{value}</div>;
+      };
+
+      const { rerender } = render(<TestComponent value={1} />);
+      const initialCount = mountFn.mock.calls.length;
+
+      // Re-render same component
+      rerender(<TestComponent value={1} />);
+
+      // mount() should NOT be called again (same scope instance)
+      expect(mountFn.mock.calls.length).toBe(initialCount);
+    });
+
+    it("should call mount() again when deps change (new scope)", async () => {
+      const mountFn = vi.fn();
+      let instanceId = 0;
+
+      const TestComponent = ({ userId }: { userId: number }) => {
+        useScope(
+          (id: number) => {
+            instanceId++;
+            return {
+              userId: signal(id),
+              mount: () => mountFn(instanceId),
+            };
+          },
+          [userId]
+        );
+
+        return <div>User {userId}</div>;
+      };
+
+      const { rerender } = render(<TestComponent userId={1} />);
+      const callsAfterFirstMount = mountFn.mock.calls.length;
+      expect(callsAfterFirstMount).toBeGreaterThanOrEqual(1);
+
+      // Change deps - should create new scope and call mount again
+      rerender(<TestComponent userId={2} />);
+
+      // New scope's mount() should be called
+      expect(mountFn.mock.calls.length).toBeGreaterThan(callsAfterFirstMount);
+    });
+
+    it("should work with multiple scopes mode", () => {
+      const mount1 = vi.fn();
+      const mount2 = vi.fn();
+
+      const TestComponent = () => {
+        useScope([
+          () => ({ value: signal(1), mount: mount1 }),
+          () => ({ value: signal(2), mount: mount2 }),
+        ]);
+
+        return <div>Test</div>;
+      };
+
+      render(<TestComponent />);
+
+      // Both mount functions should be called
+      expect(mount1).toHaveBeenCalled();
+      expect(mount2).toHaveBeenCalled();
+    });
+
+    it("should not require mount() to be present", () => {
+      // Scope without mount function should work fine
+      const TestComponent = () => {
+        const scope = useScope(() => ({
+          value: signal(42),
+        }));
+
+        return <div>{scope.value()}</div>;
+      };
+
+      expect(() => render(<TestComponent />)).not.toThrow();
+    });
+
+    it("should call mount() after dispose() clears on remount", async () => {
+      const mountFn = vi.fn();
+      const disposeFn = vi.fn();
+
+      const TestComponent = () => {
+        useScope(() => ({
+          value: signal(0),
+          mount: mountFn,
+          dispose: disposeFn,
+        }));
+
+        return <div>Test</div>;
+      };
+
+      const { unmount } = render(<TestComponent />);
+      const mountCallsAfterFirstRender = mountFn.mock.calls.length;
+
+      unmount();
+
+      // Wait for disposal
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 10));
+      });
+
+      expect(disposeFn).toHaveBeenCalled();
+
+      // Render again (new component instance)
+      render(<TestComponent />);
+
+      // mount() should be called for the new scope
+      expect(mountFn.mock.calls.length).toBeGreaterThan(
+        mountCallsAfterFirstRender
+      );
+    });
+  });
+
   describe("logic support", () => {
     it("should use logic.create() for Logic factories", () => {
       let createCount = 0;

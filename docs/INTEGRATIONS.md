@@ -177,7 +177,7 @@ const getUser = cache(
 
 ```tsx
 function UserProfile({ userId }: { userId: string }) {
-  const scope = useScope("userProfile", (id) => {
+  const scope = useScope((id) => {
     const { value, unref } = getUser(id);
     return { value, dispose: unref };
   }, [userId]);

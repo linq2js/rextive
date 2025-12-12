@@ -290,7 +290,7 @@ import { signal, rx, useScope } from "rextive/react";
 
 function TodoList() {
   // useScope() creates scope once and auto-disposes signals on unmount
-  const scope = useScope("todoList", () => {
+  const scope = useScope(() => {
     // Mutable signals for state
     const todos = signal([
       { id: 1, text: "Learn Rextive", status: "done" },
@@ -385,7 +385,7 @@ import { signal, rx, useScope, task } from "rextive/react";
 
 function UserProfile({ userId }) {
   // Create scoped query instance - recreates when userId changes
-  const scope = useScope("userProfile", (id) => {
+  const scope = useScope((id) => {
     // Result signal - fetches user data
     const result = signal(async ({ abortSignal }) => {
       const res = await fetch(`/api/user/${id}`, {
@@ -454,7 +454,7 @@ import {
 } from "rextive/react";
 
 function RegistrationForm() {
-  const scope = useScope("registrationForm", () => {
+  const scope = useScope(() => {
     // Mock existing usernames (would be API call in real app)
     const existingUsernames = ["admin", "testuser", "john123"];
 
@@ -564,7 +564,7 @@ import {
 } from "rextive/react";
 
 function SearchBox() {
-  const scope = useScope("searchBox", () => {
+  const scope = useScope(() => {
     const searchInput = signal("");
 
     const results = signal(
@@ -874,7 +874,7 @@ const resilientData = signal(async ({ abortSignal, refresh }) => {
 
 ```tsx
 function StockTicker() {
-  const scope = useScope("stockTicker", () => {
+  const scope = useScope(() => {
     const symbol = signal("AAPL");
 
     // Poll stock price every 5 seconds
@@ -922,7 +922,7 @@ function StockTicker() {
 
 ```tsx
 function Dashboard() {
-  const scope = useScope("dashboard", () => {
+  const scope = useScope(() => {
     const isVisible = signal(true);
     const pollInterval = signal(30 * 1000);
 

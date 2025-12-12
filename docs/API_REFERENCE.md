@@ -440,13 +440,14 @@ Access loading/error/success state from a Promise:
 ```tsx
 const state = task.from(promise);
 
-state.status;  // "loading" | "success" | "error"
+state.status; // "loading" | "success" | "error"
 state.loading; // boolean
-state.value;   // resolved value (undefined while loading)
-state.error;   // error if rejected
+state.value; // resolved value (undefined while loading)
+state.error; // error if rejected
 ```
 
 **Example - Stale-while-revalidate pattern:**
+
 ```tsx
 rx(() => {
   const state = task.from(userDataSignal());
@@ -482,6 +483,7 @@ rx(() => {
 
 > **Why not Promise.race/settled?** Use `wait()` + `task.from()` instead of creating
 > wrapper promises. You get loading/error states without extra promise overhead:
+>
 > ```tsx
 > rx(() => {
 >   const state = task.from(asyncSignal());
@@ -605,17 +607,17 @@ events.dispose();
 ```tsx
 import {
   // Equality helpers
-  shallowEquals,    // Shallow equality comparison
-  resolveEquals,    // Resolve equality strategy string to function
-  
+  shallowEquals, // Shallow equality comparison
+  resolveEquals, // Resolve equality strategy string to function
+
   // Type checks
-  isPromiseLike,    // Check if value is promise-like
-  
+  isPromiseLike, // Check if value is promise-like
+
   // Function utilities
-  compose,          // Function composition (right to left)
-  
+  compose, // Function composition (right to left)
+
   // Development
-  dev,              // Check if in dev mode: dev() => boolean
+  dev, // Check if in dev mode: dev() => boolean
 } from "rextive";
 ```
 
@@ -647,8 +649,8 @@ if (dev()) {
 ```tsx
 import {
   AbortedComputationError, // Thrown when async computation is aborted
-  FallbackError,           // Thrown when fallback handler fails
-  SignalDisposedError,     // Thrown when accessing disposed signal
+  FallbackError, // Thrown when fallback handler fails
+  SignalDisposedError, // Thrown when accessing disposed signal
 } from "rextive";
 ```
 
@@ -733,16 +735,6 @@ const { user } = useScope(
 const { count, increment } = useScope(counterLogic);
 ```
 
-#### Shared Mode (keyed, shared across components)
-
-```tsx
-// Multiple components share this scope
-const { input } = useScope("searchBar", searchBarLogic);
-
-// Dynamic keys for multiple instances
-const { content } = useScope(`tab:${tabId}`, tabLogic);
-```
-
 #### Custom Equality for Deps
 
 ```tsx
@@ -764,16 +756,7 @@ const [counter, form] = useScope([
 // With scope() helper for clarity
 import { scope } from "rextive/react";
 
-const [counter, form] = useScope([
-  scope(counterLogic),
-  scope(formLogic),
-]);
-
-// Shared mode with scope()
-const [shared, local] = useScope([
-  scope("shared-key", sharedLogic), // Shared across components
-  () => ({ value: signal("local") }), // Local to this component
-]);
+const [counter, form] = useScope([scope(counterLogic), scope(formLogic)]);
 
 // Mixed: logic and factories
 const [counter, form, validator] = useScope([
@@ -786,15 +769,9 @@ const [counter, form, validator] = useScope([
 **`scope()` helper function:**
 
 ```tsx
-// Local mode
 scope(factory);
 scope(factory, deps);
 scope(factory, deps, equals);
-
-// Shared mode
-scope(key, factory);
-scope(key, factory, deps);
-scope(key, factory, deps, equals);
 
 // Returns a Scope<T> descriptor
 // Note: No proxy mode for scope()
@@ -808,13 +785,13 @@ Dynamic stable reference getter. Similar to `useCallback`/`useMemo` but with dyn
 
 **When to use `useStable()` vs React hooks:**
 
-| Use Case | Recommendation |
-|----------|---------------|
-| Single callback with known deps | `useCallback` |
-| Single memoized value | `useMemo` |
-| Multiple callbacks in one place | `useStable()` |
-| Dynamic/computed keys | `useStable()` |
-| Need stable ref without deps array | `useStable()` |
+| Use Case                           | Recommendation |
+| ---------------------------------- | -------------- |
+| Single callback with known deps    | `useCallback`  |
+| Single memoized value              | `useMemo`      |
+| Multiple callbacks in one place    | `useStable()`  |
+| Dynamic/computed keys              | `useStable()`  |
+| Need stable ref without deps array | `useStable()`  |
 
 ```tsx
 const stable = useStable<{
@@ -834,6 +811,7 @@ const handlers = stable({
 ```
 
 **vs React hooks:**
+
 ```tsx
 // useStable - one line, no deps array
 const onClick = stable("onClick", () => doSomething(count));
@@ -1005,22 +983,23 @@ const delayed = source.pipe(delay(500));
 #### Take Operators
 
 ```tsx
-take(5);                    // First 5 values
-takeWhile((x) => x < 10);   // While condition true
-takeLast(3);                // Last 3 values
-takeUntil(stopSignal);      // Until signal emits
+take(5); // First 5 values
+takeWhile((x) => x < 10); // While condition true
+takeLast(3); // Last 3 values
+takeUntil(stopSignal); // Until signal emits
 ```
 
 #### Skip Operators
 
 ```tsx
-skip(5);                    // Skip first 5
-skipWhile((x) => x < 10);   // Skip while condition true
-skipLast(3);                // Skip last 3
-skipUntil(startSignal);     // Skip until signal emits
+skip(5); // Skip first 5
+skipWhile((x) => x < 10); // Skip while condition true
+skipLast(3); // Skip last 3
+skipUntil(startSignal); // Skip until signal emits
 ```
 
 **Example - Stream processing:**
+
 ```tsx
 // Only process first 10 mouse events, then stop
 const limitedClicks = clicks.pipe(take(10));
@@ -1034,9 +1013,9 @@ const protectedEvents = events.pipe(skipUntil(isAuthenticated));
 ### Aggregation Operators
 
 ```tsx
-min();      // Track minimum value seen
-max();      // Track maximum value seen
-count();    // Count emissions
+min(); // Track minimum value seen
+max(); // Track maximum value seen
+count(); // Count emissions
 distinct(); // Remove consecutive duplicates
 ```
 
