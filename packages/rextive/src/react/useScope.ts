@@ -9,6 +9,13 @@ import { emitter } from "../utils/emitter";
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
+/**
+ * @internal - Exposed for testing
+ */
+export function __clearCache() {
+  scopeCache.clear();
+}
+
 // ============================================================================
 // Types
 // ============================================================================
