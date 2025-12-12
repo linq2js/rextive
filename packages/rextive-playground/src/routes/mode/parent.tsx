@@ -164,8 +164,14 @@ function LoginScreen() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="card w-full max-w-md">
-        <Link to="/" viewTransition className="mb-4 inline-block text-2xl">
-          ←
+        <Link
+          to="/"
+          viewTransition
+          className="mb-4 inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+          title={t("common.back")}
+        >
+          <Icon name="back" size={20} />
+          <span className="text-sm font-medium">{t("common.back")}</span>
         </Link>
         <h1 className="font-display text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
           <Icon name="lock" size={24} /> {t("parent.parentAccess")}
