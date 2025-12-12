@@ -31,6 +31,11 @@ interface Achievement {
   icon: IconName;
   unlocked: boolean;
   description: string;
+  progress?: {
+    current: number;
+    target: number;
+    label: string;
+  };
 }
 
 function statsPageLogic() {
@@ -134,17 +139,59 @@ function statsPageLogic() {
 
     const achievements = stats().achievements.map((a) => {
       let unlocked = a.unlocked;
-      if (a.id === "first-game" && totalGames > 0) unlocked = true;
-      if (a.id === "unlock-2" && unlockedGamesCount >= 2) unlocked = true;
-      if (a.id === "unlock-all" && unlockedGamesCount >= AVAILABLE_GAMES.length)
-        unlocked = true;
-      if (a.id === "streak-3" && bestStreak >= 3) unlocked = true;
-      if (a.id === "streak-7" && bestStreak >= 7) unlocked = true;
-      if (a.id === "score-1000" && totalScore >= 1000) unlocked = true;
-      if (a.id === "level-5" && level >= 5) unlocked = true;
-      if (a.id === "all-games" && gamesPlayedSet.size >= AVAILABLE_GAMES.length)
-        unlocked = true;
-      return { ...a, unlocked };
+      let progress: { current: number; target: number; label: string } | undefined;
+
+      if (a.id === "first-game") {
+        unlocked = totalGames > 0;
+        if (!unlocked) {
+          progress = { current: totalGames, target: 1, label: "games" };
+        }
+      } else if (a.id === "unlock-2") {
+        unlocked = unlockedGamesCount >= 2;
+        if (!unlocked) {
+          progress = { current: unlockedGamesCount, target: 2, label: "games" };
+        }
+      } else if (a.id === "unlock-all") {
+        unlocked = unlockedGamesCount >= AVAILABLE_GAMES.length;
+        if (!unlocked) {
+          progress = {
+            current: unlockedGamesCount,
+            target: AVAILABLE_GAMES.length,
+            label: "games",
+          };
+        }
+      } else if (a.id === "streak-3") {
+        unlocked = bestStreak >= 3;
+        if (!unlocked) {
+          progress = { current: bestStreak, target: 3, label: "days" };
+        }
+      } else if (a.id === "streak-7") {
+        unlocked = bestStreak >= 7;
+        if (!unlocked) {
+          progress = { current: bestStreak, target: 7, label: "days" };
+        }
+      } else if (a.id === "score-1000") {
+        unlocked = totalScore >= 1000;
+        if (!unlocked) {
+          progress = { current: totalScore, target: 1000, label: "points" };
+        }
+      } else if (a.id === "level-5") {
+        unlocked = level >= 5;
+        if (!unlocked) {
+          progress = { current: level, target: 5, label: "level" };
+        }
+      } else if (a.id === "all-games") {
+        unlocked = gamesPlayedSet.size >= AVAILABLE_GAMES.length;
+        if (!unlocked) {
+          progress = {
+            current: gamesPlayedSet.size,
+            target: AVAILABLE_GAMES.length,
+            label: "games",
+          };
+        }
+      }
+
+      return { ...a, unlocked, progress };
     });
 
     stats.set({
@@ -366,7 +413,7 @@ function StatCard({
 function AchievementCard({ achievement }: { achievement: Achievement }) {
   return (
     <div
-      className={`card flex flex-col items-center p-3 text-center transition-all min-h-[100px] ${
+      className={`card flex flex-col items-center p-3 text-center transition-all min-h-[120px] ${
         achievement.unlocked
           ? "bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200"
           : "bg-gray-50 opacity-60"
@@ -381,13 +428,32 @@ function AchievementCard({ achievement }: { achievement: Achievement }) {
       >
         <Icon name={achievement.icon} size={22} />
       </div>
-      <div className="mt-2 flex-1">
+      <div className="mt-2 flex-1 w-full">
         <div className="font-display font-semibold text-gray-800 text-sm leading-tight">
           {achievement.name}
         </div>
         <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">
           {achievement.description}
         </div>
+        {!achievement.unlocked && achievement.progress && (
+          <div className="mt-2 space-y-1">
+            <div className="text-xs font-medium text-gray-700">
+              {achievement.progress.current} / {achievement.progress.target}{" "}
+              {achievement.progress.label}
+            </div>
+            <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-primary-500 to-purple-500 rounded-full transition-all duration-300"
+                style={{
+                  width: `${Math.min(
+                    (achievement.progress.current / achievement.progress.target) * 100,
+                    100
+                  )}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
       {achievement.unlocked && (
         <div className="mt-1 text-green-500">
