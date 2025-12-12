@@ -9,6 +9,7 @@
  * - Play button with energy cost display
  */
 import type { IconName } from "./Icons";
+import { useTranslation } from "@/i18n";
 
 // =============================================================================
 // Types
@@ -175,6 +176,7 @@ export function GameMenu({
   void icon;
   void themeColor;
 
+  const { t } = useTranslation();
   const hasEnergy = energy >= energyCost;
 
   return (
@@ -190,7 +192,7 @@ export function GameMenu({
       {/* Difficulty Selection */}
       <div className="card bg-white/95 py-4">
         <h3 className="font-display text-base font-semibold text-gray-700 mb-2">
-          Choose Difficulty
+          {t("games.chooseDifficulty")}
         </h3>
         <div className="grid grid-cols-3 gap-2">
           {difficultyOptions.map((option) => (
@@ -207,7 +209,7 @@ export function GameMenu({
       {/* How to Play */}
       <div className={`card py-4 ${howToPlayColor}`}>
         <h3 className="font-display text-base font-semibold text-gray-700 mb-2">
-          How to Play
+          {t("games.howToPlay")}
         </h3>
         <ul className="text-sm text-gray-600 space-y-0.5">
           {howToPlay.map((instruction, i) => (
@@ -227,13 +229,13 @@ export function GameMenu({
         }`}
       >
         {isLoading ? (
-          "Starting..."
+          t("common.loading")
         ) : hasEnergy ? (
           <span className="flex items-center justify-center gap-2">
-            Play <EnergyIcon /> {energyCost}
+            {t("common.play")} <EnergyIcon /> {energyCost}
           </span>
         ) : (
-          "No Energy - Come Back Tomorrow!"
+          t("app.noEnergyMessage")
         )}
       </button>
     </div>

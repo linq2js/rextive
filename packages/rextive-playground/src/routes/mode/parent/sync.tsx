@@ -12,6 +12,7 @@ import { signal } from "rextive";
 import { rx, useScope } from "rextive/react";
 import { syncLogic, type SyncState } from "@/features/sync";
 import { Icon } from "@/components/Icons";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/mode/parent/sync")({
   component: SyncPage,
@@ -78,6 +79,8 @@ function SyncPage() {
 // =============================================================================
 
 function ModeSelection({ $page }: { $page: ReturnType<typeof syncPageLogic> }) {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-6">
       {/* Info Card */}
@@ -86,11 +89,10 @@ function ModeSelection({ $page }: { $page: ReturnType<typeof syncPageLogic> }) {
           <div className="text-3xl">📱</div>
           <div>
             <h3 className="font-semibold text-blue-800">
-              Sync data between devices
+              {t("parent.syncDataBetweenDevices")}
             </h3>
             <p className="text-sm text-blue-600 mt-1">
-              Transfer profiles and game progress to another phone or tablet
-              using a secure peer-to-peer connection.
+              {t("parent.syncDescription")}
             </p>
           </div>
         </div>
@@ -109,10 +111,10 @@ function ModeSelection({ $page }: { $page: ReturnType<typeof syncPageLogic> }) {
             </div>
             <div className="flex-1">
               <h3 className="font-display text-lg font-bold text-gray-800">
-                Share from this device
+                {t("parent.host")}
               </h3>
               <p className="text-sm text-gray-500">
-                Generate a code for another device to connect
+                {t("parent.hostDescription")}
               </p>
             </div>
             <Icon name="chevron-right" size={24} className="text-gray-400" />
@@ -130,40 +132,15 @@ function ModeSelection({ $page }: { $page: ReturnType<typeof syncPageLogic> }) {
             </div>
             <div className="flex-1">
               <h3 className="font-display text-lg font-bold text-gray-800">
-                Receive from another device
+                {t("parent.guest")}
               </h3>
               <p className="text-sm text-gray-500">
-                Enter a code to connect and receive data
+                {t("parent.guestDescription")}
               </p>
             </div>
             <Icon name="chevron-right" size={24} className="text-gray-400" />
           </div>
         </button>
-      </div>
-
-      {/* How it works */}
-      <div className="card bg-gray-50">
-        <h4 className="font-semibold text-gray-800 mb-3">How it works</h4>
-        <ol className="space-y-2 text-sm text-gray-600">
-          <li className="flex items-start gap-2">
-            <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
-              1
-            </span>
-            <span>One device shares and shows a 6-digit code</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
-              2
-            </span>
-            <span>Other device enters the code to connect</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
-              3
-            </span>
-            <span>Choose which data to transfer</span>
-          </li>
-        </ol>
       </div>
     </div>
   );
@@ -174,6 +151,8 @@ function ModeSelection({ $page }: { $page: ReturnType<typeof syncPageLogic> }) {
 // =============================================================================
 
 function HostView({ $page }: { $page: ReturnType<typeof syncPageLogic> }) {
+  const { t } = useTranslation();
+
   return rx(() => {
     const state = $page.state();
     const code = $page.syncCode();
@@ -190,7 +169,7 @@ function HostView({ $page }: { $page: ReturnType<typeof syncPageLogic> }) {
         {/* Code Display */}
         {(state === "hosting" || state === "connected") && (
           <div className="card text-center py-8">
-            <p className="text-sm text-gray-500 mb-2">Your sync code</p>
+            <p className="text-sm text-gray-500 mb-2">{t("parent.syncCode")}</p>
             <div className="flex justify-center gap-2">
               {code.split("").map((digit, i) => (
                 <div
@@ -202,7 +181,7 @@ function HostView({ $page }: { $page: ReturnType<typeof syncPageLogic> }) {
               ))}
             </div>
             <p className="text-xs text-gray-400 mt-4">
-              Enter this code on the other device
+              {t("parent.enterCodeOnOtherDevice")}
             </p>
           </div>
         )}
@@ -214,7 +193,7 @@ function HostView({ $page }: { $page: ReturnType<typeof syncPageLogic> }) {
               <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
               <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: "0.2s" }} />
               <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: "0.4s" }} />
-              <span className="ml-2">Waiting for connection...</span>
+              <span className="ml-2">{t("parent.waitingForConnection")}</span>
             </div>
           </div>
         )}
@@ -234,7 +213,7 @@ function HostView({ $page }: { $page: ReturnType<typeof syncPageLogic> }) {
               onClick={() => $page.sendData()}
               className="btn w-full py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all"
             >
-              📤 Send My Data
+              {t("parent.sendMyData")}
             </button>
             
             {$page.hasReceivedData() && (
@@ -242,7 +221,7 @@ function HostView({ $page }: { $page: ReturnType<typeof syncPageLogic> }) {
                 onClick={() => $page.importReceivedData("replace")}
                 className="btn w-full py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all"
               >
-                📥 Import Their Data
+                {t("parent.importTheirData")}
               </button>
             )}
           </div>
@@ -256,7 +235,7 @@ function HostView({ $page }: { $page: ReturnType<typeof syncPageLogic> }) {
           onClick={() => $page.reset()}
           className="btn w-full py-3 bg-gray-200 text-gray-700 hover:bg-gray-300"
         >
-          {state === "success" || state === "error" ? "Done" : "Cancel"}
+          {state === "success" || state === "error" ? t("parent.done") : t("parent.cancel")}
         </button>
       </div>
     );
@@ -268,6 +247,8 @@ function HostView({ $page }: { $page: ReturnType<typeof syncPageLogic> }) {
 // =============================================================================
 
 function GuestView({ $page, state }: { $page: ReturnType<typeof syncPageLogic>; state: SyncState }) {
+  const { t } = useTranslation();
+
   return rx(() => {
     const codeInput = $page.codeInput();
     const progress = $page.progress();
@@ -281,7 +262,7 @@ function GuestView({ $page, state }: { $page: ReturnType<typeof syncPageLogic>; 
         <div className="space-y-6">
           <div className="card py-6">
             <label className="block text-sm text-gray-500 mb-2">
-              Enter the 6-digit code from the other device
+              {t("parent.enter6DigitCode")}
             </label>
             
             {/* Simple text input */}
@@ -308,7 +289,7 @@ function GuestView({ $page, state }: { $page: ReturnType<typeof syncPageLogic>; 
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }`}
           >
-            Connect
+            {t("parent.connect")}
           </button>
 
           {/* Back Button */}
@@ -316,7 +297,7 @@ function GuestView({ $page, state }: { $page: ReturnType<typeof syncPageLogic>; 
             onClick={() => $page.reset()}
             className="btn w-full py-3 bg-gray-200 text-gray-700 hover:bg-gray-300"
           >
-            Back
+            {t("parent.back")}
           </button>
         </div>
       );
@@ -332,7 +313,7 @@ function GuestView({ $page, state }: { $page: ReturnType<typeof syncPageLogic>; 
         {state === "joining" && (
           <div className="card text-center py-8">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full border-4 border-purple-200 border-t-purple-500 animate-spin" />
-            <p className="text-gray-500">Connecting to device...</p>
+            <p className="text-gray-500">{t("parent.connectingToDevice")}</p>
           </div>
         )}
 
@@ -351,7 +332,7 @@ function GuestView({ $page, state }: { $page: ReturnType<typeof syncPageLogic>; 
               onClick={() => $page.sendData()}
               className="btn w-full py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all"
             >
-              📤 Send My Data
+              {t("parent.sendMyData")}
             </button>
             
             {$page.hasReceivedData() && (
@@ -359,7 +340,7 @@ function GuestView({ $page, state }: { $page: ReturnType<typeof syncPageLogic>; 
                 onClick={() => $page.importReceivedData("replace")}
                 className="btn w-full py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all"
               >
-                📥 Import Their Data
+                {t("parent.importTheirData")}
               </button>
             )}
           </div>
@@ -373,7 +354,7 @@ function GuestView({ $page, state }: { $page: ReturnType<typeof syncPageLogic>; 
           onClick={() => $page.reset()}
           className="btn w-full py-3 bg-gray-200 text-gray-700 hover:bg-gray-300"
         >
-          {state === "success" || state === "error" ? "Done" : "Cancel"}
+          {state === "success" || state === "error" ? t("parent.done") : t("parent.cancel")}
         </button>
       </div>
     );
@@ -393,14 +374,16 @@ function StatusHeader({
   error: string;
   progress: string;
 }) {
-  const statusConfig: Record<SyncState, { icon: string; color: string; label: string }> = {
-    idle: { icon: "📱", color: "bg-gray-100", label: "Ready" },
-    hosting: { icon: "📡", color: "bg-blue-100", label: "Hosting" },
-    joining: { icon: "🔗", color: "bg-purple-100", label: "Connecting" },
-    connected: { icon: "✅", color: "bg-green-100", label: "Connected" },
-    syncing: { icon: "🔄", color: "bg-amber-100", label: "Syncing" },
-    success: { icon: "🎉", color: "bg-green-100", label: "Success" },
-    error: { icon: "❌", color: "bg-red-100", label: "Error" },
+  const { t } = useTranslation();
+
+  const statusConfig: Record<SyncState, { icon: string; color: string; labelKey: string }> = {
+    idle: { icon: "📱", color: "bg-gray-100", labelKey: "parent.ready" },
+    hosting: { icon: "📡", color: "bg-blue-100", labelKey: "parent.hosting" },
+    joining: { icon: "🔗", color: "bg-purple-100", labelKey: "parent.connecting" },
+    connected: { icon: "✅", color: "bg-green-100", labelKey: "parent.connected" },
+    syncing: { icon: "🔄", color: "bg-amber-100", labelKey: "parent.syncing" },
+    success: { icon: "🎉", color: "bg-green-100", labelKey: "parent.success" },
+    error: { icon: "❌", color: "bg-red-100", labelKey: "parent.error" },
   };
 
   const config = statusConfig[state];
@@ -410,9 +393,9 @@ function StatusHeader({
       <div className="flex items-center gap-3">
         <span className="text-2xl">{config.icon}</span>
         <div className="flex-1">
-          <h3 className="font-semibold text-gray-800">{config.label}</h3>
+          <h3 className="font-semibold text-gray-800">{t(config.labelKey)}</h3>
           <p className="text-sm text-gray-600">
-            {error || progress || "Processing..."}
+            {error || progress || t("parent.processing")}
           </p>
         </div>
       </div>
@@ -427,43 +410,45 @@ function DataSummaryCards({
   localSummary: { profileCount: number; gameSessionCount: number } | null;
   remoteSummary: { profileCount: number; gameSessionCount: number } | null;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="grid grid-cols-2 gap-4">
       {/* This Device */}
       <div className="card bg-blue-50">
-        <h4 className="text-xs font-semibold text-blue-600 mb-2">THIS DEVICE</h4>
+        <h4 className="text-xs font-semibold text-blue-600 mb-2">{t("parent.thisDevice")}</h4>
         <div className="space-y-1 text-sm">
           <p className="flex items-center gap-2">
             <span>👤</span>
             <span className="font-bold">{localSummary?.profileCount || 0}</span>
-            <span className="text-gray-500">profiles</span>
+            <span className="text-gray-500">{t("parent.profiles")}</span>
           </p>
           <p className="flex items-center gap-2">
             <span>🎮</span>
             <span className="font-bold">{localSummary?.gameSessionCount || 0}</span>
-            <span className="text-gray-500">sessions</span>
+            <span className="text-gray-500">{t("parent.sessions")}</span>
           </p>
         </div>
       </div>
 
       {/* Other Device */}
       <div className="card bg-purple-50">
-        <h4 className="text-xs font-semibold text-purple-600 mb-2">OTHER DEVICE</h4>
+        <h4 className="text-xs font-semibold text-purple-600 mb-2">{t("parent.otherDevice")}</h4>
         {remoteSummary ? (
           <div className="space-y-1 text-sm">
             <p className="flex items-center gap-2">
               <span>👤</span>
               <span className="font-bold">{remoteSummary.profileCount}</span>
-              <span className="text-gray-500">profiles</span>
+              <span className="text-gray-500">{t("parent.profiles")}</span>
             </p>
             <p className="flex items-center gap-2">
               <span>🎮</span>
               <span className="font-bold">{remoteSummary.gameSessionCount}</span>
-              <span className="text-gray-500">sessions</span>
+              <span className="text-gray-500">{t("parent.sessions")}</span>
             </p>
           </div>
         ) : (
-          <p className="text-sm text-gray-400">Waiting...</p>
+          <p className="text-sm text-gray-400">{t("parent.waiting")}</p>
         )}
       </div>
     </div>
@@ -471,11 +456,13 @@ function DataSummaryCards({
 }
 
 function SuccessView({ progress }: { progress: string }) {
+  const { t } = useTranslation();
+
   return (
     <div className="card text-center py-8 bg-green-50">
       <div className="text-5xl mb-4">🎉</div>
       <h3 className="font-display text-xl font-bold text-green-800">
-        Sync Complete!
+        {t("parent.syncComplete")}
       </h3>
       <p className="text-sm text-green-600 mt-2">{progress}</p>
     </div>

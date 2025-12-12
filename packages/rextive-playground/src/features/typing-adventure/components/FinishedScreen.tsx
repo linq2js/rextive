@@ -4,11 +4,13 @@ import { energyLogic } from "@/logic";
 import { useTypingGame } from "../provider";
 import { StatItem } from "./StatItem";
 import { Icon } from "@/components/Icons";
+import { useTranslation } from "@/i18n";
 
 export function FinishedScreen() {
   const $game = useTypingGame();
   const $energy = energyLogic();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return rx(() => {
     const stats = $game.stats();
@@ -35,7 +37,7 @@ export function FinishedScreen() {
             <Icon name="trophy" size={64} />
           </div>
           <h2 className="font-display text-2xl font-bold text-gray-800">
-            Great Job!
+            {t("typingAdventure.greatJob")}
           </h2>
 
           {/* Stars */}
@@ -58,18 +60,18 @@ export function FinishedScreen() {
 
           {/* Stats Grid */}
           <div className="mt-6 grid grid-cols-2 gap-4 text-left">
-            <StatItem label="Words Typed" value={stats.wordsCompleted} />
-            <StatItem label="Accuracy" value={`${stats.accuracy}%`} />
-            <StatItem label="Best Streak" value={stats.bestStreak} iconName="fire" />
+            <StatItem label={t("typingAdventure.wordsTyped")} value={stats.wordsCompleted} />
+            <StatItem label={t("typingAdventure.accuracy")} value={`${stats.accuracy}%`} />
+            <StatItem label={t("typingAdventure.bestStreak")} value={stats.bestStreak} iconName="fire" />
             <StatItem
-              label="Difficulty"
-              value={difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+              label={t("games.chooseDifficulty")}
+              value={t(`typingAdventure.difficulty.${difficulty}`)}
             />
           </div>
 
           {/* XP Earned */}
           <div className="mt-6 p-4 bg-amber-50 rounded-xl">
-            <div className="text-sm text-amber-700">XP Earned</div>
+            <div className="text-sm text-amber-700">{t("typingAdventure.xpEarned")}</div>
             <div className="text-2xl font-bold text-amber-600">
               +{totalXP} XP
             </div>
@@ -87,13 +89,13 @@ export function FinishedScreen() {
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }`}
           >
-            {energy > 0 ? <>Play Again <Icon name="lightning" size={20} className="inline" />1</> : <>No Energy Left</>}
+            {energy > 0 ? <>{t("typingAdventure.playAgain")} <Icon name="lightning" size={20} className="inline" />1</> : <>{t("typingAdventure.noEnergyLeft")}</>}
           </button>
           <button
             onClick={() => navigate({ to: "/dashboard" })}
             className="btn btn-outline py-3"
           >
-            Back to Dashboard
+            {t("typingAdventure.backToDashboard")}
           </button>
         </div>
       </div>

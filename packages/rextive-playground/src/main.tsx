@@ -2,6 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import "./index.css";
+// Initialize i18n before anything else
+import "./i18n/config";
 
 // Dynamic import to ensure devtools is enabled before signals/logics are created
 async function bootstrap(preSetup?: () => void | Promise<void>) {

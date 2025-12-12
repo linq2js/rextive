@@ -5,6 +5,7 @@ import { rx, useScope, inputValue } from "rextive/react";
 import { focus } from "rextive/op";
 import { parentAuthLogic } from "@/logic";
 import { Icon } from "@/components/Icons";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/mode/parent/settings")({
   component: SettingsTab,
@@ -37,19 +38,19 @@ function changePasswordFormLogic() {
   async function submit() {
     const { currentPassword, newPassword, confirmPassword } = state();
 
-    // Validation
+    // Validation - errors will be translated in the component
     if (!currentPassword || !newPassword || !confirmPassword) {
-      state.set(patch("error", "All fields are required"));
+      state.set(patch("error", "allFieldsRequired"));
       return;
     }
 
     if (newPassword.length < 4) {
-      state.set(patch("error", "New password must be at least 4 characters"));
+      state.set(patch("error", "passwordMinLength"));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      state.set(patch("error", "New passwords do not match"));
+      state.set(patch("error", "passwordsDoNotMatch"));
       return;
     }
 
@@ -77,7 +78,7 @@ function changePasswordFormLogic() {
         state.set(
           patch<ChangePasswordFormState>({
             loading: false,
-            error: "Current password is incorrect",
+            error: "currentPasswordIncorrect",
           })
         );
       }
@@ -85,7 +86,7 @@ function changePasswordFormLogic() {
       state.set(
         patch<ChangePasswordFormState>({
           loading: false,
-          error: "Failed to change password",
+          error: "failedToChangePassword",
         })
       );
     }
@@ -107,13 +108,26 @@ function changePasswordFormLogic() {
 
 function SettingsTab() {
   const $form = useScope(changePasswordFormLogic);
+  const { t } = useTranslation();
+
+  // Helper to translate error codes
+  const translateError = (error: string) => {
+    const errorMap: Record<string, string> = {
+      allFieldsRequired: t("parent.allFieldsRequired"),
+      passwordMinLength: t("parent.passwordMinLength"),
+      passwordsDoNotMatch: t("parent.passwordsDoNotMatch"),
+      currentPasswordIncorrect: t("parent.currentPasswordIncorrect"),
+      failedToChangePassword: t("parent.failedToChangePassword"),
+    };
+    return errorMap[error] || error;
+  };
 
   return (
     <div className="space-y-6">
       {/* Change Password Card */}
       <div className="card">
         <h3 className="font-display text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-          <Icon name="lock" size={20} className="text-gray-600" /> Change Password
+          <Icon name="lock" size={20} className="text-gray-600" /> {t("parent.changePassword")}
         </h3>
 
         <form
@@ -128,7 +142,7 @@ function SettingsTab() {
             const success = $form.state().success;
             return success ? (
               <div className="p-3 rounded-xl bg-green-100 text-green-800 text-center font-medium animate-pop flex items-center justify-center gap-2">
-                <Icon name="check" size={18} /> Password changed successfully!
+                <Icon name="check" size={18} /> {t("parent.passwordChangedSuccessfully")}
               </div>
             ) : null;
           })}
@@ -141,14 +155,14 @@ function SettingsTab() {
             return (
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Current Password
+                  {t("parent.currentPassword")}
                 </label>
                 <input
                   type="password"
                   value={get()}
                   onChange={set}
                   className="input"
-                  placeholder="Enter current password"
+                  placeholder={t("parent.currentPassword")}
                   autoComplete="current-password"
                 />
               </div>
@@ -163,14 +177,14 @@ function SettingsTab() {
             return (
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  New Password
+                  {t("parent.newPassword")}
                 </label>
                 <input
                   type="password"
                   value={get()}
                   onChange={set}
                   className="input"
-                  placeholder="Enter new password"
+                  placeholder={t("parent.newPassword")}
                   autoComplete="new-password"
                 />
               </div>
@@ -185,14 +199,14 @@ function SettingsTab() {
             return (
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Confirm New Password
+                  {t("parent.confirmNewPassword")}
                 </label>
                 <input
                   type="password"
                   value={get()}
                   onChange={set}
                   className="input"
-                  placeholder="Confirm new password"
+                  placeholder={t("parent.confirmNewPassword")}
                   autoComplete="new-password"
                 />
               </div>
@@ -203,7 +217,7 @@ function SettingsTab() {
           {rx(() => {
             const error = $form.state().error;
             return error ? (
-              <p className="text-sm text-red-500">{error}</p>
+              <p className="text-sm text-red-500">{translateError(error)}</p>
             ) : null;
           })}
 
@@ -214,7 +228,7 @@ function SettingsTab() {
               disabled={$form.state().loading}
               className="btn btn-primary w-full py-3"
             >
-              {$form.state().loading ? "Changing..." : "Change Password"}
+              {$form.state().loading ? t("parent.changing") : t("parent.changePassword")}
             </button>
           ))}
         </form>
@@ -223,12 +237,12 @@ function SettingsTab() {
       {/* Security Tips */}
       <div className="card bg-blue-50">
         <h4 className="font-display font-semibold text-gray-800 mb-2">
-          Security Tips
+          {t("parent.securityTips")}
         </h4>
         <ul className="text-sm text-gray-600 space-y-1">
-          <li>• Use a password that's easy for you to remember</li>
-          <li>• Don't share your password with your kids</li>
-          <li>• Change your password if you suspect it's compromised</li>
+          <li>• {t("parent.securityTip1")}</li>
+          <li>• {t("parent.securityTip2")}</li>
+          <li>• {t("parent.securityTip3")}</li>
         </ul>
       </div>
     </div>

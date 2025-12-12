@@ -21,6 +21,7 @@ import {
   type DifficultyOption,
   type ThemeOption,
 } from "@/components/GameMenu";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/games/memory-match")({
   component: MemoryMatch,
@@ -554,23 +555,20 @@ const THEME_OPTIONS: ThemeOption[] = Object.entries(CATEGORY_INFO).map(
   })
 );
 
-const HOW_TO_PLAY = [
-  "Tap cards to flip them",
-  "Find matching pairs",
-  "Match all pairs before time runs out!",
-  "Consecutive matches = bonus points!",
-];
-
 function MenuScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> }) {
+  const { t } = useTranslation();
+
   return rx(() => {
     const difficulty = $game.difficulty();
     const category = $game.category();
     const energy = $game.energy();
 
+    const howToPlay = t("memoryMatch.howToPlay", { returnObjects: true }) as string[];
+
     return (
       <GameMenu
-        title="Memory Match"
-        description="Find matching pairs before time runs out!"
+        title={t("memoryMatch.title")}
+        description={t("memoryMatch.description")}
         icon="brain"
         themeColor="from-purple-500 to-pink-500"
         difficulty={difficulty}
@@ -583,16 +581,17 @@ function MenuScreen({ $game }: { $game: ReturnType<typeof memoryMatchLogic> }) {
           if (!started) {
             const $modal = modalLogic();
             await $modal.warning(
-              "No energy left! Come back tomorrow to play again.",
-              "No Energy"
+              t("app.noEnergyMessage"),
+              t("app.noEnergy")
             );
           }
         }}
-        howToPlay={HOW_TO_PLAY}
+        howToPlay={howToPlay}
         howToPlayColor="bg-purple-100/80"
       >
         {/* Theme Selection - Memory Match specific */}
         <ThemeSelector
+          title={t("memoryMatch.chooseTheme")}
           themes={THEME_OPTIONS}
           selected={category}
           onChange={(c) => $game.setCategory(c as Category)}

@@ -7,6 +7,7 @@ import { dataExportRepository } from "@/infrastructure/repositories";
 import { db } from "@/infrastructure/database";
 import { useRef } from "react";
 import { Icon } from "@/components/Icons";
+import { useTranslation, t } from "@/i18n";
 
 export const Route = createFileRoute("/mode/parent/data")({
   component: DataTab,
@@ -58,10 +59,10 @@ function dataTabLogic() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      showMessage("success", "Data exported successfully!");
+      showMessage("success", "dataExportedSuccessfully");
     } catch (e) {
       console.error("Export error:", e);
-      showMessage("error", "Failed to export data");
+      showMessage("error", "failedToExport");
     } finally {
       isExporting.set(false);
     }
@@ -75,15 +76,15 @@ function dataTabLogic() {
       // Validate first
       const validation = dataExportRepository.validateImportData(text);
       if (!validation.valid) {
-        showMessage("error", validation.error || "Invalid file format");
+        showMessage("error", validation.error || "invalidFileFormat");
         return;
       }
 
-      // Confirm before importing
+      // Confirm before importing - use t() directly in logic
       const $modal = modalLogic();
       const confirmed = await $modal.confirmDanger(
-        "This will REPLACE all existing data (profiles, stats, settings).\n\nAre you sure you want to continue?",
-        "Import Data"
+        t("parent.importConfirm"),
+        t("parent.importData")
       );
       if (!confirmed) {
         return;
@@ -102,7 +103,7 @@ function dataTabLogic() {
       }
     } catch (e) {
       console.error("Import error:", e);
-      showMessage("error", "Failed to import data");
+      showMessage("error", "failedToImport");
     } finally {
       isImporting.set(false);
     }
@@ -131,7 +132,7 @@ function dataTabLogic() {
       console.error("Failed to reset data:", error);
       resetState.set(patch("loading", false));
       const $modal = modalLogic();
-      await $modal.error("Failed to reset data. Please try again.");
+      await $modal.error("failedToResetData");
     }
   }
 
@@ -153,6 +154,19 @@ function dataTabLogic() {
 function DataTab() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const $data = useScope(dataTabLogic);
+  const { t } = useTranslation();
+
+  // Helper to translate message codes
+  const translateMessage = (text: string) => {
+    const messageMap: Record<string, string> = {
+      dataExportedSuccessfully: t("parent.dataExportedSuccessfully"),
+      failedToExport: t("parent.failedToExport"),
+      failedToImport: t("parent.failedToImport"),
+      invalidFileFormat: t("parent.invalidFileFormat"),
+      failedToResetData: t("parent.failedToResetData"),
+    };
+    return messageMap[text] || text;
+  };
 
   return rx(() => {
     const msgState = $data.message();
@@ -170,46 +184,58 @@ function DataTab() {
                 : "bg-red-100 text-red-800"
             }`}
           >
-            {msgState.text}
+            {translateMessage(msgState.text)}
           </div>
         )}
 
         {/* Export Section */}
         <div className="card">
           <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Icon name="upload" size={20} className="text-green-500" /> Export Data
+            <Icon name="upload" size={20} className="text-green-500" />{" "}
+            {t("parent.exportData")}
           </h3>
           <p className="text-sm text-gray-600 mb-4">
-            Download all your data as a JSON file. This includes:
+            {t("parent.exportDescription")}
           </p>
           <ul className="text-sm text-gray-600 mb-4 space-y-1">
-            <li>• Kid profiles</li>
-            <li>• Game progress & stats</li>
-            <li>• Energy levels</li>
-            <li>• Game visibility settings</li>
-            <li>• Parent settings</li>
+            <li>• {t("parent.exportIncludes1")}</li>
+            <li>• {t("parent.exportIncludes2")}</li>
+            <li>• {t("parent.exportIncludes3")}</li>
+            <li>• {t("parent.exportIncludes4")}</li>
+            <li>• {t("parent.exportIncludes5")}</li>
           </ul>
           <button
             onClick={() => $data.handleExport()}
             disabled={exporting}
             className="btn btn-primary w-full py-3"
           >
-            {exporting ? "Exporting..." : <><Icon name="download" size={18} /> Download Backup</>}
+            {exporting ? (
+              t("parent.exporting")
+            ) : (
+              <>
+                <Icon name="download" size={18} /> {t("parent.downloadBackup")}
+              </>
+            )}
           </button>
         </div>
 
         {/* Import Section */}
         <div className="card">
           <h3 className="font-display text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Icon name="download" size={20} className="text-blue-500" /> Import Data
+            <Icon name="download" size={20} className="text-blue-500" />{" "}
+            {t("parent.importData")}
           </h3>
           <p className="text-sm text-gray-600 mb-4">
-            Restore data from a previously exported JSON file.
+            {t("parent.importDescription")}
           </p>
           <div className="p-4 bg-amber-50 rounded-xl mb-4 flex items-start gap-2">
-            <Icon name="warning" size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <Icon
+              name="warning"
+              size={18}
+              className="text-amber-600 flex-shrink-0 mt-0.5"
+            />
             <p className="text-sm text-amber-800 font-medium">
-              Warning: Importing will replace ALL existing data!
+              {t("parent.importWarning")}
             </p>
           </div>
 
@@ -236,20 +262,27 @@ function DataTab() {
             disabled={importing}
             className="btn btn-outline w-full py-3"
           >
-            {importing ? "Importing..." : <><Icon name="upload" size={18} /> Choose File to Import</>}
+            {importing ? (
+              t("parent.importing")
+            ) : (
+              <>
+                <Icon name="upload" size={18} />{" "}
+                {t("parent.chooseFileToImport")}
+              </>
+            )}
           </button>
         </div>
 
         {/* Info */}
         <div className="card bg-blue-50">
           <h4 className="font-display font-semibold text-blue-800 mb-2">
-            Tips
+            {t("parent.tips")}
           </h4>
           <ul className="text-sm text-blue-700 space-y-1">
-            <li>• Export regularly to keep backups</li>
-            <li>• Store backups in a safe place</li>
-            <li>• Use import to restore or transfer data</li>
-            <li>• JSON format is human-readable</li>
+            <li>• {t("parent.tip1")}</li>
+            <li>• {t("parent.tip2")}</li>
+            <li>• {t("parent.tip3")}</li>
+            <li>• {t("parent.tip4")}</li>
           </ul>
         </div>
 
@@ -261,32 +294,35 @@ function DataTab() {
 }
 
 function DangerZone({ $data }: { $data: ReturnType<typeof dataTabLogic> }) {
+  const { t } = useTranslation();
+
   return rx(() => {
     const { showConfirm, loading } = $data.resetState();
 
     return (
       <div className="card border-2 border-red-200 bg-red-50">
         <h3 className="font-display text-lg font-semibold text-red-800 mb-2 flex items-center gap-2">
-          <Icon name="warning" size={20} className="text-red-600" /> Danger Zone
+          <Icon name="warning" size={20} className="text-red-600" />{" "}
+          {t("parent.dangerZone")}
         </h3>
         <p className="text-sm text-red-700 mb-4">
-          These actions are irreversible. Please proceed with caution.
+          {t("parent.dangerZoneDescription")}
         </p>
 
         {showConfirm ? (
           <div className="p-4 bg-white rounded-xl border border-red-300">
             <p className="text-sm text-red-800 font-medium mb-3">
-              Are you sure you want to delete ALL data? This includes:
+              {t("parent.resetAllDataConfirm")}
             </p>
             <ul className="text-sm text-red-700 mb-4 space-y-1">
-              <li>• All kid profiles</li>
-              <li>• All game progress and scores</li>
-              <li>• All energy data</li>
-              <li>• Parent password</li>
-              <li>• All settings</li>
+              <li>• {t("parent.resetAllDataIncludes1")}</li>
+              <li>• {t("parent.resetAllDataIncludes2")}</li>
+              <li>• {t("parent.resetAllDataIncludes3")}</li>
+              <li>• {t("parent.resetAllDataIncludes4")}</li>
+              <li>• {t("parent.resetAllDataIncludes5")}</li>
             </ul>
             <p className="text-sm text-red-800 font-bold mb-4">
-              This action CANNOT be undone!
+              {t("parent.cannotBeUndone")}
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <button
@@ -294,14 +330,16 @@ function DangerZone({ $data }: { $data: ReturnType<typeof dataTabLogic> }) {
                 disabled={loading}
                 className="btn btn-outline flex-1 py-3 w-full sm:w-auto"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 onClick={() => $data.resetAllData()}
                 disabled={loading}
                 className="btn flex-1 py-3 w-full sm:w-auto bg-red-500 text-white hover:bg-red-600"
               >
-                {loading ? "Deleting..." : "Yes, Delete Everything"}
+                {loading
+                  ? t("parent.deleting")
+                  : t("parent.yesDeleteEverything")}
               </button>
             </div>
           </div>
@@ -310,7 +348,7 @@ function DangerZone({ $data }: { $data: ReturnType<typeof dataTabLogic> }) {
             onClick={() => $data.showResetConfirm()}
             className="btn w-full py-3 bg-red-100 text-red-700 border border-red-300 hover:bg-red-200"
           >
-            <Icon name="trash" size={18} /> Reset All Data
+            <Icon name="trash" size={18} /> {t("parent.resetAllData")}
           </button>
         )}
       </div>

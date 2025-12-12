@@ -6,6 +6,8 @@ import { AVATAR_NAMES } from "@/domain/types";
 import { WELCOME_CHIME } from "@/hooks/useSound";
 import { Avatar } from "@/components/Avatar";
 import { Icon, type IconName } from "@/components/Icons";
+import { useTranslation } from "@/i18n";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -69,6 +71,7 @@ function HomePage() {
   const $profiles = kidProfilesLogic();
   const hasPlayedSound = useRef(false);
   const [quote] = useState(() => getRandomQuote());
+  const { t } = useTranslation();
 
   // Play sound when profiles exist
   useEffect(() => {
@@ -100,11 +103,10 @@ function HomePage() {
                     size={36}
                     className="text-primary-500"
                   />
-                  Ging
-                  <span className="text-gradient-kid"> Playground</span>
+                  {t("app.title")}
                 </h1>
                 <p className="mt-2 text-gray-600">
-                  Fun learning games for kids!
+                  {t("app.subtitle")}
                 </p>
               </header>
 
@@ -122,7 +124,7 @@ function HomePage() {
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   <Icon name="lock" size={16} />
-                  <span>Parent Mode</span>
+                  <span>{t("app.parentMode")}</span>
                 </Link>
               </div>
             </div>
@@ -153,6 +155,7 @@ function ProfileSelector({
 }) {
   const navigate = useNavigate();
   const $selected = selectedProfileLogic();
+  const { t } = useTranslation();
 
   const handleSelect = (profileId: number) => {
     $selected.select(profileId);
@@ -161,8 +164,12 @@ function ProfileSelector({
 
   return (
     <section className="mb-8">
+      {/* Language Switcher - Centered above Select Profile */}
+      <div className="flex justify-center mb-4">
+        <LanguageSwitcher />
+      </div>
       <h2 className="mb-4 font-display text-xl font-semibold text-gray-700 text-center">
-        Who's playing today?
+        {t("profile.selectProfile")}
       </h2>
       <div className="flex flex-wrap justify-center gap-4">
         {profiles.map((profile) => {

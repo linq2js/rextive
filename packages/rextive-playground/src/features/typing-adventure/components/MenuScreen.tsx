@@ -6,57 +6,55 @@ import { rx } from "rextive/react";
 import { energyLogic } from "@/logic";
 import { useTypingGame } from "../provider";
 import { GameMenu, type DifficultyOption } from "@/components/GameMenu";
-
-// Typing-specific difficulty options
-const DIFFICULTY_OPTIONS: DifficultyOption[] = [
-  {
-    value: "easy",
-    label: "Easy",
-    description: "5 pts/word",
-    color: "from-emerald-400 to-green-500",
-  },
-  {
-    value: "medium",
-    label: "Medium",
-    description: "10 pts/word",
-    color: "from-amber-400 to-orange-500",
-  },
-  {
-    value: "hard",
-    label: "Hard",
-    description: "20 pts/word",
-    color: "from-red-400 to-rose-500",
-  },
-];
-
-const HOW_TO_PLAY = [
-  "Type the words that appear on screen",
-  "Complete words to earn points",
-  "Build streaks for bonus points!",
-  "Press Space or Enter to skip a word",
-];
+import { useTranslation } from "@/i18n";
 
 export function MenuScreen() {
   const $game = useTypingGame();
   const $energy = energyLogic();
+  const { t } = useTranslation();
 
   return rx(() => {
     const difficulty = $game.difficulty();
     const energy = $energy.energy();
 
+    // Typing-specific difficulty options (translated)
+    const difficultyOptions: DifficultyOption[] = [
+      {
+        value: "easy",
+        label: t("typingAdventure.difficulty.easy"),
+        description: t("typingAdventure.difficulty.easyDesc"),
+        color: "from-emerald-400 to-green-500",
+      },
+      {
+        value: "medium",
+        label: t("typingAdventure.difficulty.medium"),
+        description: t("typingAdventure.difficulty.mediumDesc"),
+        color: "from-amber-400 to-orange-500",
+      },
+      {
+        value: "hard",
+        label: t("typingAdventure.difficulty.hard"),
+        description: t("typingAdventure.difficulty.hardDesc"),
+        color: "from-red-400 to-rose-500",
+      },
+    ];
+
+    // How to play instructions (translated)
+    const howToPlay = t("typingAdventure.howToPlay", { returnObjects: true }) as string[];
+
     return (
       <GameMenu
-        title="Typing Adventure"
-        description="Practice typing words as fast as you can!"
+        title={t("typingAdventure.title")}
+        description={t("typingAdventure.description")}
         icon="keyboard"
         themeColor="from-primary-500 to-purple-500"
         difficulty={difficulty}
         onDifficultyChange={(d) => $game.setDifficulty(d)}
-        difficultyOptions={DIFFICULTY_OPTIONS}
+        difficultyOptions={difficultyOptions}
         energy={energy}
         energyCost={1}
         onPlay={() => $game.startGame()}
-        howToPlay={HOW_TO_PLAY}
+        howToPlay={howToPlay}
         howToPlayColor="bg-blue-50"
       />
     );

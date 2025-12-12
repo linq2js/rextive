@@ -16,6 +16,7 @@ import { profileFormLogic } from "@/logic/profileForm.logic";
 import { AVATAR_OPTIONS, AVATAR_NAMES, type KidProfile } from "@/domain/types";
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/Icons";
+import { useTranslation } from "@/i18n";
 
 interface ProfileFormModalProps {
   /** Profile to edit (undefined for create mode) */
@@ -27,6 +28,7 @@ interface ProfileFormModalProps {
 export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
   // Initialize form logic with close callback and optional profile for edit mode
   const $form = useScope(profileFormLogic, [onClose, profile]);
+  const { t } = useTranslation();
 
   // Create input-mapped lenses for form fields
   const nameLens = focus.lens($form.state, "name").map(inputValue);
@@ -39,7 +41,7 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
     >
       {/* Header */}
       <h2 className="font-display text-xl font-bold text-gray-800">
-        {$form.isEditing ? "Edit Profile" : "Add Kid Profile"}
+        {$form.isEditing ? t("profile.editProfile") : t("profile.addKidProfile")}
       </h2>
 
       <form
@@ -53,14 +55,14 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
         {rx(() => (
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Name
+              {t("profile.name")}
             </label>
             <input
               type="text"
               value={nameLens[0]()}
               onChange={nameLens[1]}
               className="input"
-              placeholder="Kid's name"
+              placeholder={t("profile.kidsName")}
               required
             />
           </div>
@@ -70,7 +72,7 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
         {rx(() => (
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Age
+              {t("profile.age")}
             </label>
             <input
               type="number"
@@ -90,7 +92,7 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
           return (
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
-                Choose Avatar
+                {t("profile.chooseAvatar")}
               </label>
               <div className="grid grid-cols-5 gap-2 max-h-60 overflow-y-auto p-1 custom-scrollbar">
                 {AVATAR_OPTIONS.map((emoji) => (
@@ -146,8 +148,7 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
                     className="flex-shrink-0 mt-0.5"
                   />
                   <span>
-                    Are you sure? This will delete all progress data for this
-                    profile.
+                    {t("profile.deleteConfirmText")}
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -157,7 +158,7 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
                     disabled={loading}
                     className="btn bg-red-500 text-white hover:bg-red-600 flex-1 py-3 w-full sm:w-auto"
                   >
-                    {loading ? "Deleting..." : "Yes, Delete"}
+                    {loading ? t("profile.deleting") : t("profile.yesDelete")}
                   </button>
                   <button
                     type="button"
@@ -165,7 +166,7 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
                     disabled={loading}
                     className="btn btn-outline flex-1 py-3 w-full sm:w-auto"
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </button>
                 </div>
               </div>
@@ -181,10 +182,10 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
                 className="btn btn-primary flex-1 py-3 w-full sm:w-auto"
               >
                 {loading
-                  ? "Saving..."
+                  ? t("profile.saving")
                   : isEditing
-                    ? "Save Changes"
-                    : "Add Profile"}
+                    ? t("profile.saveChanges")
+                    : t("profile.addProfile")}
               </button>
               <button
                 type="button"
@@ -192,7 +193,7 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
                 disabled={loading}
                 className="btn btn-outline flex-1 py-3 w-full sm:w-auto"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               {isEditing && (
                 <button
@@ -202,7 +203,7 @@ export function ProfileFormModal({ profile, onClose }: ProfileFormModalProps) {
                   className="btn bg-red-100 text-red-600 hover:bg-red-200 py-3 w-full sm:w-auto sm:px-4"
                 >
                   <Icon name="trash" size={18} />
-                  <span className="sm:hidden ml-2">Delete</span>
+                  <span className="sm:hidden ml-2">{t("common.delete")}</span>
                 </button>
               )}
             </div>

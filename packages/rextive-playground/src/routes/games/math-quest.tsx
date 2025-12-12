@@ -20,6 +20,7 @@ import {
   type ThemeOption,
 } from "@/components/GameMenu";
 import { gameTickLogic } from "@/utils";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/games/math-quest")({
   component: MathQuest,
@@ -996,84 +997,58 @@ function XIcon({ className = "w-6 h-6" }: { className?: string }) {
 // Menu Screen
 // =============================================================================
 
-const MATH_DIFFICULTY_OPTIONS: DifficultyOption[] = [
-  {
-    value: "easy",
-    label: "Easy",
-    description: "Numbers 1-10",
-    color: "from-emerald-400 to-green-500",
-  },
-  {
-    value: "medium",
-    label: "Medium",
-    description: "Numbers 1-20",
-    color: "from-amber-400 to-orange-500",
-  },
-  {
-    value: "hard",
-    label: "Hard",
-    description: "Numbers 5-50",
-    color: "from-red-400 to-rose-500",
-  },
-];
-
-const CATEGORY_OPTIONS: ThemeOption[] = Object.entries(CATEGORY_INFO).map(
-  ([key, info]) => ({
-    value: key,
-    label: info.name,
-    color: info.color,
-    icon: MathCategoryIcons[key as keyof typeof MathCategoryIcons],
-  })
-);
-
-const HOW_TO_PLAY: Record<MathCategory, string[]> = {
-  mix: [
-    "Random challenge mode!",
-    "Each problem is a different type",
-    "Quiz, Compare, Fill, Sort & Chain!",
-  ],
-  quiz: [
-    "Solve math problems!",
-    "Tap the correct answer",
-    "Build streaks for bonus points",
-  ],
-  compare: [
-    "Compare two sides!",
-    "Choose < (less), > (greater), or = (equal)",
-    "Think fast!",
-  ],
-  fillBlank: [
-    "Find the missing number!",
-    "Complete the equation",
-    "All operations included",
-  ],
-  sort: [
-    "Arrange numbers in order!",
-    "Tap numbers from smallest to largest (or reverse)",
-    "Clear to retry",
-  ],
-  chain: [
-    "Solve step-by-step!",
-    "Calculate the chain of operations",
-    "Follow order: left to right",
-  ],
-};
-
 function MenuScreen({ $game }: { $game: ReturnType<typeof mathQuestLogic> }) {
+  const { t } = useTranslation();
+
   return rx(() => {
     const difficulty = $game.difficulty();
     const cat = $game.category();
     const energy = $game.energy();
 
+    // Difficulty options (translated)
+    const difficultyOptions: DifficultyOption[] = [
+      {
+        value: "easy",
+        label: t("mathQuest.difficulty.easy"),
+        description: t("mathQuest.difficulty.easyDesc"),
+        color: "from-emerald-400 to-green-500",
+      },
+      {
+        value: "medium",
+        label: t("mathQuest.difficulty.medium"),
+        description: t("mathQuest.difficulty.mediumDesc"),
+        color: "from-amber-400 to-orange-500",
+      },
+      {
+        value: "hard",
+        label: t("mathQuest.difficulty.hard"),
+        description: t("mathQuest.difficulty.hardDesc"),
+        color: "from-red-400 to-rose-500",
+      },
+    ];
+
+    // Category options (translated)
+    const categoryOptions: ThemeOption[] = Object.entries(CATEGORY_INFO).map(
+      ([key, info]) => ({
+        value: key,
+        label: t(`mathQuest.category.${key}`),
+        color: info.color,
+        icon: MathCategoryIcons[key as keyof typeof MathCategoryIcons],
+      })
+    );
+
+    // How to play (translated)
+    const howToPlay = t(`mathQuest.howToPlay.${cat}`, { returnObjects: true }) as string[];
+
     return (
       <GameMenu
-        title="Math Quest"
-        description={CATEGORY_INFO[cat].description}
+        title={t("mathQuest.title")}
+        description={t(`mathQuest.category.${cat}Desc`)}
         icon="math"
         themeColor="from-blue-500 to-cyan-500"
         difficulty={difficulty}
         onDifficultyChange={(d) => $game.setDifficulty(d)}
-        difficultyOptions={MATH_DIFFICULTY_OPTIONS}
+        difficultyOptions={difficultyOptions}
         energy={energy}
         energyCost={1}
         onPlay={async () => {
@@ -1082,18 +1057,18 @@ function MenuScreen({ $game }: { $game: ReturnType<typeof mathQuestLogic> }) {
           if (!started) {
             const $modal = modalLogic();
             await $modal.warning(
-              "No energy left! Come back tomorrow to play again.",
-              "No Energy"
+              t("app.noEnergyMessage"),
+              t("app.noEnergy")
             );
           }
         }}
-        howToPlay={HOW_TO_PLAY[cat]}
+        howToPlay={howToPlay}
         howToPlayColor="bg-blue-100/80"
       >
         {/* Category Selection */}
         <ThemeSelector
-          title="Choose Category"
-          themes={CATEGORY_OPTIONS}
+          title={t("mathQuest.chooseCategory")}
+          themes={categoryOptions}
           selected={cat}
           onChange={(c) => $game.setCategory(c as MathCategory)}
         />
@@ -1111,6 +1086,8 @@ function PlayingScreen({
 }: {
   $game: ReturnType<typeof mathQuestLogic>;
 }) {
+  const { t } = useTranslation();
+
   return rx(() => {
     const problem = $game.currentProblem();
     const difficulty = $game.difficulty();
@@ -1135,11 +1112,11 @@ function PlayingScreen({
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-4">
               <div>
-                <span className="text-gray-500">Score:</span>
+                <span className="text-gray-500">{t("mathQuest.stats.score")}:</span>
                 <span className="ml-1 font-bold text-blue-600">{score}</span>
               </div>
               <div>
-                <span className="text-gray-500">Problem:</span>
+                <span className="text-gray-500">{t("mathQuest.stats.problem")}:</span>
                 <span className="ml-1 font-bold">
                   {problemIndex + 1}/{config.problemCount}
                 </span>
@@ -1565,6 +1542,8 @@ function FinishedScreen({
 }: {
   $game: ReturnType<typeof mathQuestLogic>;
 }) {
+  const { t } = useTranslation();
+
   return rx(() => {
     const score = $game.score();
     const correctCount = $game.correctCount();
@@ -1602,13 +1581,13 @@ function FinishedScreen({
           <h2 className="font-display text-2xl font-bold text-gray-800 mt-4">
             {completed
               ? accuracy >= 80
-                ? "Great Job!"
-                : "Well Done!"
-              : "Time's Up!"}
+                ? t("typingAdventure.greatJob")
+                : t("typingAdventure.wellDone")
+              : t("typingAdventure.timesUp")}
           </h2>
 
           <div className="mt-2 text-sm text-gray-500">
-            {CATEGORY_INFO[category].name} Mode
+            {t(`mathQuest.category.${category}`)} Mode
           </div>
 
           <div className="mt-4 flex justify-center gap-2">
@@ -1629,26 +1608,26 @@ function FinishedScreen({
 
           <div className="mt-6 grid grid-cols-2 gap-4 text-left">
             <StatItem
-              label="Correct"
+              label={t("mathQuest.stats.correct")}
               value={`${correctCount}/${config.problemCount}`}
             />
-            <StatItem label="Accuracy" value={`${accuracy}%`} />
+            <StatItem label={t("typingAdventure.accuracy")} value={`${accuracy}%`} />
             <StatItem
-              label="Best Streak"
+              label={t("mathQuest.stats.bestStreak")}
               value={bestStreak}
               icon={<FireIcon />}
             />
-            <StatItem label="Wrong" value={wrongCount} />
+            <StatItem label={t("mathQuest.stats.wrong")} value={wrongCount} />
           </div>
 
           <div className="mt-6 p-4 bg-amber-50 rounded-xl">
-            <div className="text-sm text-amber-700">XP Earned</div>
+            <div className="text-sm text-amber-700">{t("mathQuest.stats.xpEarned")}</div>
             <div className="text-2xl font-bold text-amber-600">
               +{totalXP} XP
             </div>
             {timeBonus > 0 && (
               <div className="text-xs text-amber-600">
-                (includes +{timeBonus} time bonus)
+                {t("mathQuest.stats.timeBonus", { bonus: timeBonus })}
               </div>
             )}
           </div>
@@ -1662,8 +1641,8 @@ function FinishedScreen({
               if (!started) {
                 const $modal = modalLogic();
                 await $modal.warning(
-                  "No energy left! Come back tomorrow to play again.",
-                  "No Energy"
+                  t("app.noEnergyMessage"),
+                  t("app.noEnergy")
                 );
               }
             }}
@@ -1676,10 +1655,10 @@ function FinishedScreen({
           >
             {$game.energy() > 0 ? (
               <span className="flex items-center justify-center gap-2">
-                Play Again <EnergyIcon /> 1
+                {t("common.play")} <EnergyIcon /> 1
               </span>
             ) : (
-              "No Energy Left"
+              t("typingAdventure.noEnergyLeft")
             )}
           </button>
           <Link
@@ -1687,7 +1666,7 @@ function FinishedScreen({
             viewTransition
             className="btn bg-gray-200 text-gray-700 py-3 text-center hover:bg-gray-300"
           >
-            Back to Dashboard
+            {t("typingAdventure.backToDashboard")}
           </Link>
         </div>
       </div>

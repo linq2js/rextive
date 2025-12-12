@@ -12,15 +12,17 @@ import { parentAuthLogic, kidProfilesLogic } from "@/logic";
 import { setupPasswordFormLogic } from "@/logic/setupPasswordForm.logic";
 import { loginFormLogic } from "@/logic/loginForm.logic";
 import { Icon } from "@/components/Icons";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/mode/parent")({
   component: ParentLayout,
 });
 
 function LoadingSpinner() {
+  const { t } = useTranslation();
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <div className="text-2xl">Loading...</div>
+      <div className="text-2xl">{t("parent.loading")}</div>
     </div>
   );
 }
@@ -62,6 +64,7 @@ function ParentLayout() {
 
 function SetupPassword() {
   const $form = useScope(setupPasswordFormLogic);
+  const { t } = useTranslation();
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -70,10 +73,10 @@ function SetupPassword() {
           ←
         </Link>
         <h1 className="font-display text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
-          <Icon name="lock" size={24} /> Set Up Parent Access
+          <Icon name="lock" size={24} /> {t("parent.setUpParentAccess")}
         </h1>
         <p className="mt-2 text-gray-600">
-          Create a password to protect parent settings.
+          {t("parent.createPasswordDescription")}
         </p>
 
         <form
@@ -90,14 +93,14 @@ function SetupPassword() {
             return (
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Password
+                  {t("parent.password")}
                 </label>
                 <input
                   type="password"
                   value={get()}
                   onChange={set}
                   className="input"
-                  placeholder="Enter password"
+                  placeholder={t("parent.enterPassword")}
                   autoComplete="new-password"
                 />
               </div>
@@ -111,14 +114,14 @@ function SetupPassword() {
             return (
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Confirm Password
+                  {t("parent.confirmPassword")}
                 </label>
                 <input
                   type="password"
                   value={get()}
                   onChange={set}
                   className="input"
-                  placeholder="Confirm password"
+                  placeholder={t("parent.confirmPassword")}
                   autoComplete="new-password"
                 />
               </div>
@@ -138,7 +141,7 @@ function SetupPassword() {
               disabled={$form.state().loading}
               className="btn btn-primary w-full py-3"
             >
-              {$form.state().loading ? "Setting up..." : "Set Password"}
+              {$form.state().loading ? t("parent.settingUp") : t("parent.setPassword")}
             </button>
           ))}
         </form>
@@ -153,6 +156,7 @@ function SetupPassword() {
 
 function LoginScreen() {
   const $form = useScope(loginFormLogic);
+  const { t } = useTranslation();
 
   // Create input-mapped lens for password field
   const passwordLens = focus.lens($form.state, "password").map(inputValue);
@@ -164,9 +168,9 @@ function LoginScreen() {
           ←
         </Link>
         <h1 className="font-display text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
-          <Icon name="lock" size={24} /> Parent Access
+          <Icon name="lock" size={24} /> {t("parent.parentAccess")}
         </h1>
-        <p className="mt-2 text-gray-600">Enter your password to continue.</p>
+        <p className="mt-2 text-gray-600">{t("parent.enterPasswordToContinue")}</p>
 
         <form
           onSubmit={(e) => {
@@ -178,14 +182,14 @@ function LoginScreen() {
           {rx(() => (
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                Password
+                {t("parent.password")}
               </label>
               <input
                 type="password"
                 value={passwordLens[0]()}
                 onChange={passwordLens[1]}
                 className="input"
-                placeholder="Enter password"
+                placeholder={t("parent.enterPassword")}
                 autoComplete="current-password"
               />
             </div>
@@ -204,7 +208,7 @@ function LoginScreen() {
               disabled={$form.getLoading()}
               className="btn btn-primary w-full py-3"
             >
-              {$form.getLoading() ? "Verifying..." : "Enter"}
+              {$form.getLoading() ? t("parent.verifying") : t("parent.enter")}
             </button>
           ))}
         </form>
@@ -221,6 +225,7 @@ function ParentDashboardLayout() {
   const $auth = parentAuthLogic();
   const $profiles = kidProfilesLogic();
   const location = useLocation();
+  const { t } = useTranslation();
 
   // Determine active tab from URL
   const pathname = location.pathname;
@@ -251,25 +256,21 @@ function ParentDashboardLayout() {
                   <Link
                     to="/"
                     viewTransition
-                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+                    className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+                    title={t("parent.home")}
                   >
                     <span className="text-xl">←</span>
-                    <span className="text-sm font-medium hidden sm:inline">
-                      Home
-                    </span>
                   </Link>
 
                   <h1 className="font-display text-lg font-bold text-gray-800 flex items-center gap-2">
-                    <Icon name="settings" size={20} /> Parent Dashboard
+                    <Icon name="settings" size={20} /> {t("parent.title")}
                   </h1>
 
                   <button
                     onClick={() => $auth.logout()}
-                    className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors"
+                    className="flex items-center text-gray-600 hover:text-red-600 transition-colors"
+                    title={t("parent.logout")}
                   >
-                    <span className="text-sm font-medium hidden sm:inline">
-                      Logout
-                    </span>
                     <Icon name="power" size={20} />
                   </button>
                 </div>
@@ -284,25 +285,25 @@ function ParentDashboardLayout() {
                     to="/mode/parent"
                     active={activeTab === "kids"}
                     icon="baby"
-                    label="Kids"
+                    label={t("parent.kids")}
                   />
                   <TabLink
                     to="/mode/parent/sync"
                     active={activeTab === "sync"}
                     icon="refresh"
-                    label="Sync"
+                    label={t("parent.sync")}
                   />
                   <TabLink
                     to="/mode/parent/data"
                     active={activeTab === "data"}
                     icon="download"
-                    label="Backup"
+                    label={t("parent.backup")}
                   />
                   <TabLink
                     to="/mode/parent/settings"
                     active={activeTab === "settings"}
                     icon="settings"
-                    label="Settings"
+                    label={t("parent.settings")}
                   />
                 </div>
               </div>

@@ -1,7 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { signal } from "rextive";
 import { rx, useScope } from "rextive/react";
-import { selectedProfileLogic, energyLogic, kidProfilesLogic } from "@/logic";
+import {
+  selectedProfileLogic,
+  energyLogic,
+  kidProfilesLogic,
+  guards,
+} from "@/logic";
 import {
   AVAILABLE_GAMES,
   isGameUnlocked,
@@ -11,8 +16,11 @@ import { Suspense, useState } from "react";
 import { Icon, type IconName } from "@/components/Icons";
 import { gameProgressRepository } from "@/infrastructure/repositories";
 import { playClickSound } from "@/hooks/useSound";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/dashboard/")({
+  // Require profile to access dashboard - redirects to "/" if no profile
+  beforeLoad: guards.requireProfile(),
   component: Dashboard,
 });
 
@@ -365,6 +373,7 @@ function LoadingSpinner() {
 function Dashboard() {
   const navigate = useNavigate();
   const $dash = useScope(dashboardLogic);
+  const { t } = useTranslation();
 
   return (
     <Suspense fallback={<LoadingSpinner />}>
@@ -395,7 +404,9 @@ function Dashboard() {
                     className="flex items-center gap-1 text-gray-600 hover:text-gray-900 transition-colors"
                   >
                     <Icon name="back" size={20} />
-                    <span className="text-sm font-medium">Switch</span>
+                    <span className="text-sm font-medium">
+                      {t("dashboard.switch")}
+                    </span>
                   </button>
 
                   {/* Energy & Stats */}
@@ -430,18 +441,22 @@ function Dashboard() {
               {/* Welcome & Progress Banner */}
               <div className="card bg-gradient-to-r from-primary-500 via-purple-500 to-pink-500 text-white">
                 <h1 className="font-display text-2xl font-bold flex items-center gap-2">
-                  Welcome back, {profile.name}!{" "}
+                  {t("dashboard.welcomeBack", { name: profile.name })}{" "}
                   <Icon name="star" size={24} className="text-amber-300" />
                 </h1>
                 <p className="mt-1 text-white/80">
-                  You're on a {stats.currentStreak} day streak! Keep it up!
+                  {t("dashboard.dayStreak", { count: stats.currentStreak })}
                 </p>
 
                 {/* Level Progress */}
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-sm">
-                    <span>Level {stats.level}</span>
-                    <span>Level {stats.level + 1}</span>
+                    <span>
+                      {t("dashboard.level")} {stats.level}
+                    </span>
+                    <span>
+                      {t("dashboard.level")} {stats.level + 1}
+                    </span>
                   </div>
                   <div className="mt-1 h-3 rounded-full bg-white/30 overflow-hidden">
                     <div
@@ -450,7 +465,9 @@ function Dashboard() {
                     />
                   </div>
                   <div className="mt-1 text-center text-sm text-white/80">
-                    {stats.xpToNextLevel - stats.xp} XP to next level
+                    {t("dashboard.xpToNextLevel", {
+                      xp: stats.xpToNextLevel - stats.xp,
+                    })}
                   </div>
                 </div>
 
@@ -466,7 +483,7 @@ function Dashboard() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="font-display font-semibold text-sm">
-                          Next: {nextLockedGame.name}
+                          {t("dashboard.next", { name: nextLockedGame.name })}
                         </span>
                         <span className="text-xs text-white/80">
                           {unlockedCount}/{games.length}
@@ -482,8 +499,10 @@ function Dashboard() {
                       </div>
                       <div className="mt-0.5 text-xs text-white/80">
                         {xpToUnlock > 0
-                          ? `${xpToUnlock.toLocaleString()} XP to unlock`
-                          : "Unlocked!"}
+                          ? t("dashboard.xpToUnlock", {
+                              xp: xpToUnlock.toLocaleString(),
+                            })
+                          : t("dashboard.unlocked")}
                       </div>
                     </div>
                   </div>
@@ -494,10 +513,12 @@ function Dashboard() {
                     </div>
                     <div className="flex-1">
                       <div className="font-display font-semibold text-sm">
-                        All Games Unlocked!
+                        {t("dashboard.allGamesUnlocked")}
                       </div>
                       <div className="text-xs text-white/80">
-                        You've unlocked all {games.length} games!
+                        {t("dashboard.unlockedAllGames", {
+                          count: games.length,
+                        })}
                       </div>
                     </div>
                   </div>
@@ -510,25 +531,25 @@ function Dashboard() {
                   <span className="text-primary-500">
                     <Icon name="controller" size={24} />
                   </span>
-                  Today's Progress
+                  {t("dashboard.todaysProgress")}
                 </h2>
                 <div className="grid grid-cols-3 gap-3">
                   <ProgressCard
                     icon="controller"
                     value={stats.todayGames}
-                    label="Games"
+                    label={t("dashboard.games")}
                     target={5}
                   />
                   <ProgressCard
                     icon="star"
                     value={stats.todayScore}
-                    label="Score"
+                    label={t("dashboard.score")}
                     target={1000}
                   />
                   <ProgressCard
                     icon="clock"
                     value={stats.todayMinutes}
-                    label="Minutes"
+                    label={t("dashboard.minutes")}
                     target={30}
                   />
                 </div>
@@ -540,7 +561,7 @@ function Dashboard() {
                   <span className="text-primary-500">
                     <Icon name="controller" size={24} />
                   </span>
-                  Games
+                  {t("dashboard.games")}
                 </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {games.map((game) => (
@@ -572,6 +593,7 @@ function ProgressCard({
   label: string;
   target: number;
 }) {
+  const { t } = useTranslation();
   const percent = Math.min(100, Math.round((value / target) * 100));
   const isComplete = value >= target;
 
@@ -597,7 +619,7 @@ function ProgressCard({
       <div className="mt-1 text-xs text-gray-400 flex items-center justify-center gap-1">
         {isComplete ? (
           <>
-            <Icon name="check" size={12} /> Complete!
+            <Icon name="check" size={12} /> {t("dashboard.complete")}
           </>
         ) : (
           `${value}/${target}`
@@ -616,6 +638,11 @@ function GameCard({
   energy: number;
   totalXp: number;
 }) {
+  const { t } = useTranslation();
+  // Available game (unlocked + implemented + has energy)
+  const navigate = useNavigate();
+  const [isLaunching, setIsLaunching] = useState(false);
+
   // Check if user has enough energy for this game (free games always playable)
   const hasEnoughEnergy = game.energyCost === 0 || energy >= game.energyCost;
 
@@ -627,7 +654,7 @@ function GameCard({
         className={`card relative flex flex-col items-center p-4 ${game.color} opacity-60`}
       >
         <div className="absolute -top-2 -right-2 rounded-full bg-gray-500 px-2 py-0.5 text-xs font-bold text-white flex items-center gap-1">
-          <Icon name="lock" size={10} /> Locked
+          <Icon name="lock" size={10} /> {t("dashboard.locked")}
         </div>
         <span className={`text-4xl ${game.textColor} opacity-50`}>
           <Icon name={game.icon} size={48} />
@@ -638,7 +665,7 @@ function GameCard({
           {game.name}
         </h3>
         <p className="text-xs text-gray-500 text-center">
-          {xpNeeded.toLocaleString()} XP to unlock
+          {t("dashboard.xpToUnlock", { xp: xpNeeded.toLocaleString() })}
         </p>
         <div className="mt-2 w-full h-1.5 rounded-full bg-white/50 overflow-hidden">
           <div
@@ -659,7 +686,7 @@ function GameCard({
         className={`card relative flex flex-col items-center p-4 ${game.color} opacity-80`}
       >
         <div className="absolute -top-2 -right-2 rounded-full bg-purple-500 px-2 py-0.5 text-xs font-bold text-white">
-          Soon
+          {t("dashboard.soon")}
         </div>
         <span className={`text-4xl ${game.textColor} opacity-50`}>
           <Icon name={game.icon} size={48} />
@@ -669,9 +696,11 @@ function GameCard({
         >
           {game.name}
         </h3>
-        <p className="text-xs text-gray-500 text-center">Coming soon!</p>
+        <p className="text-xs text-gray-500 text-center">
+          {t("dashboard.comingSoon")}
+        </p>
         <div className="mt-2 text-xs font-medium text-green-600 flex items-center gap-1">
-          <Icon name="check" size={12} /> Unlocked!
+          <Icon name="check" size={12} /> {t("dashboard.unlocked")}
         </div>
       </div>
     );
@@ -696,15 +725,11 @@ function GameCard({
           {game.name}
         </h3>
         <p className="text-xs text-gray-500 text-center">
-          Need {game.energyCost} energy
+          {t("dashboard.needEnergy", { cost: game.energyCost })}
         </p>
       </div>
     );
   }
-
-  // Available game (unlocked + implemented + has energy)
-  const navigate = useNavigate();
-  const [isLaunching, setIsLaunching] = useState(false);
 
   const handleGameLaunch = () => {
     if (isLaunching) return;
@@ -752,7 +777,7 @@ function GameCard({
       <div
         className={`mt-2 text-xs font-medium ${game.textColor} flex items-center gap-1`}
       >
-        {isLaunching ? "Loading..." : "Play Now"}{" "}
+        {isLaunching ? t("dashboard.loading") : t("dashboard.playNow")}{" "}
         <Icon name="controller" size={12} />
       </div>
     </button>

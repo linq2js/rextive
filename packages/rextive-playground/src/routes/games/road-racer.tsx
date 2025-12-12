@@ -17,6 +17,7 @@ import {
   backgroundMusic,
   playClickSound,
 } from "@/hooks/useSound";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/games/road-racer")({
   component: RoadRacer,
@@ -95,27 +96,7 @@ const DIFFICULTY_CONFIG: Record<Difficulty, DifficultySettings> = {
   },
 };
 
-// Difficulty options for the GameMenu component
-const ROAD_RACER_DIFFICULTY_OPTIONS: DifficultyOption[] = [
-  {
-    value: "easy",
-    label: "Easy",
-    description: "5 lives, slower traffic",
-    color: "from-emerald-400 to-green-500",
-  },
-  {
-    value: "medium",
-    label: "Medium",
-    description: "3 lives, 1.5× score",
-    color: "from-amber-400 to-orange-500",
-  },
-  {
-    value: "hard",
-    label: "Hard",
-    description: "2 lives, 2× score",
-    color: "from-red-400 to-rose-500",
-  },
-];
+// Difficulty options will be created dynamically with translations
 
 // Obstacle car colors (CSS classes)
 const OBSTACLE_COLORS = [
@@ -814,6 +795,7 @@ function getStarRating(score: number): number {
 function RoadRacer() {
   const navigate = useNavigate();
   const $game = useScope(roadRacerLogic);
+  const { t } = useTranslation();
 
   // Handle back button with confirmation during gameplay
   const handleBack = async () => {
@@ -1184,42 +1166,62 @@ function RoadRacer() {
           )}
 
           {/* Game Menu - shown in menu state */}
-          {gameState.status === "menu" && (
-            <GameMenu
-              title="Road Racer"
-              description="Dodge traffic and collect coins! Use arrow keys or tap to move."
-              icon="car"
-              themeColor="from-emerald-500 to-teal-500"
-              difficulty={gameState.difficulty}
-              onDifficultyChange={$game.setDifficulty}
-              difficultyOptions={ROAD_RACER_DIFFICULTY_OPTIONS}
-              energy={energy}
-              energyCost={2}
-              onPlay={async () => {
-                playClickSound();
-                const started = await $game.startGame();
-                if (!started) {
-                  const $modal = modalLogic();
-                  if ($game.energy() < 2) {
-                    await $modal.warning(
-                      "Not enough energy! Come back tomorrow to play again.",
-                      "No Energy"
-                    );
-                  } else {
-                    await $modal.error(
-                      "Could not start game. Please try again."
-                    );
+          {gameState.status === "menu" && (() => {
+            const difficultyOptions: DifficultyOption[] = [
+              {
+                value: "easy",
+                label: t("roadRacer.difficulty.easy"),
+                description: t("roadRacer.difficulty.easyDesc"),
+                color: "from-emerald-400 to-green-500",
+              },
+              {
+                value: "medium",
+                label: t("roadRacer.difficulty.medium"),
+                description: t("roadRacer.difficulty.mediumDesc"),
+                color: "from-amber-400 to-orange-500",
+              },
+              {
+                value: "hard",
+                label: t("roadRacer.difficulty.hard"),
+                description: t("roadRacer.difficulty.hardDesc"),
+                color: "from-red-400 to-rose-500",
+              },
+            ];
+
+            const howToPlay = t("roadRacer.howToPlay", { returnObjects: true }) as string[];
+
+            return (
+              <GameMenu
+                title={t("roadRacer.title")}
+                description={t("roadRacer.description")}
+                icon="car"
+                themeColor="from-emerald-500 to-teal-500"
+                difficulty={gameState.difficulty}
+                onDifficultyChange={$game.setDifficulty}
+                difficultyOptions={difficultyOptions}
+                energy={energy}
+                energyCost={2}
+                onPlay={async () => {
+                  playClickSound();
+                  const started = await $game.startGame();
+                  if (!started) {
+                    const $modal = modalLogic();
+                    if ($game.energy() < 2) {
+                      await $modal.warning(
+                        t("app.noEnergyMessage"),
+                        t("app.noEnergy")
+                      );
+                    } else {
+                      await $modal.error(
+                        t("common.error")
+                      );
+                    }
                   }
-                }
-              }}
-              howToPlay={[
-                "Use arrow keys or tap sides to move",
-                "Collect coins for +10 points",
-                "Avoid cars! Collision = -20 points",
-                "Lives depend on difficulty",
-              ]}
-            />
-          )}
+                }}
+                howToPlay={howToPlay}
+              />
+            );
+          })()}
         </div>
 
         {/* CSS for animations */}

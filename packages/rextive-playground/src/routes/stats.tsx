@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Icon, type IconName } from "@/components/Icons";
 import { gameProgressRepository } from "@/infrastructure/repositories";
+import { useTranslation } from "@/i18n";
 
 export const Route = createFileRoute("/stats")({
   component: StatsPage,
@@ -168,6 +169,28 @@ function statsPageLogic() {
 
 function StatsPage() {
   const $page = useScope(statsPageLogic);
+  const { t } = useTranslation();
+
+  // Helper to translate achievement names/descriptions
+  const translateAchievement = (achievement: Achievement) => {
+    const keyMap: Record<string, { name: string; desc: string }> = {
+      "first-game": { name: "achievements.firstSteps", desc: "achievements.firstStepsDesc" },
+      "unlock-2": { name: "achievements.gameCollector", desc: "achievements.gameCollectorDesc" },
+      "unlock-all": { name: "achievements.masterUnlocker", desc: "achievements.masterUnlockerDesc" },
+      "streak-3": { name: "achievements.onFire", desc: "achievements.onFireDesc" },
+      "streak-7": { name: "achievements.weekWarrior", desc: "achievements.weekWarriorDesc" },
+      "score-1000": { name: "achievements.highScorer", desc: "achievements.highScorerDesc" },
+      "level-5": { name: "achievements.risingStar", desc: "achievements.risingStarDesc" },
+      "all-games": { name: "achievements.explorer", desc: "achievements.explorerDesc" },
+    };
+    const keys = keyMap[achievement.id];
+    if (!keys) return achievement;
+    return {
+      ...achievement,
+      name: t(keys.name),
+      description: t(keys.desc),
+    };
+  };
 
   return (
     <Suspense fallback={<LoadingSpinner />}>
@@ -193,10 +216,10 @@ function StatsPage() {
                     className="flex items-center gap-1 text-gray-600 hover:text-gray-900 transition-colors"
                   >
                     <Icon name="back" size={20} />
-                    <span className="text-sm font-medium">Back</span>
+                    <span className="text-sm font-medium">{t("common.back")}</span>
                   </Link>
                   <h1 className="font-display font-bold text-gray-800">
-                    Stats & Achievements
+                    {t("stats.title")}
                   </h1>
                   <div className="w-16" /> {/* Spacer for centering */}
                 </div>
@@ -215,7 +238,7 @@ function StatsPage() {
                       {profile.name}
                     </h2>
                     <p className="text-white/80">
-                      Level {stats.level} • {avatarName}
+                      {t("stats.level", { level: stats.level })} • {avatarName}
                     </p>
                   </div>
                 </div>
@@ -227,30 +250,30 @@ function StatsPage() {
                   <span className="text-amber-500">
                     <Icon name="chart" size={24} />
                   </span>
-                  Your Stats
+                  {t("stats.yourStats")}
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
                   <StatCard
                     icon="controller"
                     value={stats.totalGames}
-                    label="Total Games"
+                    label={t("stats.totalGames")}
                   />
                   <StatCard
                     icon="star"
                     value={stats.totalScore.toLocaleString()}
-                    label="Total Score"
+                    label={t("stats.totalScore")}
                   />
                   <StatCard
                     icon="fire"
                     value={stats.currentStreak}
-                    label="Current Streak"
-                    suffix=" days"
+                    label={t("stats.currentStreak")}
+                    suffix={` ${t("stats.days")}`}
                   />
                   <StatCard
                     icon="trophy"
                     value={stats.bestStreak}
-                    label="Best Streak"
-                    suffix=" days"
+                    label={t("stats.bestStreak")}
+                    suffix={` ${t("stats.days")}`}
                   />
                 </div>
               </section>
@@ -258,11 +281,11 @@ function StatsPage() {
               {/* Level Progress */}
               <section className="card">
                 <h3 className="font-display font-semibold text-gray-700 mb-3">
-                  Level Progress
+                  {t("stats.levelProgress")}
                 </h3>
                 <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
-                  <span>Level {stats.level}</span>
-                  <span>Level {stats.level + 1}</span>
+                  <span>{t("stats.level", { level: stats.level })}</span>
+                  <span>{t("stats.level", { level: stats.level + 1 })}</span>
                 </div>
                 <div className="h-4 rounded-full bg-gray-100 overflow-hidden">
                   <div
@@ -273,7 +296,7 @@ function StatsPage() {
                   />
                 </div>
                 <p className="text-center text-sm text-gray-500 mt-2">
-                  {stats.xpToNextLevel - stats.xp} XP to next level
+                  {t("stats.xpToNextLevel", { xp: stats.xpToNextLevel - stats.xp })}
                 </p>
               </section>
 
@@ -283,7 +306,7 @@ function StatsPage() {
                   <span className="text-amber-500">
                     <Icon name="trophy" size={24} />
                   </span>
-                  Achievements
+                  {t("stats.achievements")}
                   <span className="text-sm font-normal text-gray-500">
                     ({unlockedCount}/{stats.achievements.length})
                   </span>
@@ -292,7 +315,7 @@ function StatsPage() {
                   {stats.achievements.map((achievement) => (
                     <AchievementCard
                       key={achievement.id}
-                      achievement={achievement}
+                      achievement={translateAchievement(achievement)}
                     />
                   ))}
                 </div>
