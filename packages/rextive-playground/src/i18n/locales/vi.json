@@ -5,6 +5,7 @@
     "start": "Bắt đầu",
     "continue": "Tiếp tục",
     "retry": "Thử lại",
+    "quit": "Thoát",
     "menu": "Menu",
     "settings": "Cài đặt",
     "close": "Đóng",
@@ -70,7 +71,12 @@
     "chooseDifficulty": "Chọn Độ Khó",
     "howToPlay": "Cách Chơi",
     "energyCost": "Chi phí Năng lượng",
-    "energyRequired": "Cần {{cost}} Năng lượng"
+    "energyRequired": "Cần {{cost}} Năng lượng",
+    "difficulty": {
+      "easy": "Dễ",
+      "medium": "Trung bình",
+      "hard": "Khó"
+    }
   },
   "typingAdventure": {
     "title": "Cuộc Phiêu Lưu Đánh Máy",
@@ -296,6 +302,38 @@
       "lives": "Mạng",
       "distance": "Khoảng cách"
     }
+  },
+  "puzzle": {
+    "title": "Puzzle Time",
+    "description": "Kéo các hình để sắp xếp đúng thứ tự!",
+    "difficulty": {
+      "easy": "Dễ",
+      "medium": "Trung bình",
+      "hard": "Khó",
+      "easyDesc": "4 hình, 2 phút",
+      "mediumDesc": "6 hình, 3 phút",
+      "hardDesc": "8 hình, 4 phút"
+    },
+    "howToPlay1": "Xem thứ tự mục tiêu ở phía trên",
+    "howToPlay2": "Kéo các hình để khớp theo thứ tự A-Z",
+    "howToPlay3": "Tạo chuỗi để nhận điểm thưởng!",
+    "howToPlay4": "Hoàn thành câu đố trước khi hết giờ",
+    "timeLeft": "Thời gian",
+    "score": "Điểm",
+    "moves": "Lượt",
+    "matches": "Khớp",
+    "streak": "Chuỗi {{count}}",
+    "targetOrder": "Khớp Theo Thứ Tự (A-Z)",
+    "dragToMatch": "Kéo Để Khớp",
+    "quitConfirm": "Bạn có chắc muốn thoát? Tiến trình sẽ bị mất!",
+    "quitTitle": "Rời khỏi trò chơi?",
+    "finished": "Hoàn thành!",
+    "greatJob": "Làm tốt lắm!",
+    "finalScore": "Điểm cuối",
+    "totalMoves": "Tổng lượt",
+    "bestStreak": "Chuỗi tốt nhất",
+    "rating": "Đánh giá",
+    "playAgain": "Chơi lại"
   },
   "typingAdventure": {
     "title": "Cuộc Phiêu Lưu Đánh Máy",

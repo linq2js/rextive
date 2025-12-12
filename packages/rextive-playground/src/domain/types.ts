@@ -72,7 +72,7 @@ export const AVAILABLE_GAMES: GameConfig[] = [
   { id: "memory-match", name: "Memory Match", icon: "brain", xpRequired: 500, implemented: true },
   { id: "road-racer", name: "Road Racer", icon: "car", xpRequired: 1500, implemented: true },
   { id: "word-builder", name: "Word Builder", icon: "pencil", xpRequired: 3000, implemented: false },
-  { id: "puzzle-time", name: "Puzzle Time", icon: "puzzle", xpRequired: 5000, implemented: false },
+  { id: "puzzle-time", name: "Puzzle Time", icon: "puzzle", xpRequired: 5000, implemented: true },
   { id: "color-fun", name: "Color Fun", icon: "palette", xpRequired: 8000, implemented: false },
 ];
 

@@ -5,6 +5,7 @@
     "start": "Start",
     "continue": "Continue",
     "retry": "Retry",
+    "quit": "Quit",
     "menu": "Menu",
     "settings": "Settings",
     "close": "Close",
@@ -57,7 +58,9 @@
     "complete": "Complete!",
     "soon": "Soon",
     "comingSoon": "Coming soon!",
-    "needEnergy": "Need {{cost}} energy"
+    "needEnergy": "Need {{cost}} energy",
+    "playNow": "Play Now",
+    "loading": "Loading..."
   },
   "games": {
     "title": "Games",
@@ -68,7 +71,12 @@
     "chooseDifficulty": "Choose Difficulty",
     "howToPlay": "How to Play",
     "energyCost": "Energy Cost",
-    "energyRequired": "{{cost}} Energy Required"
+    "energyRequired": "{{cost}} Energy Required",
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    }
   },
   "typingAdventure": {
     "title": "Typing Adventure",
@@ -294,6 +302,38 @@
       "lives": "Lives",
       "distance": "Distance"
     }
+  },
+  "puzzle": {
+    "title": "Puzzle Time",
+    "description": "Drag shapes to match the correct order!",
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard",
+      "easyDesc": "4 shapes, 2 min",
+      "mediumDesc": "6 shapes, 3 min",
+      "hardDesc": "8 shapes, 4 min"
+    },
+    "howToPlay1": "Look at the target order shown at the top",
+    "howToPlay2": "Drag shapes to match the target order (A-Z)",
+    "howToPlay3": "Build streaks for bonus points!",
+    "howToPlay4": "Complete puzzles before time runs out",
+    "timeLeft": "Time",
+    "score": "Score",
+    "moves": "Moves",
+    "matches": "Matches",
+    "streak": "{{count}} streak",
+    "targetOrder": "Match This Order (A-Z)",
+    "dragToMatch": "Drag to Match",
+    "quitConfirm": "Are you sure you want to quit? Your progress will be lost!",
+    "quitTitle": "Leave Game?",
+    "finished": "Finished!",
+    "greatJob": "Great Job!",
+    "finalScore": "Final Score",
+    "totalMoves": "Total Moves",
+    "bestStreak": "Best Streak",
+    "rating": "Rating",
+    "playAgain": "Play Again"
   },
   "typingAdventure": {
     "title": "Typing Adventure",
