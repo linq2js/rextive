@@ -6,8 +6,6 @@ import { signal } from "../signal";
 import { withHooks } from "../hooks";
 import { emitter } from "../utils/emitter";
 
-const NO_KEY = Symbol("no-key");
-
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
@@ -102,30 +100,15 @@ export function __clearCache() {
 // ============================================================================
 
 /**
- * useScope - Create a cached scope with automatic lifecycle management.
+ * useScope - Create a scoped state with automatic lifecycle management.
  *
- * Provides two modes for different use cases:
- *
- * ## 🔒 Local Mode (Recommended for most cases)
- *
- * Each component instance gets its **own private scope**.
- * Use when state belongs exclusively to a single component.
+ * Each component instance gets its **own private scope**. Signals are
+ * automatically disposed when the component unmounts.
  *
  * ```tsx
  * useScope(factory)              // No deps
  * useScope(factory, [deps])      // With deps (passed to factory)
  * useScope(factory, [deps], options)
- * ```
- *
- * ## 🔗 Shared Mode
- *
- * Multiple components **share the same scope** via a key.
- * Use when multiple components need to access the same state.
- *
- * ```tsx
- * useScope(key, factory)              // No deps
- * useScope(key, factory, [deps])      // With deps
- * useScope(key, factory, [deps], options)
  * ```
  *
  * ## Key Features
@@ -145,7 +128,7 @@ export function __clearCache() {
  *
  * ---
  *
- * @example Local mode - Basic (most common)
+ * @example Basic (most common)
  * ```tsx
  * function SearchBar() {
  *   const { input, results } = useScope(() => ({
@@ -157,7 +140,7 @@ export function __clearCache() {
  * }
  * ```
  *
- * @example Local mode - With deps
+ * @example With deps
  * ```tsx
  * function UserProfile({ userId }: { userId: string }) {
  *   // Recreates scope when userId changes
@@ -169,46 +152,11 @@ export function __clearCache() {
  * }
  * ```
  *
- * @example Local mode - With Logic
+ * @example With Logic
  * ```tsx
  * function Counter() {
  *   const { count, increment } = useScope(counterLogic);
  *   return <button onClick={increment}>{rx(count)}</button>;
- * }
- * ```
- *
- * @example Shared mode - Multiple components share state
- * ```tsx
- * // Both SearchBar instances share the same scope
- * function Header() {
- *   return (
- *     <>
- *       <SearchBar />
- *       <MobileSearchBar />
- *     </>
- *   );
- * }
- *
- * function SearchBar() {
- *   const { input } = useScope("searchBar", searchBarLogic);
- *   return <input value={rx(input)} />;
- * }
- *
- * function MobileSearchBar() {
- *   const { input } = useScope("searchBar", searchBarLogic);
- *   return <input value={rx(input)} />;  // Same state as SearchBar!
- * }
- * ```
- *
- * @example Shared mode - Dynamic keys for multiple instances
- * ```tsx
- * function Tab({ tabId }: { tabId: string }) {
- *   // Each unique tabId gets its own scope
- *   const scope = useScope(`tab:${tabId}`, () => ({
- *     content: signal(""),
- *   }));
- *
- *   return <div>{rx(scope.content)}</div>;
  * }
  * ```
  *
@@ -221,47 +169,12 @@ export function __clearCache() {
  * useScope((obj) => ({ ... }), [obj], (a, b) => a.id === b.id);
  * ```
  *
- * @example Component Effects - Logic communicates with component
- * ```ts
- * // Logic exposes component effects
- * const gameLogic = () => {
- *   const gameState = signal("menu");
- *
- *   // Component effect for DOM concerns
- *   const onStateChange = (listener) => {
- *     listener(gameState()); // Immediate call
- *     return { dispose: gameState.on(() => listener(gameState())) };
- *   };
- *
- *   return { gameState, onStateChange };
- * };
- *
- * // Component binds effect with callback
- * function Game() {
- *   const $game = useScope(gameLogic);
- *   const inputRef = useRef(null);
- *
- *   // Bind component effect - auto-cleanup on unmount
- *   useScope($game.onStateChange, [(state) => {
- *     if (state === "playing") inputRef.current?.focus();
- *   }]);
- *
- *   return createElement("input", { ref: inputRef });
- * }
- * ```
- *
  * @example Multiple Scopes - Create multiple scopes at once
  * ```ts
  * // Returns tuple of scope values
  * const [counter, form] = useScope([
  *   scope(counterLogic),
  *   scope(formLogic),
- * ]);
- *
- * // Mixed: shared and local scopes
- * const [shared, local] = useScope([
- *   scope("shared-key", sharedLogic),
- *   () => ({ value: signal("local") }),
  * ]);
  * ```
  */
@@ -382,38 +295,6 @@ export function useScope<TScope, TArgs extends any[]>(
 ): TScope;
 
 // ============================================================================
-// Shared Mode Overloads (keyed, shared across components)
-// ============================================================================
-
-/**
- * **Shared Mode** - Multiple components share the same scope via a key.
- *
- * @param key - Unique identifier for the scope (same key = same instance)
- * @param factory - Factory function to create the scope
- * @param deps - Optional dependencies passed to factory (scope recreates when deps change)
- * @param options - Optional equality strategy for deps comparison
- *
- * @example
- * ```tsx
- * // Multiple components share this scope
- * const { input } = useScope("searchBar", searchBarLogic);
- *
- * // Dynamic keys for multiple instances
- * const { content } = useScope(`tab:${tabId}`, tabLogic);
- * ```
- */
-export function useScope<TScope, TArgs extends any[]>(
-  key: unknown,
-  factory: (...deps: TArgs) => TScope,
-  ...extra: [] extends TArgs
-    ? [deps?: unknown[]]
-    : [
-        deps: [...args: TArgs, ...customDeps: unknown[]],
-        options?: OptionsOrEquals,
-      ]
-): TScope;
-
-// ============================================================================
 // Implementation
 // ============================================================================
 
@@ -440,36 +321,28 @@ export function useScope(...args: any[]): any {
     isMultiple = true;
     scopes = args[0].map((item: Scope<any> | AnyFunc, index: number) => {
       if (typeof item === "function") {
-        return new Scope(getLocalKey(index), item);
-      } else if (item.key === undefined || item.key === NO_KEY) {
-        // Local scope - use component-stable key
-        return new Scope(
-          getLocalKey(index),
-          item.factory,
-          item.deps,
-          item.options
-        );
-      } else {
-        // Shared scope - use provided key
-        return item;
+        return new Scope(getLocalKey(index), item, []);
       }
+      return new Scope(
+        getLocalKey(index),
+        item.factory,
+        item.deps ?? [],
+        item.options
+      );
     });
   } else if (args.length === 0) {
     // ========================================
     // Proxy Mode: useScope<T>() with no args
     // ========================================
     isProxyMode = true;
-    scopes = [new Scope(getLocalKey(0), createSignalProxy)];
-  } else if (typeof args[1] === "function") {
-    // ========================================
-    // Shared Mode: useScope(key, factory, ...)
-    // ========================================
-    scopes = [new Scope(args[0], args[1], args[2], args[3])];
+    scopes = [new Scope(getLocalKey(0), createSignalProxy, [])];
   } else {
     // ========================================
-    // Local Mode: useScope(factory, ...)
+    // Local Mode: useScope(factory, [deps], options)
     // ========================================
-    scopes = [new Scope(getLocalKey(0), args[0], args[1], args[2])];
+    const deps = Array.isArray(args[1]) ? args[1] : [];
+    const options = Array.isArray(args[1]) ? args[2] : args[1];
+    scopes = [new Scope(getLocalKey(0), args[0], deps, options)];
   }
 
   // Get or create entries from cache (stable objects, won't cause re-renders)
@@ -576,8 +449,8 @@ function createSignalProxy(): {
  */
 export class Scope<TScope> {
   constructor(
-    /** Unique key for the scope (undefined = local mode, value = shared mode) */
-    public readonly key: unknown | undefined,
+    /** Unique key for the scope */
+    public readonly key: unknown,
     /** Factory function that creates the scope */
     public readonly factory: (...args: any[]) => TScope,
     /** Optional dependencies passed to factory */
@@ -588,17 +461,14 @@ export class Scope<TScope> {
 }
 
 // ============================================================================
-// scope() - Create Scope descriptors (mirrors useScope overloads, except proxy mode)
+// scope() - Create Scope descriptors for multiple scopes mode
 // ============================================================================
 
 /**
  * Create a Scope descriptor without executing it.
  *
  * Use with `useScope([...])` for multiple scopes mode. The `scope()` function
- * mirrors `useScope()` overloads (local and shared modes) but doesn't support
- * proxy mode. It creates a descriptor that `useScope` will execute later.
- *
- * **Local Mode** - Creates a Scope descriptor for local (per-component) scope.
+ * creates a descriptor that `useScope` will execute later.
  *
  * @typeParam TScope - The type returned by the factory function
  * @typeParam TArgs - Tuple type of factory arguments
@@ -609,45 +479,13 @@ export class Scope<TScope> {
  *
  * @example
  * ```tsx
- * // Local scope (private per-component)
  * scope(() => ({ count: signal(0) }))
  * scope(counterLogic)
  * scope(counterLogic, [initialValue])
+ * scope(formLogic, [data], "shallow")
  * ```
  */
 export function scope<TScope, TArgs extends any[]>(
-  factory: (...deps: TArgs) => TScope,
-  ...extra: [] extends TArgs
-    ? [deps?: unknown[]]
-    : [
-        deps: [...args: TArgs, ...customDeps: unknown[]],
-        options?: OptionsOrEquals,
-      ]
-): Scope<TScope>;
-
-/**
- * **Shared Mode** - Creates a Scope descriptor for shared (keyed) scope.
- *
- * Multiple components using the same key will share the same scope instance.
- *
- * @typeParam TScope - The type returned by the factory function
- * @typeParam TArgs - Tuple type of factory arguments
- * @param key - Unique identifier for the scope (same key = same instance across components)
- * @param factory - Factory function to create the scope
- * @param deps - Optional dependencies passed to factory (scope recreates when deps change)
- * @param options - Optional equality strategy for deps comparison
- * @returns Scope descriptor for use with `useScope([...])`
- *
- * @example
- * ```tsx
- * // Shared scope (same instance across components with same key)
- * scope("searchBar", searchBarLogic)
- * scope("tab:123", tabLogic, [tabData])
- * scope("filters", filterLogic, [initialFilters], "shallow")
- * ```
- */
-export function scope<TScope, TArgs extends any[]>(
-  key: unknown,
   factory: (...deps: TArgs) => TScope,
   ...extra: [] extends TArgs
     ? [deps?: unknown[]]
@@ -659,36 +497,17 @@ export function scope<TScope, TArgs extends any[]>(
 
 // Implementation
 export function scope(...args: any[]): Scope<any> {
-  let key: unknown | undefined = NO_KEY; // NO_KEY signals local mode
   let factory: AnyFunc;
   let deps: unknown[] = [];
   let options: OptionsOrEquals | undefined;
 
-  if (typeof args[1] === "function") {
-    // ========================================
-    // Shared mode: scope(key, factory, [deps], [options])
-    // ========================================
-    key = args[0];
-    factory = args[1];
-    if (Array.isArray(args[2])) {
-      deps = args[2];
-      options = args[3];
-    } else {
-      options = args[2];
-    }
+  factory = args[0];
+  if (Array.isArray(args[1])) {
+    deps = args[1];
+    options = args[2];
   } else {
-    // ========================================
-    // Local mode: scope(factory, [deps], [options])
-    // ========================================
-    key = undefined; // Will be replaced with stable key in useScope
-    factory = args[0];
-    if (Array.isArray(args[1])) {
-      deps = args[1];
-      options = args[2];
-    } else {
-      options = args[1];
-    }
+    options = args[1];
   }
 
-  return new Scope(key, factory, deps, options);
+  return new Scope(undefined, factory, deps, options);
 }

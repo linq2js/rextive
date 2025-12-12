@@ -42,6 +42,8 @@ export class ScopeEntry {
   /** Whether this entry has been disposed */
   disposed = false;
 
+  mounted = false;
+
   /**
    * @param scope - The scope object created by the factory
    * @param args - Arguments used to create this scope (for comparison)
@@ -82,6 +84,12 @@ export class ScopeEntry {
   commit = () => {
     if (this.disposed) return;
     this.refs++;
+    if (!this.mounted) {
+      this.mounted = true;
+      if (typeof this.scope?.mount === "function") {
+        this.scope.mount();
+      }
+    }
   };
 
   /**

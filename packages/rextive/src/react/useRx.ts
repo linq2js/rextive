@@ -68,38 +68,42 @@ import { useScope } from "./useScope";
 export function useRx<T>(fn: () => T): T {
   // Rerender trigger - use useState for forcing re-renders
   const [, setRerenderState] = useState({});
-  const scope = useScope(fn, () => {
-    const reactiveSignals = new Set<AnySignal<any>>();
-    const onCleanup = emitter();
+  // Pass fn as dep so scope is recreated if fn reference changes
+  const scope = useScope(
+    (reactiveFn: () => T) => {
+      const reactiveSignals = new Set<AnySignal<any>>();
+      const onCleanup = emitter();
 
-    return {
-      reactiveSignals,
-      dispose() {
-        reactiveSignals.clear();
-        emit.forgetDisposedSignals(onCleanup.emitAndClear);
-      },
-      compute() {
-        reactiveSignals.clear();
-        // dispose all signals created in fn
-        onCleanup.emitAndClear();
-        return withHooks(
-          (prev) => ({
-            onSignalCreate(signal, deps, disposalHandled) {
-              if (!disposalHandled) {
-                disposalHandled = true;
-                onCleanup.on(signal.dispose);
-              }
-              prev?.onSignalCreate?.(signal, deps, disposalHandled);
-            },
-            onSignalAccess(signal) {
-              reactiveSignals.add(signal);
-            },
-          }),
-          fn
-        );
-      },
-    };
-  });
+      return {
+        reactiveSignals,
+        dispose() {
+          reactiveSignals.clear();
+          emit.forgetDisposedSignals(onCleanup.emitAndClear);
+        },
+        compute() {
+          reactiveSignals.clear();
+          // dispose all signals created in fn
+          onCleanup.emitAndClear();
+          return withHooks(
+            (prev) => ({
+              onSignalCreate(signal, deps, disposalHandled) {
+                if (!disposalHandled) {
+                  disposalHandled = true;
+                  onCleanup.on(signal.dispose);
+                }
+                prev?.onSignalCreate?.(signal, deps, disposalHandled);
+              },
+              onSignalAccess(signal) {
+                reactiveSignals.add(signal);
+              },
+            }),
+            reactiveFn
+          );
+        },
+      };
+    },
+    [fn]
+  );
 
   useEffect(() => {
     if (scope.reactiveSignals.size === 0) return;

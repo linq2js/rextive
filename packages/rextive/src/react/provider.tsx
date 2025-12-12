@@ -3,7 +3,6 @@ import {
   PropsWithChildren,
   useContext,
   useEffect,
-  useId,
   useRef,
 } from "react";
 import { EqualsFn, Mutable, Signal } from "../types";
@@ -55,7 +54,7 @@ export type ProviderResult<TContext, TValue> = [
   useContext: () => TContext extends Signal<any>
     ? TContext
     : Omit<TContext, "dispose">,
-  Provider: (props: PropsWithChildren<{ value: TValue }>) => JSX.Element
+  Provider: (props: PropsWithChildren<{ value: TValue }>) => JSX.Element,
 ];
 
 // ============================================================================
@@ -144,11 +143,10 @@ export function provider<TContext, TValue = TContext>(
 
     // Provider component
     (props: PropsWithChildren<{ value: TValue }>) => {
-      const id = useId();
       const hasCreate = "create" in options;
 
       // Create scope for factory/signal modes (raw mode skips this)
-      const scope = useScope(`${options.name}:${id}`, (): any => {
+      const scope = useScope((): any => {
         if (raw) return undefined;
         if (hasCreate) return options.create(props.value);
         return signal(props.value);

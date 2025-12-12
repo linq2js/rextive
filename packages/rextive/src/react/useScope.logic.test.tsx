@@ -35,7 +35,7 @@ describe.each(testModes)(
 
         const TestComponent = () => {
           // Pass logic directly - useScope detects and calls .create()
-          const scope = useScope("counter", counterLogic);
+          const scope = useScope(counterLogic);
           return <div data-testid="value">{scope.count()}</div>;
         };
 
@@ -59,7 +59,7 @@ describe.each(testModes)(
         });
 
         const TestComponent = () => {
-          const scope = useScope("counter", counterLogic);
+          const scope = useScope(counterLogic);
           return <div>{scope.count()}</div>;
         };
 
@@ -92,7 +92,7 @@ describe.each(testModes)(
 
         const TestComponent = ({ id }: { id: number }) => {
           // Different keys = different instances
-          const scope = useScope(`counter:${id}`, counterLogic);
+          const scope = useScope(counterLogic);
           return <div data-testid="value">{scope.count()}</div>;
         };
 
@@ -123,7 +123,7 @@ describe.each(testModes)(
         let scopeRef: ReturnType<typeof todoLogic.create> | null = null as any;
 
         const TestComponent = () => {
-          const scope = useScope("todo", todoLogic);
+          const scope = useScope(todoLogic);
           scopeRef = scope;
           return (
             <div>
@@ -164,7 +164,7 @@ describe.each(testModes)(
         const TestComponent = () => {
           try {
             // Abstract logic without implementation should throw
-            useScope("api", apiAbstract as any);
+            useScope(apiAbstract as any);
             return <div>Should not render</div>;
           } catch (error) {
             return (
@@ -381,7 +381,7 @@ describe("useScope error handling with logic", () => {
 
     const TestComponent = () => {
       try {
-        useScope("failing", failingLogic);
+        useScope(failingLogic);
         return <div>Should not render</div>;
       } catch (error) {
         return (
@@ -414,7 +414,7 @@ describe("useScope error handling with logic", () => {
     });
 
     const TestComponent = () => {
-      const scope = useScope("async", asyncLogic);
+      const scope = useScope(asyncLogic);
       return <div data-testid="value">Has data signal</div>;
     };
 

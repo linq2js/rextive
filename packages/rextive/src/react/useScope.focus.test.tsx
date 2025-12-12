@@ -48,7 +48,7 @@ describe("useScope with focus operator", () => {
       const disposeCalls: string[] = [];
 
       function ContactsEditor() {
-        const scope = useScope("contacts", () => {
+        const scope = useScope(() => {
           initCalls.push("contacts");
           const contacts = formData.pipe(focus("contacts"));
           return disposable({
@@ -100,7 +100,7 @@ describe("useScope with focus operator", () => {
       let contactsSignal: any = null;
 
       function ContactsEditor() {
-        const scope = useScope("contacts", () => {
+        const scope = useScope(() => {
           const contacts = formData.pipe(focus("contacts"));
           contactsSignal = contacts;
           return disposable({
@@ -137,19 +137,23 @@ describe("useScope with focus operator", () => {
       expect(contactsSignal.disposed()).toBe(true);
     });
 
-    it("should recreate signals when key changes", async () => {
+    it("should recreate signals when deps change", async () => {
       const initCalls: number[] = [];
       const disposeCalls: number[] = [];
 
       function ContactItem({ index }: { index: number }) {
-        const scope = useScope(`contact:${index}`, () => {
-          initCalls.push(index);
-          const firstName = formData.pipe(focus(`contacts.${index}.firstName`));
-          return disposable({
-            firstName,
-            dispose: () => disposeCalls.push(index),
-          });
-        });
+        // Pass index as dep so scope is recreated when index changes
+        const scope = useScope(
+          (idx: number) => {
+            initCalls.push(idx);
+            const firstName = formData.pipe(focus(`contacts.${idx}.firstName`));
+            return disposable({
+              firstName,
+              dispose: () => disposeCalls.push(idx),
+            });
+          },
+          [index]
+        );
 
         return (
           <div data-testid={`contact-${index}`}>
@@ -200,7 +204,7 @@ describe("useScope with focus operator", () => {
       console.log("initCalls:", initCalls);
       console.log("disposeCalls:", disposeCalls);
 
-      // After key change, old scope should be disposed and new one created
+      // After deps change (index 0 → 1), old scope should be disposed and new one created
       expect(initCalls).toContain(0);
       expect(initCalls).toContain(1);
     });
@@ -217,7 +221,7 @@ describe("useScope with focus operator", () => {
         id: string;
         onRemove: () => void;
       }) {
-        const scope = useScope(`contact:${id}`, () => {
+        const scope = useScope(() => {
           const firstName = formData.pipe(focus(`contacts.${index}.firstName`));
           return disposable({
             firstName,

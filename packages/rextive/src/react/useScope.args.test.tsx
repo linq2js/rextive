@@ -18,7 +18,7 @@ describe("useScope with args", () => {
       });
 
       function TestComponent() {
-        const scope = useScope("test", factory, [42, "test"]);
+        const scope = useScope(factory, [42, "test"]);
         return <div>{scope.count()}</div>;
       }
 
@@ -35,7 +35,7 @@ describe("useScope with args", () => {
       });
 
       function TestComponent({ userId }: { userId: number }) {
-        const scope = useScope("user", factory, [userId]);
+        const scope = useScope(factory, [userId]);
         return <div>{scope.data()}</div>;
       }
 
@@ -65,7 +65,7 @@ describe("useScope with args", () => {
         userId: number;
         count: number;
       }) {
-        const scope = useScope("user", factory, [userId]);
+        const scope = useScope(factory, [userId]);
         return (
           <div>
             {scope.data()} - {count}
@@ -93,7 +93,7 @@ describe("useScope with args", () => {
       );
 
       function TestComponent() {
-        const scope = useScope("multi", factory, [42, "test", true, { x: 10 }]);
+        const scope = useScope(factory, [42, "test", true, { x: 10 }]);
         return <div>{scope.count()}</div>;
       }
 
@@ -108,7 +108,6 @@ describe("useScope with args", () => {
       function TestComponent() {
         // This should work
         const scope1 = useScope(
-          "correct",
           (a: number, b: string) => {
             const count = signal(a);
             return { count, label: b };
@@ -117,7 +116,6 @@ describe("useScope with args", () => {
         );
 
         const scope2 = useScope(
-          "wrong",
           // @ts-expect-error - Wrong types
           (a: number, b: string) => {
             const count = signal(a);
@@ -141,7 +139,7 @@ describe("useScope with args", () => {
       });
 
       function TestComponent() {
-        const scope = useScope("single", factory, [42]);
+        const scope = useScope(factory, [42]);
         return <div>{scope.data()}</div>;
       }
 
@@ -170,7 +168,7 @@ describe("useScope with args", () => {
       };
 
       function TestComponent() {
-        const scope = useScope("config", factory, [config]);
+        const scope = useScope(factory, [config]);
         return <div>{scope.data().id}</div>;
       }
 
@@ -186,7 +184,7 @@ describe("useScope with args", () => {
       });
 
       function TestComponent({ config }: { config: { id: number } }) {
-        const scope = useScope("objRef", factory, [config]);
+        const scope = useScope(factory, [config]);
         return <div>{scope.data()}</div>;
       }
 
@@ -205,7 +203,7 @@ describe("useScope with args", () => {
       });
 
       function TestComponent({ config }: { config: { id: number } }) {
-        const scope = useScope("customEquals", factory, [config], {
+        const scope = useScope(factory, [config], {
           equals: (a, b) =>
             (a as { id: number }).id === (b as { id: number }).id,
         });
@@ -241,8 +239,7 @@ describe("useScope with args", () => {
         filter: string;
       }) {
         const scope = useScope(
-          "userData",
-          (userId, filter) => {
+          (userId: number, filter: string) => {
             const userData = signal(fetchUser(userId, filter));
             return { userData };
           },
